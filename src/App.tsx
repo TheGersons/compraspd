@@ -18,6 +18,12 @@ import Blank from "./pages/Blank";
 import AppLayout from "./layout/AppLayout";
 import { ScrollToTop } from "./components/common/ScrollToTop";
 import Home from "./pages/Dashboard/Home";
+import Quotes from "./pages/Quotes/Quotes";
+import QuotesNew from "./pages/Quotes/New";
+import QuotesFollowUps from "./pages/Quotes/FollowUps";
+import QuotesHistory from "./pages/Quotes/History";
+import QuotesAssignment from "./pages/Quotes/Assignment";
+
 
 export default function App() {
   return (
@@ -28,6 +34,20 @@ export default function App() {
           {/* Dashboard Layout */}
           <Route element={<AppLayout />}>
             <Route index path="/" element={<Home />} />
+
+
+            {/*Rutas reales a usar*/}
+
+            {/*  Quotes  */}
+            <Route path="/quotes" element={<Quotes />} />
+            <Route path="/quotes/new" element={<QuotesNew />} />
+            <Route path="/quotes/follow-ups" element={<QuotesFollowUps />} />
+            <Route path="/quotes/history" element={<QuotesHistory />} />
+            <Route path="/quotes/assignment" element={<QuotesAssignment />} />
+
+
+
+            {/*Rutas genericas para ejemplos*/}
 
             {/* Others Page */}
             <Route path="/profile" element={<UserProfiles />} />
