@@ -28,18 +28,41 @@ export default function DatePicker({
   useEffect(() => {
     const flatPickr = flatpickr(`#${id}`, {
       mode: mode || "single",
-      static: true,
+      static: false,
       monthSelectorType: "static",
       dateFormat: "Y-m-d",
       altInput: true,
-      altFormat: "d/m/Y",
+      altFormat: "d/m/y",
       defaultDate,
+      closeOnSelect: false,   // no se cierra al primer click
+      clickOpens: true,
+      allowInput: false,
+      disableMobile: true,
       minDate,
       onChange: [
-        function (selectedDates, _dateStr, instance) {
-          if (mode === "range" && selectedDates.length === 1) instance.open();
+        (selectedDates, _str, instance) => {
+          if (mode === "range") {
+            if (selectedDates.length < 2) return; // sigue abierto
+            instance.close();                     // cierra al elegir la 2ª fecha
+          }
+          if (instance.config.mode === "range") {
+            if (selectedDates.length < 2) {
+              // workaround: en algunas versiones se cierra igual; reabrir
+              setTimeout(() => instance.open(), 0);
+              return;
+            }
+            instance.close(); // cerrar cuando ya hay 2 fechas
+          }
         },
         ...(Array.isArray(onChange) ? onChange : onChange ? [onChange] : []),
+      ],
+      onClose: [
+        (selectedDates, _str, instance) => {
+          // si se cerró con solo 1 fecha, reabrir
+          if (instance.config.mode === "range" && selectedDates.length < 2) {
+            instance.open();
+          }
+        },
       ],
     });
 
@@ -48,7 +71,7 @@ export default function DatePicker({
         flatPickr.destroy();
       }
     };
-  }, [mode, onChange, id, defaultDate]);
+  }, [mode, onChange, id, defaultDate, minDate]);
 
   return (
     <div>
