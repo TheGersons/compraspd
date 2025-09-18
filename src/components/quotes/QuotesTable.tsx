@@ -1,6 +1,7 @@
 // pages/Quotes/components/QuotesTable.tsx
 import StatusBadge, { QuoteStatus } from "./StatusBadge";
 
+
 export type Quote = {
   id: string; customer: string; createdAt: string; dueAt: string;
   assignedTo?: string; amount: number; currency: "HNL" | "USD"; status: QuoteStatus;

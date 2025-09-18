@@ -776,3 +776,39 @@ span.flatpickr-weekday,
 .simplebar-scrollbar.simplebar-visible:before {
   @apply opacity-100;
 }
+/* Nice Scrollbar — sin Tailwind, compatible con dark mode */
+.nice-scrollbar {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: rgba(70, 95, 255, 0.6) transparent; /* Firefox */
+}
+
+.nice-scrollbar::-webkit-scrollbar {
+  height: 8px;   /* horizontal */
+  width: 8px;    /* vertical */
+}
+
+.nice-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.nice-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(70, 95, 255, 0.6);
+  border-radius: 8px;
+}
+
+.nice-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(70, 95, 255, 0.8);
+}
+
+/* Oscuro con selector .dark en <html> o <body> */
+.dark .nice-scrollbar {
+  scrollbar-color: #475467 transparent; /* Firefox */
+}
+
+.dark .nice-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #475467;
+}
+
+.dark .nice-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: #344054;
+}

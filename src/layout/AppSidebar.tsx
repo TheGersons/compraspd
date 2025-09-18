@@ -26,24 +26,24 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   {
-    icon: <GridIcon />,
-    name: "Dashboard",
-    subItems: [
-      { name: "Cotizaciones", path: "/", pro: false },
-      { name: "Compras", path: "/compras", pro: true },
-      { name: "import/export", path: "/import-export", pro: true, new: true },
-    ],
-  },
-  {
     //icono generico para cotizaciones
     icon: <PieChartIcon />,
     name: "Cotizaciones",
     subItems: [
-      { name: "Resumen", path: "/quotes", pro: false },
+      { name: "Resumen", path: "/", pro: false },
       { name: "Nueva Cotización", path: "/quotes/new", pro: false },
       { name: "Seguimiento", path: "/quotes/follow-ups", pro: false },
       { name: "Historial", path: "/quotes/history", pro: false },
       { name: "Asignación", path: "/quotes/assignment", pro: false },
+    ],
+  },
+  {
+    icon: <GridIcon />,
+    name: "Dashboard",
+    subItems: [
+      { name: "Cotizaciones", path: "/home", pro: false },
+      { name: "Compras", path: "/compras", pro: true },
+      { name: "import/export", path: "/import-export", pro: true, new: true },
     ],
   },
   {

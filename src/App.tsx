@@ -23,6 +23,7 @@ import QuotesNew from "./pages/Quotes/New";
 import QuotesFollowUps from "./pages/Quotes/FollowUps";
 import QuotesHistory from "./pages/Quotes/History";
 import QuotesAssignment from "./pages/Quotes/Assignment";
+import QuotesLayout from "./pages/Quotes/Layout/QuotesLayouts";
 
 
 export default function App() {
@@ -33,18 +34,23 @@ export default function App() {
         <Routes>
           {/* Dashboard Layout */}
           <Route element={<AppLayout />}>
-            <Route index path="/" element={<Home />} />
+            <Route index path="/" element={<Quotes />} />
 
 
             {/*Rutas reales a usar*/}
 
             {/*  Quotes  */}
-            <Route path="/quotes" element={<Quotes />} />
-            <Route path="/quotes/new" element={<QuotesNew />} />
-            <Route path="/quotes/follow-ups" element={<QuotesFollowUps />} />
-            <Route path="/quotes/history" element={<QuotesHistory />} />
-            <Route path="/quotes/assignment" element={<QuotesAssignment />} />
+            <Route path="/quotes" element={<QuotesLayout />}>
+              <Route index element={<Quotes />} />
+              <Route path="new" element={<QuotesNew />} />
+              <Route path="follow-ups" element={<QuotesFollowUps />} />
+              <Route path="history" element={<QuotesHistory />} />
+              <Route path="assignment" element={<QuotesAssignment />} />
+            </Route>
 
+            {/* rutas de dashboards */}
+
+            <Route path="/home" element={<Home />} />
 
 
             {/*Rutas genericas para ejemplos*/}

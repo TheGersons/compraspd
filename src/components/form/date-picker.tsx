@@ -31,9 +31,16 @@ export default function DatePicker({
       static: true,
       monthSelectorType: "static",
       dateFormat: "Y-m-d",
+      altInput: true,
+      altFormat: "d/m/Y",
       defaultDate,
       minDate,
-      onChange,
+      onChange: [
+        function (selectedDates, _dateStr, instance) {
+          if (mode === "range" && selectedDates.length === 1) instance.open();
+        },
+        ...(Array.isArray(onChange) ? onChange : onChange ? [onChange] : []),
+      ],
     });
 
     return () => {

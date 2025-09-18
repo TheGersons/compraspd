@@ -1,7 +1,7 @@
 // pages/Quotes/charts/LineTrend.tsx
 import Chart from "react-apexcharts";
 import type { ApexOptions } from "apexcharts";
-import useDarkMode from "../hooks/useDarkMode";
+import useDarkMode from "../../../pages/Quotes/hooks/useDarkMode";
 
 export default function LineTrend({
   series,
@@ -13,7 +13,7 @@ export default function LineTrend({
   series: { name: string; data: number[] }[]; categories: string[]; height?: number; title?: string;
 }) {
   const isDark = useDarkMode();
-  const surface = isDark ? "#101828" : "#FFFFFF";
+  const surface = isDark ? "#171F2F" : "#FFFFFF";
   const label   = isDark ? "#C7D2FE" : "#6B7280";
   const grid    = isDark ? "rgba(255,255,255,0.08)" : "#E5E7EB";
 
