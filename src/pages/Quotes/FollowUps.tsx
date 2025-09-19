@@ -260,7 +260,7 @@ export default function QuotesFollowUps() {
                       <div className="text-sm font-semibold text-black-800 dark:text-white/90 mt-1">{progress}%</div>
                     </div>
                     <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">ETA (estimado)</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Fecha de finalización (estimada)</div>
                       <input
                         type="date"
                         value={eta}
