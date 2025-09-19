@@ -159,8 +159,11 @@ export default function QuotesNew() {
                 description="Esta es la página para crear una nueva cotización en Compras Energia PD"
             />
             <div className="rounded-xl border border-gray-200 p-6 bg-white dark:border-white/10 dark:bg-[#101828]">
-                <h2 className="mb-4 text-lg font-semibold text-gray-800 dark:text-white/90">Nueva cotización</h2>
+                <h2 className="text-title-sm sm:text-title-md font-semibold text-gray-800 dark:text-white/90">Nueva cotización</h2>
 
+                {// Espacio en blanco
+}
+                <div className="h-6" />
                 <form onSubmit={onSubmit} className="space-y-8">
                     {/* Tipo de compra / solicitud */}
                     <section className="grid gap-4 sm:grid-cols-2">

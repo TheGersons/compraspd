@@ -170,7 +170,7 @@ export default function QuotesFollowUps() {
       />
 
       <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Seguimiento de solicitudes</h2>
+        <h2 className="text-title-sm sm:text-title-md font-semibold text-gray-800 dark:text-white/90">Seguimiento de solicitudes</h2>
 
         <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Columna izquierda: listado asignadas si no venimos con selección */}
@@ -340,12 +340,12 @@ export default function QuotesFollowUps() {
                   {/* Adjuntos en borrador */}
                   {files.length > 0 && (
                     <div className="mt-2 rounded-lg ring-1 ring-gray-200 dark:ring-gray-800 p-2">
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Adjuntos:</div>
-                      <ul className="flex flex-wrap gap-2">
+                      <div className="text-xs text-gray-500 dark:text-white mb-1">Adjuntos:</div>
+                      <ul className="flex flex-wrap gap-2 dark:text-white">
                         {files.map(f => (
-                          <li key={f.name} className="text-xs rounded-md px-2 py-1 ring-1 ring-gray-200 dark:ring-gray-800">
+                          <li key={f.name} className="text-xs rounded-md px-2 py-1 ring-1 ring-gray-200 dark:ring-white-800">
                             {f.name}
-                            <button className="ml-2 underline" onClick={() => removeDraftFile(f.name)}>quitar</button>
+                            <button className="ml-2 underline text-xs rounded-md px-2 py-1 ring-1 ring-gray-200 dark:ring-white-800" onClick={() => removeDraftFile(f.name)}>quitar</button>
                           </li>
                         ))}
                       </ul>

@@ -30,7 +30,7 @@ const navItems: NavItem[] = [
     icon: <PieChartIcon />,
     name: "Cotizaciones",
     subItems: [
-      { name: "Resumen", path: "/", pro: false },
+      { name: "Resumen", path: "/quotes", pro: false },
       { name: "Nueva Cotización", path: "/quotes/new", pro: false },
       { name: "Seguimiento", path: "/quotes/follow-ups", pro: false },
       { name: "Historial", path: "/quotes/history", pro: false },
