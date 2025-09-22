@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
+import { ShoppingCart, User } from "lucide-react";
 
 // Assume these icons are imported from an icon library
 import {
@@ -13,7 +14,6 @@ import {
   PieChartIcon,
   PlugInIcon,
   TableIcon,
-  UserCircleIcon,
 } from "../icons";
 import { useSidebar } from "../context/SidebarContext";
 
@@ -38,6 +38,18 @@ const navItems: NavItem[] = [
     ],
   },
   {
+    //sales / compras
+    icon: <ShoppingCart />,
+    name: "Compras",
+    subItems: [
+      { name: "Resumen", path: "/shopping", pro: false },
+      { name: "Nueva Compra", path: "/shopping/new", pro: false },
+      { name: "Seguimiento", path: "/shopping/follow-ups", pro: false },
+      { name: "Historial", path: "/shopping/history", pro: false },
+      { name: "Asignación", path: "/shopping/assignment", pro: false },
+    ],
+  },
+  {
     icon: <GridIcon />,
     name: "Dashboard",
     subItems: [
@@ -52,7 +64,7 @@ const navItems: NavItem[] = [
     path: "/calendar",
   },
   {
-    icon: <UserCircleIcon />,
+    icon: <User />,
     name: "User Profile",
     path: "/profile",
   },

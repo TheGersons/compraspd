@@ -364,10 +364,10 @@ export default function QuotesNew() {
                                                 />
                                             </td>
                                             <td className="px-3 py-2 align-top">
-                                                <button type="button" onClick={() => removeLine(i)}
-                                                    className="rounded-md px-2 py-1 text-xs text-rose-500 hover:bg-rose-500/10">
+                                                <Button size="xs" variant="danger" onClick={() => removeLine(i)}>
+                                                    
                                                     Quitar
-                                                </button>
+                                                </Button>
                                             </td>
                                         </tr>
                                     ))}
@@ -385,7 +385,7 @@ export default function QuotesNew() {
 
                     {/* Acciones */}
                     <div className="flex justify-end gap-3">
-                        <Button variant="outline" onClick={() => history.back()}>Cancelar</Button>
+                        <Button variant="danger" onClick={() => history.back()}>Cancelar</Button>
                         <Button>Guardar solicitud</Button>
                     </div>
                 </form>

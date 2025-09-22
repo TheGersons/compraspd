@@ -79,10 +79,10 @@ export default function Filters({
                     {!local.preset && "Resumen"}
                 </p>
                 <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant={local.preset === "7d" ? "primary" : "outline"} onClick={() => applyPreset("7d")}>7 días</Button>
-                    <Button size="sm" variant={local.preset === "30d" ? "primary" : "outline"} onClick={() => applyPreset("30d")}>30 días</Button>
-                    <Button size="sm" variant={local.preset === "90d" ? "primary" : "outline"} onClick={() => applyPreset("90d")}>90 días</Button>
-                    <Button size="sm" variant={local.preset === "custom" ? "primary" : "outline"} onClick={() => applyPreset("custom")}>Personalizado</Button>
+                    <Button size="sm" variant={local.preset === "7d" ? "primary" : "secondary"} onClick={() => applyPreset("7d")}>7 días</Button>
+                    <Button size="sm" variant={local.preset === "30d" ? "primary" : "secondary"} onClick={() => applyPreset("30d")}>30 días</Button>
+                    <Button size="sm" variant={local.preset === "90d" ? "primary" : "secondary"} onClick={() => applyPreset("90d")}>90 días</Button>
+                    <Button size="sm" variant={local.preset === "custom" ? "primary" : "secondary"} onClick={() => applyPreset("custom")}>Personalizado</Button>
                 </div>
             </div>
 
@@ -211,7 +211,7 @@ export default function Filters({
                     ))}
                 </div>
                 <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={clear}>Limpiar</Button>
+                    <Button size="sm" variant="secondary" onClick={clear}>Limpiar</Button>
                     <Button size="sm" onClick={apply}>Aplicar</Button>
                 </div>
             </div>

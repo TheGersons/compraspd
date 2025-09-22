@@ -281,16 +281,18 @@ export default function QuotesFollowUps() {
 
                   {/* Acciones de estado */}
                   <div className="flex flex-wrap gap-2">
-                    <Button variant={status === "en_progreso" ? "primary" : "outline"} onClick={() => actionSetStatus("en_progreso")}>
+                    <Button variant="primary" onClick={() => actionSetStatus("en_progreso")}>
                       En progreso
                     </Button>
-                    <Button variant={status === "pausado" ? "primary" : "outline"} onClick={() => actionSetStatus("pausado")}>
-                      Pausar
+                    <Button variant="warning" onClick={() => actionSetStatus(
+                      status !== "pausado" ? "pausado" : "en_progreso"
+                    )}>
+                      {status !== "pausado" ? "Pausar" : "Reanudar"}
                     </Button>
-                    <Button variant={status === "cancelado" ? "primary" : "outline"} onClick={() => actionSetStatus("cancelado")}>
+                    <Button variant="danger" onClick={() => actionSetStatus("cancelado")}>
                       Cancelar
                     </Button>
-                    <Button variant={status === "finalizado" ? "primary" : "outline"} onClick={() => actionSetStatus("finalizado")}>
+                    <Button variant="success" onClick={() => actionSetStatus("finalizado")}>
                       Finalizar
                     </Button>
                   </div>
@@ -368,7 +370,7 @@ export default function QuotesFollowUps() {
                       className="hidden"
                       accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip"
                     />
-                    <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+                    <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>
                       Adjuntar
                     </Button>
                     <Button variant="primary" onClick={() => sendMsg("encargado")}>

@@ -342,7 +342,7 @@ export default function QuotesAssignment() {
                   )}
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant="secondary"
                     onClick={() =>
                       navigate("/quotes/follow-ups", {
                         state: { fromAssignment: true, selected },
