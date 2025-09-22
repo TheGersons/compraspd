@@ -3,104 +3,14 @@ import { useMemo, useState } from "react";
 import PageMeta from "../../components/common/PageMeta";
 import ComponentCard from "../../components/common/ComponentCard";
 import Button from "../../components/ui/button/Button";
+import { MOCK } from "../../data/mock_history";
+import { exportHistoryToExcel, exportHistoryToPDF } from "../../utils/export";
+import { QuoteHistory } from "../../types/quotes";
 
 type Scope = "nacional" | "internacional";
 type RequestType = "licitaciones" | "proyectos" | "suministros" | "inventarios";
 type HistoryStatus = "ganada" | "perdida" | "cancelada" | "cerrada" | "enviada";
 
-type QuoteHistory = {
-  id: string;
-  reference: string;
-  finalClient: string;
-  requester: string;
-  assignedTo?: string;
-  requestType: RequestType;
-  scope: Scope;
-  createdAt: string;  // ISO
-  closedAt?: string;  // ISO
-  amount?: number;
-  currency?: string;
-  status: HistoryStatus;
-  notes?: string;
-};
-
-// --- Mock inicial (conecta a tu API luego) ---
-const MOCK: QuoteHistory[] = [
-  {
-    id: "Q-2025-0101",
-    reference: "UPS-1KVA",
-    finalClient: "Acme SA",
-    requester: "Gabriela",
-    assignedTo: "Carlos",
-    requestType: "proyectos",
-    scope: "nacional",
-    createdAt: "2025-08-28",
-    closedAt: "2025-09-02",
-    amount: 12500,
-    currency: "USD",
-    status: "ganada",
-    notes: "Incluye mantenimiento 12m",
-  },
-  {
-    id: "Q-2025-0097",
-    reference: "GEN-30KVA",
-    finalClient: "Globex",
-    requester: "Mario",
-    assignedTo: "Ana",
-    requestType: "suministros",
-    scope: "internacional",
-    createdAt: "2025-08-25",
-    closedAt: "2025-08-30",
-    amount: 28900,
-    currency: "USD",
-    status: "perdida",
-    notes: "Precio fuera de presupuesto",
-  },
-  {
-    id: "Q-2025-0094",
-    reference: "CABLE-CAT6",
-    finalClient: "Walmart",
-    requester: "Sofía",
-    assignedTo: "Luis",
-    requestType: "inventarios",
-    scope: "nacional",
-    createdAt: "2025-08-20",
-    closedAt: "2025-08-29",
-    amount: 5600,
-    currency: "USD",
-    status: "cerrada",
-    notes: "Cierre administrativo",
-  },
-  {
-    id: "Q-2025-0088",
-    reference: "SW-24P-POE",
-    finalClient: "Umbrella",
-    requester: "Pedro",
-    assignedTo: "Ana",
-    requestType: "proyectos",
-    scope: "nacional",
-    createdAt: "2025-07-12",
-    closedAt: "2025-07-28",
-    amount: 9800,
-    currency: "USD",
-    status: "cancelada",
-    notes: "Cancelada por el cliente",
-  },
-  {
-    id: "Q-2025-0110",
-    reference: "SERV-MANTTO",
-    finalClient: "Initech",
-    requester: "Carolina",
-    assignedTo: "Carlos",
-    requestType: "proyectos",
-    scope: "internacional",
-    createdAt: "2025-09-05",
-    amount: 4100,
-    currency: "USD",
-    status: "enviada",
-    notes: "Esperando respuesta",
-  },
-];
 
 // --- Filtros ---
 type SortKey = "createdAt" | "closedAt" | "amount";
@@ -202,7 +112,6 @@ export default function QuotesHistory() {
       return (
         r.id.toLowerCase().includes(q) ||
         r.reference.toLowerCase().includes(q) ||
-        r.finalClient.toLowerCase().includes(q) ||
         r.requester.toLowerCase().includes(q) ||
         (r.assignedTo ?? "").toLowerCase().includes(q)
       );
@@ -229,24 +138,16 @@ export default function QuotesHistory() {
 
   const resetFilters = () => setFilters(initialFilters);
 
-  const exportCSV = () => {
-    const header = [
-      "ID", "Referencia", "Cliente", "Solicitante", "Asignado a",
-      "Tipo", "Alcance", "Creada", "Cerrada", "Monto", "Moneda", "Estado", "Notas",
-    ];
-    const lines = filtered.map(r => [
-      r.id, r.reference, r.finalClient, r.requester, r.assignedTo ?? "",
-      r.requestType, r.scope, r.createdAt, r.closedAt ?? "", r.amount ?? "", r.currency ?? "USD", r.status, r.notes ?? "",
-    ]);
-    const csv = [header, ...lines].map(a => a.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `historial_cotizaciones_${Date.now()}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailRow, setDetailRow] = useState<QuoteHistory | null>(null);
+  const openDetail = (r: QuoteHistory) => { setDetailRow(r); setDetailOpen(true); };
+  const closeDetail = () => { setDetailOpen(false); setDetailRow(null); };
+
+  const money = (v?: number, c = "USD") => v == null ? "—" : `${c} ${v.toLocaleString()}`;
+  const itemsTotal = (r: QuoteHistory) =>
+    (r.items ?? []).reduce((acc, it) => acc + it.quantity * it.unitPrice, 0);
+
 
   return (
     <>
@@ -403,8 +304,13 @@ export default function QuotesHistory() {
 
           {/* acciones */}
           <div className="flex gap-2">
-            <Button variant="outline" onClick={resetFilters}>Limpiar</Button>
-            <Button variant="primary" onClick={exportCSV}>Exportar CSV</Button>
+            <Button variant="secondary" onClick={resetFilters}>Limpiar</Button>
+            <Button variant="primary" onClick={() => exportHistoryToExcel(filtered as QuoteHistory[])}>
+              Exportar Excel
+            </Button>
+            <Button variant="primary" onClick={() => exportHistoryToPDF(filtered as QuoteHistory[])}>
+              Exportar PDF
+            </Button>
           </div>
         </div>
       </ComponentCard>
@@ -413,11 +319,10 @@ export default function QuotesHistory() {
       <ComponentCard title={`Resultados (${filtered.length})`}>
         <div className="overflow-auto rounded-lg ring-1 ring-gray-200 dark:ring-gray-800">
           <table className="min-w-full text-sm dark:text-gray-200">
-            <thead className="bg-gray-50 dark:bg-white/5 text-gray-700 dark:text-gray-200">
+            <thead>
               <tr>
                 <th className="px-3 py-2 text-left">ID</th>
                 <th className="px-3 py-2 text-left">Referencia</th>
-                <th className="px-3 py-2 text-left">Cliente</th>
                 <th className="px-3 py-2 text-left">Solicitante</th>
                 <th className="px-3 py-2 text-left">Asignado</th>
                 <th className="px-3 py-2 text-left">Tipo</th>
@@ -427,8 +332,10 @@ export default function QuotesHistory() {
                 <th className="px-3 py-2 text-right">Monto</th>
                 <th className="px-3 py-2 text-left">Estado</th>
                 <th className="px-3 py-2 text-left">Notas</th>
+                <th className="px-3 py-2 text-right">Acciones</th>
               </tr>
             </thead>
+
             <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
               {pageRows.length === 0 ? (
                 <tr>
@@ -441,7 +348,7 @@ export default function QuotesHistory() {
                   <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-white/5">
                     <td className="px-3 py-2">{r.id}</td>
                     <td className="px-3 py-2">{r.reference}</td>
-                    <td className="px-3 py-2">{r.finalClient}</td>
+                    {/* eliminado Cliente */}
                     <td className="px-3 py-2">{r.requester}</td>
                     <td className="px-3 py-2">{r.assignedTo ?? "—"}</td>
                     <td className="px-3 py-2 capitalize">{r.requestType}</td>
@@ -450,26 +357,133 @@ export default function QuotesHistory() {
                     <td className="px-3 py-2">{fmt(r.closedAt)}</td>
                     <td className="px-3 py-2 text-right">{currency(r.amount, r.currency)}</td>
                     <td className="px-3 py-2">
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-xs
-                        ${r.status === "ganada" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300"
+                      <span className={`px-2 py-0.5 rounded-full text-xs
+            ${r.status === "ganada" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300"
                           : r.status === "perdida" ? "bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-300"
-                          : r.status === "cancelada" ? "bg-gray-100 text-gray-700 dark:bg-gray-700/40 dark:text-gray-300"
-                          : r.status === "cerrada" ? "bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-300"
-                          : "bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300"}`}
-                      >
+                            : r.status === "cancelada" ? "bg-gray-100 text-gray-700 dark:bg-gray-700/40 dark:text-gray-300"
+                              : r.status === "cerrada" ? "bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-300"
+                                : "bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300"}`}>
                         {r.status}
                       </span>
                     </td>
-                    <td className="px-3 py-2 max-w-[280px] truncate" title={r.notes ?? ""}>
+                    <td className="px-3 py-2 max-w-[220px] truncate" title={r.notes ?? ""}>
                       {r.notes ?? "—"}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <Button size="sm" variant="secondary" onClick={() => openDetail(r)}>
+                        Ver detalle
+                      </Button>
                     </td>
                   </tr>
                 ))
               )}
             </tbody>
+
+
           </table>
         </div>
+        {detailOpen && detailRow && (
+          <div className="fixed inset-0 z-50">
+            {/* overlay */}
+            <div className="absolute inset-0 bg-black/40" onClick={closeDetail} />
+            {/* panel */}
+            <div className="absolute inset-y-0 right-0 w-full max-w-xl bg-white dark:bg-gray-900 shadow-xl ring-1 ring-gray-200 dark:ring-gray-800 flex flex-col">
+              <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+                <div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">Cotización</div>
+                  <h3 className="text-base font-semibold">{detailRow.id} — {detailRow.reference}</h3>
+                </div>
+                <Button variant="outline" size="sm" onClick={closeDetail}>Cerrar</Button>
+              </div>
+
+              <div className="p-4 space-y-4 overflow-auto">
+                {/* 'X' button to close detail view */}
+                <div className="flex justify-start">
+                  <Button variant="danger" size="sm" onClick={closeDetail}>
+                    X
+                  </Button>
+                  
+                </div>
+
+                {/* metadatos */}
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="rounded-lg ring-1 ring-gray-200 dark:ring-gray-800 p-3">
+                    <div className="text-xs text-gray-500 dark:text-gray-400">Solicitante</div>
+                    <div className="font-medium dark:text-gray-300">{detailRow.requester}</div>
+                  </div>
+                  <div className="rounded-lg ring-1 ring-gray-200 dark:ring-gray-800 p-3">
+                    <div className="text-xs text-gray-500 dark:text-gray-400">Asignado</div>
+                    <div className="font-medium dark:text-gray-300">{detailRow.assignedTo ?? "—"}</div>
+                  </div>
+                  <div className="rounded-lg ring-1 ring-gray-200 dark:ring-gray-800 p-3">
+                    <div className="text-xs text-gray-500 dark:text-gray-400">Creada</div>
+                    <div className="font-medium dark:text-gray-300">{fmt(detailRow.createdAt)}</div>
+                  </div>
+                  <div className="rounded-lg ring-1 ring-gray-200 dark:ring-gray-800 p-3">
+                    <div className="text-xs text-gray-500 dark:text-gray-400">Cerrada</div>
+                    <div className="font-medium dark:text-gray-300">{fmt(detailRow.closedAt)}</div>
+                  </div>
+                  <div className="rounded-lg ring-1 ring-gray-200 dark:ring-gray-800 p-3">
+                    <div className="text-xs text-gray-500 dark:text-gray-400">Tipo</div>
+                    <div className="font-medium capitalize dark:text-gray-300">{detailRow.requestType}</div>
+                  </div>
+                  <div className="rounded-lg ring-1 ring-gray-200 dark:ring-gray-800 p-3">
+                    <div className="text-xs text-gray-500 dark:text-gray-400">Alcance</div>
+                    <div className="font-medium capitalize dark:text-gray-300">{detailRow.scope}</div>
+                  </div>
+                </div>
+
+                {/* items */}
+                <div>
+                  <div className="text-sm font-medium mb-2 dark:text-gray-300">Artículos</div>
+                  <div className="overflow-auto rounded-lg ring-1 ring-gray-200 dark:ring-gray-800">
+                    <table className="min-w-full text-sm dark:text-gray-200">
+                      <thead className="bg-gray-50 dark:bg-white/5">
+                        <tr>
+                          <th className="px-3 py-2 text-left">SKU</th>
+                          <th className="px-3 py-2 text-left">Descripción</th>
+                          <th className="px-3 py-2 text-right">Cant.</th>
+                          <th className="px-3 py-2 text-right">P. unit</th>
+                          <th className="px-3 py-2 text-right">Importe</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
+                        {(detailRow.items ?? []).length === 0 ? (
+                          <tr><td colSpan={5} className="px-3 py-4 text-center text-gray-500 dark:text-gray-400">Sin artículos.</td></tr>
+                        ) : (
+                          detailRow.items!.map(it => (
+                            <tr key={it.sku}>
+                              <td className="px-3 py-2">{it.sku}</td>
+                              <td className="px-3 py-2">{it.description}</td>
+                              <td className="px-3 py-2 text-right">{it.quantity}</td>
+                              <td className="px-3 py-2 text-right">{money(it.unitPrice, it.currency ?? detailRow.currency ?? "USD")}</td>
+                              <td className="px-3 py-2 text-right">{money(it.quantity * it.unitPrice, it.currency ?? detailRow.currency ?? "USD")}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                      <tfoot>
+                        <tr>
+                          <td colSpan={4} className="px-3 py-2 text-right font-medium">Total</td>
+                          <td className="px-3 py-2 text-right font-semibold">
+                            {money(itemsTotal(detailRow), detailRow.currency ?? "USD")}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+
+                {/* notas */}
+                <div className="text-sm">
+                  <div className="font-medium mb-1 dark:text-gray-300">Notas</div>
+                  <p className="text-gray-700 dark:text-gray-300">{detailRow.notes ?? "—"}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
 
         {/* Paginación */}
         <div className="mt-3 flex items-center justify-between text-sm">
@@ -477,10 +491,10 @@ export default function QuotesHistory() {
             Página {page} de {totalPages}
           </div>
           <div className="flex gap-2">
-            <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>
+            <Button size="sm" variant="primary" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>
               Anterior
             </Button>
-            <Button size="sm" variant="outline" disabled={page >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>
+            <Button size="sm" variant="primary" disabled={page >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>
               Siguiente
             </Button>
           </div>
