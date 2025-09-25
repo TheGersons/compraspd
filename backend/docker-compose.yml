@@ -9,5 +9,20 @@ services:
     ports: ["5455:5432"]
     volumes:
       - dbdata:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: ./
+      dockerfile: Dockerfile.dev
+    env_file:
+      - ./.env.docker
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./:/app
+      - /app/node_modules
+    depends_on:
+      - db
+
 volumes:
   dbdata:

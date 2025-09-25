@@ -7,11 +7,434 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/// --- Identidad y control de acceso ---
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  role      String   @default("user")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  fullName     String
+  department   String?
+  costCenter   String?
+  isActive     Boolean  @default(true)
+  roleId       String
+  role         Role     @relation(fields: [roleId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // visibilidad por proyecto
+  projectMemberships ProjectMember[]
+  auditLogs          AuditLog[]
+  assignments        Assignment[]      @relation("AssigneeAssignments")
+  notifications      Notification[]
+  Project            Project[]
+  PurchaseRequest    PurchaseRequest[]
+  Attachment         Attachment[]
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique // p.ej. CLIENTE, SUPERVISOR, ADMIN
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users           User[]
+  rolePermissions RolePermission[]
+}
+
+model Permission {
+  id             String           @id @default(cuid())
+  resource       String // e.g. "quote","purchaseOrder","shipment","project","supplier","product"
+  action         String // e.g. "read","create","update","delete","approve","assign","receive"
+  description    String?
+  createdAt      DateTime         @default(now())
+  RolePermission RolePermission[]
+
+  @@unique([resource, action])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id])
+  permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+}
+
+/// --- Organización, proyectos y ubicaciones ---
+model Project {
+  id          String    @id @default(cuid())
+  name        String
+  code        String?   @unique
+  description String?
+  status      String    @default("ACTIVE") // flexible
+  startDate   DateTime?
+  endDate     DateTime?
+  managerId   String?
+  manager     User?     @relation(fields: [managerId], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  locations       Location[]
+  members         ProjectMember[]
+  PurchaseRequest PurchaseRequest[]
+  PurchaseOrder   PurchaseOrder[]
+}
+
+model ProjectMember {
+  id        String  @id @default(cuid())
+  projectId String
+  userId    String
+  role      String? // p.ej. "MIEMBRO","GERENCIA"
+  project   Project @relation(fields: [projectId], references: [id])
+  user      User    @relation(fields: [userId], references: [id])
+
+  @@unique([projectId, userId])
+}
+
+model Location {
+  id              String            @id @default(cuid())
+  projectId       String?
+  type            String // "OFICINA","ALMACEN","PROYECTO"
+  name            String
+  address1        String?
+  address2        String?
+  city            String?
+  state           String?
+  zip             String?
+  country         String? // HN, etc.
+  latitude        Float?
+  longitude       Float?
+  active          Boolean           @default(true)
+  project         Project?          @relation(fields: [projectId], references: [id])
+  PurchaseRequest PurchaseRequest[]
+  PurchaseOrder   PurchaseOrder[]
+}
+
+/// --- Proveedores y catálogo ---
+model Supplier {
+  id           String   @id @default(cuid())
+  name         String
+  rtn          String? // opcional
+  email        String?
+  phone        String?
+  currencyCode String? // preferida
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  products      SupplierProduct[]
+  QuoteOffer    QuoteOffer[]
+  PurchaseOrder PurchaseOrder[]
+}
+
+model Product {
+  id          String             @id @default(cuid())
+  name        String
+  description String?
+  unit        String? // unidad de medida
+  skuInternal String?            @unique
+  // Mantener flexibilidad alta
+  attributes  ProductAttribute[]
+  active      Boolean            @default(true)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  supplierLinks SupplierProduct[]
+  PRItem        PRItem[]
+  POLine        POLine[]
+}
+
+model ProductAttribute {
+  id        String  @id @default(cuid())
+  productId String
+  key       String
+  value     String
+  product   Product @relation(fields: [productId], references: [id])
+
+  @@index([productId])
+}
+
+/// Relación proveedor-producto con precios y vigencias
+model SupplierProduct {
+  id           String    @id @default(cuid())
+  supplierId   String
+  productId    String
+  skuSupplier  String?
+  price        Decimal   @db.Decimal(18, 6)
+  currencyCode String // HNL, USD
+  validFrom    DateTime  @default(now())
+  validTo      DateTime?
+  supplier     Supplier  @relation(fields: [supplierId], references: [id])
+  product      Product   @relation(fields: [productId], references: [id])
+
+  @@unique([supplierId, productId, validFrom])
+}
+
+/// --- Monedas y tipos de cambio ---
+model Currency {
+  code   String  @id // "HNL", "USD"
+  name   String
+  isBase Boolean @default(false) // HNL = true
+}
+
+model ExchangeRate {
+  id          String   @id @default(cuid())
+  baseCode    String
+  quoteCode   String
+  rate        Decimal  @db.Decimal(18, 6)
+  effectiveOn DateTime // fecha de vigencia
+
+  @@unique([baseCode, quoteCode, effectiveOn])
+}
+
+/// --- Cotizaciones y solicitudes ---
+/// 1:1 entre Solicitud y Cotización.
+/// Cotización puede tener múltiples ofertas por proveedor; selección por línea para permitir múltiples proveedores.
+model PurchaseRequest {
+  id          String    @id @default(cuid())
+  requesterId String
+  projectId   String?
+  locationId  String? // destino solicitado
+  title       String
+  description String?
+  dueDate     DateTime? // prioridad por fecha límite
+  status      String    @default("DRAFT") // flexible y extensible
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  requester User      @relation(fields: [requesterId], references: [id])
+  project   Project?  @relation(fields: [projectId], references: [id])
+  location  Location? @relation(fields: [locationId], references: [id])
+
+  items       PRItem[]
+  quote       Quote?
+  attachments Attachment[]
+  auditLogs   AuditLog[]
+}
+
+model PRItem {
+  id                String           @id @default(cuid())
+  purchaseRequestId String
+  productId         String?
+  description       String // libre para casos no catalogados
+  quantity          Decimal          @db.Decimal(18, 6)
+  unit              String?
+  requiredCurrency  String? // si requiere cotizar en USD por ejemplo
+  purchaseRequest   PurchaseRequest  @relation(fields: [purchaseRequestId], references: [id])
+  product           Product?         @relation(fields: [productId], references: [id])
+  QuoteLine         QuoteLine[]
+  QuoteOfferLine    QuoteOfferLine[]
+  POLine            POLine[]
+
+  @@index([purchaseRequestId])
+}
+
+model Quote {
+  id                String    @id @default(cuid())
+  purchaseRequestId String    @unique
+  status            String    @default("REQUESTED")
+  validUntil        DateTime?
+  baseCurrency      String // "HNL"
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  purchaseRequest PurchaseRequest @relation(fields: [purchaseRequestId], references: [id])
+  lines           QuoteLine[]
+  offers          QuoteOffer[] // por proveedor
+  attachments     Attachment[]
+}
+
+model QuoteLine {
+  id               String   @id @default(cuid())
+  quoteId          String
+  prItemId         String
+  // selección por línea
+  chosenSupplierId String?
+  chosenOfferId    String?
+  chosenUnitPrice  Decimal? @db.Decimal(18, 6)
+  chosenCurrency   String?
+  quote            Quote    @relation(fields: [quoteId], references: [id])
+  prItem           PRItem   @relation(fields: [prItemId], references: [id])
+
+  @@index([quoteId])
+}
+
+model QuoteOffer {
+  id         String   @id @default(cuid())
+  quoteId    String
+  supplierId String
+  currency   String // HNL o USD
+  rateHNL    Decimal? @db.Decimal(18, 6) // tipo de cambio usado
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  quote       Quote            @relation(fields: [quoteId], references: [id])
+  supplier    Supplier         @relation(fields: [supplierId], references: [id])
+  lines       QuoteOfferLine[]
+  attachments Attachment[]
+
+  @@unique([quoteId, supplierId])
+}
+
+model QuoteOfferLine {
+  id           String     @id @default(cuid())
+  quoteOfferId String
+  prItemId     String
+  unitPrice    Decimal    @db.Decimal(18, 6)
+  deliveryDays Int?
+  notes        String?
+  quoteOffer   QuoteOffer @relation(fields: [quoteOfferId], references: [id])
+  prItem       PRItem     @relation(fields: [prItemId], references: [id])
+
+  @@index([quoteOfferId])
+}
+
+/// --- Órdenes de compra y recepción ---
+model PurchaseOrder {
+  id            String   @id @default(cuid())
+  supplierId    String
+  projectId     String?
+  locationId    String?
+  currency      String
+  rateHNL       Decimal? @db.Decimal(18, 6)
+  status        String   @default("DRAFT") // "APPROVED","SENT","PARTIAL","RECEIVED","CANCELLED"
+  sourceQuoteId String? // trazabilidad
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  supplier Supplier  @relation(fields: [supplierId], references: [id])
+  project  Project?  @relation(fields: [projectId], references: [id])
+  location Location? @relation(fields: [locationId], references: [id])
+
+  lines       POLine[]
+  shipments   Shipment[]
+  attachments Attachment[]
+  auditLogs   AuditLog[]
+
+  @@index([supplierId])
+}
+
+model POLine {
+  id              String         @id @default(cuid())
+  purchaseOrderId String
+  prItemId        String?
+  productId       String?
+  description     String
+  quantity        Decimal        @db.Decimal(18, 6)
+  unit            String?
+  unitPrice       Decimal        @db.Decimal(18, 6)
+  taxPercent      Decimal?       @db.Decimal(5, 2)
+  discount        Decimal?       @db.Decimal(18, 6)
+  purchaseOrder   PurchaseOrder  @relation(fields: [purchaseOrderId], references: [id])
+  product         Product?       @relation(fields: [productId], references: [id])
+  prItem          PRItem?        @relation(fields: [prItemId], references: [id])
+  ShipmentLine    ShipmentLine[]
+
+  @@index([purchaseOrderId])
+}
+
+/// Parciales y backorder con Shipments y ShipmentLines
+model Shipment {
+  id              String   @id @default(cuid())
+  purchaseOrderId String
+  carrier         String? // transportista o empresa
+  trackingCode    String?
+  incoterm        String?
+  mode            String? // AIR, SEA, ROAD
+  status          String   @default("PREPARED") // "DISPATCHED","IN_TRANSIT","RECEIVED","VERIFIED"
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  purchaseOrder PurchaseOrder   @relation(fields: [purchaseOrderId], references: [id])
+  events        ShipmentEvent[]
+  lines         ShipmentLine[]
+}
+
+model ShipmentLine {
+  id         String   @id @default(cuid())
+  shipmentId String
+  poLineId   String
+  quantity   Decimal  @db.Decimal(18, 6) // cantidad enviada/recibida parcial
+  shipment   Shipment @relation(fields: [shipmentId], references: [id])
+  poLine     POLine   @relation(fields: [poLineId], references: [id])
+
+  @@index([shipmentId])
+}
+
+model ShipmentEvent {
+  id         String   @id @default(cuid())
+  shipmentId String
+  status     String // hitos de tracking
+  notes      String?
+  at         DateTime @default(now())
+  visibleTo  String? // "SUPERVISORS","PROJECT_MEMBERS","ADMINS" etc.
+  shipment   Shipment @relation(fields: [shipmentId], references: [id])
+
+  @@index([shipmentId])
+}
+
+/// --- Asignaciones, auditoría, adjuntos, notificaciones ---
+model Assignment {
+  id         String   @id @default(cuid())
+  entityType String // "PurchaseRequest","Quote","PurchaseOrder","Shipment"
+  entityId   String
+  assigneeId String
+  role       String? // "REVISOR","APROBADOR","COMPRADOR"
+  createdAt  DateTime @default(now())
+  assignee   User     @relation("AssigneeAssignments", fields: [assigneeId], references: [id])
+
+  @@index([entityType, entityId])
+}
+
+model Attachment {
+  id                String           @id @default(cuid())
+  entityType        String
+  entityId          String
+  fileName          String
+  mimeType          String
+  size              Int
+  url               String // almacenado internamente; control por rol
+  createdById       String?
+  createdAt         DateTime         @default(now())
+  createdBy         User?            @relation(fields: [createdById], references: [id])
+  // Validaciones en app: tipos permitidos (img, planos, doc, xls, ppt, pdf, mp4...)
+  PurchaseRequest   PurchaseRequest? @relation(fields: [purchaseRequestId], references: [id])
+  purchaseRequestId String?
+  Quote             Quote?           @relation(fields: [quoteId], references: [id])
+  quoteId           String?
+  QuoteOffer        QuoteOffer?      @relation(fields: [quoteOfferId], references: [id])
+  quoteOfferId      String?
+  PurchaseOrder     PurchaseOrder?   @relation(fields: [purchaseOrderId], references: [id])
+  purchaseOrderId   String?
+}
+
+model AuditLog {
+  id                String           @id @default(cuid())
+  entityType        String
+  entityId          String
+  action            String // CREATED, UPDATED, STATUS_CHANGED, APPROVED, CANCELLED, etc.
+  actorId           String?
+  before            Json?
+  after             Json?
+  at                DateTime         @default(now())
+  actor             User?            @relation(fields: [actorId], references: [id])
+  PurchaseRequest   PurchaseRequest? @relation(fields: [purchaseRequestId], references: [id])
+  purchaseRequestId String?
+  PurchaseOrder     PurchaseOrder?   @relation(fields: [purchaseOrderId], references: [id])
+  purchaseOrderId   String?
+
+  @@index([entityType, entityId])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      String // EMAIL, IN_APP
+  title     String
+  body      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id])
 }
