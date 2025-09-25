@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { CreateQuotesCrudDto } from './dto/create-quotes--crud.dto';
-import { UpdateQuotesCrudDto } from './dto/update-quotes--crud.dto';
+import { CreateQuotesCrudDto } from './dto/create-quotes.dto';
+import { UpdateQuotesCrudDto } from './dto/update-quotes.dto';
 
 @Injectable()
 export class QuotesCrudService {

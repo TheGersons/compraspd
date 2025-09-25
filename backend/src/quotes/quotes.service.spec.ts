@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { QuotesCrudService } from './quotes--crud.service';
+import { QuotesCrudService } from './quotes.service';
 
 describe('QuotesCrudService', () => {
   let service: QuotesCrudService;

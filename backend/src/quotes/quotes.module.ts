@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { QuotesCrudService } from './quotes--crud.service';
-import { QuotesCrudController } from './quotes--crud.controller';
+import { QuotesCrudService } from './quotes.service';
+import { QuotesCrudController } from './quotes.controller';
 
 @Module({
   controllers: [QuotesCrudController],

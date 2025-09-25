@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { CreateSuppliersCrudDto } from './dto/create-suppliers--crud.dto';
-import { UpdateSuppliersCrudDto } from './dto/update-suppliers--crud.dto';
+import { CreateSuppliersCrudDto } from './dto/create-suppliers.dto';
+import { UpdateSuppliersCrudDto } from './dto/update-suppliers.dto';
 
 @Injectable()
 export class SuppliersCrudService {
