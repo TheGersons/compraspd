@@ -17,6 +17,7 @@ export default function DefaultInputs() {
     console.log("Selected value:", value);
   };
 
+  
   return (
     <ComponentCard title="Default Inputs">
       <div className="space-y-6">
