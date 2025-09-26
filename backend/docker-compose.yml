@@ -1,4 +1,7 @@
 version: "3.9"
+networks:
+  compras_net:
+    external: true
 services:
   db:
     image: postgres:16
@@ -23,6 +26,9 @@ services:
       - /app/node_modules
     depends_on:
       - db
+    networks:
+      - compras_net 
+
 
 volumes:
   dbdata:

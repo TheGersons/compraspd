@@ -9,6 +9,15 @@ import { QuotesCrudModule } from './quotes/quotes.module';
 import { PurchaseOrdersCrudModule } from './purchases/purchase.module';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), PrismaModule, AuthModule, UsersModule, SuppliersCrudModule, ProductsCrudModule, QuotesCrudModule, PurchaseOrdersCrudModule],
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    PrismaModule,
+    AuthModule,
+    UsersModule,
+    SuppliersCrudModule,
+    ProductsCrudModule,
+    QuotesCrudModule,
+    PurchaseOrdersCrudModule,
+  ],
 })
 export class AppModule {}

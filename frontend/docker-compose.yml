@@ -1,0 +1,16 @@
+version: "3.9"
+
+networks:
+  compras_net:
+    external: true
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: compras-frontend
+    ports:
+      - "8080:80"
+    networks:
+      - compras_net
