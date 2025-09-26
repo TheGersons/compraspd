@@ -19,4 +19,9 @@ COPY --from=build /app/node_modules /app/node_modules
 COPY --from=build /app/dist /app/dist
 COPY prisma ./prisma
 EXPOSE 3001
+# Dockerfile.dev (o Dockerfile)
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
+
 CMD ["pnpm","start:prod"]

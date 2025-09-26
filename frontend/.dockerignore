@@ -1,0 +1,10 @@
+node_modules
+.pnpm
+.pnpm-store
+dist
+.git
+.gitignore
+.vscode
+*.log
+Dockerfile
+docker-compose.yml

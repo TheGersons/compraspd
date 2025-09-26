@@ -5,4 +5,9 @@ COPY package.json pnpm-lock.yaml* ./
 RUN pnpm install
 COPY . .
 EXPOSE 3001
+# Dockerfile.dev (o Dockerfile)
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
+
 CMD ["pnpm","start:dev"]

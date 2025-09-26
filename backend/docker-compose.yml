@@ -12,7 +12,8 @@ services:
     ports: ["5455:5432"]
     volumes:
       - dbdata:/var/lib/postgresql/data
-
+    networks:
+      - compras_net 
   api:
     build:
       context: ./
