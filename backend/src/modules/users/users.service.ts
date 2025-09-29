@@ -29,10 +29,25 @@ export class UsersService {
   }
 
   async findById(id: string) {
-    const user = await this.prisma.user.findUnique({ where: { id }, include: { role: true } });
-    if (!user) throw new NotFoundException('Usuario no encontrado');
-    return user;
-  }
+  const user = await this.prisma.user.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      email: true,
+      fullName: true,
+      department: true,
+      costCenter: true,
+      isActive: true,
+      createdAt: true,
+      updatedAt: true,
+      role: { select: { id: true, name: true, description: true } },
+      // passwordHash: false // no se incluye
+    },
+  });
+  if (!user) throw new NotFoundException('Usuario no encontrado');
+  return user;
+}
+
 
   async paginate(params: { page?: number; pageSize?: number; search?: string; roleId?: string; isActive?: boolean }) {
     const page = Math.max(1, params.page ?? 1);

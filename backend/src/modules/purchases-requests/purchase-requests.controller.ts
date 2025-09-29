@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
-import { PurchaseOrdersCrudService } from './purchase.service';
-import { CreatePurchaseOrdersCrudDto } from './dto/create-purchase.dto';
-import { UpdatePurchaseOrdersCrudDto } from './dto/update-purchase.dto';
+import { PurchaseOrdersCrudService } from './purchase-requests.service';
+import { CreatePurchaseOrdersCrudDto } from './dto/create-pr.dto';
+import { UpdatePurchaseOrdersCrudDto } from './dto/update-pr.dto';
 
 @Controller('purchase-orders--crud')
 export class PurchaseOrdersCrudController {

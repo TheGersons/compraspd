@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { PurchaseOrdersCrudService } from './purchase.service';
-import { PurchaseOrdersCrudController } from './purchase.controller';
+import { PurchaseOrdersCrudService } from './purchase-requests.service';
+import { PurchaseOrdersCrudController } from './purchase-requests.controller';
 
 @Module({
   controllers: [PurchaseOrdersCrudController],
