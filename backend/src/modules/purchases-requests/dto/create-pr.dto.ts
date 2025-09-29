@@ -1,23 +1,60 @@
-import { IsArray, IsEnum, IsISO8601, IsOptional, IsString, IsUUID, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-import { DeliveryType, ProcurementType } from '../entities/purchase-request.entity';
+import { IsDateString, IsEnum, IsOptional, IsString, IsUUID, MinLength, ValidateNested } from 'class-validator';
+import { PrItemDto } from './pr-item.dto';
+
+
 export class CreatePrDto {
-  @IsString() title: string;
-  @IsOptional() @IsString() description?: string;
+    @IsString()
+    @MinLength(3)
+    title!: string;
 
-  @IsOptional() @IsString() departmentId?: string;
-  @IsOptional() @IsString() clientId?: string;
 
-  @IsEnum(ProcurementType) procurement: ProcurementType;
-  @IsOptional() @IsISO8601() quoteDeadline?: string;
+    @IsOptional()
+    @IsString()
+    description?: string;
 
-  @IsEnum(DeliveryType) deliveryType: DeliveryType;
-  @IsOptional() @IsString() warehouseId?: string;
-  @IsOptional() @IsString() projectId?: string;
 
-  @IsOptional() @IsString() reference?: string;
-  @IsOptional() @IsString() comment?: string;
+    @IsOptional()
+    @IsDateString()
+    dueDate?: string;
 
-  @IsArray() @ValidateNested({ each: true }) @Type(() => PRItemDto)
-  items: PRItemDto[];
+
+    @IsOptional()
+    @IsUUID()
+    projectId?: string;
+
+
+    @IsOptional()
+    @IsUUID()
+    locationId?: string; // destino
+
+
+    @ValidateNested({ each: true })
+    @Type(() => PrItemDto)
+    items!: PrItemDto[];
+
+
+    @IsOptional()
+    @IsUUID()
+    departmentId?: string;
+
+
+    @IsOptional()
+    @IsUUID()
+    clientId?: string;
+
+
+    @IsOptional()
+    @IsEnum({ WAREHOUSE: 'WAREHOUSE', PROJECT: 'PROJECT' })
+    deliveryType?: 'WAREHOUSE' | 'PROJECT';
+
+
+    @IsOptional()
+    @IsString()
+    reference?: string;
+
+
+    @IsOptional()
+    @IsString()
+    comment?: string;
 }

@@ -12,7 +12,7 @@ import { JwtAuthGuard } from 'src/modules/auth/jwt-auth.guard';
 @UseGuards(JwtAuthGuard) // auth llegará luego; no se aplica guard aún
 @Controller('api/v1/users')
 export class UsersController {
-  constructor(private readonly svc: UsersService) {}
+  constructor(private readonly svc: UsersService) { }
 
   @Post()
   create(@Body() dto: CreateUserDto) {

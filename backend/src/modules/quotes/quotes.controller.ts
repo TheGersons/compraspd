@@ -1,34 +1,39 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
-import { QuotesCrudService } from './quotes.service';
-import { CreateQuotesCrudDto } from './dto/create-quotes.dto';
-import { UpdateQuotesCrudDto } from './dto/update-quotes.dto';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { AuthGuard } from '@nestjs/passport';
+import { QuotesService } from './quotes.service';
+import { CreateQuoteDto } from './dto/create-quotes.dto';
+import { SelectLineDto } from './dto/select-line.sto';
+import { UpdateQuoteDto } from './dto/update-quotes.dto';
 
-@Controller('quotes--crud')
-export class QuotesCrudController {
-  constructor(private readonly quotesCrudService: QuotesCrudService) {}
+@ApiTags('Comparativos (Quotes)')
+@ApiBearerAuth()
+@UseGuards(AuthGuard('jwt'))
+@Controller('api/v1/quotes')
+export class QuotesController {
+  constructor(private readonly svc: QuotesService) { }
 
-  @Post()
-  create(@Body() createQuotesCrudDto: CreateQuotesCrudDto) {
-    return this.quotesCrudService.create(createQuotesCrudDto);
+
+  @Post('ensure')
+  ensure(@Body() dto: CreateQuoteDto) {
+    return this.svc.ensureForPr(dto);
   }
 
-  @Get()
-  findAll() {
-    return this.quotesCrudService.findAll();
+
+  @Get('by-request/:prId')
+  getByPr(@Param('prId') prId: string) {
+    return this.svc.getByPr(prId);
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.quotesCrudService.findOne(+id);
-  }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateQuotesCrudDto: UpdateQuotesCrudDto) {
-    return this.quotesCrudService.update(+id, updateQuotesCrudDto);
+  update(@Param('id') id: string, @Body() dto: UpdateQuoteDto) {
+    return this.svc.update(id, dto);
   }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.quotesCrudService.remove(+id);
+
+  @Patch('select-line')
+  selectLine(@Body() dto: SelectLineDto) {
+    return this.svc.selectLine(dto);
   }
 }

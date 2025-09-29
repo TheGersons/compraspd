@@ -1,0 +1,26 @@
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { AuthGuard } from '@nestjs/passport';
+import { AssignmentsService } from './assignments.service';
+import { CreateAssignmentDto } from './dto/create-assignment.dto';
+
+
+@ApiTags('Asignaciones')
+@ApiBearerAuth()
+@UseGuards(AuthGuard('jwt'))
+@Controller('api/v1/assignments')
+export class AssignmentsController {
+    constructor(private readonly svc: AssignmentsService) { }
+
+
+    @Post()
+    create(@Body() dto: CreateAssignmentDto) {
+        return this.svc.create(dto);
+    }
+
+
+    @Get(':entityType/:entityId')
+    list(@Param('entityType') entityType: string, @Param('entityId') entityId: string) {
+        return this.svc.listFor(entityType, entityId);
+    }
+}

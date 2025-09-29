@@ -1,4 +1,2 @@
 import { PaginationDto } from '../../../common/dto/pagination.dto';
-
-
-export class ListQueryDto extends PaginationDto { }
+export class ListQuotesQueryDto extends PaginationDto { }

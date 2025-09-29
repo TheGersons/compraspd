@@ -8,7 +8,7 @@ export class UsersService {
 
   async create(data: {
     email: string; password: string; fullName: string;
-    department?: string; costCenter?: string; roleId: string;
+    departmentId?: string; costCenter?: string; roleId: string;
   }) {
     const exists = await this.prisma.user.findUnique({ where: { email: data.email } });
     if (exists) throw new BadRequestException('Email ya registrado');
@@ -19,35 +19,34 @@ export class UsersService {
         email: data.email,
         passwordHash,
         fullName: data.fullName,
-        department: data.department,
+        departmentId: data.departmentId ?? null,
         costCenter: data.costCenter,
         roleId: data.roleId,
       },
-      include: { role: true },
+      include: { role: true, department: true },
     });
     return user;
   }
 
   async findById(id: string) {
-  const user = await this.prisma.user.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      email: true,
-      fullName: true,
-      department: true,
-      costCenter: true,
-      isActive: true,
-      createdAt: true,
-      updatedAt: true,
-      role: { select: { id: true, name: true, description: true } },
-      // passwordHash: false // no se incluye
-    },
-  });
-  if (!user) throw new NotFoundException('Usuario no encontrado');
-  return user;
-}
-
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        departmentId: true,
+        department: { select: { id: true, name: true } },
+        costCenter: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+        role: { select: { id: true, name: true, description: true } },
+      },
+    });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+    return user;
+  }
 
   async paginate(params: { page?: number; pageSize?: number; search?: string; roleId?: string; isActive?: boolean }) {
     const page = Math.max(1, params.page ?? 1);
@@ -88,15 +87,22 @@ export class UsersService {
     return { page, pageSize, total, items };
   }
 
-  async update(id: string, data: { fullName?: string; department?: string; costCenter?: string; roleId?: string; isActive?: boolean }) {
+  async update(id: string, data: {
+    fullName?: string; departmentId?: string; costCenter?: string; roleId?: string; isActive?: boolean
+  }) {
     await this.ensureExists(id);
     return this.prisma.user.update({
       where: { id },
-      data,
-      include: { role: true },
+      data: {
+        fullName: data.fullName,
+        departmentId: data.departmentId ?? undefined,
+        costCenter: data.costCenter,
+        roleId: data.roleId,
+        isActive: typeof data.isActive === 'boolean' ? data.isActive : undefined,
+      },
+      include: { role: true, department: true },
     });
   }
-
   async changePassword(id: string, newPassword: string, oldPassword: string) {
     await this.ensureExists(id);
 

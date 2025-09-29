@@ -5,13 +5,15 @@ import Label from "../form/Label";
 import Input from "../form/input/InputField";
 import Checkbox from "../form/input/Checkbox";
 import Button from "../ui/button/Button";
+import { useAuth } from "../../context/AuthContext";
+
 
 type LoginResponse = { access_token: string; token_type?: string; expires_in?: string };
 
 export default function SignInForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [keepLoggedIn, setKeepLoggedIn] = useState(false);
-
+  const { refresh } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -19,6 +21,8 @@ export default function SignInForm() {
   const [error, setError] = useState<string | null>(null);
   let debug = true;
   const navigate = useNavigate();
+
+
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -40,6 +44,7 @@ export default function SignInForm() {
       const data: LoginResponse = await res.json();
       const storage = keepLoggedIn ? localStorage : sessionStorage;
       storage.setItem("token", data.access_token);
+      await refresh();
 
       if(!debug)return;
       navigate("/");

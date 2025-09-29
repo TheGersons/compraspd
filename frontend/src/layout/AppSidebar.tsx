@@ -1,19 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
-import { ShoppingCart, User } from "lucide-react";
+import { ShoppingCart /*, User*/ } from "lucide-react";
 
 // Assume these icons are imported from an icon library
 import {
   BoxCubeIcon,
-  CalenderIcon,
+  //CalenderIcon,
   ChevronDownIcon,
-  GridIcon,
+ //GridIcon,
   HorizontaLDots,
-  ListIcon,
-  PageIcon,
+  //ListIcon,
+  //PageIcon,
   PieChartIcon,
-  PlugInIcon,
-  TableIcon,
+  //PlugInIcon,
+  //TableIcon,
 } from "../icons";
 import { useSidebar } from "../context/SidebarContext";
 
@@ -49,6 +49,7 @@ const navItems: NavItem[] = [
       { name: "Asignación", path: "/shopping/assignment", pro: false },
     ],
   },
+  /*
   {
     icon: <GridIcon />,
     name: "Dashboard",
@@ -86,10 +87,11 @@ const navItems: NavItem[] = [
       { name: "404 Error", path: "/error-404", pro: false },
     ],
   },
+  */
 ];
 
 const othersItems: NavItem[] = [
-  {
+  /*{
     icon: <PieChartIcon />,
     name: "Charts",
     subItems: [
@@ -97,6 +99,7 @@ const othersItems: NavItem[] = [
       { name: "Bar Chart", path: "/bar-chart", pro: false },
     ],
   },
+  */
   {
     icon: <BoxCubeIcon />,
     name: "UI Elements",
@@ -109,6 +112,7 @@ const othersItems: NavItem[] = [
       { name: "Videos", path: "/videos", pro: false },
     ],
   },
+  /*
   {
     icon: <PlugInIcon />,
     name: "Authentication",
@@ -117,6 +121,7 @@ const othersItems: NavItem[] = [
       { name: "Sign Up", path: "/signup", pro: false },
     ],
   },
+  */
 ];
 
 const AppSidebar: React.FC = () => {
@@ -373,7 +378,7 @@ const AppSidebar: React.FC = () => {
                   }`}
               >
                 {isExpanded || isHovered || isMobileOpen ? (
-                  "Others"
+                  "Otros"
                 ) : (
                   <HorizontaLDots />
                 )}

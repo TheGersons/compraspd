@@ -8,6 +8,11 @@ export default function UserDropdown() {
   const [isOpen, setIsOpen] = useState(false);
   const { user } = useAuth();
 
+  //obtener los datos del usuario desde el contexto de autenticación
+  const email = user?.email;
+  const fullName = user?.fullName;
+
+
   function toggleDropdown() {
     setIsOpen(!isOpen);
   }
@@ -57,10 +62,10 @@ export default function UserDropdown() {
       >
         <div>
           <span className="block font-medium text-gray-700 text-theme-sm dark:text-gray-400">
-            {user?.fullName}
+            {fullName}
           </span>
           <span className="mt-0.5 block text-theme-xs text-gray-500 dark:text-gray-400">
-            {user?.email}
+            {email}
           </span>
         </div>
 

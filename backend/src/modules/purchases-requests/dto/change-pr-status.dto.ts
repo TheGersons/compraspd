@@ -1,5 +1,8 @@
-import { IsIn, IsOptional, IsString } from 'class-validator';
+import { IsString, MinLength } from 'class-validator';
+
+
 export class ChangePrStatusDto {
-  @IsIn(['DRAFT','SUBMITTED','UNDER_REVIEW','APPROVED','REJECTED']) status: string;
-  @IsOptional() @IsString() comment?: string;
+    @IsString()
+    @MinLength(2)
+    status!: string; // DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED
 }

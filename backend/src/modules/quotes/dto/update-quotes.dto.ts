@@ -1,4 +1,13 @@
-import { PartialType } from '@nestjs/swagger';
-import { CreateQuotesCrudDto } from './create-quotes.dto';
+import { IsOptional, IsString } from 'class-validator';
 
-export class UpdateQuotesCrudDto extends PartialType(CreateQuotesCrudDto) {}
+
+export class UpdateQuoteDto {
+    @IsOptional()
+    @IsString()
+    status?: string;
+
+
+    @IsOptional()
+    @IsString()
+    validUntil?: string;
+}
