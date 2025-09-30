@@ -2,12 +2,12 @@ import { Controller, Get, Param, Post, UploadedFile, UseGuards, UseInterceptors,
 import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { v4 as uuid } from 'uuid';
-import { extname } from 'path';
 import { AttachmentsService } from './attachments.service';
 import { UploadAttachmentDto } from './dto/upload-attachment.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import type { Express } from 'express'; // <-- añade este import de tipo
+import { diskStorage } from 'multer';
+import { v4 as uuid } from 'uuid';
 
 
 @ApiTags('Adjuntos')
@@ -18,21 +18,21 @@ export class AttachmentsController {
     constructor(private readonly svc: AttachmentsService) { }
 
 
-    @Post('upload')
     @ApiConsumes('multipart/form-data')
     @UseInterceptors(
         FileInterceptor('file', {
             storage: diskStorage({
                 destination: 'uploads',
-                filename: (_req, file, cb) => {
-                    const id = uuid();
-                    cb(null, `${id}${extname(file.originalname)}`);
-                },
+                filename: (_req, file, cb) => cb(null, `${uuid()}-${file.originalname}`),
             }),
-            limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
         }),
     )
-    async upload(@CurrentUser() me: any, @UploadedFile() file: Express.Multer.File, @Body() dto: UploadAttachmentDto) {
+    @Post('upload')
+    async upload(
+        @CurrentUser() me: any,
+        @UploadedFile() file: Express.Multer.File, // <-- ya tipa bien
+        @Body() dto: UploadAttachmentDto,
+    ) {
         const url = `/uploads/${file.filename}`;
         const saved = await this.svc.create({
             entityType: dto.entityType,

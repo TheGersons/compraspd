@@ -105,7 +105,7 @@ async function adminUser(adminRoleId: string) {
         passwordHash: hash,
         fullName: 'Administrador del Sistema',
         roleId: adminRoleId,
-        department: 'TI',
+        departmentId: 'TI',
         isActive: true,
       },
     });

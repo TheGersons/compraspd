@@ -26,4 +26,4 @@ import { PurchaseRequestsModule } from './modules/purchases-requests/purchase-re
     PurchaseRequestsModule,
   ],
 })
-export class AppModule {}
+export class AppModule { }
