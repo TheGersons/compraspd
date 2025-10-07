@@ -1,60 +1,102 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { User } from '@prisma/client';
+import { PrismaClient } from '@prisma/client/extension';
+import { CreatePurchaseRequestDto } from './dto/create-pr.dto';
 
-type UserJwt = { sub: string; role?: string; email?: string };
+type UserJwt = { sub: string; role?: string };
 
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   DRAFT: ['SUBMITTED', 'CANCELLED'],
-  SUBMITTED: ['UNDER_REVIEW', 'CANCELLED'],
+  SUBMITTED: ['UNDER_REVIEW', 'CANCELLED', 'REJECTED'],
   UNDER_REVIEW: ['APPROVED', 'REJECTED', 'CANCELLED'],
-  APPROVED: [], // siguiente paso sería generar OC (fuera de este módulo)
+  APPROVED: [],
   REJECTED: [],
   CANCELLED: [],
 };
 
+/**
+ * Service responsible for handling purchase request operations.  This
+ * implementation makes optional relations like projectId, departmentId and
+ * clientId truly optional by conditionally attaching them to the create
+ * payload.  It also connects the authenticated user as the requester and
+ * sanitises item payloads so undefined optional properties become null.
+ */
 @Injectable()
 export class PurchaseRequestsService {
-  constructor(private prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaClient) {}
 
-  async create(dto: any, me: UserJwt) {
-    if (!dto.items || dto.items.length === 0) {
+  /**
+   * Creates a new purchase request.  Ensures that at least one item is
+   * provided and attaches the authenticated user as the requester.  Optional
+   * relations (project, department, client) are only connected when values
+   * are supplied.
+   *
+   * @param input The payload for the purchase request
+   * @param user  The authenticated user creating the request
+   */
+  async create(input: CreatePurchaseRequestDto, user: User) {
+    // Validate items exist
+    if (!input.items || input.items.length === 0) {
       throw new BadRequestException('Debes incluir al menos 1 ítem');
     }
 
+    // Destructure optional foreign keys so we can handle them separately
+    const {
+      items,
+      projectId,
+      departmentId,
+      clientId,
+      ...rest
+    } = input;
+
+    // Start constructing the data payload.  Attach the requester via a
+    // relation instead of passing an undefined requesterId.
+    const data: any = {
+      ...rest,
+      requester: { connect: { id: user.id } },
+    };
+
+    // Conditionally attach optional relations.  When these properties are
+    // undefined or null they are omitted and Prisma will store a NULL value.
+    if (projectId !== undefined && projectId !== null) {
+      data.project = { connect: { id: projectId } };
+    }
+    if (departmentId !== undefined && departmentId !== null) {
+      data.department = { connect: { id: departmentId } };
+    }
+    if (clientId !== undefined && clientId !== null && clientId !== '') {
+      data.client = { connect: { id: clientId } };
+    }
+
+    // Map items, converting undefined optional fields to null so Prisma
+    // accepts them.  The quantity is converted to a number.
+    data.items = {
+      create: items.map((item) => ({
+        description: item.description,
+        quantity: Number(item.quantity),
+        unit: item.unit,
+        sku: item.sku,
+        productId: item.productId ?? null,
+        requiredCurrency: item.requiredCurrency ?? null,
+        itemType: item.itemType ?? null,
+        barcode: item.barcode ?? null,
+      })),
+    };
+
     return this.prisma.purchaseRequest.create({
-      data: {
-        requesterId: me.sub,
-        title: dto.title,
-        description: dto.description,
-        dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
-        projectId: dto.projectId ? dto.projectId : undefined,
-        locationId: dto.locationId,
-        departmentId: dto.departmentId ? dto.departmentId : undefined,
-        clientId: dto.clientId,
-        procurement: dto.procurement,
-        quoteDeadline: dto.quoteDeadline ? new Date(dto.quoteDeadline) : undefined,
-        deliveryType: dto.deliveryType,
-        reference: dto.reference,
-        comment: dto.comment,
-        status: 'DRAFT',
-        items: {
-          create: dto.items.map((i: any) => ({
-            description: i.description,
-            quantity: i.quantity, // Decimal (string) ok
-            unit: i.unit,
-            productId: i.productId,
-            requiredCurrency: i.requiredCurrency,
-            itemType: i.itemType,
-            sku: i.sku,
-            barcode: i.barcode,
-          })),
-        },
+      data,
+      include: {
+        items: true,
+        project: true,
+        location: true,
+        department: true,
+        client: true,
       },
-      include: { items: true, project: true, location: true },
     });
   }
 
-  async listMine(me: UserJwt, page = 1, pageSize = 20) {
+  // Additional methods (e.g. findAll, findOne, update, remove) would go here
+ async listMine(me: UserJwt, page = 1, pageSize = 20) {
     const [total, items] = await this.prisma.$transaction([
       this.prisma.purchaseRequest.count({ where: { requesterId: me.sub } }),
       this.prisma.purchaseRequest.findMany({
