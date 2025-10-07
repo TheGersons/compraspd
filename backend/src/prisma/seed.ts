@@ -22,6 +22,7 @@ const RESOURCES = [
 ] as const;
 const ACTIONS = ['read','create','update','delete','approve','assign','receive'] as const;
 
+//clasificar, ordenar, limpiar, estandarizar y mantener
 async function upsertPermissions() {
   for (const r of RESOURCES) {
     for (const a of ACTIONS) {
@@ -105,7 +106,7 @@ async function adminUser(adminRoleId: string) {
         passwordHash: hash,
         fullName: 'Administrador del Sistema',
         roleId: adminRoleId,
-        departmentId: 'TI',
+        departmentId: null,
         isActive: true,
       },
     });

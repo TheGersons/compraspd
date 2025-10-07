@@ -32,4 +32,5 @@ dist-ssr
 /backend/dist
 /backend/.env
 /backend/.env.test
+/backend/.pnpm-store
 .vite
