@@ -1,9 +1,23 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsDateString, IsEnum, IsOptional, IsString, IsUUID, MinLength, ValidateNested } from 'class-validator';
+import {
+  IsArray,
+  IsDateString,
+  IsEnum,
+  IsOptional,
+  IsString,
+  MinLength,
+  ValidateNested,
+} from 'class-validator';
 import { PRItemDto } from './pr-item.dto';
 
-export enum ProcurementType { NATIONAL = 'NATIONAL', INTERNATIONAL = 'INTERNATIONAL' }
-export enum DeliveryType { WAREHOUSE = 'WAREHOUSE', PROJECT = 'PROJECT' }
+export enum ProcurementType {
+  NATIONAL = 'NATIONAL',
+  INTERNATIONAL = 'INTERNATIONAL',
+}
+export enum DeliveryType {
+  WAREHOUSE = 'WAREHOUSE',
+  PROJECT = 'PROJECT',
+}
 
 export class CreatePurchaseRequestDto {
   @IsString()
@@ -19,20 +33,19 @@ export class CreatePurchaseRequestDto {
   dueDate?: string;
 
   @IsOptional()
-  @IsUUID()
-  projectId?: string;
+  @IsString()
+  projectId?: string; // cuid, no UUID
 
-  // Si se entrega a un proyecto concreto, podemos inferir location según tus reglas de negocio después.
   @IsOptional()
-  @IsUUID()
-  locationId?: string;
+  @IsString()
+  locationId?: string; // cuid
 
-  // Extras (opcionales pero ya contemplados en tu modelo extendido)
   @IsOptional()
-  @IsUUID()
+  @IsString()
   departmentId?: string;
 
   @IsOptional()
+  @IsString()
   clientId?: string;
 
   @IsOptional()
@@ -48,7 +61,7 @@ export class CreatePurchaseRequestDto {
   deliveryType?: DeliveryType;
 
   @IsOptional()
-  @IsUUID()
+  @IsString()
   warehouseId?: string; // si DeliveryType = WAREHOUSE
 
   @IsOptional()

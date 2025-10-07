@@ -1,13 +1,23 @@
-import { IsEnum, IsNumberString, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+import {
+  IsEnum,
+  IsNumberString,
+  IsOptional,
+  IsString,
+  MinLength,
+} from 'class-validator';
 
-export enum ItemType { PRODUCT = 'PRODUCT', SERVICE = 'SERVICE', RENTAL = 'RENTAL', OTHER = 'OTHER' }
+export enum ItemType {
+  PRODUCT = 'PRODUCT',
+  SERVICE = 'SERVICE',
+  RENTAL = 'RENTAL',
+  OTHER = 'OTHER',
+}
 
 export class PRItemDto {
   @IsString()
   @MinLength(2)
   description!: string;
 
-  // Aceptamos string numérica por compatibilidad con Decimal de Prisma
   @IsNumberString()
   quantity!: string;
 
@@ -16,8 +26,8 @@ export class PRItemDto {
   unit?: string;
 
   @IsOptional()
-  @IsUUID()
-  productId?: string;
+  @IsString()
+  productId?: string; // cuid, no UUID
 
   @IsOptional()
   @IsEnum(ItemType)
