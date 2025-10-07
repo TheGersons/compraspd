@@ -1,46 +1,37 @@
-import { IsDecimal, IsEnum, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+import { IsEnum, IsNumberString, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
 
+export enum ItemType { PRODUCT = 'PRODUCT', SERVICE = 'SERVICE', RENTAL = 'RENTAL', OTHER = 'OTHER' }
 
-export class PrItemDto {
-    @IsOptional()
-    @IsUUID()
-    productId?: string;
+export class PRItemDto {
+  @IsString()
+  @MinLength(2)
+  description!: string;
 
+  // Aceptamos string numérica por compatibilidad con Decimal de Prisma
+  @IsNumberString()
+  quantity!: string;
 
-    @IsString()
-    @MinLength(1)
-    description!: string;
+  @IsOptional()
+  @IsString()
+  unit?: string;
 
+  @IsOptional()
+  @IsUUID()
+  productId?: string;
 
-    @IsDecimal({ decimal_digits: '0,6' })
-    quantity!: any; // usar Decimal.js si deseas
+  @IsOptional()
+  @IsEnum(ItemType)
+  itemType?: ItemType;
 
+  @IsOptional()
+  @IsString()
+  sku?: string;
 
-    @IsOptional()
-    @IsString()
-    unit?: string;
+  @IsOptional()
+  @IsString()
+  barcode?: string;
 
-
-    @IsOptional()
-    @IsString()
-    requiredCurrency?: string; // HNL|USD
-
-
-    @IsOptional()
-    @IsEnum({ PRODUCT: 'PRODUCT', SERVICE: 'SERVICE', RENTAL: 'RENTAL', OTHER: 'OTHER' })
-    itemType?: 'PRODUCT' | 'SERVICE' | 'RENTAL' | 'OTHER';
-
-
-    @IsOptional()
-    @IsString()
-    sku?: string;
-
-
-    @IsOptional()
-    @IsString()
-    barcode?: string;
-
-
-    @IsOptional()
-    extraSpecs?: Record<string, any>;
+  @IsOptional()
+  @IsString()
+  requiredCurrency?: string; // 'HNL' | 'USD'
 }

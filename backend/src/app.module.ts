@@ -10,6 +10,7 @@ import { AttachmentsModule } from './modules/attachments/attachments.module';
 import { CatalogsModule } from './modules/catalogs/catalogs.module';
 import { OffersModule } from './modules/offers/offers.module';
 import { PurchaseRequestsModule } from './modules/purchases-requests/purchase-requests.module';
+import { ClientsModule } from './modules/clients/clients.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { PurchaseRequestsModule } from './modules/purchases-requests/purchase-re
     CatalogsModule,
     OffersModule,
     PurchaseRequestsModule,
+    ClientsModule,
   ],
 })
 export class AppModule { }

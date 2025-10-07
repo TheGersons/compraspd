@@ -1,60 +1,66 @@
 import { Type } from 'class-transformer';
-import { IsDateString, IsEnum, IsOptional, IsString, IsUUID, MinLength, ValidateNested } from 'class-validator';
-import { PrItemDto } from './pr-item.dto';
+import { IsArray, IsDateString, IsEnum, IsOptional, IsString, IsUUID, MinLength, ValidateNested } from 'class-validator';
+import { PRItemDto } from './pr-item.dto';
 
+export enum ProcurementType { NATIONAL = 'NATIONAL', INTERNATIONAL = 'INTERNATIONAL' }
+export enum DeliveryType { WAREHOUSE = 'WAREHOUSE', PROJECT = 'PROJECT' }
 
-export class CreatePrDto {
-    @IsString()
-    @MinLength(3)
-    title!: string;
+export class CreatePurchaseRequestDto {
+  @IsString()
+  @MinLength(3)
+  title!: string;
 
+  @IsOptional()
+  @IsString()
+  description?: string;
 
-    @IsOptional()
-    @IsString()
-    description?: string;
+  @IsOptional()
+  @IsDateString()
+  dueDate?: string;
 
+  @IsOptional()
+  @IsUUID()
+  projectId?: string;
 
-    @IsOptional()
-    @IsDateString()
-    dueDate?: string;
+  // Si se entrega a un proyecto concreto, podemos inferir location según tus reglas de negocio después.
+  @IsOptional()
+  @IsUUID()
+  locationId?: string;
 
+  // Extras (opcionales pero ya contemplados en tu modelo extendido)
+  @IsOptional()
+  @IsUUID()
+  departmentId?: string;
 
-    @IsOptional()
-    @IsUUID()
-    projectId?: string;
+  @IsOptional()
+  clientId?: string;
 
+  @IsOptional()
+  @IsEnum(ProcurementType)
+  procurement?: ProcurementType;
 
-    @IsOptional()
-    @IsUUID()
-    locationId?: string; // destino
+  @IsOptional()
+  @IsDateString()
+  quoteDeadline?: string;
 
+  @IsOptional()
+  @IsEnum(DeliveryType)
+  deliveryType?: DeliveryType;
 
-    @ValidateNested({ each: true })
-    @Type(() => PrItemDto)
-    items!: PrItemDto[];
+  @IsOptional()
+  @IsUUID()
+  warehouseId?: string; // si DeliveryType = WAREHOUSE
 
+  @IsOptional()
+  @IsString()
+  reference?: string;
 
-    @IsOptional()
-    @IsUUID()
-    departmentId?: string;
+  @IsOptional()
+  @IsString()
+  comment?: string;
 
-
-    @IsOptional()
-    @IsUUID()
-    clientId?: string;
-
-
-    @IsOptional()
-    @IsEnum({ WAREHOUSE: 'WAREHOUSE', PROJECT: 'PROJECT' })
-    deliveryType?: 'WAREHOUSE' | 'PROJECT';
-
-
-    @IsOptional()
-    @IsString()
-    reference?: string;
-
-
-    @IsOptional()
-    @IsString()
-    comment?: string;
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PRItemDto)
+  items!: PRItemDto[];
 }
