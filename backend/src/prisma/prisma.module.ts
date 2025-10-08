@@ -1,14 +1,10 @@
+// src/prisma/prisma.module.ts
 import { Global, Module } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { PrismaService } from './prisma.service';
 
 @Global()
 @Module({
-  providers: [
-    {
-      provide: PrismaClient,
-      useFactory: () => new PrismaClient(),
-    },
-  ],
-  exports: [PrismaClient],
+  providers: [PrismaService], // Provee la clase con los hooks de ciclo de vida
+  exports: [PrismaService],   // Permite que otros módulos la inyecten
 })
 export class PrismaModule {}

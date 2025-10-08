@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { User } from '@prisma/client';
-import { PrismaClient } from '@prisma/client/extension';
 import { CreatePurchaseRequestDto } from './dto/create-pr.dto';
+import { PrismaService } from '../../prisma/prisma.service';
 
 type UserJwt = { sub: string; role?: string };
 
@@ -15,26 +15,26 @@ const ALLOWED_TRANSITIONS: Record<string, string[]> = {
 };
 
 /**
- * Service responsible for handling purchase request operations.  This
+ * Service responsible for handling purchase request operations. This
  * implementation makes optional relations like projectId, departmentId and
  * clientId truly optional by conditionally attaching them to the create
- * payload.  It also connects the authenticated user as the requester and
+ * payload. It also connects the authenticated user as the requester and
  * sanitises item payloads so undefined optional properties become null.
  */
 @Injectable()
 export class PurchaseRequestsService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   /**
-   * Creates a new purchase request.  Ensures that at least one item is
-   * provided and attaches the authenticated user as the requester.  Optional
+   * Creates a new purchase request. Ensures that at least one item is
+   * provided and attaches the authenticated user as the requester. Optional
    * relations (project, department, client) are only connected when values
    * are supplied.
    *
    * @param input The payload for the purchase request
-   * @param user  The authenticated user creating the request
+   * @param user The authenticated user creating the request
    */
-  async create(input: CreatePurchaseRequestDto, user: User) {
+  async create(input: CreatePurchaseRequestDto, user: { userId: string }) {
     // Validate items exist
     if (!input.items || input.items.length === 0) {
       throw new BadRequestException('Debes incluir al menos 1 ítem');
@@ -46,57 +46,98 @@ export class PurchaseRequestsService {
       projectId,
       departmentId,
       clientId,
+      locationId, // Añadido locationId para ser manejado aquí
+      dueDate,
+      quoteDeadline,
       ...rest
     } = input;
 
-    // Start constructing the data payload.  Attach the requester via a
+    // Start constructing the data payload. Attach the requester via a
     // relation instead of passing an undefined requesterId.
     const data: any = {
       ...rest,
-      requester: { connect: { id: user.id } },
+      requester: { connect: { id: user.userId } },
+      dueDate: dueDate ? new Date(dueDate) : undefined,
+      quoteDeadline: quoteDeadline ? new Date(quoteDeadline) : undefined
     };
+    
+    // --- INICIO DE VERIFICACIÓN DE FALLO ---
+    console.log('--- CHECKPOINT 1: Inicio de Mapeo de Relaciones ---');
+    console.log('IDs Opcionales:', { projectId, departmentId, clientId, locationId });
+    // ----------------------------------------
 
-    // Conditionally attach optional relations.  When these properties are
-    // undefined or null they are omitted and Prisma will store a NULL value.
-    if (projectId !== undefined && projectId !== null) {
+    // Condicionalmente adjuntar relaciones opcionales. Agregué una
+    // verificación para string vacío (''), que es a menudo el problema en peticiones HTTP.
+    if (projectId && projectId !== '') {
       data.project = { connect: { id: projectId } };
     }
-    if (departmentId !== undefined && departmentId !== null) {
+    if (departmentId && departmentId !== '') {
       data.department = { connect: { id: departmentId } };
     }
-    if (clientId !== undefined && clientId !== null && clientId !== '') {
+    if (clientId && clientId !== '') {
       data.client = { connect: { id: clientId } };
+    }
+    if (locationId && locationId !== '') { // Asegurando que locationId también se conecte si está presente
+        data.location = { connect: { id: locationId } };
     }
 
     // Map items, converting undefined optional fields to null so Prisma
-    // accepts them.  The quantity is converted to a number.
+    // accepts them. The quantity is converted to a number.
     data.items = {
-      create: items.map((item) => ({
-        description: item.description,
-        quantity: Number(item.quantity),
-        unit: item.unit,
-        sku: item.sku,
-        productId: item.productId ?? null,
-        requiredCurrency: item.requiredCurrency ?? null,
-        itemType: item.itemType ?? null,
-        barcode: item.barcode ?? null,
-      })),
-    };
+      create: items.map((item) => {
 
+        // Objeto base del ítem (campos obligatorios y el que requiere conversión)
+        const itemData: any = {
+          description: item.description,
+          quantity: Number(item.quantity), // Convertir el string del DTO a Number/Decimal
+          unit: item.unit, // Si es undefined, se queda así
+          sku: item.sku,
+          barcode: item.barcode,
+          requiredCurrency: item.requiredCurrency,
+          productId: item.productId,
+          itemType: item.itemType,
+        };
+
+        // **PASO CLAVE: Función de Limpieza**
+        // Filtramos el objeto para eliminar claves que son undefined o null.
+        Object.keys(itemData).forEach((key) => {
+          // Usamos `== null` para verificar si es `null` o `undefined`.
+          if (itemData[key] == null) {
+            delete itemData[key];
+          }
+        });
+
+        return itemData;
+      }),
+    }
+    
+    // --- PUNTO CRÍTICO DE LOG ---
+    console.log('--- CHECKPOINT 2: DATA FINAL LISTA PARA PRISMA ---');
+    // Muestra solo los campos principales de "data" y el primer ítem
+    const logData = {
+        ...data,
+        items: { create: data.items.create.length > 0 ? [data.items.create[0], `... ${data.items.create.length - 1} más`] : [] }
+    };
+    console.log('Data Final (Extracto):', JSON.stringify(logData, null, 2)); 
+    console.log('--------------------------------------------------');
+    // ----------------------------
+
+    // La operación de creación de la Solicitud de Compra
     return this.prisma.purchaseRequest.create({
       data,
-      include: {
-        items: true,
-        project: true,
-        location: true,
+      include: { 
+        requester: true, 
+        items: true, 
+        project: true, 
+        location: true, 
         department: true,
         client: true,
-      },
+      }, // Incluimos todas las relaciones para confirmar que se conectan
     });
   }
-
-  // Additional methods (e.g. findAll, findOne, update, remove) would go here
- async listMine(me: UserJwt, page = 1, pageSize = 20) {
+  
+  // Lista todas las solicitudes creadas por el usuario autenticado.
+  async listMine(me: UserJwt, page = 1, pageSize = 20) {
     const [total, items] = await this.prisma.$transaction([
       this.prisma.purchaseRequest.count({ where: { requesterId: me.sub } }),
       this.prisma.purchaseRequest.findMany({
@@ -110,6 +151,7 @@ export class PurchaseRequestsService {
     return { page, pageSize, total, items };
   }
 
+  // Obtiene una solicitud por ID.
   async getById(id: string, me: UserJwt) {
     const pr = await this.prisma.purchaseRequest.findUnique({
       where: { id },
@@ -124,7 +166,13 @@ export class PurchaseRequestsService {
     return pr;
   }
 
+  // Actualiza una solicitud existente.
   async update(id: string, dto: any, me: UserJwt) {
+     // --- NUEVO LOG DE VERIFICACIÓN ---
+    console.log('--- VERIFICANDO ROL DEL USUARIO EN UPDATE ---');
+    console.log('Usuario que ejecuta (me):', me); 
+    console.log('--------------------------------------------');
+    // ------------------------------------
     const current = await this.prisma.purchaseRequest.findUnique({ where: { id }, include: { items: true } });
     if (!current) throw new NotFoundException('Solicitud no encontrada');
 
@@ -155,6 +203,7 @@ export class PurchaseRequestsService {
     });
   }
 
+  // Cambia el estado de una solicitud.
   async changeStatus(id: string, status: string, me: UserJwt) {
     const current = await this.prisma.purchaseRequest.findUnique({ where: { id } });
     if (!current) throw new NotFoundException('Solicitud no encontrada');
@@ -205,6 +254,7 @@ export class PurchaseRequestsService {
     return { page, pageSize, total, items };
   }
 
+  // Comprueba si el usuario tiene rol de supervisor o administrador
   private isSupervisorOrAdmin(me: UserJwt) {
     const r = (me.role || '').toUpperCase();
     return r === 'SUPERVISOR' || r === 'ADMIN';

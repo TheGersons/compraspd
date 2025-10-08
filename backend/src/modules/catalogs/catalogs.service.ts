@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { PrismaService } from '../../prisma/prisma.service';
 
 
 @Injectable()
 export class CatalogsService {
-    constructor(private prisma: PrismaClient) { }
+    constructor(private prisma: PrismaService) { }
 
 
     listDepartments(dto: { q?: string; skip: number; take: number }) {

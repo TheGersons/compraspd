@@ -1,12 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
 import { CreateQuoteDto } from './dto/create-quotes.dto';
 import { UpdateQuoteDto } from './dto/update-quotes.dto';
+import { PrismaService } from '../../prisma/prisma.service';
 
 
 @Injectable()
 export class QuotesService {
-  constructor(private prisma: PrismaClient) { }
+  constructor(private prisma: PrismaService) { }
 
 
   async ensureForPr(dto: CreateQuoteDto) {

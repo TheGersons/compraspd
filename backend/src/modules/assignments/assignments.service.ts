@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
 import { CreateAssignmentDto } from './dto/create-assignment.dto';
+import { PrismaService } from '../../prisma/prisma.service';
 
 
 @Injectable()
 export class AssignmentsService {
-    constructor(private prisma: PrismaClient) { }
+    constructor(private prisma: PrismaService) { }
 
 
     create(dto: CreateAssignmentDto) {

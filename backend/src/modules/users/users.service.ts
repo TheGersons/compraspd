@@ -1,10 +1,10 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaClient) { }
+  constructor(private prisma: PrismaService) { }
 
   async create(data: {
     email: string; password: string; fullName: string;

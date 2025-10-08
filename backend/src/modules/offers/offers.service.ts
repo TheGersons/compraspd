@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
 import { CreateOfferDto } from './dto/create-offer.dto';
 import { AddOfferLinesDto } from './dto/add-offer-lines.dto';
 import { UpdateOfferLineDto } from './dto/update-offer-line.dto';
+import { PrismaService } from '../../prisma/prisma.service';
 
 
 @Injectable()
 export class OffersService {
-    constructor(private prisma: PrismaClient) { }
+    constructor(private prisma: PrismaService) { }
 
 
     create(dto: CreateOfferDto) {

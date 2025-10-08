@@ -1,7 +1,8 @@
 generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["fullTextSearch"] // Opcional, mantén tus features
+  log = ["query"]
 }
-
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -555,4 +556,9 @@ model Message {
 
   @@index([threadId])
 }
+
+
+
+
+
 

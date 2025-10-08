@@ -1,7 +1,7 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 
-const prisma = new PrismaClient();
+const prisma = new PrismaService();
 
 async function upsertCurrencies() {
   await prisma.currency.upsert({

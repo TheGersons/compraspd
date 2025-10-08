@@ -1,10 +1,10 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class ClientsService {
-  constructor(private prisma: PrismaClient) {}
-
+  constructor(private prisma: PrismaService) {}
+  
   async create(data: { name: string; taxId?: string; contact?: string }) {
     if (data.taxId) {
       const exists = await this.prisma.client.findUnique({ where: { taxId: data.taxId } }).catch(() => null);

@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { PrismaService } from '../../prisma/prisma.service';
 
 
 @Injectable()
 export class AttachmentsService {
-    constructor(private prisma: PrismaClient) { }
+    constructor(private prisma: PrismaService) { }
 
 
     create(data: { entityType: string; entityId: string; fileName: string; mimeType: string; size: number; url: string; createdById?: string }) {
