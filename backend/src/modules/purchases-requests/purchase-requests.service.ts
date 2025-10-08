@@ -1,5 +1,4 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { User } from '@prisma/client';
 import { CreatePurchaseRequestDto } from './dto/create-pr.dto';
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -47,6 +46,8 @@ export class PurchaseRequestsService {
       departmentId,
       clientId,
       locationId, // Añadido locationId para ser manejado aquí
+      requestCategory,
+      warehouseId,
       dueDate,
       quoteDeadline,
       ...rest
@@ -56,6 +57,8 @@ export class PurchaseRequestsService {
     // relation instead of passing an undefined requesterId.
     const data: any = {
       ...rest,
+      requestCategory : requestCategory,
+      warehouseId : warehouseId || undefined,
       requester: { connect: { id: user.userId } },
       dueDate: dueDate ? new Date(dueDate) : undefined,
       quoteDeadline: quoteDeadline ? new Date(quoteDeadline) : undefined

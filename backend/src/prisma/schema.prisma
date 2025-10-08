@@ -203,6 +203,7 @@ model PurchaseRequest {
   id          String    @id @default(cuid())
   requesterId String
   projectId   String?
+  requestCategory RequestCategory
   title       String
   description String?
   dueDate     DateTime?
@@ -500,6 +501,13 @@ enum ItemType {
   SERVICE
   RENTAL
   OTHER
+}
+
+enum RequestCategory {
+  SUMINISTROS
+  LICITACIONES
+  INVENTARIOS
+  PROYECTOS
 }
 
 model Department {

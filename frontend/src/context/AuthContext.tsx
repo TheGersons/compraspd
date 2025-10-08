@@ -1,45 +1,93 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { api, getToken } from "../lib/api";
 
-type Me = { userId: string; email: string; };
-type User = { userId: string; email: string; fullName: string; department: string; };
-type AuthCtx = { user: User | null; refresh: () => Promise<void>; logout: () => void };
+// ----------------------------------------------------
+// PASO 1: Tipos del Backend
+// ----------------------------------------------------
 
+// Lo que devuelve el token endpoint /api/v1/auth/me
+type Me = { 
+    sub: string; // ID del usuario
+    email: string; 
+    role: string; // Nombre del rol (ej: "SUPERVISOR") viene directo del token
+}; 
+
+// Lo que devuelve el endpoint de perfil /api/v1/users/:id
+type UserProfileResponse = {
+    id: string;
+    email: string;
+    fullName: string;
+    // El departamento es un objeto anidado (o null)
+    department: { name: string } | null; 
+    // El rol es un objeto anidado
+    role: { id: string; name: string; description: string }; 
+};
+
+// ----------------------------------------------------
+// PASO 2: Tipo del Contexto (Lo que usará tu UI)
+// ----------------------------------------------------
+type UserContext = { 
+    id: string; 
+    email: string; 
+    fullName: string; 
+    // Mantenemos solo el nombre del departamento
+    departmentName: string | null; 
+    role: string; // Mantenemos solo el nombre del rol
+};
+type AuthCtx = { 
+    user: UserContext | null; 
+    refresh: () => Promise<void>; 
+    logout: () => void 
+};
+// ----------------------------------------------------
 
 const Ctx = createContext<AuthCtx>({ user: null, refresh: async () => { }, logout: () => { } });
 export const useAuth = () => useContext(Ctx);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<UserContext | null>(null);
 
   async function refresh() {
     const token = getToken();
     if (!token) { setUser(null); return; }
 
     try {
-      // 1) pide identidad mínima
+      // 1) Pide identidad mínima del token (sub, email, role)
       const me = await api<Me>("/api/v1/auth/me");
-      // 2) pide perfil completo usando el id del paso 1
-      const u = await api<User>(`/api/v1/users/${me.userId}`);
+      
+      // 2) Pide perfil completo usando el ID del token ('sub')
+      const profile = await api<UserProfileResponse>(`/api/v1/users/${me.sub}`); 
 
-      // 3) normaliza a tu tipo User
+      // 3) Normaliza a tu tipo UserContext, extrayendo el nombre del rol y departamento
       setUser({
-        userId: u.userId,
-        email: u.email,
-        fullName: u.fullName,
-        department: u.department,
+        id: me.sub,         
+        email: me.email,
+        fullName: profile.fullName, 
+        
+        // El departamento es opcional y está anidado
+        departmentName: profile.department?.name ?? null, 
+        
+        // Aunque el rol viene en 'me', lo confirmamos y lo tomamos del token 
+        // para máxima consistencia y evitar dependencia de profile.role.name
+        role: me.role,       
       });
-    } catch {
-      setUser(null);
+      
+    } catch (e) {
+        console.error("Error al cargar perfil:", e);
+        logout(); 
     }
   }
+
   function logout() {
     localStorage.removeItem("token");
     sessionStorage.removeItem("token");
     setUser(null);
   }
-
+  
+  // Implementación de useEffect y Provider (se mantiene igual)
   useEffect(() => {
+    void refresh(); 
+    
     const onStorage = (e: StorageEvent) => {
       if (e.key === "token") void refresh();
     };

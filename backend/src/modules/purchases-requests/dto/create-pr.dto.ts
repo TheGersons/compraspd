@@ -3,6 +3,7 @@ import {
   IsArray,
   IsDateString,
   IsEnum,
+  IsNotEmpty,
   IsOptional,
   IsString,
   MinLength,
@@ -18,6 +19,12 @@ export enum DeliveryType {
   WAREHOUSE = 'WAREHOUSE',
   PROJECT = 'PROJECT',
 }
+export enum RequestCategory{
+  SUMINISTROS = 'SUMINISTROS',
+  LICITACIONES = 'LICITACIONES',
+  INVENTARIOS = 'INVENTARIOS',
+  PROYECTOS = 'PROYECTOS'
+}
 
 export class CreatePurchaseRequestDto {
   @IsString()
@@ -28,6 +35,10 @@ export class CreatePurchaseRequestDto {
   @IsString()
   description?: string;
 
+  @IsEnum(RequestCategory)
+  @IsNotEmpty()
+  requestCategory: RequestCategory;
+  
   @IsOptional()
   @IsDateString()
   dueDate?: string;
