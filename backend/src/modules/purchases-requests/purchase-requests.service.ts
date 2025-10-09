@@ -49,14 +49,14 @@ export class PurchaseRequestsService {
    * @param input The payload for the purchase request
    * @param user The authenticated user creating the request
    */
-  async create(input: CreatePurchaseRequestDto, user: { userId: string }) {
+  async create(input: CreatePurchaseRequestDto, user: { sub?: string; userId?: string }) {
     // Validate items exist
     if (!input.items || input.items.length === 0) {
       throw new BadRequestException('Debes incluir al menos 1 ítem');
     }
 
      // 1) Usuario solicitante
-    const requesterId = user.userId;
+    const requesterId = user?.userId ?? user?.sub;
     if (!requesterId) throw new BadRequestException('Usuario no identificado. ' + user.userId);
 
     // 2) Normaliza enums para Prisma
@@ -99,28 +99,22 @@ export class PurchaseRequestsService {
     // Condicionalmente adjuntar relaciones opcionales. Agregué una
     // verificación para string vacío (''), que es a menudo el problema en peticiones HTTP.
     // Proyecto / Almacén coherentes con deliveryType
+     // relaciones opcionales
+    if (departmentId) data.department = { connect: { id: departmentId } };
+    if (locationId)  data.location  = { connect: { id: locationId } };
+
+    // aquí NO uses warehouseId: el schema expone relación "warehouse"
     if (deliveryType === 'PROJECT') {
       if (projectId) data.project = { connect: { id: projectId } };
-      // no enviar warehouseId si no aplica
-      if ('warehouseId' in data) delete data.warehouseId;
-    } else if (deliveryType === 'WAREHOUSE') {
-      // si tu modelo usa FK simple:
-      data.warehouseId = warehouseId && warehouseId !== '' ? warehouseId : undefined;
-      // si en tu esquema es relación, usa:
-      // if (warehouseId) data.warehouse = { connect: { id: warehouseId } };
-      if ('project' in data) delete data.project;
+    } else {
+      if (warehouseId) data.warehouse = { connect: { id: warehouseId } }; // << corrección
     }
 
-    // Cliente: si recibes nombre, conecta por name; si recibes id, por id
+    // cliente: conecta por id real; por nombre solo si es UNIQUE en Prisma
     if (clientId) {
-      if (/^[0-9a-f-]{16,}$/i.test(clientId)) {
-        data.client = { connect: { id: clientId } };
-      } else {
-        // Úsalo solo si `Client.name` es único en Prisma
-        data.client = { connect: { name: clientId } };
-      }
+      if (/^[0-9a-f-]{16,}$/i.test(clientId)) data.client = { connect: { id: clientId } };
+      else data.client = { connect: { name: clientId } }; // requiere @@unique(name)
     }
-
     // Map items, converting undefined optional fields to null so Prisma
     // accepts them. The quantity is converted to a number.
     data.items = {

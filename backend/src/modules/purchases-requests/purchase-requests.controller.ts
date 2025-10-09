@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { PurchaseRequestsService } from './purchase-requests.service';
 import { AuthGuard } from '@nestjs/passport';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -15,8 +15,9 @@ export class PurchaseRequestsController {
 
   // Crear solicitud
   @Post()
-  create(@CurrentUser() me: any, @Body() dto: CreatePurchaseRequestDto) {
-    return this.service.create(dto, me);
+  create(@Body() dto: CreatePurchaseRequestDto,@CurrentUser() user: {sub: string; userId?: string}) {
+    //if(!req?.user?.sub) throw new UnauthorizedException('Token invalido');
+    return this.service.create(dto, user);
   }
 
   // Listar las mías
