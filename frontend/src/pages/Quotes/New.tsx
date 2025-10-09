@@ -4,6 +4,7 @@ import ScrollArea from "../../components/common/ScrollArea";
 import DatePicker from "../../components/form/date-picker";
 import Button from "../../components/ui/button/Button";
 import PageMeta from "../../components/common/PageMeta";
+import { api } from  "../../lib/api"
 // IMPORTACIONES CORREGIDAS: Importamos los Enums y el DTO del archivo compartido
 import { 
     CreatePurchaseRequestDto, 
@@ -146,70 +147,94 @@ export default function QuotesNew() {
         return Object.keys(e).length === 0;
     };
 
-    const onSubmit = (ev: React.FormEvent) => {
-        ev.preventDefault();
-        if (!validate()) return;
+    const onSubmit = async (ev: React.FormEvent) => {
+  ev.preventDefault();
+  if (!validate()) return;
 
-        // DEFINICIÓN DE VARIABLES NECESARIAS (¡SOLUCIÓN AL ERROR DE SCOPE!)
-        const user = MOCK_USER; // Usamos el mock de usuario
-        
-        // Mapeo a los Enums en mayúsculas que el backend espera
-        const finalRequestCategory = form.requestType.toUpperCase() as RequestCategory;
-        const finalProcurementType = form.scope.toUpperCase() as ProcurementType;
-        const finalDeliveryType = form.deliveryPlace.toUpperCase() as DeliveryType;
-        // -------------------------------------------------------------
+  const user = MOCK_USER;
+  const finalRequestCategory = form.requestType.toUpperCase() as RequestCategory;
+  const finalProcurementType = form.scope.toUpperCase() as ProcurementType;
+  const finalDeliveryType = form.deliveryPlace.toUpperCase() as DeliveryType;
 
-        const payload: CreatePurchaseRequestDto = {
-            // CABECERA (PurchaseRequest)
-            requesterId: user.id, 
-            procurement: finalProcurementType, 
-            requestCategory: finalRequestCategory, 
-            reference: form.reference, 
-            clientId: form.finalClient.trim() || null, 
-            
-            // FECHAS (asegúrate de que las fechas sean UTC)
-            quoteDeadline: form.deadline ? `${form.deadline}T00:00:00.000Z` : '2020-10-08T11:49:00.000000-05:00', 
-            dueDate: form.deadline ? `${form.deadline}T00:00:00.000Z` : '2021-10-08T11:49:00.000000-05:00', // Asumimos que la due date es igual a la deadline
-    
-            // UBICACIÓN Y ENTREGA
-            deliveryType: finalDeliveryType, 
-            // Seleccionamos el ID apropiado, el otro es null
-            warehouseId: form.deliveryPlace === "almacen" ? form.warehouseId || null : null, 
-            projectId: form.deliveryPlace === "proyecto" ? form.projectId || null : null, 
-            
-            // DESCRIPCIONES VARIAS
-            comment: form.comments.trim() || null, 
-            title: `Solicitud - ${finalRequestCategory} - ${form.reference}`, 
-            description: form.comments.trim() || 'Sin descripcion', // Usamos los comentarios como descripción/justificación
-            
-            // DETALLES (PRItem)
-            items: form.lines.map(l => ({
-                sku: l.sku.trim(),
-                description: l.description.trim(),
-                quantity: Number(l.quantity),
-                unit: l.unit.toUpperCase(), 
-                extraSpecs: l.notes?.trim() || null, // Mapeo de 'notes' a extraSpecs
-                // Otros campos de PRItem si los necesitas (e.g., requiredCurrency)
-                requiredCurrency: 'USD', // ASUMIDO: Necesitarás un campo para esto en el form
-                productId: null, // ASUMIDO: Si no usas un catálogo de productos
-                itemType: 'PRODUCT' // ASUMIDO: Si usas un Enum para esto
-            })),
-        };
+  const payload: CreatePurchaseRequestDto = {
+    requesterId: user.id,
+    procurement: finalProcurementType,
+    requestCategory: finalRequestCategory,
+    reference: form.reference,
+    clientId: form.finalClient.trim() || null,
+    quoteDeadline: form.deadline
+      ? `${form.deadline}T00:00:00.000Z`
+      : "2020-10-08T11:49:00.000000-05:00",
+    dueDate: form.deadline
+      ? `${form.deadline}T00:00:00.000Z`
+      : "2021-10-08T11:49:00.000000-05:00",
+    deliveryType: finalDeliveryType,
+    warehouseId:
+      form.deliveryPlace === "almacen" ? form.warehouseId || null : null,
+    projectId:
+      form.deliveryPlace === "proyecto" ? form.projectId || null : null,
+    comment: form.comments.trim() || null,
+    title: `Solicitud - ${finalRequestCategory} - ${form.reference}`,
+    description: form.comments.trim() || "Sin descripcion",
+    items: form.lines.map((l) => ({
+      sku: l.sku.trim(),
+      description: l.description.trim(),
+      quantity: Number(l.quantity),
+      unit: l.unit.toUpperCase(),
+      extraSpecs: l.notes?.trim() || null,
+      requiredCurrency: "USD",
+      productId: null,
+      itemType: "PRODUCT",
+    })),
+  };
 
-        console.log("QUOTE_NEW_PAYLOAD", payload);
-        alert("Solicitud validada y lista para enviar.");
+  // Log útil antes de enviar
+  console.log("Enviando payload a la API:", payload);
 
-        // *** AÑADIR LLAMADA A LA API AQUÍ ***
-        // Por ejemplo:
-        // try {
-        //     const response = await api.post("/purchase-requests", payload);
-        //     alert(`Solicitud creada: ${response.data.id}`);
-        //     // Redirigir a la vista de la solicitud
-        // } catch(error) {
-        //     console.error("Error al crear solicitud", error);
-        //     alert("Ocurrió un error al enviar la solicitud.");
-        // }
-    };
+  try {
+    // Llama al backend
+    const created = await api<{ id: string }>("/api/v1/purchase-requests", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+
+    // Log de la respuesta completa
+    console.log("Respuesta de creación:", created);
+
+    alert(`Solicitud creada correctamente con id: ${created.id}`);
+    // Aquí puedes redirigir con react-router si lo deseas
+  } catch (err: any) {
+    // Muestra siempre el error en consola para depurar
+    console.error("Error recibido de la API:", err);
+
+    // Intenta extraer un mensaje útil del error.message (que contiene el cuerpo)
+    let mensaje = "Error desconocido";
+    if (err instanceof Error && err.message) {
+      try {
+        const parsed = JSON.parse(err.message);
+        if (typeof parsed === "string") {
+          mensaje = parsed;
+        } else if (parsed?.message) {
+          // Si message es un array (como suele devolver Nest), únelo
+          mensaje = Array.isArray(parsed.message)
+            ? parsed.message.join(", ")
+            : parsed.message;
+        } else {
+          mensaje = JSON.stringify(parsed);
+        }
+      } catch {
+        // Si no es JSON, muestra el texto tal cual
+        mensaje = err.message;
+      }
+    }
+
+    // Log del mensaje extraído
+    console.log("Mensaje de error procesado:", mensaje);
+
+    // Notificación emergente o alert con el mensaje procesado
+    alert(`Ocurrió un error al enviar la solicitud: ${mensaje}`);
+  }
+};
 
     return (
         <>
