@@ -14,10 +14,14 @@ import { PRItemDto } from './pr-item.dto';
 export enum ProcurementType {
   NATIONAL = 'NATIONAL',
   INTERNATIONAL = 'INTERNATIONAL',
+  NACIONAL = 'NACIONAL',
+  INTERNACIONAL = 'INTERNACIONAL'
 }
 export enum DeliveryType {
   WAREHOUSE = 'WAREHOUSE',
   PROJECT = 'PROJECT',
+  ALMACEN = 'ALMACEN',
+  PROYECTO = 'PROYECTO'
 }
 export enum RequestCategory{
   SUMINISTROS = 'SUMINISTROS',

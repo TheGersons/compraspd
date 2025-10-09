@@ -12,6 +12,22 @@ const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   REJECTED: [],
   CANCELLED: [],
 };
+const toEnumProcurement = (v?: string) => {
+  const t = (v ?? '').toUpperCase();
+  if (t === 'NATIONAL' || t === 'INTERNATIONAL') return t;
+  if (t === 'NACIONAL') return 'NATIONAL';
+  if (t === 'INTERNACIONAL') return 'INTERNATIONAL';
+  return undefined;
+};
+
+const toEnumDelivery = (v?: string) => {
+  const t = (v ?? '').toUpperCase();
+  if (t === 'WAREHOUSE' || t === 'PROJECT') return t;
+  if (t === 'ALMACEN' || t === 'ALMACÉN') return 'WAREHOUSE';
+  if (t === 'PROYECTO') return 'PROJECT';
+  return undefined;
+};
+
 
 /**
  * Service responsible for handling purchase request operations. This
@@ -39,6 +55,15 @@ export class PurchaseRequestsService {
       throw new BadRequestException('Debes incluir al menos 1 ítem');
     }
 
+     // 1) Usuario solicitante
+    const requesterId = user.userId;
+    if (!requesterId) throw new BadRequestException('Usuario no identificado. ' + user.userId);
+
+    // 2) Normaliza enums para Prisma
+    const procurement = toEnumProcurement(input.procurement);
+    const deliveryType = toEnumDelivery(input.deliveryType);
+    if (!procurement) throw new BadRequestException('procurement inválido');
+    if (!deliveryType) throw new BadRequestException('deliveryType inválido');
     // Destructure optional foreign keys so we can handle them separately
     const {
       items,
@@ -57,6 +82,8 @@ export class PurchaseRequestsService {
     // relation instead of passing an undefined requesterId.
     const data: any = {
       ...rest,
+      procurement,
+      deliveryType,
       requestCategory : requestCategory,
       warehouseId : warehouseId || undefined,
       requester: { connect: { id: user.userId } },
@@ -71,17 +98,27 @@ export class PurchaseRequestsService {
 
     // Condicionalmente adjuntar relaciones opcionales. Agregué una
     // verificación para string vacío (''), que es a menudo el problema en peticiones HTTP.
-    if (projectId && projectId !== '') {
-      data.project = { connect: { id: projectId } };
+    // Proyecto / Almacén coherentes con deliveryType
+    if (deliveryType === 'PROJECT') {
+      if (projectId) data.project = { connect: { id: projectId } };
+      // no enviar warehouseId si no aplica
+      if ('warehouseId' in data) delete data.warehouseId;
+    } else if (deliveryType === 'WAREHOUSE') {
+      // si tu modelo usa FK simple:
+      data.warehouseId = warehouseId && warehouseId !== '' ? warehouseId : undefined;
+      // si en tu esquema es relación, usa:
+      // if (warehouseId) data.warehouse = { connect: { id: warehouseId } };
+      if ('project' in data) delete data.project;
     }
-    if (departmentId && departmentId !== '') {
-      data.department = { connect: { id: departmentId } };
-    }
-    if (clientId && clientId !== '') {
-      data.client = { connect: { id: clientId } };
-    }
-    if (locationId && locationId !== '') { // Asegurando que locationId también se conecte si está presente
-        data.location = { connect: { id: locationId } };
+
+    // Cliente: si recibes nombre, conecta por name; si recibes id, por id
+    if (clientId) {
+      if (/^[0-9a-f-]{16,}$/i.test(clientId)) {
+        data.client = { connect: { id: clientId } };
+      } else {
+        // Úsalo solo si `Client.name` es único en Prisma
+        data.client = { connect: { name: clientId } };
+      }
     }
 
     // Map items, converting undefined optional fields to null so Prisma
@@ -93,12 +130,12 @@ export class PurchaseRequestsService {
         const itemData: any = {
           description: item.description,
           quantity: Number(item.quantity), // Convertir el string del DTO a Number/Decimal
-          unit: item.unit, // Si es undefined, se queda así
-          sku: item.sku,
-          barcode: item.barcode,
-          requiredCurrency: item.requiredCurrency,
-          productId: item.productId,
-          itemType: item.itemType,
+          unit: item.unit ?? 1, // Si es undefined, se queda así
+          sku: item.sku ?? undefined,
+          barcode: item.barcode ?? undefined,
+          requiredCurrency: item.requiredCurrency ?? 'HNL',
+          productId: item.productId ?? undefined,
+          itemType: item.itemType ?? undefined,
         };
 
         // **PASO CLAVE: Función de Limpieza**
@@ -124,6 +161,13 @@ export class PurchaseRequestsService {
     console.log('Data Final (Extracto):', JSON.stringify(logData, null, 2)); 
     console.log('--------------------------------------------------');
     // ----------------------------
+
+
+     // Log corto útil
+    console.log('[PR.create] data.deliveryType=', data.deliveryType,
+                'warehouseId=', data.warehouseId, 'project?', !!data.project,
+                'requester=', requesterId);
+
 
     // La operación de creación de la Solicitud de Compra
     return this.prisma.purchaseRequest.create({

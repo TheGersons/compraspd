@@ -1,66 +1,48 @@
-// src/prisma/prisma.service.ts
-import {
-  INestApplication,
-  Injectable,
-  OnModuleInit,
-  OnModuleDestroy,
-} from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
-import { Logger } from '@nestjs/common';
+// backend/src/prisma/prisma.service.ts
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { PrismaClient, Prisma } from '@prisma/client';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
-    private readonly logger = new Logger(PrismaService.name);
+  private readonly logger = new Logger('Prisma');
+
   constructor() {
-    // 1. **CLAVE:** Inicializar con la configuración 'log'
-    // Esto asegura que PrismaClient sepa que debe escuchar eventos,
-    // incluyendo 'beforeExit'.
     super({
-      // ¡AGREGA ESTO!
       log: [
-        { level: 'warn', emit: 'event' },
         { level: 'error', emit: 'event' },
-        { level: 'query', emit: 'event' }, // <--- ESTO MUESTRA CADA CONSULTA SQL
+        { level: 'warn',  emit: 'event' },
+        // { level: 'query', emit: 'event' },
+        // { level: 'info',  emit: 'event' },
       ],
-      // ... otras configuraciones
     });
+
+    // Forzar la firma de $on para evitar "never"
+    const on = this.$on.bind(this) as unknown as {
+      (event: 'error'|'warn', cb: (e: Prisma.LogEvent) => void): void;
+      (event: 'query', cb: (e: Prisma.QueryEvent) => void): void;
+      (event: 'info',  cb: (e: Prisma.LogEvent) => void): void;
+    };
+
+    on('error', (e) => this.logger.error(`[${e.target}] ${e.message}`));
+    on('warn',  (e) => this.logger.warn(`[${e.target}] ${e.message}`));
+    // on('query', (e) => this.logger.log(`${e.query} :: ${e.duration}ms`));
+    // on('info',  (e) => this.logger.log(e.message));
   }
 
   async onModuleInit() {
     await this.$connect();
-
-    // 2. Suscribirse a los eventos de consulta y registrarlos
-    (this as any).$on('query', (event: any) => {
-      this.logger.log(`Prisma Query: ${event.query} (Params: ${event.params})`);
-    });
-
-    // Opcional: registrar advertencias y errores
-    (this as any).$on('warn', (event: any) => {
-      this.logger.warn(`Prisma Warning: ${event.message}`);
-    });
-    (this as any).$on('error', (event: any) => {
-      this.logger.error(`Prisma Error: ${event.message}`);
-    });
+    this.logger.log('Prisma conectado');
   }
+
   async onModuleDestroy() {
-    // 3. Desconexión limpia durante el hot-reload.
     await this.$disconnect();
+    this.logger.log('Prisma desconectado');
   }
 
-  // Hook para permitir un cierre elegante de NestJS.
-  // IMPORTANTE: El tipado se arregla al configurar 'log' en el constructor.
-  // Si persiste el error, verifica que no tengas problemas de versiones de @types.
-  async enableShutdownHooks(app: INestApplication) {
-    // Para entornos muy estrictos, a veces es necesario un pequeño "hack" de tipado:
-    (this as any).$on('beforeExit', async () => {
-       await app.close();
+  async enableShutdownHooks(appClose: () => Promise<void>) {
+    process.on('beforeExit', async () => {
+      this.logger.log('beforeExit recibido, cerrando app…');
+      await appClose();
     });
-    
-    /*
-    // Si la solución de 'as any' no te gusta, intenta la línea normal:
-    // this.$on('beforeExit', async () => {
-    //   await app.close();
-    // });
-    */
   }
 }

@@ -22,7 +22,7 @@ export enum DeliveryType {
 export interface PRItemCreateDto {
     sku: string;
     description: string;
-    quantity: number;
+    quantity: string;
     unit: string;
     extraSpecs?: string | null;
 }
