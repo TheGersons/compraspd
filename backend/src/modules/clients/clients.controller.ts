@@ -15,9 +15,10 @@ export class ClientsController {
   }
 
   @Get()
-  list(@Query() q: ListClientQueryDto) {
-    return this.service.list(q);
-  }
+  //El frontend llama a esta ruta sin parametros
+  list(@Query() q: ListClientQueryDto) { 
+    return this.service.list(q);
+  }
 
   @Get(':id')
   get(@Param('id') id: string) {

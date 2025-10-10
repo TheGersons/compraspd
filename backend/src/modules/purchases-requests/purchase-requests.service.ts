@@ -55,7 +55,7 @@ export class PurchaseRequestsService {
       throw new BadRequestException('Debes incluir al menos 1 ítem');
     }
 
-     // 1) Usuario solicitante
+    // 1) Usuario solicitante
     const requesterId = user?.userId ?? user?.sub;
     if (!requesterId) throw new BadRequestException('Usuario no identificado. ' + user.userId);
 
@@ -84,13 +84,13 @@ export class PurchaseRequestsService {
       ...rest,
       procurement,
       deliveryType,
-      requestCategory : requestCategory,
-      warehouseId : warehouseId || undefined,
-      requester: { connect: { id: user.userId } },
+      requestCategory: requestCategory,
+      //warehouseId: warehouseId || undefined,
+      requester: { connect: { id: requesterId } }, // <--- ¡Usa la variable validada!
       dueDate: dueDate ? new Date(dueDate) : undefined,
       quoteDeadline: quoteDeadline ? new Date(quoteDeadline) : undefined
     };
-    
+
     // --- INICIO DE VERIFICACIÓN DE FALLO ---
     console.log('--- CHECKPOINT 1: Inicio de Mapeo de Relaciones ---');
     console.log('IDs Opcionales:', { projectId, departmentId, clientId, locationId });
@@ -99,9 +99,9 @@ export class PurchaseRequestsService {
     // Condicionalmente adjuntar relaciones opcionales. Agregué una
     // verificación para string vacío (''), que es a menudo el problema en peticiones HTTP.
     // Proyecto / Almacén coherentes con deliveryType
-     // relaciones opcionales
+    // relaciones opcionales
     if (departmentId) data.department = { connect: { id: departmentId } };
-    if (locationId)  data.location  = { connect: { id: locationId } };
+    if (locationId) data.location = { connect: { id: locationId } };
 
     // aquí NO uses warehouseId: el schema expone relación "warehouse"
     if (deliveryType === 'PROJECT') {
@@ -144,39 +144,39 @@ export class PurchaseRequestsService {
         return itemData;
       }),
     }
-    
+
     // --- PUNTO CRÍTICO DE LOG ---
     console.log('--- CHECKPOINT 2: DATA FINAL LISTA PARA PRISMA ---');
     // Muestra solo los campos principales de "data" y el primer ítem
     const logData = {
-        ...data,
-        items: { create: data.items.create.length > 0 ? [data.items.create[0], `... ${data.items.create.length - 1} más`] : [] }
+      ...data,
+      items: { create: data.items.create.length > 0 ? [data.items.create[0], `... ${data.items.create.length - 1} más`] : [] }
     };
-    console.log('Data Final (Extracto):', JSON.stringify(logData, null, 2)); 
+    console.log('Data Final (Extracto):', JSON.stringify(logData, null, 2));
     console.log('--------------------------------------------------');
     // ----------------------------
 
 
-     // Log corto útil
+    // Log corto útil
     console.log('[PR.create] data.deliveryType=', data.deliveryType,
-                'warehouseId=', data.warehouseId, 'project?', !!data.project,
-                'requester=', requesterId);
+      'warehouseId=', data.warehouseId, 'project?', !!data.project,
+      'requester=', requesterId);
 
 
     // La operación de creación de la Solicitud de Compra
     return this.prisma.purchaseRequest.create({
       data,
-      include: { 
-        requester: true, 
-        items: true, 
-        project: true, 
-        location: true, 
+      include: {
+        requester: true,
+        items: true,
+        project: true,
+        location: true,
         department: true,
         client: true,
       }, // Incluimos todas las relaciones para confirmar que se conectan
     });
   }
-  
+
   // Lista todas las solicitudes creadas por el usuario autenticado.
   async listMine(me: UserJwt, page = 1, pageSize = 20) {
     const [total, items] = await this.prisma.$transaction([
@@ -209,9 +209,9 @@ export class PurchaseRequestsService {
 
   // Actualiza una solicitud existente.
   async update(id: string, dto: any, me: UserJwt) {
-     // --- NUEVO LOG DE VERIFICACIÓN ---
+    // --- NUEVO LOG DE VERIFICACIÓN ---
     console.log('--- VERIFICANDO ROL DEL USUARIO EN UPDATE ---');
-    console.log('Usuario que ejecuta (me):', me); 
+    console.log('Usuario que ejecuta (me):', me);
     console.log('--------------------------------------------');
     // ------------------------------------
     const current = await this.prisma.purchaseRequest.findUnique({ where: { id }, include: { items: true } });

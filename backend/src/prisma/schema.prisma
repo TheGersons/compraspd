@@ -203,7 +203,7 @@ model PurchaseRequest {
   id          String    @id @default(cuid())
   requesterId String
   projectId   String?
-  requestCategory RequestCategory
+  requestCategory RequestCategory @default(LICITACIONES)
   title       String
   description String?
   dueDate     DateTime?

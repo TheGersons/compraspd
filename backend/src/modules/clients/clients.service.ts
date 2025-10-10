@@ -3,8 +3,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class ClientsService {
-  constructor(private prisma: PrismaService) {}
-  
+  constructor(private prisma: PrismaService) { }
+
   async create(data: { name: string; taxId?: string; contact?: string }) {
     if (data.taxId) {
       const exists = await this.prisma.client.findUnique({ where: { taxId: data.taxId } }).catch(() => null);
@@ -14,8 +14,6 @@ export class ClientsService {
   }
 
   async list(params: { search?: string; page?: number; pageSize?: number }) {
-    const page = Math.max(1, params.page ?? 1);
-    const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 20));
     const where: any = {};
     if (params.search) {
       where.OR = [
@@ -24,6 +22,21 @@ export class ClientsService {
         { contact: { contains: params.search, mode: 'insensitive' } },
       ];
     }
+
+    // Si no se especifican page/pageSize, devolvemos toda la lista (sin contar total)
+    if (!params.page && !params.pageSize) {
+      const items = await this.prisma.client.findMany({
+        where,
+        orderBy: { name: 'asc' },
+      });
+      // Devolvemos la lista simple que el frontend espera
+      return items;
+    }
+
+    // Lógica de paginación normal si page/pageSize están presentes
+    const page = Math.max(1, params.page ?? 1);
+    const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 20));
+
     const [total, items] = await this.prisma.$transaction([
       this.prisma.client.count({ where }),
       this.prisma.client.findMany({
@@ -31,6 +44,8 @@ export class ClientsService {
         orderBy: { name: 'asc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
+        // Solo seleccionamos los campos que necesita el frontend
+        select: { id: true, name: true, taxId: true }
       }),
     ]);
     return { page, pageSize, total, items };
