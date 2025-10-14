@@ -1,6 +1,6 @@
 // pages/Quotes/Assignment.tsx
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate } from "react-router-dom";
 import PageMeta from "../../components/common/PageMeta";
 import ComponentCard from "../../components/common/ComponentCard";
 import Filters, { QuoteFilters } from "../../components/quotes/filters";

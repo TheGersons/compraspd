@@ -21,11 +21,13 @@ type RequestType = "licitaciones" | "proyectos" | "suministros" | "inventarios";
 type DeliveryPlace = "almacen" | "proyecto";
 
 type ProductLine = {
+  // AÑADE ESTO:
+  id: string;
   sku: string;
   description: string;
   quantity: number | "";
   unit: "und" | "caja" | "kg" | "M" | "Lb";
-  notes?: string;
+  extraSpecs: string;
 };
 
 type FormState = {
@@ -46,7 +48,7 @@ type ClientData = {
   name: string;
   taxId?: string;
 };
-
+let warehouseIds: string[] | undefined; // ID del almacén seleccionado
 const UNITS: ProductLine["unit"][] = ["und", "caja", "kg", "M", "Lb"];
 
 // Mock
@@ -57,7 +59,7 @@ const PROJECTS = [
   { id: "PRJ-003", name: "Data Center TGU" },
 ];
 // Mock para almacén (usarías un hook de datos aquí)
-const WAREHOUSE_MOCK_ID = "WH-001";
+const WAREHOUSE_MOCK_ID = "Almacén / Oficina";
 
 function formatDateYYYYMMDD(d: Date) {
   const y = d.getFullYear();
@@ -68,7 +70,7 @@ function formatDateYYYYMMDD(d: Date) {
 function addDays(base: Date, days: number) { const d = new Date(base); d.setDate(d.getDate() + days); return d; }
 
 export default function QuotesNew() {
-  
+
   const auth = useAuth();
   const minDateObj = useMemo(() => addDays(new Date(), 5), []);
   const minDeadline = useMemo(() => formatDateYYYYMMDD(minDateObj), [minDateObj]);
@@ -82,6 +84,7 @@ export default function QuotesNew() {
   const [allClients, setAllClients] = useState<ClientData[]>([]); // Lista completa
   const [clientQuery, setClientQuery] = useState(""); // El texto que el usuario teclea en el buscador
   const [isLoadingClients, setIsLoadingClients] = useState(false);
+  const generateId = () => Math.random().toString(36).substring(2, 9);
 
   const [form, setForm] = useState<FormState>({
     scope: "nacional",
@@ -93,32 +96,50 @@ export default function QuotesNew() {
     projectId: undefined,
     warehouseId: WAREHOUSE_MOCK_ID, // Usamos el ID de mock por defecto si es a almacén
     comments: "",
-    lines: [{ sku: "", description: "", quantity: "", unit: "und", notes: "" }],
+    lines: [{ id: generateId(), sku: "", description: "", quantity: "", unit: "und", extraSpecs: "" }],
   });
 
   useEffect(() => {
-    const fetchClients = async () => {
-      setIsLoadingClients(true);
-      try {
-        // ASUMIMOS que la API devuelve { items: ClientData[] }
-        const response = await api<{ items: ClientData[] }>("/api/v1/clients");
-        
-        // La clave: Extraemos la lista de la propiedad 'items'
-        const clientsArray = response.items || []; 
-        
-        console.log("Clientes cargados:", clientsArray.length);
-        setAllClients(clientsArray);
-        
-      } catch (error) {
-        console.error("Error al cargar clientes:", error);
-        setAllClients([]); 
-      } finally {
-        setIsLoadingClients(false);
-      }
-    };
+    const fetchClients = async () => {
+      setIsLoadingClients(true);
+      try {
+        // ASUMIMOS que la API devuelve { items: ClientData[] }
+        const response = await api<{ items: ClientData[] }>("/api/v1/clients");
 
-    fetchClients();
-  }, []);
+        // La clave: Extraemos la lista de la propiedad 'items'
+        const clientsArray = response.items || [];
+
+        console.log("Clientes cargados:", clientsArray.length);
+        setAllClients(clientsArray);
+
+      } catch (error) {
+        console.error("Error al cargar clientes:", error);
+        setAllClients([]);
+      } finally {
+        setIsLoadingClients(false);
+      }
+    };
+
+    fetchClients();
+  }, []);
+
+  useEffect(() => {
+    const loadLocations = async () => {
+      try {
+        const response = await api<{ id: string; name: string; type: string }[]>("/api/v1/locations/warehouses");
+
+        const warehouses = response || [];
+
+        warehouseIds = warehouses.map(wh => wh.id);
+        // Aquí podrías cargar las ubicaciones si es necesario
+        console.log("Almacenes cargados:", warehouses.length, warehouseIds);
+      } catch (error) {
+        console.error("Error al cargar ubicaciones:", error);
+      }
+    };
+
+    loadLocations();
+  }, []);
 
   // --- LÓGICA DE FILTRADO (Cliente) ---
   const filteredClients = useMemo(() => {
@@ -143,13 +164,14 @@ export default function QuotesNew() {
   const updateLine = (idx: number, patch: Partial<ProductLine>) =>
     setForm(prev => {
       const next = [...prev.lines];
-      next[idx] = { ...next[idx], ...patch };
+      next[idx] = { ...next[idx], ...patch }; // <-- Aquí el patch se aplica
       return { ...prev, lines: next };
     });
 
   const addLine = () => setForm(prev => ({
     ...prev,
-    lines: [...prev.lines, { sku: "", description: "", quantity: "", unit: "und", notes: "" }],
+    // Añadir ID al nuevo elemento
+    lines: [...prev.lines, { id: generateId(), sku: "", description: "", quantity: "", unit: "und", extraSpecs: "" }],
   }));
   const removeLine = (idx: number) =>
     setForm(prev => ({ ...prev, lines: prev.lines.filter((_, i) => i !== idx) }));
@@ -180,16 +202,19 @@ export default function QuotesNew() {
     const skuRe = /^[A-Za-z0-9._-]{3,32}$/;
     form.lines.forEach((ln, i) => {
       if (!ln.sku || !skuRe.test(ln.sku)) e[`lines.${i}.sku`] = "SKU inválido (3-32, A-Z 0-9 . _ -)";
-      if (!ln.description || ln.description.trim().length < 3) e[`lines.${i}.description`] = "Descripción muy corta";
+      if (!ln.description || ln.description.trim().length < 3) {
+        e[`lines.${i}.description`] = "Descripción muy corta";
+      }
       if (ln.quantity === "" || Number.isNaN(Number(ln.quantity)) || Number(ln.quantity) <= 0 || !Number.isFinite(Number(ln.quantity))) {
         e[`lines.${i}.quantity`] = "Cantidad > 0";
       } else if (!Number.isInteger(Number(ln.quantity))) {
         e[`lines.${i}.quantity`] = "Debe ser entero";
       }
       if (!UNITS.includes(ln.unit)) e[`lines.${i}.unit`] = "Unidad inválida";
+      if (ln.extraSpecs.trim().length > 0 && ln.extraSpecs.trim().length < 2) { e[`lines.${i}.extraSpecs`] = "Especificaciones muy cortas"; }
     });
 
-
+    alert(form.lines[0].extraSpecs);
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -198,11 +223,12 @@ export default function QuotesNew() {
     ev.preventDefault();
     if (!validate()) return;
 
-    
+
     const finalRequestCategory = form.requestType.toUpperCase() as RequestCategory;
 
     const payload: CreatePurchaseRequestDto = {
       requesterId: auth.user?.id.toString() ?? "",
+      departmentId: auth.user?.departmentId?.toString() ?? "",
       procurement: mapProcurement(form.scope) as ProcurementType,
       requestCategory: finalRequestCategory,
       reference: form.reference,
@@ -214,7 +240,9 @@ export default function QuotesNew() {
         ? `${form.deadline}T00:00:00.000Z`
         : "2021-10-08T11:49:00.000000-05:00",
       deliveryType: form.deliveryPlace.toString().toUpperCase() as DeliveryType,
-      warehouseId: form.deliveryPlace,
+      warehouseId: warehouseIds?.[0] || null, // Usamos el ID del almacén mock o null
+      locationId: warehouseIds?.[0] || null, // locationId es lo mismo que warehouseId en este contexto
+      locationName: warehouseIds?.[1] || null, // Nombre del almacén
       projectId: form.projectId ? "" : "",
       comment: form.comments.trim() || null,
       title: `Solicitud - ${finalRequestCategory} - ${form.reference}`,
@@ -224,13 +252,14 @@ export default function QuotesNew() {
         description: l.description.trim(),
         quantity: toNumberString(l.quantity),
         unit: l.unit.toUpperCase(),
-        extraSpecs: l.notes?.trim() || null,
-        requiredCurrency: "USD",
+        extraSpecs: l.extraSpecs || "",
+        requiredCurrency: form.scope === "nacional" ? "HNL" : "USD",
         productId: null,
         itemType: "PRODUCT",
       })),
     };
-    alert(payload.deliveryType.toString());
+    alert(form.lines.map((l) => l.extraSpecs));
+    alert(payload.items[0].extraSpecs);
     // Log útil antes de enviar
     console.log("Enviando payload a la API:", payload);
 
@@ -499,7 +528,7 @@ export default function QuotesNew() {
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-white/10">
                   {form.lines.map((ln, i) => (
-                    <tr key={i} className="text-sm text-gray-700 dark:text-gray-200">
+                    <tr key={ln.id} className="text-sm text-gray-700 dark:text-gray-200">
                       <td className="px-3 py-2 align-top">
                         <input
                           value={ln.sku}
@@ -541,11 +570,12 @@ export default function QuotesNew() {
                       </td>
                       <td className="px-3 py-2 align-top">
                         <input
-                          value={ln.notes || ""}
-                          onChange={e => updateLine(i, { notes: e.target.value })}
-                          placeholder="Opcional"
-                          className="min-w-56 rounded-lg border border-gray-300 bg-white p-2 text-sm dark:border-white/10 dark:bg-[#101828] dark:text-gray-100"
+                          value={ln.extraSpecs}
+                          onChange={e => updateLine(i, { extraSpecs: e.target.value })}
+                          placeholder="Especificaciones adicionales"
+                          className="min-w-64 rounded-lg border border-gray-300 bg-white p-2 text-sm dark:border-white/10 dark:bg-[#101828] dark:text-gray-100"
                         />
+                        {errors[`lines.${i}.extraSpecs`] && <p className="mt-1 text-xs text-rose-400">{errors[`lines.${i}.extraSpecs`]}</p>}
                       </td>
                       <td className="px-3 py-2 align-top">
                         <Button size="xs" variant="danger" onClick={() => removeLine(i)}>

@@ -1,4 +1,4 @@
-import { Outlet, NavLink } from "react-router";
+import { Outlet, NavLink } from "react-router-dom";
 
 const tabs = [
   { to: "/shopping", label: "Resumen", end: true },

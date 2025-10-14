@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useLocation } from "react-router";
+import { Link, useLocation } from "react-router-dom";
 import { ShoppingCart /*, User*/ } from "lucide-react";
 
 // Assume these icons are imported from an icon library

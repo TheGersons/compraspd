@@ -42,6 +42,29 @@ async function role(name: string, description?: string) {
     create: { name, description },
   });
 }
+async function upsertDefaultLocation() {
+  const warehouseName = 'Almacén Principal / Oficina Central';
+  
+  // Ahora es válido porque 'name' tiene @unique en el schema.
+  const defaultWarehouse = await prisma.location.upsert({
+    where: { name: warehouseName }, 
+    update: {
+        active: true, 
+        type: 'ALMACEN',
+        // Se puede añadir más lógica aquí si quieres actualizar campos
+    },
+    create: {
+      type: 'ALMACEN',
+      name: warehouseName,
+      address1: 'Dirección no especificada',
+      city: 'Ciudad Central',
+      country: 'HN',
+      active: true,
+    },
+  });
+  console.log(`Ubicación/Almacén creada/verificada con ID: ${defaultWarehouse.id}`);
+  return defaultWarehouse;
+}
 
 async function mapRolePerms() {
   const perms = await prisma.permission.findMany();
@@ -68,7 +91,8 @@ async function mapRolePerms() {
     ...by('product', ['create','update']),
     ...by('supplier', ['create','update']),
   ];
-
+  
+  
   // ADMIN: todo
   const adminPerms = perms.map(p => p.id);
 
@@ -114,10 +138,14 @@ async function adminUser(adminRoleId: string) {
 }
 
 async function main() {
+  // 1. Crear/verificar ubicaciones antes de usar roles
+  await upsertDefaultLocation(); // <--- LLAMADA A LA NUEVA FUNCIÓN
+
   await upsertCurrencies();
   await upsertPermissions();
   const { admin } = await mapRolePerms();
   await adminUser(admin.id);
+  
   console.log('Seed completado.');
 }
 

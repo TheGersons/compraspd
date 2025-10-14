@@ -8,7 +8,7 @@ export class UsersService {
 
   async create(data: {
     email: string; password: string; fullName: string;
-    departmentId?: string; costCenter?: string; roleId: string;
+    departmentId: string; costCenter?: string; roleId: string;
   }) {
     const exists = await this.prisma.user.findUnique({ where: { email: data.email } });
     if (exists) throw new BadRequestException('Email ya registrado');
@@ -19,7 +19,7 @@ export class UsersService {
         email: data.email,
         passwordHash,
         fullName: data.fullName,
-        departmentId: data.departmentId ?? null,
+        departmentId: data.departmentId,
         costCenter: data.costCenter,
         roleId: data.roleId,
       },

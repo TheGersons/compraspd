@@ -3,7 +3,7 @@ import KpiCard from "../../components/quotes/KpiCard";
 import QuotesTable, { Quote } from "../../components/quotes/QuotesTable";
 import { months, quotesPerMonth, amountPerMonth, revenuePerMonth } from "../../data/quotes";
 import PageMeta from "../../components/common/PageMeta";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import ComponentCard from "../../components/common/ComponentCard";
 import Button from "../../components/ui/button/Button";
 import BarMonthly from "../../components/quotes/charts/BarMonthly";

@@ -11,6 +11,8 @@ import { CatalogsModule } from './modules/catalogs/catalogs.module';
 import { OffersModule } from './modules/offers/offers.module';
 import { PurchaseRequestsModule } from './modules/purchases-requests/purchase-requests.module';
 import { ClientsModule } from './modules/clients/clients.module';
+import { LocationsModule } from './modules/Locations/locations.module';
+import { DepartmentModule } from './modules/deparments/department.module';
 
 @Module({
   imports: [
@@ -26,6 +28,8 @@ import { ClientsModule } from './modules/clients/clients.module';
     OffersModule,
     PurchaseRequestsModule,
     ClientsModule,
+    LocationsModule,
+    DepartmentModule,
   ],
 })
 export class AppModule { }

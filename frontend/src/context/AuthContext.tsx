@@ -18,7 +18,7 @@ type UserProfileResponse = {
     email: string;
     fullName: string;
     // El departamento es un objeto anidado (o null)
-    department: { name: string } | null; 
+    departmentId: string | null; 
     // El rol es un objeto anidado
     role: { id: string; name: string; description: string }; 
 };
@@ -31,7 +31,7 @@ type UserContext = {
     email: string; 
     fullName: string; 
     // Mantenemos solo el nombre del departamento
-    departmentName: string | null; 
+    departmentId: string | null; 
     role: string; // Mantenemos solo el nombre del rol
 };
 type AuthCtx = { 
@@ -65,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         fullName: profile.fullName, 
         
         // El departamento es opcional y está anidado
-        departmentName: profile.department?.name ?? null, 
+        departmentId: profile.departmentId ?? null,
         
         // Aunque el rol viene en 'me', lo confirmamos y lo tomamos del token 
         // para máxima consistencia y evitar dependencia de profile.role.name

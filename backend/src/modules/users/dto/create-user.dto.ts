@@ -5,7 +5,7 @@ export class CreateUserDto {
     @MinLength(8) password!: string;
     @IsString() @IsNotEmpty() fullName!: string;
 
-    @IsString() @IsOptional() department?: string;
+    @IsString()  departmentId!: string;
     @IsString() @IsOptional() costCenter?: string;
 
     @IsString() roleId!: string; // un rol 

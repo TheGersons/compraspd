@@ -24,12 +24,13 @@ export interface PRItemCreateDto {
     description: string;
     quantity: string;
     unit: string;
-    extraSpecs?: string | null;
+    extraSpecs: string;
 }
 
 // Opcional: Tipo DTO simplificado para el cuerpo de la petición POST
 export interface CreatePurchaseRequestDto {
     requesterId: string; 
+    departmentId: string;
     procurement: ProcurementType;
     requestCategory: RequestCategory; // Usamos el nuevo enum
     reference: string;
@@ -37,6 +38,8 @@ export interface CreatePurchaseRequestDto {
     quoteDeadline: string; 
     dueDate: string | null;
     deliveryType: DeliveryType;
+    locationName: string | null;
+    locationId: string | null;
     warehouseId: string | null;
     projectId: string | null;
     comment: string | null;

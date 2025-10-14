@@ -64,13 +64,14 @@ export class PurchaseRequestsService {
     const deliveryType = toEnumDelivery(input.deliveryType);
     if (!procurement) throw new BadRequestException('procurement inválido');
     if (!deliveryType) throw new BadRequestException('deliveryType inválido');
+    
     // Destructure optional foreign keys so we can handle them separately
     const {
       items,
       projectId,
       departmentId,
       clientId,
-      locationId, // Añadido locationId para ser manejado aquí
+      locationId,
       requestCategory,
       warehouseId,
       dueDate,
@@ -78,15 +79,13 @@ export class PurchaseRequestsService {
       ...rest
     } = input;
 
-    // Start constructing the data payload. Attach the requester via a
-    // relation instead of passing an undefined requesterId.
+    // Start constructing the data payload.
     const data: any = {
       ...rest,
       procurement,
       deliveryType,
       requestCategory: requestCategory,
-      //warehouseId: warehouseId || undefined,
-      requester: { connect: { id: requesterId } }, // <--- ¡Usa la variable validada!
+      requester: { connect: { id: requesterId } },
       dueDate: dueDate ? new Date(dueDate) : undefined,
       quoteDeadline: quoteDeadline ? new Date(quoteDeadline) : undefined
     };
@@ -96,46 +95,45 @@ export class PurchaseRequestsService {
     console.log('IDs Opcionales:', { projectId, departmentId, clientId, locationId });
     // ----------------------------------------
 
-    // Condicionalmente adjuntar relaciones opcionales. Agregué una
-    // verificación para string vacío (''), que es a menudo el problema en peticiones HTTP.
-    // Proyecto / Almacén coherentes con deliveryType
-    // relaciones opcionales
+    // Condicionalmente adjuntar relaciones opcionales.
     if (departmentId) data.department = { connect: { id: departmentId } };
     if (locationId) data.location = { connect: { id: locationId } };
 
-    // aquí NO uses warehouseId: el schema expone relación "warehouse"
+    // Proyecto / Almacén coherentes con deliveryType
     if (deliveryType === 'PROJECT') {
       if (projectId) data.project = { connect: { id: projectId } };
     } else {
-      if (warehouseId) data.warehouse = { connect: { id: warehouseId } }; // << corrección
+      if (warehouseId) data.warehouse = { connect: { id: warehouseId } };
     }
 
-    // cliente: conecta por id real; por nombre solo si es UNIQUE en Prisma
+    // ----------------------------------------------------------------
+    // !!! CORRECCIÓN DEL CLIENTE !!!
+    // Conecta el cliente *siempre* usando el campo 'id' de la tabla Client.
+    // Esto coincide con el error de Prisma que requiere 'id' o 'taxId' para `connect`.
     if (clientId) {
-      if (/^[0-9a-f-]{16,}$/i.test(clientId)) data.client = { connect: { id: clientId } };
-      else data.client = { connect: { name: clientId } }; // requiere @@unique(name)
+        data.client = { connect: { id: clientId } };
     }
+    // ----------------------------------------------------------------
+
     // Map items, converting undefined optional fields to null so Prisma
-    // accepts them. The quantity is converted to a number.
     data.items = {
       create: items.map((item) => {
-
         // Objeto base del ítem (campos obligatorios y el que requiere conversión)
         const itemData: any = {
           description: item.description,
-          quantity: Number(item.quantity), // Convertir el string del DTO a Number/Decimal
-          unit: item.unit ?? 1, // Si es undefined, se queda así
+          quantity: Number(item.quantity),
+          unit: item.unit ?? 1,
           sku: item.sku ?? undefined,
           barcode: item.barcode ?? undefined,
           requiredCurrency: item.requiredCurrency ?? 'HNL',
           productId: item.productId ?? undefined,
           itemType: item.itemType ?? undefined,
+          extraSpecs: item.extraSpecs ?? undefined,
         };
 
         // **PASO CLAVE: Función de Limpieza**
         // Filtramos el objeto para eliminar claves que son undefined o null.
         Object.keys(itemData).forEach((key) => {
-          // Usamos `== null` para verificar si es `null` o `undefined`.
           if (itemData[key] == null) {
             delete itemData[key];
           }
@@ -147,7 +145,6 @@ export class PurchaseRequestsService {
 
     // --- PUNTO CRÍTICO DE LOG ---
     console.log('--- CHECKPOINT 2: DATA FINAL LISTA PARA PRISMA ---');
-    // Muestra solo los campos principales de "data" y el primer ítem
     const logData = {
       ...data,
       items: { create: data.items.create.length > 0 ? [data.items.create[0], `... ${data.items.create.length - 1} más`] : [] }
@@ -155,7 +152,6 @@ export class PurchaseRequestsService {
     console.log('Data Final (Extracto):', JSON.stringify(logData, null, 2));
     console.log('--------------------------------------------------');
     // ----------------------------
-
 
     // Log corto útil
     console.log('[PR.create] data.deliveryType=', data.deliveryType,
@@ -173,9 +169,9 @@ export class PurchaseRequestsService {
         location: true,
         department: true,
         client: true,
-      }, // Incluimos todas las relaciones para confirmar que se conectan
+      },
     });
-  }
+}
 
   // Lista todas las solicitudes creadas por el usuario autenticado.
   async listMine(me: UserJwt, page = 1, pageSize = 20) {

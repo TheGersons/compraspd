@@ -106,7 +106,7 @@ model Location {
   id             String            @id @default(cuid())
   projectId      String?
   type           String // "OFICINA","ALMACEN","PROYECTO"
-  name           String
+  name           String @unique
   address1       String?
   address2       String?
   city           String?

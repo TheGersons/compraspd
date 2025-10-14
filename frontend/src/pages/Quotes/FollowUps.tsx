@@ -1,6 +1,6 @@
 // pages/Quotes/FollowUps.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useLocation } from "react-router";
+import { useLocation } from "react-router-dom";
 import PageMeta from "../../components/common/PageMeta";
 import ComponentCard from "../../components/common/ComponentCard";
 import Button from "../../components/ui/button/Button";

@@ -44,4 +44,8 @@ export class PRItemDto {
   @IsOptional()
   @IsString()
   requiredCurrency?: string; // 'HNL' | 'USD'
+
+  @IsOptional()
+  @IsString()
+  extraSpecs?: string; // Descripción adicional o especificaciones
 }
