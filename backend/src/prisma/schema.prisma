@@ -413,18 +413,7 @@ model ShipmentEvent {
   @@index([shipmentId])
 }
 
-/// --- Asignaciones, auditoría, adjuntos, notificaciones ---
-model Assignment {
-  id         String   @id @default(cuid())
-  entityType String // "PurchaseRequest","Quote","PurchaseOrder","Shipment"
-  entityId   String
-  assigneeId String
-  role       String? // "REVISOR","APROBADOR","COMPRADOR"
-  createdAt  DateTime @default(now())
-  assignee   User     @relation("AssigneeAssignments", fields: [assigneeId], references: [id])
 
-  @@index([entityType, entityId])
-}
 
 model Attachment {
   id          String   @id @default(cuid())
@@ -564,9 +553,74 @@ model Message {
 
   @@index([threadId])
 }
+enum FollowStatus {
+  EN_PROGRESO
+  PAUSADO
+  CANCELADO
+  FINALIZADO
+}
 
 
 
 
+model Assignment {
+  id              String        @id @default(uuid())
+  
+  // CAMPOS ORIGINALES (Asegurar que entityType/entityId se refieran a la PR)
+  entityType      String        // "PurchaseRequest"
+  entityId        String        // PR.id (Usamos este como FK)
+  
+  // Relación con la entidad PurchaseRequest (opcional, pero recomendado)
+  // purchaseRequest PurchaseRequest @relation(fields: [entityId], references: [id]) // Descomentar si PurchaseRequest tiene id: id
+
+  assigneeId      String
+  role            String        // "REVISOR" | "APROBADOR"
+
+  // 🔽 CAMPOS DE SEGUIMIENTO (Follow-up) - AGREGADOS/MANTENIDOS
+  progress          Int           @default(0)    // 0..100
+  eta               DateTime?     // Fecha estimada de finalización
+  followStatus      FollowStatus  @default(EN_PROGRESO)
+  priorityRequested Boolean       @default(false)
+  
+  // Relación con el asignado
+  assignee        User          @relation("AssigneeAssignments", fields: [assigneeId], references: [id])
+
+  // 🔽 RELACIÓN CON EL CHAT - AGREGADO
+  messages        ChatMessage[]
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  // Índices
+  @@index([entityType, entityId])
+}
+
+
+model ChatMessage {
+  id            String   @id @default(uuid())
+  assignmentId  String
+  senderId      String
+  body          String?
+  createdAt     DateTime @default(now())
+
+  assignment    Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  files         FileAttachment[]
+}
+
+model FileAttachment {
+  id           String   @id @default(uuid())
+  chatMessageId String?
+  fileName     String
+  mimeType     String
+  sizeBytes    Int
+  // URL o path local según tu estrategia de almacenamiento
+  url          String
+
+  message      ChatMessage? @relation(fields: [chatMessageId], references: [id], onDelete: SetNull)
+
+  createdAt    DateTime @default(now())
+
+  @@index([chatMessageId])
+}
 
 

@@ -13,6 +13,7 @@ import { PurchaseRequestsModule } from './modules/purchases-requests/purchase-re
 import { ClientsModule } from './modules/clients/clients.module';
 import { LocationsModule } from './modules/Locations/locations.module';
 import { DepartmentModule } from './modules/deparments/department.module';
+import { TrackingQuotesModule } from './modules/trackingQuotes/tracking-quotes.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { DepartmentModule } from './modules/deparments/department.module';
     ClientsModule,
     LocationsModule,
     DepartmentModule,
+    TrackingQuotesModule
   ],
 })
 export class AppModule { }
