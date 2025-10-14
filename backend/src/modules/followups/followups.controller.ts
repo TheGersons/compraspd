@@ -12,7 +12,7 @@ interface AuthenticatedRequest extends Request {
 }
 
 @UseGuards(JwtAuthGuard) // Aseguramos que solo usuarios autenticados puedan acceder
-@Controller('assignments')
+@Controller('api/v1/assignments')
 export class FollowupsController {
   constructor(private readonly followupsService: FollowupsService) {}
 

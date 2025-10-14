@@ -2,11 +2,17 @@
 
 import { IsNumber, IsOptional, IsDateString, IsBoolean, IsEnum, IsArray, IsString, MaxLength } from 'class-validator';
 
+/**
+ * Enumeración de estados de seguimiento.  Los valores deben coincidir con
+ * los definidos en la enumeración `FollowStatus` del esquema de Prisma.
+ * Utilizamos valores en español para reflejar el dominio del negocio y
+ * asegurar que la capa de aplicación y la base de datos estén alineadas.
+ */
 export enum FollowStatus {
-  PENDING = 'PENDING',
-  IN_PROGRESS = 'IN_PROGRESS',
-  COMPLETED = 'COMPLETED',
-  CANCELLED = 'CANCELLED',
+  EN_PROGRESO = 'EN_PROGRESO',
+  PAUSADO = 'PAUSADO',
+  CANCELADO = 'CANCELADO',
+  FINALIZADO = 'FINALIZADO',
 }
 export class UpdateFollowupDto {
   @IsOptional()

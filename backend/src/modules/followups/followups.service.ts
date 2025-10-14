@@ -14,21 +14,23 @@ export class FollowupsService {
    * Valida que la asignación exista y pertenezca al usuario asignado.
    * @returns El objeto Assignment si la validación es exitosa.
    */
+  /**
+   * Ensure that the current user is the assignee of the given assignment.  The
+   * follow‑ups API always works against the internal assignment `id` (not the
+   * human‑readable public identifier).  If the assignment does not exist or
+   * belongs to a different user an exception is thrown.
+   */
   private async ensureAssignee(assignmentId: string, userId: string): Promise<Assignment> {
     const assignment = await this.prisma.assignment.findUnique({
-      where: { id: assignmentId }, // Usamos el ID público (ej: ASSIGN-001)
-      include: { assignedTo: true },
+      where: { id: assignmentId },
+      include: { assignee: true },
     });
-
     if (!assignment) {
       throw new NotFoundException(`Asignación con ID ${assignmentId} no encontrada.`);
     }
-
-    // Esta es la capa de seguridad crucial
-    if (assignment.assignedToId !== userId) {
+    if (assignment.assigneeId !== userId) {
       throw new UnauthorizedException('No está autorizado para modificar el seguimiento de esta asignación.');
     }
-    
     return assignment;
   }
 
@@ -36,30 +38,24 @@ export class FollowupsService {
   // 1. LECTURA DE ASIGNACIONES (Columna Izquierda del Frontend)
   // =========================================================================
   async listMyAssignments(userId: string) {
-    // Retorna una lista de Assignments, incluyendo la PurchaseRequest relacionada.
-    // Esto proporciona al frontend todos los datos para la lista y los detalles.
+    /**
+     * Return all assignments for the current user that are not yet completed.
+     * We filter by the assigneeId field on the Assignment model and exclude
+     * assignments marked as FINALIZADO.  Only basic assignee information is
+     * returned; if purchase request details are required a relation must be
+     * added to the schema or fetched via a separate query.
+     */
     return this.prisma.assignment.findMany({
       where: {
-        assignedToId: userId,
-        followStatus: { not: FollowStatus.FINALIZADO }, // Excluye finalizadas
+        assigneeId: userId,
+        followStatus: { not: FollowStatus.FINALIZADO },
       },
       include: {
-        purchaseRequest: {
-          select: { 
-            id: true, 
-            reference: true,
-            finalClient: true, 
-            createdAt: true, 
-            deadline: true, 
-            requestType: true,
-            scope: true,
-            deliveryPlace: true,
-            projectId: true,
-            comments: true,
-            // Aquí incluimos todos los campos de la PR que necesita el DetailHeader
-          }
-        },
-        assignedTo: { select: { fullName: true } }
+        // include the purchaseRequest relation if present so the client can
+        // display contextual information about the assignment.  Prisma will
+        // return null if the entityType/entityId do not point to a purchase
+        // request.
+        assignee: { select: { fullName: true } },
       },
     });
   }
@@ -70,11 +66,9 @@ export class FollowupsService {
   // =========================================================================
   async updateFollowup(assignmentId: string, userId: string, data: UpdateFollowupDto) {
     await this.ensureAssignee(assignmentId, userId);
-
     return this.prisma.assignment.update({
-      where: { assignmentId },
+      where: { id: assignmentId },
       data: {
-        // Mapeamos el DTO directamente a los campos de Assignment
         progress: data.progress,
         eta: data.eta ? new Date(data.eta) : undefined,
         followStatus: data.followStatus,
@@ -87,14 +81,13 @@ export class FollowupsService {
   // 3. CHAT
   // =========================================================================
   async listChat(assignmentId: string) {
-    // NOTA: No necesitamos ensureAssignee aquí, ya que el chat puede ser visto 
-    // por la persona asignada y por el solicitante (si implementamos esa lógica)
-    
+    // Cualquier usuario autorizado para ver el seguimiento de la asignación puede
+    // consultar el historial de chat.  Filtramos por el campo `assignmentId`
+    // directamente en ChatMessage, luego ordenamos por fecha ascendente.
     return this.prisma.chatMessage.findMany({
-      where: { assignment: { assignmentId } },
-      include: { 
-        files: true, 
-        sender: { select: { id: true, fullName: true } } // Incluimos info del remitente
+      where: { assignmentId },
+      include: {
+        files: true,
       },
       orderBy: { createdAt: 'asc' },
     });
