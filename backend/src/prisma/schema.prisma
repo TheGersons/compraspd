@@ -71,7 +71,7 @@ model User {
   // Back-relations
   projectMemberships ProjectMember[]
   managedProjects    Project[]           @relation("ProjectManager")
-  assignments        Assignment[]        @relation("AssigneeAssignments")
+  assignedToMe       Assignment[]        @relation("AssigneeAssignments")
   purchaseRequests   PurchaseRequest[]   @relation("RequesterRequests")
   attachments        Attachment[]        @relation("AttachmentCreatedBy")
   auditLogs          AuditLog[]
@@ -79,6 +79,7 @@ model User {
   threads            Thread[]
   threadParticipants ThreadParticipant[]
   messages           Message[]
+  chatMessages       ChatMessage[]       @relation("ChatMessageSender")
 }
 
 model Role {
@@ -282,10 +283,15 @@ model ExchangeRate {
 
 model PurchaseRequest {
   id              String          @id @default(cuid())
+  reference       String?         @unique // ID público (ej: PR-001)
   title           String
   description     String?
-  reference       String?
-  comment         String?
+  finalClient     String?
+  requestType     String?
+  scope           String?
+  deliveryPlace   String?
+  comments        String?
+  deadline        DateTime?
   status          String          @default("DRAFT")
   requestCategory RequestCategory @default(LICITACIONES)
   procurement     ProcurementType @default(NATIONAL)
@@ -312,10 +318,12 @@ model PurchaseRequest {
   quote       Quote?
   attachments Attachment[]
   auditLogs   AuditLog[]
+  assignments Assignment[]
 
   @@index([departmentId])
   @@index([clientId])
   @@index([deliveryType])
+  @@index([reference])
 }
 
 model PRItem {
@@ -519,6 +527,7 @@ model ShipmentEvent {
 
 model Assignment {
   id               String       @id @default(uuid())
+  assignmentId     String       @unique // ID público (ej: ASSIGN-001)
   entityType       String
   entityId         String
   role             String
@@ -529,12 +538,17 @@ model Assignment {
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
-  assigneeId String
-  assignee   User   @relation("AssigneeAssignments", fields: [assigneeId], references: [id])
+  assignedToId String
+  assignedTo   User   @relation("AssigneeAssignments", fields: [assignedToId], references: [id])
+
+  // Relación directa con PurchaseRequest (si entityType es siempre "PurchaseRequest")
+  purchaseRequestId String?
+  purchaseRequest   PurchaseRequest? @relation(fields: [purchaseRequestId], references: [id])
 
   messages ChatMessage[]
 
   @@index([entityType, entityId])
+  @@index([assignedToId])
 }
 
 model ChatMessage {
@@ -545,8 +559,11 @@ model ChatMessage {
   assignmentId String
   assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   senderId     String
+  sender       User       @relation("ChatMessageSender", fields: [senderId], references: [id])
 
   files FileAttachment[]
+
+  @@index([assignmentId])
 }
 
 model FileAttachment {
