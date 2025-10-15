@@ -13,7 +13,7 @@ import { PurchaseRequestsModule } from './modules/purchases-requests/purchase-re
 import { ClientsModule } from './modules/clients/clients.module';
 import { LocationsModule } from './modules/Locations/locations.module';
 import { DepartmentModule } from './modules/deparments/department.module';
-import { TrackingQuotesModule } from './modules/trackingQuotes/tracking-quotes.module';
+import { FollowupsModule } from './modules/followups/followups.module';
 
 @Module({
   imports: [
@@ -31,7 +31,7 @@ import { TrackingQuotesModule } from './modules/trackingQuotes/tracking-quotes.m
     ClientsModule,
     LocationsModule,
     DepartmentModule,
-    TrackingQuotesModule
+    FollowupsModule
   ],
 })
 export class AppModule { }

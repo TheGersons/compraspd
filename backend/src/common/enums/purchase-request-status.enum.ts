@@ -1,8 +1,7 @@
 // src/common/enums/purchase-request-status.enum.ts
 export enum PurchaseRequestStatus {
-  DRAFT = 'DRAFT',
   SUBMITTED = 'SUBMITTED',
-  UNDER_REVIEW = 'UNDER_REVIEW',
+  IN_PROGRESS = 'IN_PROGRESS',
   APPROVED = 'APPROVED',
   REJECTED = 'REJECTED',
   CANCELLED = 'CANCELLED',

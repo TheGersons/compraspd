@@ -1,4 +1,4 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsOptional, isString, IsString } from 'class-validator';
 
 
 export class CreateAssignmentDto {
@@ -17,4 +17,13 @@ export class CreateAssignmentDto {
     @IsOptional()
     @IsString()
     role?: string; // REVISOR|APROBADOR|COMPRADOR
+
+    @IsString()
+    assignedToId!: string;
+
+    @IsOptional()
+    progress?: number; // 0-100
+
+    @IsOptional()
+    followStatus?: 'EN_PROGRESO' | 'PAUSADO' | 'CANCELADO' | 'FINALIZADO';
 }

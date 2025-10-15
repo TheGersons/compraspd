@@ -4,7 +4,7 @@
 
 generator client {
   provider        = "prisma-client-js"
-  previewFeatures = ["fullTextSearch"]
+  previewFeatures = ["fullTextSearchPostgres"]
   log             = ["query"]
 }
 
@@ -292,7 +292,7 @@ model PurchaseRequest {
   deliveryPlace   String?
   comments        String?
   deadline        DateTime?
-  status          String          @default("DRAFT")
+  status          String          @default("SUBMITTED") //SUBMITTED, IN_PROGRESS, APPROVED, REJECTED, CANCELLED
   requestCategory RequestCategory @default(LICITACIONES)
   procurement     ProcurementType @default(NATIONAL)
   deliveryType    DeliveryType?
@@ -434,7 +434,7 @@ model PurchaseOrder {
   id            String   @id @default(cuid())
   currency      String
   rateHNL       Decimal? @db.Decimal(18, 6)
-  status        String   @default("DRAFT")
+  status        String   @default("SUBMITTED")
   sourceQuoteId String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

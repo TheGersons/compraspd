@@ -23,4 +23,10 @@ export class AssignmentsController {
     list(@Param('entityType') entityType: string, @Param('entityId') entityId: string) {
         return this.svc.listFor(entityType, entityId);
     }
+
+
+    @Get()
+    listAll() {
+        return this.svc.listIncompletes();
+    }
 }

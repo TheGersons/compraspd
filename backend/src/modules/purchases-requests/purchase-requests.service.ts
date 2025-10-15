@@ -5,9 +5,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 type UserJwt = { sub: string; role?: string };
 
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
-  DRAFT: ['SUBMITTED', 'CANCELLED'],
-  SUBMITTED: ['UNDER_REVIEW', 'CANCELLED', 'REJECTED'],
-  UNDER_REVIEW: ['APPROVED', 'REJECTED', 'CANCELLED'],
+  SUBMITTED: ['IN_PROGRESS', 'CANCELLED', 'REJECTED'],
+  IN_PROGRESS: ['APPROVED', 'REJECTED', 'CANCELLED'],
   APPROVED: [],
   REJECTED: [],
   CANCELLED: [],
@@ -213,10 +212,10 @@ export class PurchaseRequestsService {
     const current = await this.prisma.purchaseRequest.findUnique({ where: { id }, include: { items: true } });
     if (!current) throw new NotFoundException('Solicitud no encontrada');
 
-    // Solo dueño puede editar en DRAFT. Supervisores podrían editar en UNDER_REVIEW si así lo decides.
+    // Solo dueño puede editar en DRAFT. Supervisores podrían editar en IN_PROGRESS si así lo decides.
     const canEdit =
-      (current.requesterId === me.sub && current.status === 'DRAFT') ||
-      (this.isSupervisorOrAdmin(me) && ['SUBMITTED', 'UNDER_REVIEW'].includes(current.status));
+      (current.requesterId === me.sub && current.status === 'SUBMITTED') ||
+      (this.isSupervisorOrAdmin(me) && ['SUBMITTED', 'IN_PROGRESS'].includes(current.status));
     if (!canEdit) throw new ForbiddenException('No puedes editar esta solicitud en su estado actual');
 
     // Actualizar cabecera (no tocamos items aquí; puedes modelar PATCH de items aparte)
@@ -234,7 +233,7 @@ export class PurchaseRequestsService {
         quoteDeadline: dto.quoteDeadline ? new Date(dto.quoteDeadline) : current.quoteDeadline,
         deliveryType: dto.deliveryType ?? current.deliveryType,
         reference: dto.reference ?? current.reference,
-        comment: dto.comment ?? current.comment,
+        comments: dto.comments ?? current.comments,
       },
       include: { items: true },
     });
@@ -252,11 +251,11 @@ export class PurchaseRequestsService {
 
     // Reglas:
     // - El solicitante puede pasar DRAFT→SUBMITTED / DRAFT→CANCELLED
-    // - Supervisor/Admin pueden mover SUBMITTED/UNDER_REVIEW → (APPROVED|REJECTED|CANCELLED|UNDER_REVIEW)
+    // - Supervisor/Admin pueden mover SUBMITTED/IN_PROGRESS → (APPROVED|REJECTED|CANCELLED|IN_PROGRESS)
     const isOwner = current.requesterId === me.sub;
     const isSupervisor = this.isSupervisorOrAdmin(me);
 
-    if (current.status === 'DRAFT') {
+    if (current.status === 'SUBMITTED' || current.status === 'IN_PROGRESS') {
       if (!(isOwner || isSupervisor)) throw new ForbiddenException('No autorizado');
     } else {
       if (!isSupervisor) throw new ForbiddenException('Solo supervisores o admin pueden cambiar este estado');
@@ -272,7 +271,7 @@ export class PurchaseRequestsService {
   async listAssignedTo(me: UserJwt, page = 1, pageSize = 20) {
     // Busca assignments del usuario sobre PR y trae la PR asociada
     const assignments = await this.prisma.assignment.findMany({
-      where: { assigneeId: me.sub, entityType: 'PurchaseRequest' },
+      where: { assignedToId: me.sub, entityType: 'PurchaseRequest' },
       orderBy: { createdAt: 'desc' },
       skip: (Math.max(1, page) - 1) * Math.min(100, Math.max(1, pageSize)),
       take: Math.min(100, Math.max(1, pageSize)),
