@@ -42,10 +42,10 @@ enum RequestCategory {
 }
 
 enum FollowStatus {
-  EN_PROGRESO
-  PAUSADO
-  CANCELADO
-  FINALIZADO
+  IN_PROGRESS
+  PAUSED
+  CANCELLED
+  COMPLETED
 }
 
 // ============================================================================
@@ -80,6 +80,7 @@ model User {
   threadParticipants ThreadParticipant[]
   messages           Message[]
   chatMessages       ChatMessage[]       @relation("ChatMessageSender")
+  assignments        Assignment[]        @relation("AssignmentRequester")
 }
 
 model Role {
@@ -283,7 +284,7 @@ model ExchangeRate {
 
 model PurchaseRequest {
   id              String          @id @default(cuid())
-  reference       String?         @unique // ID público (ej: PR-001)
+  reference       String?         
   title           String
   description     String?
   finalClient     String?
@@ -533,13 +534,15 @@ model Assignment {
   role             String
   progress         Int          @default(0)
   eta              DateTime?
-  followStatus     FollowStatus @default(EN_PROGRESO)
+  followStatus     FollowStatus @default(IN_PROGRESS)
   priorityRequested Boolean     @default(false)
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
   assignedToId String
   assignedTo   User   @relation("AssigneeAssignments", fields: [assignedToId], references: [id])
+  requesterId String @default("cmfzxhs2n001ohklgjuipl4nu")
+  requester   User   @relation("AssignmentRequester", fields: [requesterId], references: [id])
 
   // Relación directa con PurchaseRequest (si entityType es siempre "PurchaseRequest")
   purchaseRequestId String?

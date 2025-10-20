@@ -42,7 +42,7 @@ export interface CreatePurchaseRequestDto {
     locationId: string | null;
     warehouseId: string | null;
     projectId: string | null;
-    comment: string | null;
+    comments: string | null;
     title: string;
     description: string;
     items: PRItemCreateDto[];

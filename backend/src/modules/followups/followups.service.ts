@@ -38,7 +38,7 @@ export class FollowupsService {
     return this.prisma.assignment.findMany({
       where: {
         assignedToId: userId, // ✅ Corregido
-        followStatus: { not: FollowStatus.FINALIZADO },
+        followStatus: { not: FollowStatus.COMPLETED },
       },
       include: {
         purchaseRequest: { // ✅ Ahora existe esta relación directa

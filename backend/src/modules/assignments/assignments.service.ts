@@ -28,19 +28,60 @@ export class AssignmentsService {
     async create(dto: CreateAssignmentDto) {
         const assignmentId = await this.generateUniqueAssignmentId();
 
-        return this.prisma.assignment.create({
-            data: {
-                assignmentId,
-                entityType: dto.entityType,
-                entityId: dto.entityId,
-                assignedToId: dto.assignedToId,
-                role: dto.role ?? "",
-                progress: dto.progress ?? 0,
-                followStatus: dto.followStatus ?? 'EN_PROGRESO',
-                // Si entityType es PurchaseRequest, agregar la FK directa
-                purchaseRequestId: dto.entityType === 'PurchaseRequest' ? dto.entityId : undefined,
+        const assignee = await this.prisma.user.findUnique({
+            where: { id: dto.assignedToId },
+            select: {
+                id: true,
+                role: {
+                    select: { name: true }
+                },
             },
         });
+
+        if (!assignee || assignee.role.name != 'SUPERVISOR') {
+            console.error('El usuario asignado debe existir y tener el rol de SUPERVISOR.');
+            throw new Error('El usuario asignado debe existir y tener el rol de SUPERVISOR.');
+        }
+
+
+
+        const result = await this.prisma.$transaction(async (tx) => {
+            // opcional: si ya existe asignación abierta, puedes decidir si permitir o no
+            // const existing = await tx.assignment.findFirst({ where: { purchaseRequestId: dto.entityId, followStatus: { in: ['ASSIGNED','IN_PROGRESS'] } } });
+
+            const created = await tx.assignment.create({
+                data: {
+                    assignmentId: assignmentId,
+                    entityType: dto.entityType ?? 'PurchaseRequest',
+                    entityId: dto.entityId,
+                    assignedToId: dto.assignedToId,
+                    role: dto.role ?? 'SUPERVISOR',
+                    progress: 0,
+                    followStatus: 'IN_PROGRESS',
+                    purchaseRequestId: dto.entityId, // FK directa
+                    requesterId: dto.requesterId,
+                },
+                select: {
+                    id: true,
+                    assignedToId: true,
+                    progress: true,
+                    followStatus: true,
+                    assignedTo: { select: { id: true, fullName: true } },
+                    purchaseRequestId: true,
+                },
+            });
+
+            // Actualiza el estado del PR a IN_PROGRESS si aún no lo está
+            await tx.purchaseRequest.update({
+                where: { id: dto.entityId },
+                data: { status: 'IN_PROGRESS' },
+                select: { id: true },
+            });
+
+            return created;
+        });
+
+        return result;
     }
 
     listFor(entityType: string, entityId: string) {
@@ -50,26 +91,8 @@ export class AssignmentsService {
         });
     }
 
-
-    //formato a recuperar
-    /*
-const MOCK_DATA: AssignmentRequest[] = [
-  {
-    id: "REQ-2025-0012",
-    reference: "REF-UPS-1KVA",
-    finalClient: "Acme SA",
-    createdAt: "2025-09-10",
-    deadline: "2025-10-20",
-    requestType: "proyectos",
-    scope: "nacional",
-    deliveryPlace: "almacen",
-    comments: "UPS de respaldo para planta solar.",
-  },
-];
-
-*/
-    listIncompletes() {
-        return this.prisma.purchaseRequest.findMany({
+    async listIncompletes() {
+        const incompletes = this.prisma.purchaseRequest.findMany({
             where: {
                 status: { in: ['SUBMITTED', 'IN_PROGRESS'] },
             },
@@ -92,8 +115,24 @@ const MOCK_DATA: AssignmentRequest[] = [
                         assignedTo: { select: { id: true, fullName: true } },
                     },
                 },
+                requester: { select: { id: true, fullName: true } },
+                items: {
+                    select: {
+                        id: true,
+                        sku: true,
+                        description: true,
+                        quantity: true,
+                        unit: true,
+                        extraSpecs: true,
+                    },
+                },
             },
         });
+
+        return incompletes;
+
+        //prItems tiene que ir dentro de incompletes
+        
     }
 
 }

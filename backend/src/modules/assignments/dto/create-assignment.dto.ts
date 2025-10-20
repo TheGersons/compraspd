@@ -10,10 +10,6 @@ export class CreateAssignmentDto {
     entityId!: string;
 
 
-    @IsString()
-    assigneeId!: string;
-
-
     @IsOptional()
     @IsString()
     role?: string; // REVISOR|APROBADOR|COMPRADOR
@@ -25,5 +21,8 @@ export class CreateAssignmentDto {
     progress?: number; // 0-100
 
     @IsOptional()
-    followStatus?: 'EN_PROGRESO' | 'PAUSADO' | 'CANCELADO' | 'FINALIZADO';
+    followStatus?: 'IN_PROGRESS' | 'PAUSED' | 'CANCELLED' | 'COMPLETED';
+
+    @IsString()
+    requesterId!: string;
 }

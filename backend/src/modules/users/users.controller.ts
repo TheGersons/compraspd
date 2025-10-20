@@ -7,6 +7,7 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { QueryUsersDto } from './dto/query-users.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
+
 @ApiTags('Users')
 @ApiBearerAuth() // auth llegará luego; no se aplica guard aún
 @UseGuards(JwtAuthGuard) // auth llegará luego; no se aplica guard aún
@@ -19,6 +20,11 @@ export class UsersController {
     return this.svc.create(dto);
   }
 
+  @Get('supervisors')
+  listSupervisors() {
+    return this.svc.supervisorsList();
+  }
+  
   @Get()
   list(@Query() q: QueryUsersDto) {
     return this.svc.paginate({

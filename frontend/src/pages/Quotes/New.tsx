@@ -596,7 +596,7 @@ export default function QuotesNew() {
       locationId: warehouses[0]?.id || null,
       locationName: warehouses[0]?.name || null,
       projectId: formData.projectId || "",
-      comment: formData.comments.trim() || null,
+      comments: formData.comments.trim() || null,
       title: `Solicitud - ${formData.requestType.toUpperCase()} - ${formData.reference}`,
       description: formData.comments.trim() || "Sin descripción",
       items: formData.lines.map(l => ({

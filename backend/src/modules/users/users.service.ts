@@ -48,6 +48,8 @@ export class UsersService {
     return user;
   }
 
+
+
   async paginate(params: { page?: number; pageSize?: number; search?: string; roleId?: string; isActive?: boolean }) {
     const page = Math.max(1, params.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 20));
@@ -125,5 +127,26 @@ export class UsersService {
   private async ensureExists(id: string) {
     const u = await this.prisma.user.findUnique({ where: { id } });
     if (!u) throw new NotFoundException('Usuario no encontrado');
+  }
+
+  async supervisorsList() {
+    const supervisorRole = await this.prisma.role.findFirst({
+      where: { name: 'SUPERVISOR' }, select: { id: true },
+    });
+    console.log('Supervisor Role:', supervisorRole);
+    if (!supervisorRole) {
+      throw new NotFoundException('Rol de SUPERVISOR no encontrado');
+    }
+    const supervisors = await this.prisma.user.findMany({
+      where: { isActive: true, roleId: supervisorRole!.id },
+      select: { id: true, fullName: true, email: true },
+      orderBy: { fullName: 'asc' },
+    });
+    console.log('Supervisores encontrados:', supervisors);
+    if (supervisors.length === 0) {
+      throw new NotFoundException('No se encontraron supervisores activos');
+    }
+
+    return supervisors;
   }
 }

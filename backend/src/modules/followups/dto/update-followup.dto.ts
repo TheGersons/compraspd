@@ -9,10 +9,10 @@ import { IsNumber, IsOptional, IsDateString, IsBoolean, IsEnum, IsArray, IsStrin
  * asegurar que la capa de aplicación y la base de datos estén alineadas.
  */
 export enum FollowStatus {
-  EN_PROGRESO = 'EN_PROGRESO',
-  PAUSADO = 'PAUSADO',
-  CANCELADO = 'CANCELADO',
-  FINALIZADO = 'FINALIZADO',
+  IN_PROGRESS = 'IN_PROGRESS',
+  PAUSED = 'PAUSED',
+  CANCELLED = 'CANCELLED',
+  COMPLETED = 'COMPLETED',
 }
 export class UpdateFollowupDto {
   @IsOptional()
