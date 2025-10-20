@@ -131,44 +131,6 @@ const URGENCY_CONFIG: Record<Urgency, UrgencyConfig> = {
     borderClass: "border-l-4 border-gray-300 bg-white hover:bg-gray-50",
   },
 };
-/*
-const MOCK_DATA: AssignmentRequest[] = [
-  {
-    id: "REQ-2025-0012",
-    reference: "REF-UPS-1KVA",
-    finalClient: "Acme SA",
-    createdAt: "2025-09-10",
-    deadline: "2025-10-20",
-    requestCategory: "proyectos",
-    scope: "nacional",
-    deliveryPlace: "almacen",
-    description: "UPS de respaldo para planta solar.",
-  },
-];
-
-*/
-
-const MOCK_PROJECTS = [
-  { id: "PRJ-001", nombre: "Planta Solar Choluteca" },
-  { id: "PRJ-002", nombre: "Hospital SPS" },
-  { id: "PRJ-003", nombre: "Data Center TGU" },
-];
-
-const MOCK_USERS = [
-  { id: "Ana", nombre: "Ana" },
-  { id: "Carlos", nombre: "Carlos" },
-  { id: "Luis", nombre: "Luis" },
-];
-
-//const cotizaciones = ObtenerCotizaciones();
-
-// ============================================================================
-// UTILITIES
-// ============================================================================
-//const formatDate = (date: string): string =>
-//  new Intl.DateTimeFormat("es-HN", { day: "2-digit", month: "2-digit", year: "2-digit" })
-//    .format(new Date(date));
-
 
 
 const calculateDaysDifference = (deadline: string): number => {
@@ -186,25 +148,12 @@ const getUrgency = (deadline: string): Urgency => {
 };
 
 
-
 const calculateUrgencyScore = (request: AssignmentRequest): number => {
   const days = calculateDaysDifference(request.quoteDeadlineISO);
   if (days < 0) return -2;
   if (days <= 1) return -1;
   return days;
 };
-
-//const getDeadlineMessage = (quoteDeadline: string): string => {
-//  const diffDays = calculateDaysDifference(quoteDeadline);
-
-//  console.log("Deadline:", quoteDeadline);
-//  const formattedDate = FormatDateApi(quoteDeadline);
-
-//  console.log("Formatted Date:", formattedDate);
-
-//  if (diffDays < 0) return `Vence ${formattedDate} • Atrasada`;
-//  return `Vence ${formattedDate} • ${diffDays} día${diffDays === 1 ? "" : "s"} restantes`;
-//};
 
 // ============================================================================
 // HOOKS
