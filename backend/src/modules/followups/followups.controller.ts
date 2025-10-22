@@ -4,6 +4,8 @@ import { Controller, Get, Param, Patch, Body, Post, UseGuards, Req } from '@nest
 import { FollowupsService } from './followups.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UpdateFollowupDto, SendMessageDto } from './dto/update-followup.dto';
+import { AuthGuard } from '@nestjs/passport';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 // Simulamos la extracción del ID del usuario del Request (típico de NestJS con JWT Guard)
 // En un proyecto real, esto se haría con un decorador @GetUser('id') o similar.
@@ -11,7 +13,7 @@ interface AuthenticatedRequest extends Request {
     user: { id: string }; 
 }
 
-@UseGuards(JwtAuthGuard) // Aseguramos que solo usuarios autenticados puedan acceder
+@UseGuards(AuthGuard('jwt')) // Aseguramos que solo usuarios autenticados puedan acceder
 @Controller('api/v1/assignments')
 export class FollowupsController {
   constructor(private readonly followupsService: FollowupsService) {}
@@ -25,13 +27,13 @@ export class FollowupsController {
   
   // PATCH /assignments/:assignmentId/follow-up
   // Endpoint para actualizar progreso, ETA o estado
-  @Patch(':assignmentId/follow-up')
+  @Patch(':assignmentId/followup')
   updateFollowup(
     @Param('assignmentId') assignmentId: string,
     @Body() updateDto: UpdateFollowupDto,
-    @Req() req: AuthenticatedRequest,
+    @CurrentUser() user: {sub: string; userId: string},
   ) {
-    return this.followupsService.updateFollowup(assignmentId, req.user.id, updateDto);
+    return this.followupsService.updateFollowup(assignmentId, user.userId, updateDto);
   }
 
   // GET /assignments/:assignmentId/chat

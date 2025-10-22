@@ -30,11 +30,20 @@ import ShoppingAssignment from "./pages/Shopping/Assignment";
 import ShoppingFollowUps from "./pages/Shopping/FollowUps";
 import ShoppingHistory from "./pages/Shopping/History";
 import ShoppingNew from "./pages/Shopping/New";
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 export default function App() {
   return (
-    <>
+    <QueryClientProvider client={queryClient}>
       <Router>
         <ScrollToTop />
         <Routes>
@@ -102,6 +111,6 @@ export default function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Router>
-    </>
+    </QueryClientProvider>
   );
 }

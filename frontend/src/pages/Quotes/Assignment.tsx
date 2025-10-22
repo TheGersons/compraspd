@@ -9,7 +9,7 @@ import Button from "../../components/ui/button/Button";
 import { api } from "../../lib/api";
 import { FormatDateApi } from "../../lib/FormatDateApi"
 import getDeadlineMessage from "./lib/Deadline";
-
+import { useAuth } from "../../context/AuthContext";
 
 
 
@@ -23,7 +23,7 @@ type DeliveryPlace = "almacen" | "proyecto";
 type Urgency = "critical" | "high" | "medium" | "low" | "normal";
 type AlertVariant = "success" | "error" | "warning" | "info";
 
-interface AssignmentRequest {
+export interface AssignmentRequest {
   id: string;
   reference: string;
   finalClient: string;            // siempre string
@@ -81,6 +81,11 @@ type Supervisor = {
   email: string;
 }
 
+interface usuarios {
+  id: string;
+  nombre: string;
+};
+
 
 interface UrgencyConfig {
   variant: AlertVariant;
@@ -89,6 +94,14 @@ interface UrgencyConfig {
   textColor: string;
   borderClass?: string;
 }
+
+const MOCK_PROJECTS = [
+  { id: "proj_1", nombre: "Proyecto Alpha" },
+  { id: "proj_2", nombre: "Proyecto Beta" },
+  { id: "proj_3", nombre: "Proyecto Gamma" },
+];
+
+
 
 // ============================================================================
 // CONSTANTS
@@ -161,48 +174,152 @@ const calculateUrgencyScore = (request: AssignmentRequest): number => {
 
 // Asegúrate de que calculateDaysDifference esté importada y use el string ISO.
 
+// Assignment.tsx (Actualización del hook useFilteredRequests)
+// Asegúrate de importar useMemo: import { useEffect, useMemo, useState } from "react";
+
 const useFilteredRequests = (
   requests: AssignmentRequest[],
   filters: QuoteFilters
 ) => {
   return useMemo(() => {
-    // 1. Determinar el número MÁXIMO de días restantes permitidos
-    //    Si el preset es '7d', queremos requests que venzan en 7 días o menos (incluyendo vencidas).
+    let filtered = requests;
 
+    // ===========================================
+    // 1. Filtrar por Presets de Días
+    // ===========================================
     let maxDays: number | null = null;
+    if (filters.preset === "7d") maxDays = 7;
+    else if (filters.preset === "30d") maxDays = 30;
+    else if (filters.preset === "90d") maxDays = 90;
 
-    if (filters.preset === "7d") {
-      maxDays = 7;
-    } else if (filters.preset === "30d") {
-      maxDays = 30;
-    } else if (filters.preset === "90d") {
-      maxDays = 90;
+    if (maxDays !== null) {
+      filtered = filtered.filter((r) => {
+        const diffDays = calculateDaysDifference(r.quoteDeadlineISO);
+        // Incluye solicitudes vencidas (días < 0) siempre que la fecha límite no exceda maxDays desde hoy.
+        return diffDays <= maxDays;
+      });
     }
 
-    // Si no hay un filtro de días activo, retorna la lista completa
-    if (maxDays === null) {
-      return requests;
+    // Nota: El filtro 'custom' no se aplica aquí ya que requiere la información de 'range'
+    // (start/end) que no estás pasando al hook, y 'filters.range' es undefined
+    // después de aplicar el preset en filters.tsx.
+    // Si necesitas filtrar por rango de fechas (start/end),
+    // necesitarás implementarlo y probablemente pasar el rango de DatePicker a este hook.
+    // Por simplicidad, se omite el filtro de rango 'custom' basado en YYYY-MM-DD.
+    // ===========================================
+
+
+    // ===========================================
+    // 2. Filtrar por Otros Criterios
+    // ===========================================
+
+    // Filtro por Estado (estado): No se aplica aquí porque las AssignmentRequest no tienen un campo 'estado'
+    // mapeado del backend. El componente Filters usa 'estado' pero la lista AssignmentRequest
+    // solo tiene `progress` y `followStatus`.
+
+    // Filtro por Tipo de Solicitud (tipoSolicitud)
+    if (filters.tipoSolicitud && filters.tipoSolicitud !== "todas") {
+      filtered = filtered.filter(
+        (r) => r.requestCategory === filters.tipoSolicitud?.toUpperCase()
+      );
     }
 
-    // 2. Filtrar
-    return requests.filter((r) => {
-      // Obtiene los días restantes (positivos para futuro, 0 para hoy, negativos para vencidas)
-      const diffDays = calculateDaysDifference(r.quoteDeadlineISO);
-      // Ejemplo: si maxDays es 7, esto incluye: -5 (vencida), 0 (hoy), 7 (en 7 días).
-      return diffDays <= maxDays;
-    });
-  }, [requests, filters.preset]);
+    // Filtro por Tipo de Compra (tipoCompra)
+    if (filters.tipoCompra && filters.tipoCompra !== "todas") {
+      // En filters.tsx tienes: 'nacional' | 'internacional'
+      // En AssignmentRequest tienes: 'procuremet' que es 'nacional' | 'internacional' | 'NACIONAL' | 'INTERNACIONAL'
+      filtered = filtered.filter(
+        (r) => r.procuremet.toLowerCase() === filters.tipoCompra
+      );
+    }
+
+    // Filtro por Proyecto (proyectoId)
+    if (filters.proyectoId && filters.proyectoId !== "todos") {
+      filtered = filtered.filter(
+        (r) => r.projectId === filters.proyectoId
+      );
+    }
+
+    // Filtro por Asignado A (asignadoA)
+    // if (filters.asignadoA && filters.asignadoA !== "todos") {
+    //   if (filters.asignadoA === "sin_asignar") {
+    //     filtered = filtered.filter((r) => !r.assignedToId);
+    //   } else {
+    //     // Asume que el valor es un ID de usuario
+    //     filtered = filtered.filter((r) => r.assignedToId === filters.asignadoA);
+    //   }
+    // }
+
+    //habra 2 filtros fijos 'asignado a:todos como estaba antes y 'sin asignar'
+    //Luego se agregara una lista de usuarios ya cargada para filtrar por usuario especifico
+    if (filters.asignadoA && filters.asignadoA !== "todos") {
+      if (filters.asignadoA === "sin_asignar") {
+        filtered = filtered.filter((r) => !r.assignedToId);
+      } else {
+        // Filtrar por usuario específico
+        filtered = filtered.filter((r) => r.assignedToId === filters.asignadoA);
+      }
+    }
+
+    // Filtro por Origen (origen): No se puede aplicar ya que AssignmentRequest no tiene un campo 'origen'.
+
+    // Filtro de Búsqueda (q)
+    if (filters.q) {
+      const qLower = filters.q.toLowerCase();
+      filtered = filtered.filter(
+        (r) =>
+          r.reference.toLowerCase().includes(qLower) ||
+          r.finalClient.toLowerCase().includes(qLower) ||
+          r.description.toLowerCase().includes(qLower) ||
+          r.items?.some(i => i.sku?.toLowerCase().includes(qLower) || i.description.toLowerCase().includes(qLower))
+      );
+    }
+
+    // ===========================================
+    // 3. Aplicar Ordenamiento (Ordenar)
+    // ===========================================
+
+    // Nota: El ordenamiento se hace por urgencia en useSortedRequests,
+    // que se aplica a toda la data, y luego se pasa a este hook.
+    // Para respetar `filters.ordenar`, debemos mover esa lógica aquí
+    // o aplicarla después del filtrado.
+
+    // Por ahora, para mantener la separación: este hook solo filtra.
+    // El ordenamiento por urgencia actual (en useSortedRequests) está bien para la vista de asignación.
+    // Si quieres aplicar el orden de `filters.ordenar`, deberás integrarlo aquí.
+
+    return filtered;
+
+  }, [
+    requests,
+    filters.preset,
+    filters.tipoSolicitud,
+    filters.tipoCompra,
+    filters.proyectoId,
+    filters.asignadoA,
+    filters.q,
+    // No se incluyen 'estado', 'origen', 'ordenar' o 'range'
+  ]);
 };
 
-const useSortedRequests = (requests: AssignmentRequest[]) => {
+const useListSorter = (requests: AssignmentRequest[], sortBy: QuoteFilters["ordenar"] = "recientes") => {
   return useMemo(() => {
-    return [...requests].sort((a, b) => {
+    let sorted = [...requests];
+
+    // Ordenamiento por Urgencia (el más importante para asignación)
+    sorted.sort((a, b) => {
       const sa = Number.isFinite(calculateUrgencyScore(a)) ? calculateUrgencyScore(a) : 0;
       const sb = Number.isFinite(calculateUrgencyScore(b)) ? calculateUrgencyScore(b) : 0;
-      return sa - sb;
+      return sa - sb; // Menor puntuación (más urgente) va primero.
     });
-  }, [requests]);
+
+    // Aquí se ignoran los demás 'ordenar' del filters.tsx (monto_asc, etc.)
+    // si quieres respetarlos, debes añadirlos aquí.
+
+    return sorted;
+  }, [requests, sortBy]);
 };
+
 
 const usePartitionedRequests = (requests: AssignmentRequest[]) => {
   return useMemo(() => {
@@ -268,7 +385,7 @@ const RequestList = ({
   const [currentPage, setCurrentPage] = useState(1);
 
   //ordenar requests por urgencia
-  const sortedRequests = useSortedRequests(requests);
+  const sortedRequests = useListSorter(requests);
 
   // Calcular paginación
   const totalPages = Math.ceil(sortedRequests.length / itemsPerPage);
@@ -453,86 +570,86 @@ const RequestDetail = ({
           </p>
         </div>
         {/* Card de Productos */}
-      {items.length > 0 && (
-        <ComponentCard
-          title="Productos Solicitados"
-          desc={`${items.length} producto${items.length !== 1 ? 's' : ''}`}
-        >
-          <div className="overflow-x-auto max-h-[60vh]">
-            <table className="w-full text-sm table-auto">
-              <thead className="sticky top-0 bg-white dark:bg-[#101828] z-10">
-                <tr className="border-b border-gray-200 dark:border-gray-700">
-                  <th className="text-left py-2 px-3 font-medium text-gray-700 dark:text-gray-300">
-                    SKU
-                  </th>
-                  <th className="text-left py-2 px-3 font-medium text-gray-700 dark:text-gray-300">
-                    Descripción
-                  </th>
-                  <th className="text-center py-2 px-3 font-medium text-gray-700 dark:text-gray-300">
-                    Cantidad
-                  </th>
-                  <th className="text-center py-2 px-3 font-medium text-gray-700 dark:text-gray-300">
-                    Unidad
-                  </th>
-                  <th className="text-left py-2 px-3 font-medium text-gray-700 dark:text-gray-300">
-                    Comentarios
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="align-top">
-                {items.map((item, index) => (
-                  <tr
-                    key={item.id || index}
-                    className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-white/[0.02]"
-                  >
-                    <td className="py-3 px-3 text-gray-600 dark:text-gray-400">
-                      {item.sku || '-'}
-                    </td>
-                    <td className="py-3 px-3 text-gray-800 dark:text-gray-200">
-                      {item.description}
-                    </td>
-                    <td className="py-3 px-3 text-center font-medium text-gray-800 dark:text-gray-200">
-                      {item.quantity}
-                    </td>
-                    <td className="py-3 px-3 text-center text-gray-600 dark:text-gray-400">
-                      {item.unit}
-                    </td>
-                    <td className="py-3 px-3 text-gray-600 dark:text-gray-400">
-                      {item.extraSpecs ? (
-                        <details className="cursor-pointer">
-                          <summary className="text-blue-600 dark:text-blue-400 hover:underline">
-                            Ver
-                          </summary>
-                          <pre className="mt-2 bg-gray-50 dark:bg-gray-900 p-2 rounded text-xs overflow-auto max-h-32">
-                            {JSON.stringify(item.extraSpecs, null, 2)}
-                          </pre>
-                        </details>
-                      ) : (
-                        '-'
-                      )}
-                    </td>
+        {items.length > 0 && (
+          <ComponentCard
+            title="Productos Solicitados"
+            desc={`${items.length} producto${items.length !== 1 ? 's' : ''}`}
+          >
+            <div className="overflow-x-auto max-h-[60vh]">
+              <table className="w-full text-sm table-auto">
+                <thead className="sticky top-0 bg-white dark:bg-[#101828] z-10">
+                  <tr className="border-b border-gray-200 dark:border-gray-700">
+                    <th className="text-left py-2 px-3 font-medium text-gray-700 dark:text-gray-300">
+                      SKU
+                    </th>
+                    <th className="text-left py-2 px-3 font-medium text-gray-700 dark:text-gray-300">
+                      Descripción
+                    </th>
+                    <th className="text-center py-2 px-3 font-medium text-gray-700 dark:text-gray-300">
+                      Cantidad
+                    </th>
+                    <th className="text-center py-2 px-3 font-medium text-gray-700 dark:text-gray-300">
+                      Unidad
+                    </th>
+                    <th className="text-left py-2 px-3 font-medium text-gray-700 dark:text-gray-300">
+                      Comentarios
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </ComponentCard>
-        
-      )}
-      <div className="pt-2 flex gap-2 flex-wrap">
-            {request.assignedTo ? (
-              <Button size="sm" variant="outline" onClick={onReassign}>
-                Reasignar
-              </Button>
-            ) : (
-              <Button size="sm" variant="primary" onClick={onAssign}>
-                Asignar
-              </Button>
-            )}
-            <Button size="sm" variant="secondary" onClick={onFollowUp}>
-              Dar seguimiento
+                </thead>
+                <tbody className="align-top">
+                  {items.map((item, index) => (
+                    <tr
+                      key={item.id || index}
+                      className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-white/[0.02]"
+                    >
+                      <td className="py-3 px-3 text-gray-600 dark:text-gray-400">
+                        {item.sku || '-'}
+                      </td>
+                      <td className="py-3 px-3 text-gray-800 dark:text-gray-200">
+                        {item.description}
+                      </td>
+                      <td className="py-3 px-3 text-center font-medium text-gray-800 dark:text-gray-200">
+                        {item.quantity}
+                      </td>
+                      <td className="py-3 px-3 text-center text-gray-600 dark:text-gray-400">
+                        {item.unit}
+                      </td>
+                      <td className="py-3 px-3 text-gray-600 dark:text-gray-400">
+                        {item.extraSpecs ? (
+                          <details className="cursor-pointer">
+                            <summary className="text-blue-600 dark:text-blue-400 hover:underline">
+                              Ver
+                            </summary>
+                            <pre className="mt-2 bg-gray-50 dark:bg-gray-900 p-2 rounded text-xs overflow-auto max-h-32">
+                              {JSON.stringify(item.extraSpecs, null, 2)}
+                            </pre>
+                          </details>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </ComponentCard>
+
+        )}
+        <div className="pt-2 flex gap-2 flex-wrap">
+          {request.assignedTo ? (
+            <Button size="sm" variant="outline" onClick={onReassign}>
+              Reasignar
             </Button>
-          </div>
+          ) : (
+            <Button size="sm" variant="primary" onClick={onAssign}>
+              Asignar
+            </Button>
+          )}
+          <Button size="sm" variant="secondary" onClick={onFollowUp}>
+            Dar seguimiento
+          </Button>
+        </div>
       </ComponentCard>
     </div>
   );
@@ -604,7 +721,7 @@ const SupervisorAssignModal = ({
             <option value="">Selecciona un supervisor…</option>
             {supervisors.map(u => (
               <option key={u.id} value={u.id}>
-                {u.fullName} {u.email ? `(${u.email})` : ""}
+                {u.fullName}
               </option>
             ))}
           </select>
@@ -631,6 +748,7 @@ const SupervisorAssignModal = ({
 
 export default function QuotesAssignment() {
   const navigate = useNavigate();
+  const user = useAuth();
 
   const [filters, setFilters] = useState<QuoteFilters>({
     preset: "30d",
@@ -643,6 +761,14 @@ export default function QuotesAssignment() {
     ordenar: "recientes",
     q: "",
   });
+
+  let Supervisores: usuarios[] = [];
+  const Usuarios = cargarSupervisores();
+
+  Usuarios.then((data) => {
+    Supervisores = data;
+  });
+
   const [data, setData] = useState<AssignmentRequest[]>([]);
   const [, setLoading] = useState(true);
   const [, setError] = useState<string | null>(null);
@@ -668,16 +794,19 @@ export default function QuotesAssignment() {
       isMounted = false; // Cleanup si se desmonta
     };
   }, []);
+
+
+
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // Processing pipeline
-  const sortedRequests = useSortedRequests(data);
-  const { pending, assigned } = usePartitionedRequests(sortedRequests);
-  const pendingFiltered = useFilteredRequests(pending, filters);
-  const assignedFiltered = useFilteredRequests(assigned, filters);
+  const allFiltered = useFilteredRequests(data, filters);
+  const { pending, assigned } = usePartitionedRequests(allFiltered);
+
+
 
   const selectedRequest = useMemo(
-    () => sortedRequests.find((r) => r.id === selectedId) ?? null,
-    [sortedRequests, selectedId]
+    () => allFiltered.find((r) => r.id === selectedId) ?? null,
+    [allFiltered, selectedId] // Cambio de sortedRequests a allFiltered
   );
 
   //despues de click de seleccionar request, ir al inicio de la pagina
@@ -707,7 +836,13 @@ export default function QuotesAssignment() {
   // enviar
   const submitAssign = async (assigneeId: string) => {
     if (!selectedRequest) return;
-
+    let nuevaFecha = new Date();
+    //hacemos el casteo de la fecha limite original
+    const fechaLimiteOriginal = new Date(selectedRequest.quoteDeadlineISO);
+    //le sumamos 3 dias
+    nuevaFecha.setTime(fechaLimiteOriginal.getTime() + 3 * 24 * 60 * 60 * 1000);
+    //convertimos a ISO
+    const nuevaFechaISO = nuevaFecha.toISOString();
     try {
       await api('/api/v1/assignments', {
         method: 'POST',
@@ -715,6 +850,9 @@ export default function QuotesAssignment() {
           entityType: 'PURCHASE_REQUEST',
           entityId: selectedRequest.id,
           assignedToId: assigneeId,
+          requesterId: user?.user?.id,
+          //a eta le ponemos la fecha limite, mas 3 dias para dar tiempo a cotizar
+          eta: nuevaFechaISO,
           role: 'SUPERVISOR',
         }),
       });
@@ -757,7 +895,7 @@ export default function QuotesAssignment() {
           value={filters}
           onChange={setFilters}
           proyectos={MOCK_PROJECTS}
-          usuarios={MOCK_USERS}
+          usuarios={Supervisores as usuarios[]}
         />
       </div>
 
@@ -766,14 +904,14 @@ export default function QuotesAssignment() {
 
           <RequestList
             title="Pendientes"
-            requests={pendingFiltered}
+            requests={pending}
             onSelectRequest={setSelectedId}
             emptyMessage="Sin pendientes."
           />
 
           <RequestList
             title="Asignadas"
-            requests={assignedFiltered}
+            requests={assigned}
             onSelectRequest={setSelectedId}
             emptyMessage="Sin asignadas."
           />
@@ -822,7 +960,7 @@ async function ObtenerCotizaciones(): Promise<AssignmentRequest[]> {
     return raw.map((r) => {
       const first = r.assignments?.[0] ?? null;
 
-      
+
 
       const flattenItems = (nested: ApiPurchaseRequest["items"]): RequestItem[] => {
         if (!nested) return [];
@@ -859,6 +997,7 @@ async function ObtenerCotizaciones(): Promise<AssignmentRequest[]> {
         createdAt,
         quoteDeadlineISO,
         quoteDeadline,
+        deadlline: r.quoteDeadline,
         requesterName: r.requester?.fullName ?? 'Solicitante no especificado',
         requestCategory: r.requestCategory as unknown as requestCategory,
         procuremet: toScope(r.procurement),
@@ -873,6 +1012,18 @@ async function ObtenerCotizaciones(): Promise<AssignmentRequest[]> {
     });
   } catch (error) {
     console.error("Error al obtener cotizaciones:", error);
+    return [];
+  }
+}
+
+async function cargarSupervisores(): Promise<usuarios[]> {
+  try {
+    const raw = await api<usuarios[]>('/api/v1/users/supervisors');
+    console.log("Usuarios cargados:", raw);
+    return raw || [];
+
+  } catch (error) {
+    console.error("Error al cargar Usuarios:", error);
     return [];
   }
 }

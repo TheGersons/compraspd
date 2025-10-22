@@ -14,8 +14,8 @@ export class AssignmentsController {
 
 
     @Post()
-    create(@Body() dto: CreateAssignmentDto) {
-        return this.svc.create(dto);
+    create(@Body() dto: CreateAssignmentDto, @Body('eta') eta: string) {
+        return this.svc.create(dto, eta);
     }
 
 
@@ -29,4 +29,10 @@ export class AssignmentsController {
     listAll() {
         return this.svc.listIncompletes();
     }
-}
+
+    //Obtener asignacion por id de supervisor
+    @Get('MyAssignments/:me')
+    listMyAssignments(@Param('me') me: string) {
+        return this.svc.listMyAssignments(me);
+    }
+}    

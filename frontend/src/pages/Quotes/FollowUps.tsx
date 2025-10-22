@@ -1,21 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useLocation } from "react-router-dom";
-
+import { useMyAssignments, useAssignmentChat, useUpdateFollowUp, useSendChat } from "../Quotes/hooks/useAssignments";
+import { assignmentsApi } from "../Quotes/services/assignmentsApi";
 // ============================================================================
-// COMPONENTES EXTERNOS (Reemplazar con tus rutas reales)
-// ============================================================================
-// import PageMeta from "../../components/common/PageMeta";
-// import ComponentCard from "../../components/common/ComponentCard";
-// import Button from "../../components/ui/button/Button";
-
-// ============================================================================
-// TYPES
+// TYPES - Actualizado para coincidir con el backend
 // ============================================================================
 
-type RequestType = "licitaciones" | "proyectos" | "suministros" | "inventarios";
-type Scope = "nacional" | "internacional";
-type DeliveryPlace = "almacen" | "proyecto";
-type FollowStatus = "EN_PROGRESO" | "PAUSADO" | "CANCELADO" | "FINALIZADO";
+type FollowStatus = "SUMMITED" | "IN_PROGRESS" | "PAUSED" | "CANCELLED" | "COMPLETED";
+type RequestCategory = "LICITACIONES" | "PROYECTOS" | "SUMINISTROS" | "INVENTARIOS";
+type Procurement = "NACIONAL" | "INTERNACIONAL";
+type DeliveryType = "ALMACEN" | "PROYECTO";
 
 type ChatFile = { 
     id: string; 
@@ -32,139 +26,75 @@ type ChatMsg = {
     files: ChatFile[];
 };
 
+// Tipo que coincide con la respuesta del backend
 type AssignmentRequest = {
-    assignmentId: string;
+    id: string; // ID de la asignación
+    assignedToId: string;
     progress: number;
     eta?: string;
     followStatus: FollowStatus;
     priorityRequested: boolean;
-    assignedTo: string;
-    id: string;
-    reference: string;
-    finalClient: string;
     createdAt: string;
-    deadline: string;
-    requestType: RequestType;
-    scope: Scope;
-    deliveryPlace: DeliveryPlace;
-    projectId?: string;
-    comments: string;
+    updatedAt: string;
+    
+    // Datos anidados de purchaseRequest
+    purchaseRequest: {
+        id: string;
+        reference: string;
+        finalClient: string;
+        createdAt: string;
+        deadline: string;
+        requestCategory: RequestCategory;
+        procurement: Procurement;
+        deliveryType: DeliveryType;
+        projectId: string | null;
+        comments: string;
+    } | null;
+    
+    // Datos del asignado
+    assignedTo: {
+        fullName: string;
+    };
 };
 
 // ============================================================================
 // UTILITIES
 // ============================================================================
 
-const formatDate = (date: string | number | Date) =>
-    new Intl.DateTimeFormat("es-HN", { 
+const formatDate = (date: string | number | Date | undefined | null) => {
+    if (!date) return "—";
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return "—";
+    
+    return new Intl.DateTimeFormat("es-HN", { 
         day: "2-digit", 
         month: "2-digit", 
         year: "2-digit", 
         hour: "2-digit", 
         minute: "2-digit" 
-    }).format(new Date(date));
+    }).format(d);
+}
 
-const shortDate = (date: string) =>
-    new Intl.DateTimeFormat("es-HN", { 
+const shortDate = (date: string | undefined | null) => {
+    if (!date) return "—";
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return "—";
+    
+    return new Intl.DateTimeFormat("es-HN", { 
         day: "2-digit", 
         month: "2-digit", 
         year: "2-digit" 
-    }).format(new Date(date));
+    }).format(d);
+}
 
-const getStatusLabel = (s: FollowStatus) => s.replace(/_/g, " ");
-
-const calculateDaysLeft = (deadline: string): number => {
-    const diff = new Date(deadline).getTime() - Date.now();
+const calculateDaysLeft = (deadline: string | undefined | null): number => {
+    if (!deadline) return 99999;
+    
+    const deadlineDate = new Date(deadline);
+    if (isNaN(deadlineDate.getTime())) return 99999;
+    
+    const diff = deadlineDate.getTime() - Date.now();
     return Math.floor(diff / 86400000);
-};
-
-// ============================================================================
-// CUSTOM HOOKS (Simulated - Replace with real API)
-// ============================================================================
-
-const useAuth = () => ({ 
-    user: { 
-        sub: "USER-CARLOS", 
-        fullName: "Carlos (Encargado)" 
-    } 
-});
-
-const useFetchMyAssignedRequests = () => {
-    const MOCK_DATA: AssignmentRequest[] = [
-        {
-            assignmentId: "ASSIGN-001",
-            id: "REQ-2025-0010",
-            reference: "REF-CABLE-CAT6",
-            finalClient: "Walmart (Solicitante)",
-            createdAt: "2025-09-08",
-            deadline: "2025-09-16",
-            requestType: "inventarios",
-            scope: "nacional",
-            deliveryPlace: "almacen",
-            comments: "Cableado estructurado para nueva tienda.",
-            assignedTo: "Carlos (Encargado)",
-            progress: 10,
-            eta: "2025-09-15",
-            followStatus: "EN_PROGRESO",
-            priorityRequested: false,
-        },
-    ];
-
-    return { 
-        data: MOCK_DATA, 
-        isLoading: false, 
-        refetch: () => console.log("Refetching...") 
-    };
-};
-
-const useAssignmentsApi = () => {
-    const uploadFiles = useCallback(async (files: File[]): Promise<ChatFile[]> => {
-        console.log("API: Uploading files...", files.map(f => f.name));
-        return files.map(f => ({
-            id: `FILE-${Math.random().toString(36).slice(2)}`,
-            name: f.name,
-            sizeBytes: f.size,
-            url: `/api/files/${f.name}`,
-        }));
-    }, []);
-
-    const sendChat = useCallback(async (assignmentId: string, body: string | null, fileIds: string[]): Promise<ChatMsg> => {
-        console.log(`API: Sending chat to ${assignmentId}. Files: ${fileIds.length}`);
-        return {
-            id: Math.random().toString(36).slice(2),
-            senderId: "USER-CARLOS",
-            body: body || undefined,
-            createdAt: new Date().toISOString(),
-            files: [],
-        };
-    }, []);
-
-    const listChat = useCallback(async (assignmentId: string): Promise<ChatMsg[]> => {
-        console.log(`API: Listing chat for ${assignmentId}`);
-        return [
-            {
-                id: "M1",
-                senderId: "USER-WALMART",
-                body: "Adjunto el pliego de condiciones actualizado.",
-                createdAt: new Date(Date.now() - 3600000).toISOString(),
-                files: [{ id: 'F1', name: 'Pliego_v2.pdf', sizeBytes: 150000, url: '#' }]
-            },
-            {
-                id: "M2",
-                senderId: "USER-CARLOS",
-                body: "Recibido. Estamos revisando la viabilidad.",
-                createdAt: new Date(Date.now() - 1800000).toISOString(),
-                files: []
-            },
-        ];
-    }, []);
-
-    const updateFollowUp = useCallback(async (assignmentId: string, data: Partial<AssignmentRequest>) => {
-        console.log(`API: Updating follow-up ${assignmentId}`, data);
-        return true;
-    }, []);
-
-    return { uploadFiles, sendChat, listChat, updateFollowUp };
 };
 
 // ============================================================================
@@ -187,10 +117,10 @@ const AssignmentListItem = React.memo(({
         onClick={onClick}
     >
         <div className="font-medium truncate font-semibold text-black-800 dark:text-white/90">
-            {req.id} – {req.finalClient}
+            {req.purchaseRequest?.reference || req.id} — {req.purchaseRequest?.finalClient || "N/A"}
         </div>
         <div className="text-xs text-black-800 dark:text-white/90">
-            Asignado a {req.assignedTo} • Estado: {getStatusLabel(req.followStatus)}
+            Asignado a {req.assignedTo.fullName} • Estado: {req.followStatus}
         </div>
     </button>
 ));
@@ -205,15 +135,16 @@ const DetailHeader = React.memo(({
     <div className="flex items-start justify-between gap-2">
         <div>
             <h3 className="text-base font-semibold text-black-800 dark:text-white/90">
-                {current.id} – {current.finalClient}
+                {current.purchaseRequest?.reference || current.id} — {current.purchaseRequest?.finalClient || "N/A"}
             </h3>
             <div className="text-xs text-black-800 dark:text-white/90">
-                Referencia {current.reference} • Tipo {current.requestType} • Asignado a {current.assignedTo}
+                Tipo {current.purchaseRequest?.requestCategory} • {current.purchaseRequest?.procurement} • 
+                Asignado a {current.assignedTo.fullName}
             </div>
         </div>
         <div className="text-right text-xs text-gray-500 dark:text-gray-400">
-            Creada {shortDate(current.createdAt)}<br />
-            Límite {shortDate(current.deadline)}
+            Creada {shortDate(current.purchaseRequest?.createdAt)}<br />
+            Límite {shortDate(current.purchaseRequest?.deadline)}
             {daysLeft >= 0 ? ` • ${daysLeft} días restantes` : ' • atrasada'}
         </div>
     </div>
@@ -291,34 +222,34 @@ const StatusActions = React.memo(({
     disabled: boolean;
     onSetStatus: (status: FollowStatus) => void;
 }) => {
-    const isFinalized = currentStatus === "CANCELADO" || currentStatus === "FINALIZADO";
+    const isFinalized = currentStatus === "CANCELLED" || currentStatus === "COMPLETED";
     
     return (
         <div className="flex flex-wrap gap-2">
             <button
                 className="px-4 py-2 rounded-lg bg-blue-500 text-white text-sm font-medium hover:bg-blue-600 disabled:opacity-50"
-                onClick={() => onSetStatus("EN_PROGRESO")}
-                disabled={currentStatus === "EN_PROGRESO" || disabled}
+                onClick={() => onSetStatus("IN_PROGRESS")}
+                disabled={currentStatus === "IN_PROGRESS" || disabled}
             >
                 En progreso
             </button>
             <button
                 className="px-4 py-2 rounded-lg bg-yellow-500 text-white text-sm font-medium hover:bg-yellow-600 disabled:opacity-50"
-                onClick={() => onSetStatus(currentStatus !== "PAUSADO" ? "PAUSADO" : "EN_PROGRESO")}
+                onClick={() => onSetStatus(currentStatus !== "PAUSED" ? "PAUSED" : "IN_PROGRESS")}
                 disabled={isFinalized || disabled}
             >
-                {currentStatus !== "PAUSADO" ? "Pausar" : "Reanudar"}
+                {currentStatus !== "PAUSED" ? "Pausar" : "Reanudar"}
             </button>
             <button
                 className="px-4 py-2 rounded-lg bg-red-500 text-white text-sm font-medium hover:bg-red-600 disabled:opacity-50"
-                onClick={() => onSetStatus("CANCELADO")}
+                onClick={() => onSetStatus("CANCELLED")}
                 disabled={isFinalized || disabled}
             >
                 Cancelar
             </button>
             <button
                 className="px-4 py-2 rounded-lg bg-green-500 text-white text-sm font-medium hover:bg-green-600 disabled:opacity-50"
-                onClick={() => onSetStatus("FINALIZADO")}
+                onClick={() => onSetStatus("COMPLETED")}
                 disabled={isFinalized || disabled}
             >
                 Finalizar
@@ -367,42 +298,52 @@ const ChatMessage = React.memo(({
 // ============================================================================
 
 export default function QuotesFollowUps() {
-    const { user } = useAuth();
-    const { state } = useLocation() as { state?: { selected?: AssignmentRequest } };
+    type LocationState = { 
+        fromAssignment?: boolean; 
+        selected?: AssignmentRequest 
+    };
+    const locationState = useLocation().state as LocationState | undefined;
     
-    const { data: assignedList, isLoading } = useFetchMyAssignedRequests();
-    const { uploadFiles, sendChat, listChat, updateFollowUp } = useAssignmentsApi();
+    // React Query hooks
+    const { data: assignedList = [], isLoading } = useMyAssignments();
+    const updateFollowUpMutation = useUpdateFollowUp();
+    const sendChatMutation = useSendChat();
 
     // State
     const [current, setCurrent] = useState<AssignmentRequest | null>(null);
-    const [status, setStatus] = useState<FollowStatus>("EN_PROGRESO");
+    const [status, setStatus] = useState<FollowStatus>("IN_PROGRESS");
     const [progress, setProgress] = useState<number>(0);
     const [eta, setEta] = useState<string>("");
     const [priorityRequested, setPriorityRequested] = useState<boolean>(false);
-    const [chat, setChat] = useState<ChatMsg[]>([]);
     const [input, setInput] = useState<string>("");
     const [files, setFiles] = useState<File[]>([]);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const chatEndRef = useRef<HTMLDivElement>(null);
 
+    // Chat query - solo se ejecuta cuando hay un current seleccionado
+    const { data: chat = [] } = useAssignmentChat(current?.id || null);
+
     // Derived state
-    const isCurrentAssignee = current?.assignedTo.includes(user.fullName) ?? false;
+    const isCurrentAssignee = true; // Siempre true porque solo ves tus asignaciones
     const daysLeft = useMemo(() => 
-        current ? calculateDaysLeft(current.deadline) : 0, 
+        current?.purchaseRequest?.deadline ? calculateDaysLeft(current.purchaseRequest.deadline) : 0, 
         [current]
     );
 
     // Handlers
     const handleSaveProgress = useCallback(async () => {
         if (!current) return;
-        console.log("Saving progress: ", progress, eta); // Agregado para ver la acción
+        
         try {
-            await updateFollowUp(current.assignmentId, { progress, eta: eta || undefined });
+            await updateFollowUpMutation.mutateAsync({
+                assignmentId: current.id,
+                data: { progress, eta: eta || undefined }
+            });
         } catch (error) {
             console.error("Error saving progress:", error);
         }
-    }, [current, progress, eta, updateFollowUp]);
+    }, [current, progress, eta, updateFollowUpMutation]);
 
     const handleAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
         const list = e.target.files;
@@ -417,13 +358,16 @@ export default function QuotesFollowUps() {
         try {
             let uploadedFiles: ChatFile[] = [];
             if (files.length > 0) {
-                uploadedFiles = await uploadFiles(files);
+                uploadedFiles = await assignmentsApi.uploadFiles(files);
             }
 
             const fileIds = uploadedFiles.map(f => f.id);
-            const newMsg = await sendChat(current.assignmentId, input.trim() || null, fileIds);
+            await sendChatMutation.mutateAsync({
+                assignmentId: current.id,
+                body: input.trim() || null,
+                fileIds
+            });
 
-            setChat(prev => [...prev, { ...newMsg, files: uploadedFiles }]);
             setInput("");
             setFiles([]);
         } catch (error) {
@@ -434,7 +378,10 @@ export default function QuotesFollowUps() {
     const requestPriorityBump = async () => {
         if (!current) return;
         try {
-            await updateFollowUp(current.assignmentId, { priorityRequested: true });
+            await updateFollowUpMutation.mutateAsync({
+                assignmentId: current.id,
+                data: { priorityRequested: true }
+            });
             setPriorityRequested(true);
         } catch (error) {
             console.error("Error requesting priority:", error);
@@ -444,7 +391,10 @@ export default function QuotesFollowUps() {
     const actionSetStatus = async (s: FollowStatus) => {
         if (!current) return;
         try {
-            await updateFollowUp(current.assignmentId, { followStatus: s });
+            await updateFollowUpMutation.mutateAsync({
+                assignmentId: current.id,
+                data: { followStatus: s }
+            });
             setStatus(s);
         } catch (error) {
             console.error("Error updating status:", error);
@@ -453,10 +403,14 @@ export default function QuotesFollowUps() {
 
     // Effects
     useEffect(() => {
-        if (state?.selected) setCurrent(state.selected);
-    }, [state?.selected]);
+        if (locationState?.selected) {
+            setCurrent(locationState.selected);
+        } else if (assignedList.length > 0 && !current) {
+            setCurrent(assignedList[0]);
+        }
+    }, [locationState, assignedList, current]);
 
-    // Sincroniza estado local y carga chat al cambiar la solicitud
+    // Sincroniza estado local con la asignación seleccionada
     useEffect(() => {
         if (!current) return;
         
@@ -464,29 +418,25 @@ export default function QuotesFollowUps() {
         setProgress(current.progress);
         setEta(current.eta || "");
         setPriorityRequested(current.priorityRequested);
+    }, [current?.id]);
 
-        listChat(current.assignmentId)
-            .then(setChat)
-            .catch(() => setChat([]));
-    }, [current?.assignmentId, listChat]);
-
-    // Guarda Progreso/ETA automáticamente (Debounce Simulado) -> SOLUCIÓN
+    // Auto-save progress/ETA con debounce
     useEffect(() => {
         if (!current) return;
         
         const delayDebounceFn = setTimeout(() => {
             handleSaveProgress();
-        }, 1500); 
+        }, 1500);
 
         return () => clearTimeout(delayDebounceFn);
-    }, [progress, eta, handleSaveProgress, current]); // Se agrega 'current' como dependencia por si la tarea cambia
+    }, [progress, eta, handleSaveProgress, current]);
 
     // Scroll al final del chat
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [chat]);
 
-    if (isLoading) return <div>Cargando asignaciones...</div>;
+    if (isLoading) return <div className="p-6 text-center">Cargando asignaciones...</div>;
 
     return (
         <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
@@ -506,10 +456,10 @@ export default function QuotesFollowUps() {
                         ) : (
                             <ul className="space-y-2">
                                 {assignedList.map(req => (
-                                    <li key={req.assignmentId}>
+                                    <li key={req.id}>
                                         <AssignmentListItem
                                             req={req}
-                                            isSelected={current?.assignmentId === req.assignmentId}
+                                            isSelected={current?.id === req.id}
                                             onClick={() => setCurrent(req)}
                                         />
                                     </li>
@@ -536,19 +486,19 @@ export default function QuotesFollowUps() {
                                     <div className="rounded-lg ring-1 ring-gray-200 dark:ring-gray-800 p-3">
                                         <div className="text-xs text-gray-500 dark:text-gray-400">Entrega</div>
                                         <div className="font-semibold text-black-800 dark:text-white/90">
-                                            {current.deliveryPlace === "almacen" ? "Almacén" : "Proyecto"}
+                                            {current.purchaseRequest?.deliveryType === "ALMACEN" ? "Almacén" : "Proyecto"}
                                         </div>
                                     </div>
                                     <div className="rounded-lg ring-1 ring-gray-200 dark:ring-gray-800 p-3">
                                         <div className="text-xs text-gray-500 dark:text-gray-400">Proyecto</div>
                                         <div className="font-semibold text-black-800 dark:text-white/90">
-                                            {current.projectId ?? "—"}
+                                            {current.purchaseRequest?.projectId ?? "—"}
                                         </div>
                                     </div>
                                 </div>
 
                                 <p className="text-sm text-gray-700 dark:text-gray-300">
-                                    <span className="font-medium">Comentarios:</span> {current.comments}
+                                    <span className="font-medium">Comentarios:</span> {current.purchaseRequest?.comments || "Sin comentarios"}
                                 </p>
 
                                 <ProgressControl
@@ -587,8 +537,8 @@ export default function QuotesFollowUps() {
                                             <ChatMessage
                                                 key={m.id}
                                                 message={m}
-                                                isFromCurrentUser={m.senderId === user.sub}
-                                                senderName={m.senderId === user.sub ? current.assignedTo : current.finalClient}
+                                                isFromCurrentUser={m.senderId === current.assignedToId}
+                                                senderName={m.senderId === current.assignedToId ? current.assignedTo.fullName : current.purchaseRequest?.finalClient || "Cliente"}
                                             />
                                         ))
                                     )}

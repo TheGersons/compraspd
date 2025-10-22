@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class AssignmentsService {
+    
     constructor(private prisma: PrismaService) { }
 
     public async generateUniqueAssignmentId(): Promise<string> {
@@ -25,9 +26,12 @@ export class AssignmentsService {
         return assignmentId;
     }
 
-    async create(dto: CreateAssignmentDto) {
+    async create(dto: CreateAssignmentDto, nuevaFechaISO: string) {
         const assignmentId = await this.generateUniqueAssignmentId();
 
+        if(!nuevaFechaISO){
+            throw new Error('La nueva fecha ETA es requerida.');
+        }
         const assignee = await this.prisma.user.findUnique({
             where: { id: dto.assignedToId },
             select: {
@@ -56,6 +60,7 @@ export class AssignmentsService {
                     entityId: dto.entityId,
                     assignedToId: dto.assignedToId,
                     role: dto.role ?? 'SUPERVISOR',
+                    eta: nuevaFechaISO,
                     progress: 0,
                     followStatus: 'IN_PROGRESS',
                     purchaseRequestId: dto.entityId, // FK directa
@@ -133,6 +138,26 @@ export class AssignmentsService {
 
         //prItems tiene que ir dentro de incompletes
         
+    }
+
+    async listMyAssignments(me: string) {
+
+        //validar sea un id existente de usuario con rol SUPERVISOR
+        const user = await this.prisma.user.findUnique({ where: { id: me }, include: { role: true } });
+        if (!user || user.role.name !== 'SUPERVISOR') {
+            throw new Error('El usuario no existe o no tiene el rol de SUPERVISOR.');
+        }
+
+        const assignments = await this.prisma.assignment.findMany({
+            where: { assignedToId: me },
+            include: { assignedTo: true }
+        });
+
+        if (assignments.length === 0) {
+            throw new Error('No se encontraron asignaciones para este supervisor.');
+        }
+
+        return assignments;
     }
 
 }
