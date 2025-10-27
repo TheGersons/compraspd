@@ -30,7 +30,9 @@ import ShoppingAssignment from "./pages/Shopping/Assignment";
 import ShoppingFollowUps from "./pages/Shopping/FollowUps";
 import ShoppingHistory from "./pages/Shopping/History";
 import ShoppingNew from "./pages/Shopping/New";
+import Profiles from "./pages/users/Profiles"
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import MyQuotes from "./pages/Quotes/MyQuotes";
 
 
 const queryClient = new QueryClient({
@@ -58,6 +60,7 @@ export default function App() {
             <Route path="/quotes" element={<QuotesLayout />}>
               <Route index element={<Quotes />} />
               <Route path="new" element={<QuotesNew />} />
+              <Route path= "my-quotes" element={<MyQuotes/>} />
               <Route path="follow-ups" element={<QuotesFollowUps />} />
               <Route path="history" element={<QuotesHistory />} />
               <Route path="assignment" element={<QuotesAssignment />} />
@@ -80,7 +83,10 @@ export default function App() {
             {/*Rutas genericas para ejemplos*/}
 
             {/* Others Page */}
-            <Route path="/profile" element={<UserProfiles />} />
+            <Route path="/Profiles" element={<Profiles />} />
+            <Route path="/settings" element={<UserProfiles />} />
+            <Route path="/roles" element={<UserProfiles />} />  
+
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/blank" element={<Blank />} />
 

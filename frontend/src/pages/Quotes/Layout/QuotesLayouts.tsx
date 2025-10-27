@@ -6,6 +6,7 @@ import { useAuth } from "../../../context/AuthContext";
 const allTabs = [
   { to: "/quotes", label: "Resumen", end: true },
   { to: "/quotes/new", label: "Nueva cotización" },
+  { to: "/quotes/my-quotes", label: "Mis cotizaciónes"},
   // 🛑 Solo para Supervisores/Administradores
   { to: "/quotes/follow-ups", label: "Seguimiento", supervisorOnly: true }, 
   { to: "/quotes/history", label: "Historial" },

@@ -14,21 +14,26 @@ export class FollowupsService {
    * @returns El objeto Assignment si la validación es exitosa.
    */
   private async ensureAssignee(id: string, userId: string): Promise<Assignment> {
-  const assignment = await this.prisma.assignment.findUnique({
-    where: { id }, // ✅ Busca por UUID interno
-  });
+    const assignment = await this.prisma.assignment.findFirst({
+      where: {
+        OR: [
+          { id: id },
+          { assignmentId: id }
+        ],
+      }, // ✅ Busca por UUID interno
+    });
 
-  if (!assignment) {
-    throw new NotFoundException(`Asignación ${id} no encontrada.`);
+    if (!assignment) {
+      throw new NotFoundException(`Asignación ${id} no encontrada.`);
+    }
+
+    if (assignment.assignedToId !== userId) {
+      console.error(`Usuario ${userId} no autorizado para modificar la asignación ${id}.`);
+      throw new UnauthorizedException('No tienes permiso para modificar esta asignación.');
+    }
+
+    return assignment;
   }
-
-  if (assignment.assignedToId !== userId) {
-    console.error(`Usuario ${userId} no autorizado para modificar la asignación ${id}.`);
-    throw new UnauthorizedException('No tienes permiso para modificar esta asignación.');
-  }
-
-  return assignment;
-}
 
   // =========================================================================
   // 1. LECTURA DE ASIGNACIONES (Columna Izquierda del Frontend)
@@ -58,30 +63,35 @@ export class FollowupsService {
           select: { fullName: true }
         }
       },
+      // ✅ AGREGADO: Ordena por referencia o cliente
+      orderBy: [
+        { purchaseRequest: { reference: 'asc' } },
+        { purchaseRequest: { finalClient: 'asc' } },
+        { createdAt: 'desc' }
+      ]
     });
 
     return assignments.map((assignment) => ({
-    // ✅ Incluye AMBOS IDs para evitar confusión
-    id: assignment.id, // ID interno (CUID)
-    assignmentId: assignment.assignmentId, // ID público (ASSIGN-XXX)
-    progress: assignment.progress,
-    eta: assignment.eta,
-    followStatus: assignment.followStatus,
-    priorityRequested: assignment.priorityRequested,
-    createdAt: assignment.createdAt,
-    updatedAt: assignment.updatedAt,
-    assignedToId: assignment.assignedToId,
-    assignedTo: assignment.assignedTo,
-    purchaseRequest: assignment.purchaseRequest
-      ? {
+      id: assignment.id,
+      assignmentId: assignment.assignmentId,
+      progress: assignment.progress,
+      eta: assignment.eta,
+      followStatus: assignment.followStatus,
+      priorityRequested: assignment.priorityRequested,
+      createdAt: assignment.createdAt,
+      updatedAt: assignment.updatedAt,
+      assignedToId: assignment.assignedToId,
+      assignedTo: assignment.assignedTo,
+      purchaseRequest: assignment.purchaseRequest
+        ? {
           ...assignment.purchaseRequest,
           projectId: assignment.purchaseRequest.projectId ?? "N/A",
           finalClient: assignment.purchaseRequest.finalClient ?? "N/A",
           comments: assignment.purchaseRequest.comments ?? "Sin comentarios",
         }
-      : null,
-  }));
-}
+        : null,
+    }));
+  }
 
   // =========================================================================
   // 2. ACTUALIZAR SEGUIMIENTO (ProgressControl / StatusActions)
@@ -105,19 +115,26 @@ export class FollowupsService {
   // =========================================================================
   // 3. CHAT
   // =========================================================================
- async listChat(id: string) {
-  // ✅ CORRECTO: ChatMessage.assignmentId referencia Assignment.id (UUID)
-  return this.prisma.chatMessage.findMany({
-    where: { assignmentId: id }, // ✅ Usa directamente el UUID
-    include: { 
-      files: true, 
-      sender: {
-        select: { id: true, fullName: true } 
-      } 
-    },
-    orderBy: { createdAt: 'asc' },
-  });
-}
+  async listChat(id: string) {
+    const messages = await this.prisma.chatMessage.findMany({
+      where: { assignmentId: id }, // ✅ Usa directamente el UUID
+      include: {
+        files: true,
+        sender: {
+          select: { id: true, fullName: true }
+        }
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    messages.map(msg => {
+      console.log(`Mensaje ${msg.id} de la asignación ${id} enviado por ${msg.sender.fullName} a las ${msg.createdAt}`);
+    });
+    if (!messages) {
+      throw new NotFoundException(`No se encontraron mensajes para la asignación ${id}.`);
+    }
+    return messages;
+  }
 
 
   async sendMessage(assignmentId: string, userId: string, dto: SendMessageDto) {

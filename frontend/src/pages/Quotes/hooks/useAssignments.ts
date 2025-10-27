@@ -1,4 +1,5 @@
 // hooks/useAssignments.ts
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { assignmentsApi } from '../services/assignmentsApi';
 
@@ -6,7 +7,7 @@ export function useMyAssignments() {
   return useQuery({
     queryKey: ['my-assignments'],
     queryFn: assignmentsApi.listMyAssignments,
-    refetchInterval: 30000,
+    staleTime: Infinity,
   });
 }
 
@@ -15,7 +16,7 @@ export function useAssignmentChat(assignmentId: string | null) {
     queryKey: ['assignment-chat', assignmentId],
     queryFn: () => assignmentId ? assignmentsApi.listChat(assignmentId) : Promise.resolve([]),
     enabled: !!assignmentId,
-    refetchInterval: 5000,
+    staleTime: Infinity,
   });
 }
 
@@ -25,8 +26,15 @@ export function useUpdateFollowUp() {
   return useMutation({
     mutationFn: ({ assignmentId, data }: { assignmentId: string; data: any }) =>
       assignmentsApi.updateFollowUp(assignmentId, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['my-assignments'] });
+    onSuccess: (_, variables) => {
+      // ✅ Actualiza solo la asignación específica en el cache
+      queryClient.setQueryData(['my-assignments'], (old: any[] = []) => {
+        return old.map(assignment => 
+          assignment.id === variables.assignmentId
+            ? { ...assignment, ...variables.data }
+            : assignment
+        );
+      });
     },
   });
 }
@@ -40,10 +48,21 @@ export function useSendChat() {
       body: string | null; 
       fileIds: string[] 
     }) => assignmentsApi.sendChat(assignmentId, body, fileIds),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ 
-        queryKey: ['assignment-chat', variables.assignmentId] 
-      });
+    onSuccess: (newMessage: any, variables) => { // ✅ Usa 'any' temporalmente
+      console.log('✅ Mensaje enviado exitosamente:', newMessage);
+      
+      queryClient.setQueryData(
+        ['assignment-chat', variables.assignmentId],
+        (oldMessages: any[] = []) => {
+          const exists = oldMessages.some(m => m.id === newMessage.id);
+          if (exists) return oldMessages;
+          
+          return [...oldMessages, newMessage];
+        }
+      );
     },
+    onError: (error) => {
+      console.error('❌ Error al enviar mensaje:', error);
+    }
   });
 }

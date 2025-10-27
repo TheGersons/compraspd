@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { ShoppingCart /*, User*/ } from "lucide-react";
+import { ShoppingCart, /*, User*/ 
+User} from "lucide-react";
 
 // Assume these icons are imported from an icon library
 import {
@@ -32,6 +33,7 @@ const navItems: NavItem[] = [
     subItems: [
       { name: "Resumen", path: "/quotes", pro: false },
       { name: "Nueva Cotización", path: "/quotes/new", pro: false },
+      { name: "Mis cotizaciónes", path: "/quotes/my-quotes", pro: false},
       { name: "Seguimiento", path: "/quotes/follow-ups", pro: false },
       { name: "Historial", path: "/quotes/history", pro: false },
       { name: "Asignación", path: "/quotes/assignment", pro: false },
@@ -64,11 +66,17 @@ const navItems: NavItem[] = [
     name: "Calendar",
     path: "/calendar",
   },
+  */
   {
     icon: <User />,
-    name: "User Profile",
-    path: "/profile",
+    name: "Usuarios",
+    subItems: [
+      { name: "Gestión de Usuarios", path: "/profile", pro: false },
+      { name: "Configuración", path: "/settings", pro: false },
+      { name: "Roles", path: "/roles", pro: false },
+    ],
   },
+  /*
   {
     name: "Forms",
     icon: <ListIcon />,

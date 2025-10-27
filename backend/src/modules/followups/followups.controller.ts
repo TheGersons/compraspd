@@ -33,7 +33,7 @@ export class FollowupsController {
     @Body() updateDto: UpdateFollowupDto,
     @CurrentUser() user: {sub: string; userId: string},
   ) {
-    return this.followupsService.updateFollowup(assignmentId, user.userId, updateDto);
+    return this.followupsService.updateFollowup(assignmentId, user.sub, updateDto);
   }
 
   // GET /assignments/:assignmentId/chat
@@ -47,11 +47,11 @@ export class FollowupsController {
   sendMessage(
     @Param('assignmentId') assignmentId: string,
     @Body() messageDto: SendMessageDto,
-    @Req() req: AuthenticatedRequest,
+    @Req() req: any,
   ) {
     // El 'assignmentId' es el ID público (ASSIGN-001)
     // El 'req.user.id' es el senderId
-    return this.followupsService.sendMessage(assignmentId, req.user.id, messageDto);
+    return this.followupsService.sendMessage(assignmentId, req.user.sub, messageDto);
   }
 
   /*

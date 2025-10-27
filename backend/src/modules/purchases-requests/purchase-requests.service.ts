@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreatePurchaseRequestDto } from './dto/create-pr.dto';
 import { PrismaService } from '../../prisma/prisma.service';
+import { SendMessageDto } from './dto/sendmessage.dto';
 
 type UserJwt = { sub: string; role?: string };
 
@@ -294,5 +295,145 @@ export class PurchaseRequestsService {
   private isSupervisorOrAdmin(me: UserJwt) {
     const r = (me.role || '').toUpperCase();
     return r === 'SUPERVISOR' || r === 'ADMIN';
+  }
+
+   // Lista las solicitudes del usuario logueado
+  async listMyRequests(userId: string) {
+    const requests = await this.prisma.purchaseRequest.findMany({
+      where: {
+        requesterId: userId,
+      },
+      include: {
+        assignments: {
+          where: {
+            followStatus: { not: 'COMPLETED' }
+          },
+          include: {
+            assignedTo: {
+              select: { fullName: true }
+            }
+          },
+          take: 1, // Solo la asignación activa
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return requests.map(req => ({
+      id: req.id,
+      reference: req.reference,
+      title: req.title,
+      finalClient: req.finalClient,
+      createdAt: req.createdAt,
+      deadline: req.deadline,
+      requestCategory: req.requestCategory,
+      procurement: req.procurement,
+      deliveryType: req.deliveryType,
+      projectId: req.projectId,
+      comments: req.comments,
+      status: req.status,
+      assignment: req.assignments[0] ? {
+        id: req.assignments[0].id,
+        progress: req.assignments[0].progress,
+        eta: req.assignments[0].eta,
+        followStatus: req.assignments[0].followStatus,
+        assignedTo: req.assignments[0].assignedTo
+      } : undefined
+    }));
+  }
+
+  // Lista el chat de una solicitud específica
+  async listRequestChat(requestId: string) {
+    // Encuentra la asignación asociada a esta solicitud
+    const assignment = await this.prisma.assignment.findFirst({
+      where: {
+        purchaseRequestId: requestId,
+      },
+      select: { id: true }
+    });
+
+    if (!assignment) {
+      // Si no hay asignación aún, retorna array vacío
+      return [];
+    }
+
+    // Obtiene los mensajes de la asignación
+    return this.prisma.chatMessage.findMany({
+      where: { assignmentId: assignment.id },
+      include: { 
+        files: true, 
+        sender: {
+          select: { id: true, fullName: true } 
+        } 
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  // Envía un mensaje en el chat de una solicitud
+  async sendRequestChat(requestId: string, userId: string, dto: SendMessageDto) {
+    // 1. Busca la asignación activa de esta solicitud
+    const assignment = await this.prisma.assignment.findFirst({
+      where: {
+        purchaseRequestId: requestId,
+      },
+      select: { id: true, assignedToId: true }
+    });
+
+    if (!assignment) {
+      throw new NotFoundException('Esta solicitud aún no tiene una asignación activa.');
+    }
+
+    // 2. Crea el mensaje
+    const newMessage = await this.prisma.chatMessage.create({
+      data: {
+        body: dto.body,
+        assignmentId: assignment.id,
+        senderId: userId,
+        files: {
+          connect: dto.fileIds?.map(fileId => ({ id: fileId })) || [],
+        },
+      },
+      include: {
+        files: true,
+        sender: {
+          select: { id: true, fullName: true }
+        }
+      },
+    });
+
+    return newMessage;
+  }
+
+  // Sube archivos y los guarda en la base de datos
+  async uploadFiles(files: Express.Multer.File[]) {
+    // TODO: Implementar subida real a S3 o almacenamiento cloud
+    // Por ahora, simula la subida guardando metadata
+    
+    const uploadedFiles = await Promise.all(
+      files.map(async (file) => {
+        // Aquí deberías subir el archivo a S3, Cloudinary, etc.
+        // const uploadResult = await s3.upload(file);
+        
+        // Por ahora, crea el registro en la base de datos con una URL simulada
+        const fileAttachment = await this.prisma.fileAttachment.create({
+          data: {
+            fileName: file.originalname,
+            mimeType: file.mimetype,
+            sizeBytes: file.size,
+            url: `/uploads/${file.originalname}`, // TODO: URL real después de subir a S3
+          }
+        });
+
+        return {
+          id: fileAttachment.id,
+          name: fileAttachment.fileName,
+          sizeBytes: fileAttachment.sizeBytes,
+          url: fileAttachment.url,
+        };
+      })
+    );
+
+    return uploadedFiles;
   }
 }

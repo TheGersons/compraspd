@@ -19,10 +19,10 @@ export class AssignmentsController {
     }
 
 
-    @Get(':entityType/:entityId')
-    list(@Param('entityType') entityType: string, @Param('entityId') entityId: string) {
-        return this.svc.listFor(entityType, entityId);
-    }
+    //@Get(':entityType/:entityId')
+    //list(@Param('entityType') entityType: string, @Param('entityId') entityId: string) {
+    //    return this.svc.listFor(entityType, entityId);
+    //}
 
 
     @Get()

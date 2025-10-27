@@ -27,6 +27,11 @@ export class UsersController {
   
   @Get()
   list(@Query() q: QueryUsersDto) {
+
+    if (1===1)
+    {
+      return this.svc.listUsers();
+    }
     return this.svc.paginate({
       page: q.page ? parseInt(q.page, 10) : undefined,
       pageSize: q.pageSize ? parseInt(q.pageSize, 10) : undefined,

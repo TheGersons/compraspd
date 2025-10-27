@@ -11,10 +11,10 @@ type RequestCategory = "LICITACIONES" | "PROYECTOS" | "SUMINISTROS" | "INVENTARI
 type Procurement = "NACIONAL" | "INTERNACIONAL";
 type DeliveryType = "ALMACEN" | "PROYECTO";
 
-type ChatFile = { 
-    id: string; 
-    name: string; 
-    sizeBytes: number; 
+type ChatFile = {
+    id: string;
+    name: string;
+    sizeBytes: number;
     url: string;
 };
 
@@ -24,11 +24,16 @@ type ChatMsg = {
     body?: string;
     createdAt: string;
     files: ChatFile[];
+    sender?: {  // ✅ Añade esto
+        id: string;
+        fullName: string;
+    };
 };
 
 // Tipo que coincide con la respuesta del backend
 type AssignmentRequest = {
-    id: string; // ID de la asignación
+    id: string; 
+    assignmentId: string;
     assignedToId: string;
     progress: number;
     eta?: string;
@@ -36,7 +41,7 @@ type AssignmentRequest = {
     priorityRequested: boolean;
     createdAt: string;
     updatedAt: string;
-    
+
     // Datos anidados de purchaseRequest
     purchaseRequest: {
         id: string;
@@ -50,7 +55,7 @@ type AssignmentRequest = {
         projectId: string | null;
         comments: string;
     } | null;
-    
+
     // Datos del asignado
     assignedTo: {
         fullName: string;
@@ -61,38 +66,35 @@ type AssignmentRequest = {
 // UTILITIES
 // ============================================================================
 
-const formatDate = (date: string | number | Date | undefined | null) => {
-    if (!date) return "—";
-    const d = new Date(date);
-    if (isNaN(d.getTime())) return "—";
-    
-    return new Intl.DateTimeFormat("es-HN", { 
-        day: "2-digit", 
-        month: "2-digit", 
-        year: "2-digit", 
-        hour: "2-digit", 
-        minute: "2-digit" 
-    }).format(d);
-}
+const formatDateForInput = (isoDate: string | null | undefined): string => {
+    if (!isoDate) return "";
+    try {
+        const date = new Date(isoDate);
+        // Formato yyyy-MM-dd para input type="date"
+        return date.toISOString().split('T')[0];
+    } catch {
+        return "";
+    }
+};
 
 const shortDate = (date: string | undefined | null) => {
     if (!date) return "—";
     const d = new Date(date);
     if (isNaN(d.getTime())) return "—";
-    
-    return new Intl.DateTimeFormat("es-HN", { 
-        day: "2-digit", 
-        month: "2-digit", 
-        year: "2-digit" 
+
+    return new Intl.DateTimeFormat("es-HN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "2-digit"
     }).format(d);
 }
 
 const calculateDaysLeft = (deadline: string | undefined | null): number => {
     if (!deadline) return 99999;
-    
+
     const deadlineDate = new Date(deadline);
     if (isNaN(deadlineDate.getTime())) return 99999;
-    
+
     const diff = deadlineDate.getTime() - Date.now();
     return Math.floor(diff / 86400000);
 };
@@ -100,20 +102,92 @@ const calculateDaysLeft = (deadline: string | undefined | null): number => {
 // ============================================================================
 // SUB-COMPONENTS
 // ============================================================================
+// En FollowUps.tsx - Modifica ProgressControl para agregar botón de guardar
 
-const AssignmentListItem = React.memo(({ 
-    req, 
-    isSelected, 
-    onClick 
-}: { 
-    req: AssignmentRequest; 
-    isSelected: boolean; 
+
+const ProgressControl2 = React.memo(({
+    progress,
+    eta,
+    priorityRequested,
+    disabled,
+    onProgressChange,
+    onEtaChange,
+    onRequestPriority,
+    onSave // ✅ NUEVO
+}: {
+    progress: number;
+    eta: string;
+    priorityRequested: boolean;
+    disabled: boolean;
+    onProgressChange: (value: number) => void;
+    onEtaChange: (value: string) => void;
+    onRequestPriority: () => void;
+    onSave: () => void; // ✅ NUEVO
+}) => (
+    <div className="rounded-lg ring-1 ring-gray-200 dark:ring-gray-800 p-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div>
+            <div className="text-xs font-semibold text-black-800 dark:text-white/90 mb-1">
+                Progreso actual: {progress}%
+            </div>
+            <input
+                type="range"
+                min={0}
+                max={100}
+                value={progress}
+                onChange={(e) => onProgressChange(Number(e.target.value))}
+                className="w-full"
+                disabled={disabled}
+            />
+            <div className="text-sm font-semibold text-black-800 dark:text-white/90 mt-1">
+                {progress}%
+            </div>
+        </div>
+        <div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                Fecha de finalización (estimada)
+            </div>
+            <input
+                type="date"
+                value={eta}
+                onChange={(e) => onEtaChange(e.target.value)}
+                className="w-full rounded-md ring-1 ring-inset ring-gray-300 bg-white px-2 py-1 text-sm dark:bg-gray-900 dark:text-gray-200 dark:ring-gray-700"
+                disabled={disabled}
+            />
+        </div>
+        <div className="flex flex-col gap-2">
+            {/* ✅ NUEVO: Botón de guardar */}
+            <button
+                className="px-4 py-2 rounded-lg bg-green-500 text-white text-sm font-medium hover:bg-green-600 disabled:opacity-50"
+                onClick={onSave}
+                disabled={disabled}
+            >
+                Guardar Progreso
+            </button>
+            <button
+                className={`px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 ${priorityRequested
+                    ? "ring-1 ring-gray-300 text-gray-600 dark:ring-gray-700 dark:text-gray-400"
+                    : "bg-blue-500 text-white hover:bg-blue-600"
+                    }`}
+                onClick={onRequestPriority}
+                disabled={priorityRequested || disabled}
+            >
+                {priorityRequested ? "Solicitud enviada" : "Solicitar prioridad"}
+            </button>
+        </div>
+    </div>
+));
+const AssignmentListItem = React.memo(({
+    req,
+    isSelected,
+    onClick
+}: {
+    req: AssignmentRequest;
+    isSelected: boolean;
     onClick: () => void;
 }) => (
     <button
-        className={`w-full text-left p-3 rounded-lg ring-1 ring-gray-200 dark:ring-gray-800 hover:bg-gray-50 dark:hover:bg-white/5 ${
-            isSelected ? "outline outline-2 outline-blue-500" : ""
-        }`}
+        className={`w-full text-left p-3 rounded-lg ring-1 ring-gray-200 dark:ring-gray-800 hover:bg-gray-50 dark:hover:bg-white/5 ${isSelected ? "outline outline-2 outline-blue-500" : ""
+            }`}
         onClick={onClick}
     >
         <div className="font-medium truncate font-semibold text-black-800 dark:text-white/90">
@@ -125,11 +199,11 @@ const AssignmentListItem = React.memo(({
     </button>
 ));
 
-const DetailHeader = React.memo(({ 
-    current, 
-    daysLeft 
-}: { 
-    current: AssignmentRequest; 
+const DetailHeader = React.memo(({
+    current,
+    daysLeft
+}: {
+    current: AssignmentRequest;
     daysLeft: number;
 }) => (
     <div className="flex items-start justify-between gap-2">
@@ -138,7 +212,7 @@ const DetailHeader = React.memo(({
                 {current.purchaseRequest?.reference || current.id} — {current.purchaseRequest?.finalClient || "N/A"}
             </h3>
             <div className="text-xs text-black-800 dark:text-white/90">
-                Tipo {current.purchaseRequest?.requestCategory} • {current.purchaseRequest?.procurement} • 
+                Tipo {current.purchaseRequest?.requestCategory} • {current.purchaseRequest?.procurement} •
                 Asignado a {current.assignedTo.fullName}
             </div>
         </div>
@@ -150,14 +224,15 @@ const DetailHeader = React.memo(({
     </div>
 ));
 
-const ProgressControl = React.memo(({ 
-    progress, 
-    eta, 
+/*
+const ProgressControl = React.memo(({
+    progress,
+    eta,
     priorityRequested,
     disabled,
-    onProgressChange, 
-    onEtaChange, 
-    onRequestPriority 
+    onProgressChange,
+    onEtaChange,
+    onRequestPriority
 }: {
     progress: number;
     eta: string;
@@ -199,11 +274,10 @@ const ProgressControl = React.memo(({
         </div>
         <div className="flex items-end gap-2">
             <button
-                className={`px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 ${
-                    priorityRequested 
-                        ? "ring-1 ring-gray-300 text-gray-600 dark:ring-gray-700 dark:text-gray-400" 
-                        : "bg-blue-500 text-white hover:bg-blue-600"
-                }`}
+                className={`px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 ${priorityRequested
+                    ? "ring-1 ring-gray-300 text-gray-600 dark:ring-gray-700 dark:text-gray-400"
+                    : "bg-blue-500 text-white hover:bg-blue-600"
+                    }`}
                 onClick={onRequestPriority}
                 disabled={priorityRequested || disabled}
             >
@@ -212,18 +286,19 @@ const ProgressControl = React.memo(({
         </div>
     </div>
 ));
+*/
 
-const StatusActions = React.memo(({ 
-    currentStatus, 
+const StatusActions = React.memo(({
+    currentStatus,
     disabled,
-    onSetStatus 
+    onSetStatus
 }: {
     currentStatus: FollowStatus;
     disabled: boolean;
     onSetStatus: (status: FollowStatus) => void;
 }) => {
     const isFinalized = currentStatus === "CANCELLED" || currentStatus === "COMPLETED";
-    
+
     return (
         <div className="flex flex-wrap gap-2">
             <button
@@ -258,24 +333,23 @@ const StatusActions = React.memo(({
     );
 });
 
-const ChatMessage = React.memo(({ 
-    message, 
-    isFromCurrentUser, 
-    senderName 
+const ChatMessage = React.memo(({
+    message,
+    isFromCurrentUser,
+    senderName
 }: {
     message: ChatMsg;
     isFromCurrentUser: boolean;
     senderName: string;
 }) => (
     <div
-        className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
-            isFromCurrentUser
-                ? "ml-auto bg-blue-500 text-white"
-                : "mr-auto ring-1 ring-gray-200 dark:ring-gray-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
-        }`}
+        className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${isFromCurrentUser
+            ? "ml-auto bg-blue-500 text-white"
+            : "mr-auto ring-1 ring-gray-200 dark:ring-gray-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+            }`}
     >
         <div className="text-[11px] opacity-70 mb-0.5">
-            {senderName} • {formatDate(message.createdAt)}
+            {senderName} • {formatDateForInput(message.createdAt)}
         </div>
         {message.body && <div className="whitespace-pre-wrap">{message.body}</div>}
         {message.files?.length > 0 && (
@@ -298,14 +372,18 @@ const ChatMessage = React.memo(({
 // ============================================================================
 
 export default function QuotesFollowUps() {
-    type LocationState = { 
-        fromAssignment?: boolean; 
-        selected?: AssignmentRequest 
+    type LocationState = {
+        fromAssignment?: boolean;
+        selected?: AssignmentRequest
     };
     const locationState = useLocation().state as LocationState | undefined;
-    
+
     // React Query hooks
-    const { data: assignedList = [], isLoading } = useMyAssignments();
+    const { data: temporalList = [], isLoading } = useMyAssignments();
+    //filtra las asignaciones que están en estado IN_PROGRESS, PAUSED o SUMMITED
+    const assignedList = temporalList.filter(assignment =>
+        ["IN_PROGRESS", "PAUSED", "SUBMITTED"].includes(assignment.followStatus)
+    );
     const updateFollowUpMutation = useUpdateFollowUp();
     const sendChatMutation = useSendChat();
 
@@ -326,15 +404,15 @@ export default function QuotesFollowUps() {
 
     // Derived state
     const isCurrentAssignee = true; // Siempre true porque solo ves tus asignaciones
-    const daysLeft = useMemo(() => 
-        current?.purchaseRequest?.deadline ? calculateDaysLeft(current.purchaseRequest.deadline) : 0, 
+    const daysLeft = useMemo(() =>
+        current?.purchaseRequest?.deadline ? calculateDaysLeft(current.purchaseRequest.deadline) : 0,
         [current]
     );
 
     // Handlers
     const handleSaveProgress = useCallback(async () => {
         if (!current) return;
-        
+
         try {
             await updateFollowUpMutation.mutateAsync({
                 assignmentId: current.id,
@@ -351,6 +429,9 @@ export default function QuotesFollowUps() {
         setFiles(prev => [...prev, ...Array.from(list)]);
         if (fileInputRef.current) fileInputRef.current.value = "";
     };
+
+
+    const [isSendingMessage,] = useState(false);
 
     const sendMsg = async () => {
         if (!current || (!input.trim() && files.length === 0)) return;
@@ -370,6 +451,11 @@ export default function QuotesFollowUps() {
 
             setInput("");
             setFiles([]);
+
+            // ✅ Scroll al final después de enviar
+            setTimeout(() => {
+                chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+            }, 100);
         } catch (error) {
             console.error("Error sending message:", error);
         }
@@ -410,31 +496,36 @@ export default function QuotesFollowUps() {
         }
     }, [locationState, assignedList, current]);
 
-    // Sincroniza estado local con la asignación seleccionada
+
     useEffect(() => {
-        if (!current) return;
-        
+        if (!current) {
+            console.log('⚠️ No hay asignación seleccionada');
+            return;
+        }
+
+        console.log('📋 Asignación seleccionada:', {
+            id: current.id,
+            assignmentId: current.assignmentId,
+            reference: current.purchaseRequest?.reference
+        });
+
         setStatus(current.followStatus);
         setProgress(current.progress);
-        setEta(current.eta || "");
+        setEta(formatDateForInput(current.eta));
         setPriorityRequested(current.priorityRequested);
-    }, [current?.id]);
 
-    // Auto-save progress/ETA con debounce
-    useEffect(() => {
-        if (!current) return;
         
-        const delayDebounceFn = setTimeout(() => {
-            handleSaveProgress();
-        }, 1500);
+    }, [current?.id, chat.length]);
 
-        return () => clearTimeout(delayDebounceFn);
-    }, [progress, eta, handleSaveProgress, current]);
-
-    // Scroll al final del chat
     useEffect(() => {
-        chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [chat]);
+        console.log('Chat actualizado:', {
+            assignmentId: current?.id,
+            messageCount: chat.length,
+            messages: chat
+        });
+    }, [chat, current?.id]);
+
+
 
     if (isLoading) return <div className="p-6 text-center">Cargando asignaciones...</div>;
 
@@ -481,7 +572,7 @@ export default function QuotesFollowUps() {
                         ) : (
                             <div className="space-y-3">
                                 <DetailHeader current={current} daysLeft={daysLeft} />
-                                
+
                                 <div className="grid grid-cols-2 gap-3 text-sm">
                                     <div className="rounded-lg ring-1 ring-gray-200 dark:ring-gray-800 p-3">
                                         <div className="text-xs text-gray-500 dark:text-gray-400">Entrega</div>
@@ -501,7 +592,7 @@ export default function QuotesFollowUps() {
                                     <span className="font-medium">Comentarios:</span> {current.purchaseRequest?.comments || "Sin comentarios"}
                                 </p>
 
-                                <ProgressControl
+                                <ProgressControl2
                                     progress={progress}
                                     eta={eta}
                                     priorityRequested={priorityRequested}
@@ -509,6 +600,7 @@ export default function QuotesFollowUps() {
                                     onProgressChange={setProgress}
                                     onEtaChange={setEta}
                                     onRequestPriority={requestPriorityBump}
+                                    onSave={handleSaveProgress} // ✅ NUEVO
                                 />
 
                                 <StatusActions
@@ -530,17 +622,27 @@ export default function QuotesFollowUps() {
                         ) : (
                             <div className="flex flex-col h-[420px]">
                                 <div className="flex-1 overflow-auto rounded-lg ring-1 ring-gray-200 dark:ring-gray-800 p-3 space-y-3">
+
+
                                     {chat.length === 0 ? (
                                         <p className="text-sm text-gray-500 dark:text-gray-400">Sin mensajes.</p>
                                     ) : (
-                                        chat.map(m => (
-                                            <ChatMessage
-                                                key={m.id}
-                                                message={m}
-                                                isFromCurrentUser={m.senderId === current.assignedToId}
-                                                senderName={m.senderId === current.assignedToId ? current.assignedTo.fullName : current.purchaseRequest?.finalClient || "Cliente"}
-                                            />
-                                        ))
+                                        chat.map(m => {
+                                            console.log('🔍 Rendering message:', m); // Debug
+                                            return (
+                                                <ChatMessage
+                                                    key={m.id}
+                                                    message={m}
+                                                    isFromCurrentUser={m.senderId === current.assignedToId}
+                                                    senderName={
+                                                        m.sender?.fullName ||
+                                                        (m.senderId === current.assignedToId
+                                                            ? current.assignedTo.fullName
+                                                            : current.purchaseRequest?.finalClient || "Cliente")
+                                                    }
+                                                />
+                                            );
+                                        })
                                     )}
                                     <div ref={chatEndRef} />
                                 </div>
@@ -590,9 +692,9 @@ export default function QuotesFollowUps() {
                                     <button
                                         className="px-4 py-2 rounded-lg bg-blue-500 text-white text-sm font-medium hover:bg-blue-600 disabled:opacity-50"
                                         onClick={sendMsg}
-                                        disabled={!isCurrentAssignee || (!input.trim() && files.length === 0)}
+                                        disabled={!isCurrentAssignee || (!input.trim() && files.length === 0) || isSendingMessage}
                                     >
-                                        Enviar
+                                        {isSendingMessage ? "Enviando..." : "Enviar"}
                                     </button>
                                 </div>
                             </div>

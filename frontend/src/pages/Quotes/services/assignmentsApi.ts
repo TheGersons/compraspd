@@ -1,55 +1,65 @@
 // services/assignmentsApi.ts
-import { api, getToken } from '../../../lib/api'
+import { api, getToken } from '../../../lib/api';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export const assignmentsApi = {
-  // Obtener mis asignaciones
   async listMyAssignments() {
-    return api<any[]>(`${API_BASE_URL}/assignments/my-followups`);
+    console.log('📋 Fetching my assignments...');
+    const data = await api<any[]>(`${API_BASE_URL}/api/v1/assignments/my-followups`);
+    console.log('✅ Assignments received:', data);
+    return data;
   },
 
-  // Subir archivos (este necesita manejo especial porque no es JSON)
   async uploadFiles(files: File[]) {
-    const token = getToken();
+    console.log('📤 Uploading files:', files.map(f => f.name));
     const formData = new FormData();
     files.forEach(file => formData.append('files', file));
     
-    const res = await fetch(`${API_BASE_URL}/assignments/upload-files`, {
+    const token = localStorage.getItem("token") ?? sessionStorage.getItem("token");
+    const res = await fetch(`${API_BASE_URL}/api/v1/assignments/upload-files`, {
       method: 'POST',
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        // NO incluir Content-Type, el browser lo configura automáticamente con el boundary
       },
       body: formData,
     });
 
     if (!res.ok) throw new Error(await res.text());
-    return res.json();
+    const uploaded = await res.json();
+    console.log('✅ Files uploaded:', uploaded);
+    return uploaded;
   },
 
-  // Enviar mensaje de chat
   async sendChat(assignmentId: string, body: string | null, fileIds: string[]) {
-    return api(`${API_BASE_URL}/assignments/${assignmentId}/chat`, {
+    console.log('💬 Sending chat to assignment:', assignmentId, { body, fileIds });
+    const response = await api(`${API_BASE_URL}/api/v1/assignments/${assignmentId}/chat`, {
       method: 'POST',
       body: JSON.stringify({ body, fileIds }),
     });
+    console.log('✅ Chat sent, response:', response);
+    return response;
   },
 
-  // Listar chat
   async listChat(assignmentId: string) {
-    return api<any[]>(`${API_BASE_URL}/assignments/${assignmentId}/chat`);
+    console.log('📨 Fetching chat for assignment:', assignmentId);
+    const messages = await api<any[]>(`${API_BASE_URL}/api/v1/assignments/${assignmentId}/chat`);
+    
+    console.log('✅ Chat messages received:', messages);
+    return messages;
   },
 
-  // Actualizar seguimiento
   async updateFollowUp(assignmentId: string, data: any) {
-    const token = getToken();
-    return api(`${API_BASE_URL}/assignments/${assignmentId}/followup`, {
+    console.log('🔄 Updating followup:', assignmentId, data);
+     const token = getToken();
+    const response = await api(`${API_BASE_URL}/api/v1/assignments/${assignmentId}/followup`, {
       method: 'PATCH',
-      body: JSON.stringify(data),
       headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        Authorization: `Bearer ${token}`,
       },
+      body: JSON.stringify(data),
     });
+    console.log('✅ Followup updated:', response);
+    return response;
   }
 };

@@ -313,7 +313,7 @@ const ClientSelector = ({
     <div className="space-y-2">
       <input
         className="w-full rounded-lg border border-gray-300 bg-white p-2 text-sm placeholder-gray-400 dark:border-white/10 dark:bg-[#101828] dark:text-gray-100"
-        placeholder="Buscar Cliente (ej: Empresa X)"
+        placeholder="Buscar Solicitante"
         value={query}
         onChange={e => onQueryChange(e.target.value)}
       />
@@ -323,7 +323,7 @@ const ClientSelector = ({
         value=""
         onChange={e => onSelectClient(e.target.value)}
       >
-        <option value="">Selecciona un cliente…</option>
+        <option value="">Selecciona un solicitante/Usuario…</option>
         {filteredClients.map(c => (
           <option key={c.id} value={c.id}>
             {c.name} ({c.id.substring(0, 4)})
@@ -695,7 +695,7 @@ export default function QuotesNew() {
 
             <div>
               <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">
-                Cliente final
+                Solicitante
               </label>
               <ClientSelector
                 clients={clients}

@@ -12,8 +12,9 @@ import { OffersModule } from './modules/offers/offers.module';
 import { PurchaseRequestsModule } from './modules/purchases-requests/purchase-requests.module';
 import { ClientsModule } from './modules/clients/clients.module';
 import { LocationsModule } from './modules/Locations/locations.module';
-import { DepartmentModule } from './modules/deparments/department.module';
 import { FollowupsModule } from './modules/followups/followups.module';
+import { rolesModule } from './modules/Roles/roles.module';
+import { DepartmentsModule } from './modules/departments/departments.module';
 
 @Module({
   imports: [
@@ -30,8 +31,9 @@ import { FollowupsModule } from './modules/followups/followups.module';
     PurchaseRequestsModule,
     ClientsModule,
     LocationsModule,
-    DepartmentModule,
-    FollowupsModule
+    FollowupsModule,
+    rolesModule,
+    DepartmentsModule
   ],
 })
 export class AppModule { }

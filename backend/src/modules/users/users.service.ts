@@ -149,4 +149,18 @@ export class UsersService {
 
     return supervisors;
   }
+  
+  async listUsers() {
+    return this.prisma.user.findMany({
+      include: {
+        role: {
+          select: { id: true, name: true, description: true }
+        },
+        department: {
+          select: { id: true, name: true }
+        }
+      },
+      orderBy: { fullName: 'asc' }
+    });
+  }
 }

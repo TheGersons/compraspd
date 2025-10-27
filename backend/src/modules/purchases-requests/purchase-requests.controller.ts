@@ -1,11 +1,17 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UnauthorizedException, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Req, UnauthorizedException, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
 import { PurchaseRequestsService } from './purchase-requests.service';
 import { AuthGuard } from '@nestjs/passport';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreatePurchaseRequestDto } from './dto/create-pr.dto';
 import { UpdatePurchaseRequestDto } from './dto/update-pr.dto';
 import { ChangePrStatusDto } from './dto/change-pr-status.dto';
+import { SendMessageDto } from './dto/sendmessage.dto';
+import { FilesInterceptor } from '@nestjs/platform-express';
 
+
+interface AuthenticatedRequest extends Request {
+    user: { id: string; sub: string }; 
+}
 
 
 @Controller('api/v1/purchase-requests')
@@ -28,6 +34,33 @@ export class PurchaseRequestsController {
     @Query('pageSize') pageSize?: string,
   ) {
     return this.service.listMine(me, Number(page ?? 1), Number(pageSize ?? 20));
+  }
+
+  @Get('my-requests')
+  listMyRequests(@Req() req: AuthenticatedRequest) {
+    return this.service.listMyRequests(req.user.sub);
+  }
+   // POST /api/v1/purchase-requests/:id/chat
+  @Post(':id/chat')
+  sendRequestChat(
+    @Param('id') requestId: string,
+    @Body() messageDto: SendMessageDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.service.sendRequestChat(requestId, req.user.sub, messageDto);
+  }
+
+  // POST /api/v1/purchase-requests/upload-files
+  @Post('upload-files')
+  @UseInterceptors(FilesInterceptor('files', 10))
+  async uploadFiles(@UploadedFiles() files: Express.Multer.File[]) {
+    return this.service.uploadFiles(files);
+  }
+
+   // GET /api/v1/purchase-requests/:id/chat
+  @Get(':id/chat')
+  listRequestChat(@Param('id') requestId: string) {
+    return this.service.listRequestChat(requestId);
   }
 
   // Obtener una concreta
