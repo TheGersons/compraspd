@@ -54,6 +54,11 @@ export class FollowupsController {
     return this.followupsService.sendMessage(assignmentId, req.user.sub, messageDto);
   }
 
+  @Get(':purchaseRequestId/items')
+  listItems(@Param('purchaseRequestId') purchaseRequestId: string) {
+    return this.followupsService.listItems(purchaseRequestId);
+  }
+
   /*
     FALTA: Un controlador separado (ej: FileUploadController) con un endpoint POST /files
     que se encargue de:

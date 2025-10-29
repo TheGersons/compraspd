@@ -61,5 +61,12 @@ export const assignmentsApi = {
     });
     console.log('✅ Followup updated:', response);
     return response;
+  },
+
+  async listItems(purchaseRequestsId: string){
+    const items = await api<any[]>(`${API_BASE_URL}/api/v1/assignments/${purchaseRequestsId}/items`);
+    console.log('✅ items recuperados: ', items)
+    return items;
   }
 };
+

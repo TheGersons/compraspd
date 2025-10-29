@@ -96,21 +96,52 @@ export class FollowupsService {
   // =========================================================================
   // 2. ACTUALIZAR SEGUIMIENTO (ProgressControl / StatusActions)
   // =========================================================================
-  async updateFollowup(assignmentId: string, userId: string, data: UpdateFollowupDto) {
-    // Primero obtén el assignment para validar
+ async updateFollowup(assignmentId: string, userId: string, data: UpdateFollowupDto) {
+    // 1. Obtén el assignment y valida el usuario (asumo que ensureAssignee maneja la existencia)
     const assignment = await this.ensureAssignee(assignmentId, userId);
 
-    // Actualiza usando el ID interno (CUID), no assignmentId
-    return this.prisma.assignment.update({
-      where: { id: assignment.id }, // ✅ Usa el ID interno retornado por ensureAssignee
-      data: {
-        progress: data.progress,
-        eta: data.eta ? new Date(data.eta) : undefined,
-        followStatus: data.followStatus,
-        priorityRequested: data.priorityRequested,
-      },
+    // 2. Obtén el purchaseRequestId
+    const purchaseRequest = await this.prisma.assignment.findUnique({
+        where: { id: assignment.id },
+        select: { purchaseRequestId: true }
     });
-  }
+
+    // Comprobación de existencia del resultado.
+    if (!purchaseRequest) {
+        throw new Error('Asignación no encontrada en la base de datos.');
+    }
+
+    // 3. Validar el ID. El purchaseRequestId DEBE existir si la asignación existe.
+    const purchaseRequestId = purchaseRequest.purchaseRequestId;
+    
+    if (purchaseRequestId === null) {
+        // Esto indica un error grave en la integridad de los datos de la base de datos
+        // Si la relación es obligatoria, usa un error más específico.
+        throw new Error('La asignación existe, pero no está vinculada a una solicitud de compra (ID es null).');
+    }
+    
+    // 4. Actualiza el PurchaseRequest
+    // Nota: El método .update requiere que le pases el objeto 'data'
+    const updatedPurchaseRequest = await this.prisma.purchaseRequest.update({
+        where: { id: purchaseRequestId }, // ✅ Aquí purchaseRequestId es un string válido
+        data: {
+            status : data.followStatus,
+            updatedAt: data.eta ? new Date(data.eta) : undefined,
+        }
+    });
+
+    // 5. Actualiza la Asignación (Followup)
+    // El 'assignment.id' es un string válido (asumiendo que ensureAssignee lo retorna correctamente).
+    return this.prisma.assignment.update({
+        where: { id: assignment.id },
+        data: {
+            progress: data.progress,
+            eta: data.eta ? new Date(data.eta) : undefined,
+            followStatus: data.followStatus,
+            priorityRequested: data.priorityRequested,
+        },
+    });
+}
 
   // =========================================================================
   // 3. CHAT
@@ -161,4 +192,25 @@ export class FollowupsService {
     });
     return newMessage;
   }
+
+  async listItems(id: string) {
+    const items = await this.prisma.pRItem.findMany({
+      where: { purchaseRequestId: id }, 
+      select: {
+        id: true, 
+        sku: true,
+        description: true,
+        quantity: true,
+        unit: true,
+        extraSpecs: true
+      }
+    });
+
+    
+    if (!items) {
+      throw new NotFoundException(`No se encontraron mensajes para la asignación ${id}.`);
+    }
+    return items;
+  }
+
 }

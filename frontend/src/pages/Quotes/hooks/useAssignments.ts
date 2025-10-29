@@ -20,6 +20,15 @@ export function useAssignmentChat(assignmentId: string | null) {
   });
 }
 
+export function loadItems(purchaseRequestId: string | null){
+  return useQuery({
+    queryKey: ['items', purchaseRequestId],
+    queryFn: () => purchaseRequestId ? assignmentsApi.listItems(purchaseRequestId) : Promise.resolve([]),
+    enabled: !!purchaseRequestId,
+    staleTime: Infinity
+  });
+}
+
 export function useUpdateFollowUp() {
   const queryClient = useQueryClient();
   

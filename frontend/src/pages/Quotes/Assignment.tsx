@@ -10,6 +10,7 @@ import { api } from "../../lib/api";
 import { FormatDateApi } from "../../lib/FormatDateApi"
 import getDeadlineMessage from "./lib/Deadline";
 import { useAuth } from "../../context/AuthContext";
+import { RequestedItemsTable } from './components/RequestedItemsTable';
 
 
 
@@ -497,7 +498,7 @@ interface RequestItem {
   description: string;
   quantity: number;
   unit: string;
-  extraSpecs?: Record<string, any>;
+  extraSpecs?: string;
 }
 
 const RequestDetail = ({
@@ -570,72 +571,12 @@ const RequestDetail = ({
           </p>
         </div>
         {/* Card de Productos */}
-        {items.length > 0 && (
-          <ComponentCard
-            title="Productos Solicitados"
-            desc={`${items.length} producto${items.length !== 1 ? 's' : ''}`}
-          >
-            <div className="overflow-x-auto max-h-[60vh]">
-              <table className="w-full text-sm table-auto">
-                <thead className="sticky top-0 bg-white dark:bg-[#101828] z-10">
-                  <tr className="border-b border-gray-200 dark:border-gray-700">
-                    <th className="text-left py-2 px-3 font-medium text-gray-700 dark:text-gray-300">
-                      SKU
-                    </th>
-                    <th className="text-left py-2 px-3 font-medium text-gray-700 dark:text-gray-300">
-                      Descripción
-                    </th>
-                    <th className="text-center py-2 px-3 font-medium text-gray-700 dark:text-gray-300">
-                      Cantidad
-                    </th>
-                    <th className="text-center py-2 px-3 font-medium text-gray-700 dark:text-gray-300">
-                      Unidad
-                    </th>
-                    <th className="text-left py-2 px-3 font-medium text-gray-700 dark:text-gray-300">
-                      Comentarios
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="align-top">
-                  {items.map((item, index) => (
-                    <tr
-                      key={item.id || index}
-                      className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-white/[0.02]"
-                    >
-                      <td className="py-3 px-3 text-gray-600 dark:text-gray-400">
-                        {item.sku || '-'}
-                      </td>
-                      <td className="py-3 px-3 text-gray-800 dark:text-gray-200">
-                        {item.description}
-                      </td>
-                      <td className="py-3 px-3 text-center font-medium text-gray-800 dark:text-gray-200">
-                        {item.quantity}
-                      </td>
-                      <td className="py-3 px-3 text-center text-gray-600 dark:text-gray-400">
-                        {item.unit}
-                      </td>
-                      <td className="py-3 px-3 text-gray-600 dark:text-gray-400">
-                        {item.extraSpecs ? (
-                          <details className="cursor-pointer">
-                            <summary className="text-blue-600 dark:text-blue-400 hover:underline">
-                              Ver
-                            </summary>
-                            <pre className="mt-2 bg-gray-50 dark:bg-gray-900 p-2 rounded text-xs overflow-auto max-h-32">
-                              {JSON.stringify(item.extraSpecs, null, 2)}
-                            </pre>
-                          </details>
-                        ) : (
-                          '-'
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </ComponentCard>
 
-        )}
+        <RequestedItemsTable items={items} />
+
+        {/* Card de Productos */}
+
+        
         <div className="pt-2 flex gap-2 flex-wrap">
           {request.assignedTo ? (
             <Button size="sm" variant="outline" onClick={onReassign}>

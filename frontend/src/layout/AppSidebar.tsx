@@ -71,7 +71,7 @@ const navItems: NavItem[] = [
     icon: <User />,
     name: "Usuarios",
     subItems: [
-      { name: "Gestión de Usuarios", path: "/profile", pro: false },
+      { name: "Gestión de Usuarios", path: "/profiles", pro: false },
       { name: "Configuración", path: "/settings", pro: false },
       { name: "Roles", path: "/roles", pro: false },
     ],

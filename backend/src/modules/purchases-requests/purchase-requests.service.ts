@@ -302,6 +302,9 @@ export class PurchaseRequestsService {
     const requests = await this.prisma.purchaseRequest.findMany({
       where: {
         requesterId: userId,
+        status: { 
+          notIn: ['COMPLETED','CANCELLED'],
+         }
       },
       include: {
         assignments: {
@@ -325,7 +328,7 @@ export class PurchaseRequestsService {
       title: req.title,
       finalClient: req.finalClient,
       createdAt: req.createdAt,
-      deadline: req.deadline,
+      quotedeadline: req.quoteDeadline,
       requestCategory: req.requestCategory,
       procurement: req.procurement,
       deliveryType: req.deliveryType,

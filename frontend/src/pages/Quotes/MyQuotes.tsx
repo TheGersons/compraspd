@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useRef, useState, /*useCallback*/ } from "re
 import { useLocation } from "react-router-dom";
 import { useMyRequests, useSendRequestChat, useRequestChat } from "./hooks/useMyRequests";
 import { myRequestsApi } from "./services/myRequestsApi";
+import { RequestedItemsTable } from "./components/RequestedItemsTable";
+import { loadItems } from "./hooks/useAssignments";
 //import { myRequestsApi } from "./services/myRequestsApi";
 
 // ============================================================================
@@ -11,12 +13,12 @@ import { myRequestsApi } from "./services/myRequestsApi";
 type FollowStatus = "SUMMITED" | "IN_PROGRESS" | "PAUSED" | "CANCELLED" | "COMPLETED";
 type RequestCategory = "LICITACIONES" | "PROYECTOS" | "SUMINISTROS" | "INVENTARIOS";
 type Procurement = "NACIONAL" | "INTERNACIONAL";
-type DeliveryType = "ALMACEN" | "PROYECTO";
+type DeliveryType = "ALMACEN" | "PROYECTO" | "WAREHOUSE" | "PROJECT";
 
-type ChatFile = { 
-    id: string; 
-    name: string; 
-    sizeBytes: number; 
+type ChatFile = {
+    id: string;
+    name: string;
+    sizeBytes: number;
     url: string;
 };
 
@@ -48,7 +50,7 @@ type MyRequest = {
     title: string;
     finalClient: string;
     createdAt: string;
-    deadline: string;
+    quotedeadline: string;
     requestCategory: RequestCategory;
     procurement: Procurement;
     deliveryType: DeliveryType;
@@ -66,13 +68,13 @@ const formatDate = (date: string | number | Date | undefined | null) => {
     if (!date) return "—";
     const d = new Date(date);
     if (isNaN(d.getTime())) return "—";
-    
-    return new Intl.DateTimeFormat("es-HN", { 
-        day: "2-digit", 
-        month: "2-digit", 
-        year: "2-digit", 
-        hour: "2-digit", 
-        minute: "2-digit" 
+
+    return new Intl.DateTimeFormat("es-HN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit"
     }).format(d);
 }
 
@@ -80,33 +82,35 @@ const shortDate = (date: string | undefined | null) => {
     if (!date) return "—";
     const d = new Date(date);
     if (isNaN(d.getTime())) return "—";
-    
-    return new Intl.DateTimeFormat("es-HN", { 
-        day: "2-digit", 
-        month: "2-digit", 
-        year: "2-digit" 
+
+    return new Intl.DateTimeFormat("es-HN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "2-digit"
     }).format(d);
 }
 
-const calculateDaysLeft = (deadline: string | undefined | null): number => {
-    if (!deadline) return 99999;
-    
-    const deadlineDate = new Date(deadline);
-    if (isNaN(deadlineDate.getTime())) return 99999;
-    
-    const diff = deadlineDate.getTime() - Date.now();
+const calculateDaysLeft = (quotedeadline: string | undefined | null): number => {
+    if (!quotedeadline) return 99999;
+    console.log(quotedeadline)
+    const quotedeadlineDate = new Date(quotedeadline);
+    if (isNaN(quotedeadlineDate.getTime())) return 99999;
+
+    const diff = quotedeadlineDate.getTime() - Date.now();
+    console.log(quotedeadlineDate)
+    console.log(diff)
     return Math.floor(diff / 86400000);
 };
 
 const getStatusBadge = (status: string) => {
     const statusMap: Record<string, { label: string; className: string }> = {
-        SUBMITTED: { label: 'Enviada', className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
+        PAUSED: { label: 'En pausa', className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
         IN_PROGRESS: { label: 'En Progreso', className: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' },
-        APPROVED: { label: 'Aprobada', className: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
+        COMPLETED: { label: 'Completada', className: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
         REJECTED: { label: 'Rechazada', className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
         CANCELLED: { label: 'Cancelada', className: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400' },
     };
-    
+
     return statusMap[status] || { label: status, className: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400' };
 };
 
@@ -114,23 +118,22 @@ const getStatusBadge = (status: string) => {
 // SUB-COMPONENTS
 // ============================================================================
 
-const RequestListItem = React.memo(({ 
-    request, 
-    isSelected, 
-    onClick 
-}: { 
-    request: MyRequest; 
-    isSelected: boolean; 
+const RequestListItem = React.memo(({
+    request,
+    isSelected,
+    onClick
+}: {
+    request: MyRequest;
+    isSelected: boolean;
     onClick: () => void;
 }) => {
     const statusBadge = getStatusBadge(request.status);
-    const daysLeft = calculateDaysLeft(request.deadline);
-    
+    const daysLeft = calculateDaysLeft(request.quotedeadline);
+    console.log(daysLeft)
     return (
         <button
-            className={`w-full text-left p-3 rounded-lg ring-1 ring-gray-200 dark:ring-gray-800 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors ${
-                isSelected ? "outline outline-2 outline-blue-500" : ""
-            }`}
+            className={`w-full text-left p-3 rounded-lg ring-1 ring-gray-200 dark:ring-gray-800 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors ${isSelected ? "outline outline-2 outline-blue-500" : ""
+                }`}
             onClick={onClick}
         >
             <div className="flex items-start justify-between gap-2 mb-2">
@@ -158,15 +161,15 @@ const RequestListItem = React.memo(({
     );
 });
 
-const DetailHeader = React.memo(({ 
-    current, 
-    daysLeft 
-}: { 
-    current: MyRequest; 
+const DetailHeader = React.memo(({
+    current,
+    daysLeft
+}: {
+    current: MyRequest;
     daysLeft: number;
 }) => {
     const statusBadge = getStatusBadge(current.status);
-    
+
     return (
         <div className="space-y-3">
             <div className="flex items-start justify-between gap-2">
@@ -188,7 +191,7 @@ const DetailHeader = React.memo(({
             <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
                 <span>Creada {shortDate(current.createdAt)}</span>
                 <span>•</span>
-                <span>Límite {shortDate(current.deadline)}</span>
+                <span>Límite {shortDate(current.quotedeadline)}</span>
                 {daysLeft >= 0 && daysLeft < 99999 && (
                     <>
                         <span>•</span>
@@ -202,8 +205,8 @@ const DetailHeader = React.memo(({
     );
 });
 
-const ProgressIndicator = React.memo(({ 
-    assignment 
+const ProgressIndicator = React.memo(({
+    assignment
 }: {
     assignment?: Assignment;
 }) => {
@@ -254,7 +257,7 @@ const ProgressIndicator = React.memo(({
                     </span>
                 </div>
                 <div className="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-800 overflow-hidden">
-                    <div 
+                    <div
                         className={`h-full ${status.color} transition-all duration-300`}
                         style={{ width: `${assignment.progress}%` }}
                     />
@@ -264,22 +267,22 @@ const ProgressIndicator = React.memo(({
     );
 });
 
-const ChatMessage = React.memo(({ 
-    message, 
-    isFromCurrentUser, 
-    senderName 
+const ChatMessage = React.memo(({
+    message,
+    isFromCurrentUser,
+    senderName
 }: {
     message: ChatMsg;
     isFromCurrentUser: boolean;
     senderName: string;
 }) => (
     <div
-        className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
-            isFromCurrentUser
-                ? "ml-auto bg-blue-500 text-white"
-                : "mr-auto ring-1 ring-gray-200 dark:ring-gray-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
-        }`}
+        className={`max-w-[80%] rounded-lg px-3 py-2 text-sm shadow-sm ${isFromCurrentUser
+            ? "ml-auto bg-blue-500 text-white"
+            : "mr-auto bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-50 ring-1 ring-gray-300 dark:ring-gray-700"
+            }`}
     >
+
         <div className="text-[11px] opacity-70 mb-0.5">
             {senderName} • {formatDate(message.createdAt)}
         </div>
@@ -304,12 +307,12 @@ const ChatMessage = React.memo(({
 // ============================================================================
 
 export default function MyQuotes() {
-    type LocationState = { 
-        fromNewQuote?: boolean; 
-        selected?: MyRequest 
+    type LocationState = {
+        fromNewQuote?: boolean;
+        selected?: MyRequest
     };
     const locationState = useLocation().state as LocationState | undefined;
-    
+
     // React Query hooks
     const { data: requests = [], isLoading } = useMyRequests();
     const sendChatMutation = useSendRequestChat();
@@ -327,22 +330,32 @@ export default function MyQuotes() {
     const { data: chat = [] } = useRequestChat(current?.id || null);
 
     // Derived state
-    const daysLeft = useMemo(() => 
-        current?.deadline ? calculateDaysLeft(current.deadline) : 0, 
+    const daysLeft = useMemo(() =>
+        current?.quotedeadline ? calculateDaysLeft(current.quotedeadline) : 0,
         [current]
     );
+
+    const [isTableVisible, setIsTableVisible] = useState(false)
+    const tableContentRef = useRef<HTMLDivElement>(null);
+    const { data: items = [], } = loadItems(current?.id !== undefined ? current.id : null);
+
+    const toggleTable = () => {
+        setIsTableVisible(prev => !prev);
+    }
+
 
     // Filter requests
     const filteredRequests = useMemo(() => {
         if (!searchQuery.trim()) return requests;
-        
+
         const query = searchQuery.toLowerCase();
-        return requests.filter(req => 
+        return requests.filter(req =>
             req.reference.toLowerCase().includes(query) ||
             req.title.toLowerCase().includes(query) ||
             req.finalClient.toLowerCase().includes(query)
         );
     }, [requests, searchQuery]);
+
 
     // Handlers
     const handleAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -370,7 +383,7 @@ export default function MyQuotes() {
 
             setInput("");
             setFiles([]);
-            
+
             setTimeout(() => {
                 chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
             }, 100);
@@ -383,9 +396,10 @@ export default function MyQuotes() {
     useEffect(() => {
         if (locationState?.selected) {
             setCurrent(locationState.selected);
-        } else if (requests.length > 0 && !current) {
-            setCurrent(requests[0]);
+            //} else if (requests.length > 0 && !current) {
+            //setCurrent(requests[0]);
         }
+
     }, [locationState, requests, current]);
 
     if (isLoading) return <div className="p-6 text-center">Cargando mis solicitudes...</div>;
@@ -414,18 +428,21 @@ export default function MyQuotes() {
                                 className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                             />
                         </div>
-                        
+
                         <h3 className="font-semibold mb-3 text-gray-800 dark:text-white/90">
                             Mis Solicitudes ({filteredRequests.length})
                         </h3>
-                        
+
                         {!filteredRequests?.length ? (
                             <p className="text-sm text-gray-600 dark:text-gray-400">
                                 {searchQuery ? 'No se encontraron solicitudes.' : 'No tienes solicitudes aún.'}
                             </p>
                         ) : (
                             <ul className="space-y-2 max-h-[600px] overflow-y-auto">
+                                {/* filtar la lista para solo mostrar las cuyo estado es IN_PROGESS, PAUSED*/}
+
                                 {filteredRequests.map(req => (
+
                                     <li key={req.id}>
                                         <RequestListItem
                                             request={req}
@@ -451,12 +468,12 @@ export default function MyQuotes() {
                         ) : (
                             <div className="space-y-4">
                                 <DetailHeader current={current} daysLeft={daysLeft} />
-                                
+
                                 <div className="grid grid-cols-2 gap-3 text-sm">
                                     <div className="rounded-lg ring-1 ring-gray-200 dark:ring-gray-800 p-3">
                                         <div className="text-xs text-gray-500 dark:text-gray-400">Entrega</div>
                                         <div className="font-semibold text-black-800 dark:text-white/90">
-                                            {current.deliveryType === "ALMACEN" ? "Almacén" : "Proyecto"}
+                                            {current.deliveryType === "WAREHOUSE" ? "Almacén" : "Proyecto"}
                                         </div>
                                     </div>
                                     <div className="rounded-lg ring-1 ring-gray-200 dark:ring-gray-800 p-3">
@@ -472,6 +489,30 @@ export default function MyQuotes() {
                                     <p className="text-sm text-gray-700 dark:text-gray-300">
                                         {current.comments || "Sin comentarios"}
                                     </p>
+                                </div>
+                                <button
+                                    onClick={toggleTable}
+                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors 
+                                                            ${isTableVisible
+                                            ? 'bg-gray-400 text-gray-800 hover:bg-gray-500' // Estilo al mostrar
+                                            : 'bg-blue-500 text-white hover:bg-blue-600'  // Estilo al ocultar
+                                        }`}
+                                >
+                                    {/* 5. Cambiar el texto del botón */}
+                                    {isTableVisible ? 'Ocultar productos' : `Ver ${items.length} productos solicitados`}
+                                </button>
+
+                                {/* 6. WRAPPER ANIMADO */}
+                                <div
+                                    ref={tableContentRef}
+                                    style={{
+                                        // Controla la altura. Si está visible, usa la altura real del contenido. Si no, 0.
+                                        height: isTableVisible ? tableContentRef.current?.scrollHeight : 0,
+                                    }}
+                                    className="overflow-hidden transition-all duration-300 ease-in-out mt-4" // Clases de Tailwind para la animación
+                                >
+                                    {/* 7. Renderiza el componente de la tabla */}
+                                    <RequestedItemsTable items={items} />
                                 </div>
 
                                 <ProgressIndicator assignment={current.assignment} />

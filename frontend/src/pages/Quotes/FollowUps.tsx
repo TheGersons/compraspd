@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useLocation } from "react-router-dom";
-import { useMyAssignments, useAssignmentChat, useUpdateFollowUp, useSendChat } from "../Quotes/hooks/useAssignments";
+import { useMyAssignments, useAssignmentChat, useUpdateFollowUp, useSendChat, loadItems } from "../Quotes/hooks/useAssignments";
 import { assignmentsApi } from "../Quotes/services/assignmentsApi";
+import { RequestedItemsTable } from "./components/RequestedItemsTable";
 // ============================================================================
 // TYPES - Actualizado para coincidir con el backend
 // ============================================================================
@@ -32,7 +33,7 @@ type ChatMsg = {
 
 // Tipo que coincide con la respuesta del backend
 type AssignmentRequest = {
-    id: string; 
+    id: string;
     assignmentId: string;
     assignedToId: string;
     progress: number;
@@ -343,9 +344,9 @@ const ChatMessage = React.memo(({
     senderName: string;
 }) => (
     <div
-        className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${isFromCurrentUser
+        className={`max-w-[80%] rounded-lg px-3 py-2 text-sm shadow-sm ${isFromCurrentUser
             ? "ml-auto bg-blue-500 text-white"
-            : "mr-auto ring-1 ring-gray-200 dark:ring-gray-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+            : "mr-auto bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-50 ring-1 ring-gray-300 dark:ring-gray-700"
             }`}
     >
         <div className="text-[11px] opacity-70 mb-0.5">
@@ -409,6 +410,13 @@ export default function QuotesFollowUps() {
         [current]
     );
 
+    const [isTableVisible, setIsTableVisible] = useState(false)
+    const tableContentRef = useRef<HTMLDivElement>(null);
+    const { data: items = [], } = loadItems(current?.purchaseRequest?.id !== undefined ? current.purchaseRequest.id : null);
+
+    const toggleTable = () => {
+        setIsTableVisible(prev => !prev);
+    }
     // Handlers
     const handleSaveProgress = useCallback(async () => {
         if (!current) return;
@@ -514,7 +522,7 @@ export default function QuotesFollowUps() {
         setEta(formatDateForInput(current.eta));
         setPriorityRequested(current.priorityRequested);
 
-        
+
     }, [current?.id, chat.length]);
 
     useEffect(() => {
@@ -586,6 +594,30 @@ export default function QuotesFollowUps() {
                                             {current.purchaseRequest?.projectId ?? "—"}
                                         </div>
                                     </div>
+                                </div>
+                                <button
+                                    onClick={toggleTable}
+                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors 
+                            ${isTableVisible
+                                            ? 'bg-gray-400 text-gray-800 hover:bg-gray-500' // Estilo al mostrar
+                                            : 'bg-blue-500 text-white hover:bg-blue-600'  // Estilo al ocultar
+                                        }`}
+                                >
+                                    {/* 5. Cambiar el texto del botón */}
+                                    {isTableVisible ? 'Ocultar productos' : `Ver ${items.length} productos solicitados`}
+                                </button>
+
+                                {/* 6. WRAPPER ANIMADO */}
+                                <div
+                                    ref={tableContentRef}
+                                    style={{
+                                        // Controla la altura. Si está visible, usa la altura real del contenido. Si no, 0.
+                                        height: isTableVisible ? tableContentRef.current?.scrollHeight : 0,
+                                    }}
+                                    className="overflow-hidden transition-all duration-300 ease-in-out mt-4" // Clases de Tailwind para la animación
+                                >
+                                    {/* 7. Renderiza el componente de la tabla */}
+                                    <RequestedItemsTable items={items} />
                                 </div>
 
                                 <p className="text-sm text-gray-700 dark:text-gray-300">
