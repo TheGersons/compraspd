@@ -14,6 +14,8 @@ import {
   RequestCategory
 } from "../../types/backend-enums";
 import { mapProcurement, toNumberString } from "../../utils/mappers";
+import { useUsers } from "../users/hooks/useUsers";
+import UserSelector from "./components/UserSelector";
 
 // ============================================================================
 // TYPES
@@ -46,11 +48,6 @@ type FormState = {
   lines: ProductLine[];
 };
 
-type ClientData = {
-  id: string;
-  name: string;
-  taxId?: string;
-};
 
 type Project = {
   id: string;
@@ -103,7 +100,7 @@ const addDays = (base: Date, days: number): Date => {
   return d;
 };
 
-const generateId = (): string => 
+const generateId = (): string =>
   Math.random().toString(36).substring(2, 9);
 
 const extractErrorMessage = (err: unknown): string => {
@@ -113,17 +110,17 @@ const extractErrorMessage = (err: unknown): string => {
 
   try {
     const parsed = JSON.parse(err.message);
-    
+
     if (typeof parsed === "string") {
       return parsed;
     }
-    
+
     if (parsed?.message) {
       return Array.isArray(parsed.message)
         ? parsed.message.join(", ")
         : parsed.message;
     }
-    
+
     return JSON.stringify(parsed);
   } catch {
     return err.message;
@@ -176,22 +173,22 @@ const validateForm = (form: FormState, minDeadline: string): ValidationErrors =>
     if (!ln.sku || !SKU_REGEX.test(ln.sku)) {
       errors[`lines.${i}.sku`] = "SKU inválido (3-32, A-Z 0-9 . _ -)";
     }
-    
+
     if (!ln.description || ln.description.trim().length < 3) {
       errors[`lines.${i}.description`] = "Descripción muy corta";
     }
-    
+
     const qty = Number(ln.quantity);
     if (ln.quantity === "" || Number.isNaN(qty) || qty <= 0 || !Number.isFinite(qty)) {
       errors[`lines.${i}.quantity`] = "Cantidad > 0";
     } else if (!Number.isInteger(qty)) {
       errors[`lines.${i}.quantity`] = "Debe ser entero";
     }
-    
+
     if (!UNITS.includes(ln.unit)) {
       errors[`lines.${i}.unit`] = "Unidad inválida";
     }
-    
+
     if (ln.extraSpecs.trim().length > 0 && ln.extraSpecs.trim().length < 2) {
       errors[`lines.${i}.extraSpecs`] = "Especificaciones muy cortas";
     }
@@ -204,33 +201,6 @@ const validateForm = (form: FormState, minDeadline: string): ValidationErrors =>
 // CUSTOM HOOKS
 // ============================================================================
 
-const useClients = () => {
-  const [clients, setClients] = useState<ClientData[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchClients = async () => {
-      setIsLoading(true);
-      setError(null);
-      
-      try {
-        const response = await api<{ items: ClientData[] }>("/api/v1/clients");
-        setClients(response.items || []);
-      } catch (err) {
-        console.error("Error loading clients:", err);
-        setError("Error al cargar clientes");
-        setClients([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchClients();
-  }, []);
-
-  return { clients, isLoading, error };
-};
 
 const useWarehouses = () => {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -239,7 +209,7 @@ const useWarehouses = () => {
   useEffect(() => {
     const fetchWarehouses = async () => {
       setIsLoading(true);
-      
+
       try {
         const response = await api<Warehouse[]>("/api/v1/locations/warehouses");
         setWarehouses(response || []);
@@ -262,83 +232,6 @@ const useWarehouses = () => {
 // SUB-COMPONENTS
 // ============================================================================
 
-const ClientSelector = ({
-  clients,
-  isLoading,
-  selectedClientId,
-  query,
-  onQueryChange,
-  onSelectClient,
-  onClearClient
-}: {
-  clients: ClientData[];
-  isLoading: boolean;
-  selectedClientId?: string;
-  query: string;
-  onQueryChange: (query: string) => void;
-  onSelectClient: (id: string) => void;
-  onClearClient: () => void;
-}) => {
-  const selectedClient = clients.find(c => c.id === selectedClientId);
-  
-  const filteredClients = useMemo(() => {
-    if (!query) return clients;
-    const lowerQuery = query.toLowerCase();
-    return clients.filter(
-      c => c.name.toLowerCase().includes(lowerQuery) || 
-           c.id.toLowerCase().includes(lowerQuery)
-    );
-  }, [query, clients]);
-
-  if (isLoading) {
-    return <p className="text-sm text-gray-500">Cargando clientes...</p>;
-  }
-
-  if (selectedClient) {
-    return (
-      <div className="inline-flex items-center gap-2 rounded-full bg-brand-50 px-3 py-1 text-xs text-brand-700 dark:bg-white/10 dark:text-brand-300">
-        {selectedClient.name}
-        <button
-          type="button"
-          onClick={onClearClient}
-          className="opacity-70 hover:opacity-100"
-        >
-          ×
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-2">
-      <input
-        className="w-full rounded-lg border border-gray-300 bg-white p-2 text-sm placeholder-gray-400 dark:border-white/10 dark:bg-[#101828] dark:text-gray-100"
-        placeholder="Buscar Solicitante"
-        value={query}
-        onChange={e => onQueryChange(e.target.value)}
-      />
-      
-      <select
-        className="w-full rounded-lg border border-gray-300 bg-white p-2 text-sm dark:border-white/10 dark:bg-[#101828] dark:text-gray-100"
-        value=""
-        onChange={e => onSelectClient(e.target.value)}
-      >
-        <option value="">Selecciona un solicitante/Usuario…</option>
-        {filteredClients.map(c => (
-          <option key={c.id} value={c.id}>
-            {c.name} ({c.id.substring(0, 4)})
-          </option>
-        ))}
-        
-        {filteredClients.length === 0 && query && (
-          <option value="CREATE_NEW_CLIENT" className="font-bold">
-            + Crear nuevo cliente "{query}" (FALTA IMPLEMENTAR)
-          </option>
-        )}
-      </select>
-    </div>
-  );
-};
 
 const ReferenceSelector = ({
   selectedRef,
@@ -422,7 +315,7 @@ const ProductLineRow = ({
         <p className="mt-1 text-xs text-rose-400">{errors[`lines.${index}.sku`]}</p>
       )}
     </td>
-    
+
     <td className="px-3 py-2 align-top">
       <input
         value={line.description}
@@ -434,7 +327,7 @@ const ProductLineRow = ({
         <p className="mt-1 text-xs text-rose-400">{errors[`lines.${index}.description`]}</p>
       )}
     </td>
-    
+
     <td className="px-3 py-2 align-top">
       <input
         inputMode="numeric"
@@ -450,7 +343,7 @@ const ProductLineRow = ({
         <p className="mt-1 text-xs text-rose-400">{errors[`lines.${index}.quantity`]}</p>
       )}
     </td>
-    
+
     <td className="px-3 py-2 align-top">
       <select
         value={line.unit}
@@ -462,7 +355,7 @@ const ProductLineRow = ({
         ))}
       </select>
     </td>
-    
+
     <td className="px-3 py-2 align-top">
       <input
         value={line.extraSpecs}
@@ -474,7 +367,7 @@ const ProductLineRow = ({
         <p className="mt-1 text-xs text-rose-400">{errors[`lines.${index}.extraSpecs`]}</p>
       )}
     </td>
-    
+
     <td className="px-3 py-2 align-top">
       <Button size="xs" variant="danger" onClick={() => onRemove(index)}>
         Quitar
@@ -489,7 +382,6 @@ const ProductLineRow = ({
 
 export default function QuotesNew() {
   const auth = useAuth();
-  const { clients, isLoading: isLoadingClients } = useClients();
   const { warehouses } = useWarehouses();
 
   // Date constraints
@@ -498,7 +390,21 @@ export default function QuotesNew() {
 
   // Search queries
   const [refQuery, setRefQuery] = useState("");
-  const [clientQuery, setClientQuery] = useState("");
+
+  const { data: users = [], isLoading: isLoadingUsers } = useUsers();
+  const [UserId, setSelectedUserId] = useState<string | undefined>(auth.user?.id);
+  const [userQuery, setUserQuery] = useState("");
+
+  // Filtrar usuarios activos y por búsqueda
+  const filteredUsers = useMemo(() => {
+    const active = users.filter(u => u.isActive);
+    if (!userQuery) return active;
+    const q = userQuery.toLowerCase();
+    return active.filter(u => u.fullName.toLowerCase().includes(q));
+  }, [users, userQuery]);
+
+  const requester = users.find(user => user.id === UserId) || null;
+
 
   // Form state
   const [form, setForm] = useState<FormState>({
@@ -542,7 +448,7 @@ export default function QuotesNew() {
   const updateLine = useCallback((idx: number, patch: Partial<ProductLine>) => {
     setForm(prev => ({
       ...prev,
-      lines: prev.lines.map((line, i) => 
+      lines: prev.lines.map((line, i) =>
         i === idx ? { ...line, ...patch } : line
       )
     }));
@@ -583,8 +489,8 @@ export default function QuotesNew() {
 
   const buildPayload = useCallback((formData: FormState): CreatePurchaseRequestDto => {
     return {
-      requesterId: auth.user?.id.toString() ?? "",
-      departmentId: auth.user?.departmentId?.toString() ?? "",
+      requesterId: UserId !== undefined ? UserId : "",
+      departmentId: requester?.departmentId ?? "",
       procurement: mapProcurement(formData.scope) as ProcurementType,
       requestCategory: formData.requestType.toUpperCase() as RequestCategory,
       reference: formData.reference,
@@ -614,10 +520,10 @@ export default function QuotesNew() {
 
   const onSubmit = async (ev: React.FormEvent) => {
     ev.preventDefault();
-    
+
     const validationErrors = validateForm(form, minDeadline);
     setErrors(validationErrors);
-    
+
     if (Object.keys(validationErrors).length > 0) {
       return;
     }
@@ -635,7 +541,7 @@ export default function QuotesNew() {
 
       console.log("Created response:", created);
       alert(`Solicitud creada correctamente con id: ${created.id}`);
-      
+
       window.location.href = "/quotes/new";
     } catch (err) {
       const errorMessage = extractErrorMessage(err);
@@ -652,7 +558,7 @@ export default function QuotesNew() {
         title="Nueva Cotización | Compras Energia PD"
         description="Crear nueva cotización en Compras Energia PD"
       />
-      
+
       <div className="rounded-xl border border-gray-200 p-6 bg-white dark:border-white/10 dark:bg-[#101828]">
         <h2 className="text-title-sm sm:text-title-md font-semibold text-gray-800 dark:text-white/90">
           Nueva cotización
@@ -697,19 +603,24 @@ export default function QuotesNew() {
               <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">
                 Solicitante
               </label>
-              <ClientSelector
-                clients={clients}
-                isLoading={isLoadingClients}
-                selectedClientId={form.finalClientId}
-                query={clientQuery}
-                onQueryChange={setClientQuery}
-                onSelectClient={id => setField("finalClientId", id)}
-                onClearClient={() => setField("finalClientId", undefined)}
+
+              <UserSelector
+                users={filteredUsers}
+                selectedUserId={UserId}
+                query={userQuery}
+                onQueryChange={setUserQuery}
+                onSelectUser={(id) => setSelectedUserId(id)}
+                onClearUser={() => setSelectedUserId(undefined)}
+                disabled={isLoadingUsers}
+                placeholder="Buscar usuario…"
               />
-              {errors.finalClient && (
-                <p className="mt-1 text-xs text-rose-400">{errors.finalClient}</p>
+
+              {/* Si quieres validar que exista solicitante */}
+              {!UserId && (
+                <p className="mt-1 text-xs text-rose-400">Selecciona un solicitante</p>
               )}
             </div>
+
 
             <div>
               <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">
@@ -719,7 +630,7 @@ export default function QuotesNew() {
                 id="deadline"
                 defaultDate={form.deadline || undefined}
                 minDate={minDateObj}
-                onChange={dates => 
+                onChange={dates =>
                   setField("deadline", dates[0] ? formatDateYYYYMMDD(dates[0]) : "")
                 }
               />
@@ -864,8 +775,8 @@ export default function QuotesNew() {
 
           {/* Actions */}
           <div className="flex justify-end gap-3">
-            <Button 
-              variant="danger" 
+            <Button
+              variant="danger"
               onClick={() => window.history.back()}
               disabled={isSubmitting}
             >
