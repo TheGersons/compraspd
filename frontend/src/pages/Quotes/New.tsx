@@ -15,7 +15,7 @@ import {
 } from "../../types/backend-enums";
 import { mapProcurement, toNumberString } from "../../utils/mappers";
 import { useUsers } from "../users/hooks/useUsers";
-import UserSelector from "./components/UserSelector";
+import UserComboBox from "./components/ComboBoxUsers";
 
 // ============================================================================
 // TYPES
@@ -393,7 +393,7 @@ export default function QuotesNew() {
 
   const { data: users = [], isLoading: isLoadingUsers } = useUsers();
   const [UserId, setSelectedUserId] = useState<string | undefined>(auth.user?.id);
-  const [userQuery, setUserQuery] = useState("");
+  const [userQuery, ] = useState("");
 
   // Filtrar usuarios activos y por búsqueda
   const filteredUsers = useMemo(() => {
@@ -603,19 +603,12 @@ export default function QuotesNew() {
               <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">
                 Solicitante
               </label>
-
-              <UserSelector
-                users={filteredUsers}
-                selectedUserId={UserId}
-                query={userQuery}
-                onQueryChange={setUserQuery}
-                onSelectUser={(id) => setSelectedUserId(id)}
-                onClearUser={() => setSelectedUserId(undefined)}
+              <UserComboBox
+                users={filteredUsers}             // o users si quieres todos
+                value={UserId}
+                onChange={(id) => setSelectedUserId(id)}
                 disabled={isLoadingUsers}
-                placeholder="Buscar usuario…"
               />
-
-              {/* Si quieres validar que exista solicitante */}
               {!UserId && (
                 <p className="mt-1 text-xs text-rose-400">Selecciona un solicitante</p>
               )}
