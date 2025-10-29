@@ -1,31 +1,57 @@
+# ============================
+#  1️⃣ Etapa de dependencias
+# ============================
 FROM node:22-alpine AS deps
 RUN corepack enable && corepack prepare pnpm@9.12.3 --activate
 WORKDIR /app
+
 COPY package.json pnpm-lock.yaml* ./
 RUN pnpm install --frozen-lockfile \
   && pnpm add multer uuid \
   && pnpm add -D @types/multer @types/uuid
 
+
+# ============================
+#  2️⃣ Etapa de build
+# ============================
 FROM node:22-alpine AS build
 RUN corepack enable && corepack prepare pnpm@9.12.3 --activate
 WORKDIR /app
-COPY --from=deps /app/node_modules /app/node_modules
+
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
 RUN pnpm db:generate && pnpm build
 
+
+# ============================
+#  3️⃣ Etapa final (runtime)
+# ============================
 FROM node:22-alpine AS runner
 RUN corepack enable && corepack prepare pnpm@9.12.3 --activate
 WORKDIR /app
+
 ENV NODE_ENV=production
-COPY --from=build /app/node_modules /app/node_modules
-COPY --from=build /app/dist /app/dist
-COPY prisma ./prisma
 EXPOSE 3001
 
+# Copiamos solo lo necesario para correr la app
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/dist ./dist
+COPY prisma ./prisma
 
-# Dockerfile.dev (o Dockerfile)
-COPY entrypoint.sh /entrypoint.sh
+# 🔹 Copiar el script SQL (asegúrate de tenerlo en /db/post_migrate.sql dentro del repo)
+COPY ./db /db
+
+# Necesarios para entrypoint.sh
+RUN apk add --no-cache postgresql-client netcat-openbsd
+
+# 🔹 Copiar y preparar entrypoint
+COPY ./entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+
+
+# 🔹 Usa el entrypoint (espera DB, corre migraciones, ejecuta post_migrate, arranca Nest)
 ENTRYPOINT ["/entrypoint.sh"]
 
-CMD ["pnpm","start:prod"]
+# 🔹 Este CMD será sobrescrito por el entrypoint
+CMD ["pnpm", "start:prod"]

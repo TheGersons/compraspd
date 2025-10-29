@@ -39,7 +39,7 @@ type FormState = {
   scope: Scope;
   requestType: RequestType;
   reference: string;
-  finalClientId?: string;
+  requesterId?: string;
   deadline: string;
   deliveryPlace: DeliveryPlace;
   projectId?: string;
@@ -143,11 +143,11 @@ const validateForm = (form: FormState, minDeadline: string): ValidationErrors =>
     errors.reference = "Referencia no estandarizada";
   }
 
-  // Client validation
-  if (!form.finalClientId) {
-    errors.finalClient = "Selecciona o crea un Cliente final";
+   //Solicitante
+  if (!form.requesterId) {
+    errors.requesterId = "Selecciona un solicitante";
   }
-
+  
   // Deadline validation
   if (!form.deadline) {
     errors.deadline = "Requerido";
@@ -392,8 +392,8 @@ export default function QuotesNew() {
   const [refQuery, setRefQuery] = useState("");
 
   const { data: users = [], isLoading: isLoadingUsers } = useUsers();
-  const [UserId, setSelectedUserId] = useState<string | undefined>(auth.user?.id);
-  const [userQuery, ] = useState("");
+  const [UserId, ] = useState<string | undefined>(auth.user?.id);
+  const [userQuery,] = useState("");
 
   // Filtrar usuarios activos y por búsqueda
   const filteredUsers = useMemo(() => {
@@ -411,7 +411,7 @@ export default function QuotesNew() {
     scope: "nacional",
     requestType: "suministros",
     reference: "",
-    finalClientId: undefined,
+    requesterId: undefined,
     deadline: "",
     deliveryPlace: "almacen",
     projectId: undefined,
@@ -494,7 +494,7 @@ export default function QuotesNew() {
       procurement: mapProcurement(formData.scope) as ProcurementType,
       requestCategory: formData.requestType.toUpperCase() as RequestCategory,
       reference: formData.reference,
-      clientId: formData.finalClientId || null,
+      clientId: formData.requesterId || null,
       quoteDeadline: `${formData.deadline}T00:00:00.000Z`,
       dueDate: `${formData.deadline}T00:00:00.000Z`,
       deliveryType: formData.deliveryPlace.toUpperCase() as DeliveryType,
@@ -523,7 +523,9 @@ export default function QuotesNew() {
 
     const validationErrors = validateForm(form, minDeadline);
     setErrors(validationErrors);
-
+    console.log(Object.keys(validationErrors))
+    console.log(Object.keys(validationErrors).length)
+    console.log(validationErrors)
     if (Object.keys(validationErrors).length > 0) {
       return;
     }
@@ -605,12 +607,12 @@ export default function QuotesNew() {
               </label>
               <UserComboBox
                 users={filteredUsers}             // o users si quieres todos
-                value={UserId}
-                onChange={(id) => setSelectedUserId(id)}
+                value={form.requesterId}
+                onChange={(id) => setField("requesterId", id)}
                 disabled={isLoadingUsers}
               />
-              {!UserId && (
-                <p className="mt-1 text-xs text-rose-400">Selecciona un solicitante</p>
+              {errors.requesterId && (
+                <p className="mt-1 text-xs text-rose-400">{errors.requesterId}</p>
               )}
             </div>
 

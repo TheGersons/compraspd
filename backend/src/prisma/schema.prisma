@@ -133,6 +133,8 @@ model Client {
   name    String
   taxId   String? @unique
   contact String?
+  isActive      Boolean            @default(true)
+  departmentId  String?   
 
   purchaseRequests PurchaseRequest[]
 }

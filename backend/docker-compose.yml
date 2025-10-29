@@ -2,6 +2,7 @@ version: "3.9"
 networks:
   compras_net:
     external: true
+
 services:
   db:
     image: postgres:16
@@ -9,17 +10,22 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: compras
+      TZ: America/Tegucigalpa       # 🕒 Zona horaria local
+      PGTZ: America/Tegucigalpa     # 🕒 PostgreSQL también usa esta TZ internamente
     ports: ["5455:5432"]
     volumes:
       - dbdata:/var/lib/postgresql/data
     networks:
       - compras_net 
+
   api:
     build:
       context: ./
       dockerfile: Dockerfile.dev
     env_file:
       - ./.env.docker
+    environment:
+      TZ: America/Tegucigalpa       # 🕒 Zona horaria local para Node/NestJS
     ports:
       - "3001:3001"
     volumes:
@@ -29,7 +35,6 @@ services:
       - db
     networks:
       - compras_net 
-
 
 volumes:
   dbdata:

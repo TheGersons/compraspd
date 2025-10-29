@@ -1,13 +1,37 @@
+# ============================
+#  Desarrollo - entorno simple
+# ============================
 FROM node:22-alpine
+
+# 🧱 Activar pnpm
 RUN corepack enable && corepack prepare pnpm@9.12.3 --activate
+
+# 🏗️ Crear carpeta de trabajo
 WORKDIR /app
+
+# 🧩 Copiar dependencias básicas
 COPY package.json pnpm-lock.yaml* ./
+
+# ⚡ Instalar dependencias (sin --frozen-lockfile en dev, más flexible)
 RUN pnpm install
+
+# 🧩 Copiar todo el código fuente
 COPY . .
+
+# 🔥 Exponer el puerto
 EXPOSE 3001
-# Dockerfile.dev (o Dockerfile)
-COPY entrypoint.sh /entrypoint.sh
+
+# Necesarios para entrypoint.sh
+RUN apk add --no-cache postgresql-client netcat-openbsd
+
+
+# 🔹 Copiar script SQL y entrypoint
+COPY ./db /db
+COPY ./entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+
+# 🔹 Comando de arranque
 ENTRYPOINT ["/entrypoint.sh"]
 
-CMD ["pnpm","start:dev"]
+# En desarrollo usamos start:dev (hot reload)
+CMD ["pnpm", "start:dev"]
