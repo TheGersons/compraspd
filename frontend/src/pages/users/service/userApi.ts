@@ -4,6 +4,16 @@ import { api } from '../../../lib/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
+type Role = { name: string };
+type User = {
+  id: string;
+  fullName: string;
+  email: string;
+  role?: Role;
+  departmentId?: string;
+  isActive?: boolean;
+};
+
 export const usersApi = {
   // GET /api/v1/users
   async listUsers() {
@@ -47,4 +57,14 @@ export const usersApi = {
     });
     console.log('✅ [API] User deleted');
   },
+
+
+  //Me
+  async me(){
+    console.log('✅ [API] Recuperando mi data')
+
+    const User = await api<User>(`${API_BASE_URL}/api/v1/auth/me`);
+    console.log('✅ [API] Me received:', User);
+    return User;
+  }
 };

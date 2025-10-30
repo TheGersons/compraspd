@@ -17,7 +17,8 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  me(@Req() req: any) {
-    return req.user; // { userId, email }
+  async me(@Req() req: any) {
+    const me = await this.auth.me(req.sub);
+    return me;
   }
 }

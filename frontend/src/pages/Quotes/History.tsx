@@ -1,505 +1,702 @@
-// pages/Quotes/History.tsx
-import { useMemo, useState } from "react";
-import PageMeta from "../../components/common/PageMeta";
-import ComponentCard from "../../components/common/ComponentCard";
-import Button from "../../components/ui/button/Button";
-import { MOCK } from "../../data/mock_history";
-import { exportHistoryToExcel, exportHistoryToPDF } from "../../utils/export";
-import { QuoteHistory } from "../../types/quotes";
+import React, { useState, useMemo, useEffect } from "react";
+import { useAllRequests } from "./hooks/useHistory";
+import { RequestedItemsTable } from "./components/RequestedItemsTable";
 
-type Scope = "nacional" | "internacional";
-type RequestType = "licitaciones" | "proyectos" | "suministros" | "inventarios";
-type HistoryStatus = "ganada" | "perdida" | "cancelada" | "cerrada" | "enviada";
+// ============================================================================
+// TYPES
+// ============================================================================
 
+type RequestCategory = "LICITACIONES" | "PROYECTOS" | "SUMINISTROS" | "INVENTARIOS";
+type Procurement = "NACIONAL" | "INTERNACIONAL";
+type DeliveryType = "ALMACEN" | "PROYECTO";
 
-// --- Filtros ---
-type SortKey = "createdAt" | "closedAt" | "amount";
-type SortDir = "asc" | "desc";
-
-type Filters = {
-  q: string;
-  status: "todos" | HistoryStatus;
-  type: "todos" | RequestType;
-  scope: "todos" | Scope;
-  assignee: "todos" | string;
-  requester: "todos" | string;
-  dateFrom?: string; // ISO
-  dateTo?: string;   // ISO
-  minAmount?: string;
-  maxAmount?: string;
-  preset: "30d" | "90d" | "thisYear" | "all";
-  sortKey: SortKey;
-  sortDir: SortDir;
+type PRItem = {
+  id: string;
+  description: string;
+  quantity: number;
+  unit: string;
+  itemType: string;
+  sku?: string;
+  barcode?: string;
 };
 
-const initialFilters: Filters = {
-  q: "",
-  status: "todos",
-  type: "todos",
-  scope: "todos",
-  assignee: "todos",
-  requester: "todos",
-  dateFrom: undefined,
-  dateTo: undefined,
-  minAmount: "",
-  maxAmount: "",
-  preset: "30d",
-  sortKey: "createdAt",
-  sortDir: "desc",
+type Assignment = {
+  id: string;
+  followStatus: string;
+  progress: number;
+  assignedTo: {
+    fullName: string;
+  };
 };
 
-// --- Utils ---
-const currency = (n?: number, c = "USD") =>
-  n == null ? "—" : `${c} ${n.toLocaleString()}`;
-
-const fmt = (iso?: string) =>
-  iso ? new Intl.DateTimeFormat("es-HN", { year: "2-digit", month: "2-digit", day: "2-digit" }).format(new Date(iso)) : "—";
-
-const withinPreset = (d: string, preset: Filters["preset"]) => {
-  if (preset === "all") return true;
-  const now = new Date();
-  let from = new Date(0);
-  if (preset === "30d") {
-    from = new Date(now); from.setDate(now.getDate() - 30);
-  } else if (preset === "90d") {
-    from = new Date(now); from.setDate(now.getDate() - 90);
-  } else if (preset === "thisYear") {
-    from = new Date(now.getFullYear(), 0, 1);
-  }
-  return new Date(d) >= from;
+type PurchaseRequest = {
+  id: string;
+  reference: string;
+  title: string;
+  description?: string;
+  finalClient: string;
+  status: string;
+  requestCategory: RequestCategory;
+  procurement: Procurement;
+  deliveryType?: DeliveryType;
+  deadline?: string;
+  createdAt: string;
+  updatedAt: string;
+  requester: {
+    fullName: string;
+    email: string;
+  };
+  project?: {
+    name: string;
+    code?: string;
+  };
+  department?: {
+    name: string;
+  };
+  items: PRItem[];
+  assignments: Assignment[];
 };
 
-export default function QuotesHistory() {
-  const [filters, setFilters] = useState<Filters>(initialFilters);
-  const [rows] = useState<QuoteHistory[]>(MOCK);
-  const [page, setPage] = useState(1);
-  const pageSize = 10;
+// ============================================================================
+// UTILITIES
+// ============================================================================
 
-  // opciones dinámicas
-  const assignees = useMemo(() => {
-    const s = new Set<string>();
-    rows.forEach(r => r.assignedTo && s.add(r.assignedTo));
-    return ["todos", ...Array.from(s)];
-  }, [rows]);
-  const requesters = useMemo(() => {
-    const s = new Set<string>();
-    rows.forEach(r => r.requester && s.add(r.requester));
-    return ["todos", ...Array.from(s)];
-  }, [rows]);
+const formatDate = (date: string | null | undefined) => {
+  if (!date) return "—";
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return "—";
+  
+  return new Intl.DateTimeFormat("es-HN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(d);
+};
 
-  // filtrado
-  const filtered = useMemo(() => {
-    const f = rows.filter(r => {
-      if (filters.preset && !withinPreset(r.createdAt, filters.preset)) return false;
+const getStatusBadge = (status: string) => {
+  const statusMap: Record<string, { label: string; className: string }> = {
+    SUBMITTED: { 
+      label: 'Enviada', 
+      className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' 
+    },
+    IN_PROGRESS: { 
+      label: 'En Progreso', 
+      className: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' 
+    },
+    APPROVED: { 
+      label: 'Aprobada', 
+      className: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' 
+    },
+    REJECTED: { 
+      label: 'Rechazada', 
+      className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' 
+    },
+    CANCELLED: { 
+      label: 'Cancelada', 
+      className: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400' 
+    },
+    COMPLETED: { 
+      label: 'Completada', 
+      className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' 
+    },
+  };
+  
+  return statusMap[status] || { 
+    label: status, 
+    className: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400' 
+  };
+};
 
-      if (filters.dateFrom && new Date(r.createdAt) < new Date(filters.dateFrom)) return false;
-      if (filters.dateTo && new Date(r.createdAt) > new Date(filters.dateTo)) return false;
+const getCategoryBadge = (category: RequestCategory) => {
+  const categoryMap: Record<RequestCategory, { className: string }> = {
+    LICITACIONES: { className: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' },
+    PROYECTOS: { className: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' },
+    SUMINISTROS: { className: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400' },
+    INVENTARIOS: { className: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400' },
+  };
+  
+  return categoryMap[category];
+};
 
-      if (filters.status !== "todos" && r.status !== filters.status) return false;
-      if (filters.type !== "todos" && r.requestType !== filters.type) return false;
-      if (filters.scope !== "todos" && r.scope !== filters.scope) return false;
+// ============================================================================
+// SUB-COMPONENTS
+// ============================================================================
 
-      if (filters.assignee !== "todos" && r.assignedTo !== filters.assignee) return false;
-      if (filters.requester !== "todos" && r.requester !== filters.requester) return false;
-
-      const minA = filters.minAmount ? Number(filters.minAmount) : undefined;
-      const maxA = filters.maxAmount ? Number(filters.maxAmount) : undefined;
-      if (minA != null && (r.amount ?? 0) < minA) return false;
-      if (maxA != null && (r.amount ?? 0) > maxA) return false;
-
-      const q = filters.q.trim().toLowerCase();
-      if (!q) return true;
-      return (
-        r.id.toLowerCase().includes(q) ||
-        r.reference.toLowerCase().includes(q) ||
-        r.requester.toLowerCase().includes(q) ||
-        (r.assignedTo ?? "").toLowerCase().includes(q)
-      );
-    });
-
-    const dir = filters.sortDir === "asc" ? 1 : -1;
-    const key = filters.sortKey;
-    f.sort((a, b) => {
-      const av = key === "amount" ? (a.amount ?? 0) : +(new Date((a as any)[key] ?? 0));
-      const bv = key === "amount" ? (b.amount ?? 0) : +(new Date((b as any)[key] ?? 0));
-      if (av === bv) return 0;
-      return av > bv ? dir : -dir;
-    });
-
-    return f;
-  }, [rows, filters]);
-
-  // paginación
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const pageRows = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filtered.slice(start, start + pageSize);
-  }, [filtered, page]);
-
-  const resetFilters = () => setFilters(initialFilters);
-
-
-  const [detailOpen, setDetailOpen] = useState(false);
-  const [detailRow, setDetailRow] = useState<QuoteHistory | null>(null);
-  const openDetail = (r: QuoteHistory) => { setDetailRow(r); setDetailOpen(true); };
-  const closeDetail = () => { setDetailOpen(false); setDetailRow(null); };
-
-  const money = (v?: number, c = "USD") => v == null ? "—" : `${c} ${v.toLocaleString()}`;
-  const itemsTotal = (r: QuoteHistory) =>
-    (r.items ?? []).reduce((acc, it) => acc + it.quantity * it.unitPrice, 0);
-
-
-  return (
-    <>
-      <PageMeta
-        title="Historial de Cotizaciones | Compras Energia PD"
-        description="Consulta y filtra el historial de cotizaciones con múltiples criterios"
+const FilterBar = React.memo(({
+  searchQuery,
+  setSearchQuery,
+  statusFilter,
+  setStatusFilter,
+  categoryFilter,
+  setCategoryFilter,
+  dateRange,
+  setDateRange,
+  onClearFilters
+}: {
+  searchQuery: string;
+  setSearchQuery: (value: string) => void;
+  statusFilter: string;
+  setStatusFilter: (value: string) => void;
+  categoryFilter: string;
+  setCategoryFilter: (value: string) => void;
+  dateRange: { from: string; to: string };
+  setDateRange: (value: { from: string; to: string }) => void;
+  onClearFilters: () => void;
+}) => (
+  <div className="space-y-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <input
+        type="text"
+        placeholder="Buscar por referencia, cliente o solicitante..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
       />
 
-      <div className="pb-6">
-        <h1 className="text-title-sm sm:text-title-md font-semibold text-gray-800 dark:text-white/90">Historial de cotizaciones</h1>
+      <select
+        value={statusFilter}
+        onChange={(e) => setStatusFilter(e.target.value)}
+        className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+      >
+        <option value="">Todos los estados</option>
+        <option value="SUBMITTED">Enviada</option>
+        <option value="IN_PROGRESS">En Progreso</option>
+        <option value="APPROVED">Aprobada</option>
+        <option value="REJECTED">Rechazada</option>
+        <option value="CANCELLED">Cancelada</option>
+        <option value="COMPLETED">Completada</option>
+      </select>
+
+      <select
+        value={categoryFilter}
+        onChange={(e) => setCategoryFilter(e.target.value)}
+        className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+      >
+        <option value="">Todas las categorías</option>
+        <option value="LICITACIONES">Licitaciones</option>
+        <option value="PROYECTOS">Proyectos</option>
+        <option value="SUMINISTROS">Suministros</option>
+        <option value="INVENTARIOS">Inventarios</option>
+      </select>
+
+      <button
+        onClick={onClearFilters}
+        className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800 dark:text-white"
+      >
+        Limpiar Filtros
+      </button>
+    </div>
+
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          Fecha Desde
+        </label>
+        <input
+          type="date"
+          value={dateRange.from}
+          onChange={(e) => setDateRange({ ...dateRange, from: e.target.value })}
+          className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          Fecha Hasta
+        </label>
+        <input
+          type="date"
+          value={dateRange.to}
+          onChange={(e) => setDateRange({ ...dateRange, to: e.target.value })}
+          className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+        />
+      </div>
+    </div>
+  </div>
+));
+
+const RequestCard = React.memo(({
+  request,
+  onViewDetails
+}: {
+  request: PurchaseRequest;
+  onViewDetails: (request: PurchaseRequest) => void;
+}) => {
+  const statusBadge = getStatusBadge(request.status);
+  const categoryBadge = getCategoryBadge(request.requestCategory);
+  const activeAssignment = request.assignments[0];
+
+  return (
+    <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <h4 className="font-semibold text-gray-800 dark:text-white/90 truncate">
+              {request.reference}
+            </h4>
+            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${statusBadge.className}`}>
+              {statusBadge.label}
+            </span>
+            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${categoryBadge.className}`}>
+              {request.requestCategory}
+            </span>
+          </div>
+          <p className="text-sm text-gray-700 dark:text-gray-300 font-medium mb-1">
+            {request.title}
+          </p>
+          <div className="flex flex-wrap gap-2 text-xs text-gray-600 dark:text-gray-400">
+            <span>Cliente: {request.finalClient}</span>
+            <span>•</span>
+            <span>Solicitante: {request.requester.fullName}</span>
+            {request.project && (
+              <>
+                <span>•</span>
+                <span>Proyecto: {request.project.name}</span>
+              </>
+            )}
+          </div>
+        </div>
+        <button
+          onClick={() => onViewDetails(request)}
+          className="rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 transition-colors whitespace-nowrap"
+        >
+          Ver Detalles
+        </button>
       </div>
 
-      {/* Filtros */}
-      <ComponentCard title="Filtros">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
-          {/* búsqueda */}
-          <div className="lg:col-span-2">
-            <div className="relative">
-              <input
-                value={filters.q}
-                onChange={e => { setPage(1); setFilters({ ...filters, q: e.target.value }); }}
-                placeholder="Buscar por ID, referencia, cliente, solicitante o asignado…"
-                className="w-full pl-9 pr-3 py-2 rounded-lg ring-1 ring-inset ring-gray-300 focus:outline-none focus:ring-brand-500 text-sm dark:bg-gray-900 dark:text-gray-200 dark:ring-gray-800"
-              />
-              <svg className="size-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1110.5 3a7.5 7.5 0 016.15 13.65z" />
-              </svg>
-            </div>
-          </div>
-
-          {/* estado */}
-          <select
-            value={filters.status}
-            onChange={(e) => { setPage(1); setFilters({ ...filters, status: e.target.value as Filters["status"] }); }}
-            className="px-3 py-2 rounded-lg ring-1 ring-inset ring-gray-300 bg-white text-sm dark:bg-gray-900 dark:text-gray-200 dark:ring-gray-800"
-          >
-            <option value="todos">Estado: todos</option>
-            <option value="enviada">Enviada</option>
-            <option value="ganada">Ganada</option>
-            <option value="perdida">Perdida</option>
-            <option value="cancelada">Cancelada</option>
-            <option value="cerrada">Cerrada</option>
-          </select>
-
-          {/* tipo */}
-          <select
-            value={filters.type}
-            onChange={(e) => { setPage(1); setFilters({ ...filters, type: e.target.value as Filters["type"] }); }}
-            className="px-3 py-2 rounded-lg ring-1 ring-inset ring-gray-300 bg-white text-sm dark:bg-gray-900 dark:text-gray-200 dark:ring-gray-800"
-          >
-            <option value="todos">Tipo: todos</option>
-            <option value="licitaciones">Licitaciones</option>
-            <option value="proyectos">Proyectos</option>
-            <option value="suministros">Suministros</option>
-            <option value="inventarios">Inventarios</option>
-          </select>
-
-          {/* alcance */}
-          <select
-            value={filters.scope}
-            onChange={(e) => { setPage(1); setFilters({ ...filters, scope: e.target.value as Filters["scope"] }); }}
-            className="px-3 py-2 rounded-lg ring-1 ring-inset ring-gray-300 bg-white text-sm dark:bg-gray-900 dark:text-gray-200 dark:ring-gray-800"
-          >
-            <option value="todos">Alcance: todos</option>
-            <option value="nacional">Nacional</option>
-            <option value="internacional">Internacional</option>
-          </select>
-
-          {/* asignado */}
-          <select
-            value={filters.assignee}
-            onChange={(e) => { setPage(1); setFilters({ ...filters, assignee: e.target.value as Filters["assignee"] }); }}
-            className="px-3 py-2 rounded-lg ring-1 ring-inset ring-gray-300 bg-white text-sm dark:bg-gray-900 dark:text-gray-200 dark:ring-gray-800"
-          >
-            {assignees.map(a => <option key={a} value={a}>{a === "todos" ? "Asignado: todos" : a}</option>)}
-          </select>
-
-          {/* solicitante */}
-          <select
-            value={filters.requester}
-            onChange={(e) => { setPage(1); setFilters({ ...filters, requester: e.target.value as Filters["requester"] }); }}
-            className="px-3 py-2 rounded-lg ring-1 ring-inset ring-gray-300 bg-white text-sm dark:bg-gray-900 dark:text-gray-200 dark:ring-gray-800"
-          >
-            {requesters.map(a => <option key={a} value={a}>{a === "todos" ? "Solicitante: todos" : a}</option>)}
-          </select>
-
-          {/* rango de fechas */}
-          <input
-            type="date"
-            value={filters.dateFrom ?? ""}
-            onChange={(e) => { setPage(1); setFilters({ ...filters, dateFrom: e.target.value || undefined }); }}
-            className="rounded-lg ring-1 ring-inset ring-gray-300 bg-white px-2 py-2 text-sm dark:bg-gray-900 dark:text-gray-200 dark:ring-gray-800"
-            placeholder="Desde"
-          />
-          <input
-            type="date"
-            value={filters.dateTo ?? ""}
-            onChange={(e) => { setPage(1); setFilters({ ...filters, dateTo: e.target.value || undefined }); }}
-            className="rounded-lg ring-1 ring-inset ring-gray-300 bg-white px-2 py-2 text-sm dark:bg-gray-900 dark:text-gray-200 dark:ring-gray-800"
-            placeholder="Hasta"
-          />
-
-          {/* monto */}
-          <input
-            type="number"
-            inputMode="numeric"
-            value={filters.minAmount}
-            onChange={(e) => { setPage(1); setFilters({ ...filters, minAmount: e.target.value }); }}
-            className="rounded-lg ring-1 ring-inset ring-gray-300 bg-white px-2 py-2 text-sm dark:bg-gray-900 dark:text-gray-200 dark:ring-gray-800"
-            placeholder="Monto mínimo"
-          />
-          <input
-            type="number"
-            inputMode="numeric"
-            value={filters.maxAmount}
-            onChange={(e) => { setPage(1); setFilters({ ...filters, maxAmount: e.target.value }); }}
-            className="rounded-lg ring-1 ring-inset ring-gray-300 bg-white px-2 py-2 text-sm dark:bg-gray-900 dark:text-gray-200 dark:ring-gray-800"
-            placeholder="Monto máximo"
-          />
-
-          {/* presets y orden */}
-          <div className="flex gap-2">
-            {(["30d", "90d", "thisYear", "all"] as const).map(p => (
-              <Button
-                key={p}
-                size="sm"
-                variant={filters.preset === p ? "primary" : "outline"}
-                onClick={() => { setPage(1); setFilters({ ...filters, preset: p }); }}
-              >
-                {p === "30d" ? "30d" : p === "90d" ? "90d" : p === "thisYear" ? "Año" : "Todo"}
-              </Button>
-            ))}
-          </div>
-
-          <div className="flex gap-2">
-            <select
-              value={filters.sortKey}
-              onChange={(e) => setFilters({ ...filters, sortKey: e.target.value as SortKey })}
-              className="px-3 py-2 rounded-lg ring-1 ring-inset ring-gray-300 bg-white text-sm dark:bg-gray-900 dark:text-gray-200 dark:ring-gray-800"
-            >
-              <option value="createdAt">Ordenar por: Creada</option>
-              <option value="closedAt">Ordenar por: Cerrada</option>
-              <option value="amount">Ordenar por: Monto</option>
-            </select>
-            <select
-              value={filters.sortDir}
-              onChange={(e) => setFilters({ ...filters, sortDir: e.target.value as SortDir })}
-              className="px-3 py-2 rounded-lg ring-1 ring-inset ring-gray-300 bg-white text-sm dark:bg-gray-900 dark:text-gray-200 dark:ring-gray-800"
-            >
-              <option value="desc">Desc</option>
-              <option value="asc">Asc</option>
-            </select>
-          </div>
-
-          {/* acciones */}
-          <div className="flex gap-2">
-            <Button variant="secondary" onClick={resetFilters}>Limpiar</Button>
-            <Button variant="primary" onClick={() => exportHistoryToExcel(filtered as QuoteHistory[])}>
-              Exportar Excel
-            </Button>
-            <Button variant="primary" onClick={() => exportHistoryToPDF(filtered as QuoteHistory[])}>
-              Exportar PDF
-            </Button>
-          </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+        <div>
+          <div className="text-gray-500 dark:text-gray-400">Items</div>
+          <div className="font-medium text-gray-700 dark:text-gray-300">{request.items.length}</div>
         </div>
-      </ComponentCard>
-
-      {/* Resultados */}
-      <ComponentCard title={`Resultados (${filtered.length})`}>
-        <div className="overflow-auto rounded-lg ring-1 ring-gray-200 dark:ring-gray-800">
-          <table className="min-w-full text-sm dark:text-gray-200">
-            <thead>
-              <tr>
-                <th className="px-3 py-2 text-left">ID</th>
-                <th className="px-3 py-2 text-left">Referencia</th>
-                <th className="px-3 py-2 text-left">Solicitante</th>
-                <th className="px-3 py-2 text-left">Asignado</th>
-                <th className="px-3 py-2 text-left">Tipo</th>
-                <th className="px-3 py-2 text-left">Alcance</th>
-                <th className="px-3 py-2 text-left">Creada</th>
-                <th className="px-3 py-2 text-left">Cerrada</th>
-                <th className="px-3 py-2 text-right">Monto</th>
-                <th className="px-3 py-2 text-left">Estado</th>
-                <th className="px-3 py-2 text-left">Notas</th>
-                <th className="px-3 py-2 text-right">Acciones</th>
-              </tr>
-            </thead>
-
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
-              {pageRows.length === 0 ? (
-                <tr>
-                  <td colSpan={12} className="px-3 py-6 text-center text-gray-500 dark:text-gray-400">
-                    Sin resultados.
-                  </td>
-                </tr>
-              ) : (
-                pageRows.map(r => (
-                  <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-white/5">
-                    <td className="px-3 py-2">{r.id}</td>
-                    <td className="px-3 py-2">{r.reference}</td>
-                    {/* eliminado Cliente */}
-                    <td className="px-3 py-2">{r.requester}</td>
-                    <td className="px-3 py-2">{r.assignedTo ?? "—"}</td>
-                    <td className="px-3 py-2 capitalize">{r.requestType}</td>
-                    <td className="px-3 py-2 capitalize">{r.scope}</td>
-                    <td className="px-3 py-2">{fmt(r.createdAt)}</td>
-                    <td className="px-3 py-2">{fmt(r.closedAt)}</td>
-                    <td className="px-3 py-2 text-right">{currency(r.amount, r.currency)}</td>
-                    <td className="px-3 py-2">
-                      <span className={`px-2 py-0.5 rounded-full text-xs
-            ${r.status === "ganada" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300"
-                          : r.status === "perdida" ? "bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-300"
-                            : r.status === "cancelada" ? "bg-gray-100 text-gray-700 dark:bg-gray-700/40 dark:text-gray-300"
-                              : r.status === "cerrada" ? "bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-300"
-                                : "bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300"}`}>
-                        {r.status}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 max-w-[220px] truncate" title={r.notes ?? ""}>
-                      {r.notes ?? "—"}
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      <Button size="sm" variant="secondary" onClick={() => openDetail(r)}>
-                        Ver detalle
-                      </Button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-
-
-          </table>
+        <div>
+          <div className="text-gray-500 dark:text-gray-400">Creada</div>
+          <div className="font-medium text-gray-700 dark:text-gray-300">{formatDate(request.createdAt)}</div>
         </div>
-        {detailOpen && detailRow && (
-          <div className="fixed inset-0 z-50">
-            {/* overlay */}
-            <div className="absolute inset-0 bg-black/40" onClick={closeDetail} />
-            {/* panel */}
-            <div className="absolute inset-y-0 right-0 w-full max-w-xl bg-white dark:bg-gray-900 shadow-xl ring-1 ring-gray-200 dark:ring-gray-800 flex flex-col">
-              <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
-                <div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400">Cotización</div>
-                  <h3 className="text-base font-semibold">{detailRow.id} — {detailRow.reference}</h3>
-                </div>
-                <Button variant="outline" size="sm" onClick={closeDetail}>Cerrar</Button>
-              </div>
-
-              <div className="p-4 space-y-4 overflow-auto">
-                {/* 'X' button to close detail view */}
-                <div className="flex justify-start">
-                  <Button variant="danger" size="sm" onClick={closeDetail}>
-                    X
-                  </Button>
-                  
-                </div>
-
-                {/* metadatos */}
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div className="rounded-lg ring-1 ring-gray-200 dark:ring-gray-800 p-3">
-                    <div className="text-xs text-gray-500 dark:text-gray-400">Solicitante</div>
-                    <div className="font-medium dark:text-gray-300">{detailRow.requester}</div>
-                  </div>
-                  <div className="rounded-lg ring-1 ring-gray-200 dark:ring-gray-800 p-3">
-                    <div className="text-xs text-gray-500 dark:text-gray-400">Asignado</div>
-                    <div className="font-medium dark:text-gray-300">{detailRow.assignedTo ?? "—"}</div>
-                  </div>
-                  <div className="rounded-lg ring-1 ring-gray-200 dark:ring-gray-800 p-3">
-                    <div className="text-xs text-gray-500 dark:text-gray-400">Creada</div>
-                    <div className="font-medium dark:text-gray-300">{fmt(detailRow.createdAt)}</div>
-                  </div>
-                  <div className="rounded-lg ring-1 ring-gray-200 dark:ring-gray-800 p-3">
-                    <div className="text-xs text-gray-500 dark:text-gray-400">Cerrada</div>
-                    <div className="font-medium dark:text-gray-300">{fmt(detailRow.closedAt)}</div>
-                  </div>
-                  <div className="rounded-lg ring-1 ring-gray-200 dark:ring-gray-800 p-3">
-                    <div className="text-xs text-gray-500 dark:text-gray-400">Tipo</div>
-                    <div className="font-medium capitalize dark:text-gray-300">{detailRow.requestType}</div>
-                  </div>
-                  <div className="rounded-lg ring-1 ring-gray-200 dark:ring-gray-800 p-3">
-                    <div className="text-xs text-gray-500 dark:text-gray-400">Alcance</div>
-                    <div className="font-medium capitalize dark:text-gray-300">{detailRow.scope}</div>
-                  </div>
-                </div>
-
-                {/* items */}
-                <div>
-                  <div className="text-sm font-medium mb-2 dark:text-gray-300">Artículos</div>
-                  <div className="overflow-auto rounded-lg ring-1 ring-gray-200 dark:ring-gray-800">
-                    <table className="min-w-full text-sm dark:text-gray-200">
-                      <thead className="bg-gray-50 dark:bg-white/5">
-                        <tr>
-                          <th className="px-3 py-2 text-left">SKU</th>
-                          <th className="px-3 py-2 text-left">Descripción</th>
-                          <th className="px-3 py-2 text-right">Cant.</th>
-                          <th className="px-3 py-2 text-right">P. unit</th>
-                          <th className="px-3 py-2 text-right">Importe</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
-                        {(detailRow.items ?? []).length === 0 ? (
-                          <tr><td colSpan={5} className="px-3 py-4 text-center text-gray-500 dark:text-gray-400">Sin artículos.</td></tr>
-                        ) : (
-                          detailRow.items!.map(it => (
-                            <tr key={it.sku}>
-                              <td className="px-3 py-2">{it.sku}</td>
-                              <td className="px-3 py-2">{it.description}</td>
-                              <td className="px-3 py-2 text-right">{it.quantity}</td>
-                              <td className="px-3 py-2 text-right">{money(it.unitPrice, it.currency ?? detailRow.currency ?? "USD")}</td>
-                              <td className="px-3 py-2 text-right">{money(it.quantity * it.unitPrice, it.currency ?? detailRow.currency ?? "USD")}</td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                      <tfoot>
-                        <tr>
-                          <td colSpan={4} className="px-3 py-2 text-right font-medium">Total</td>
-                          <td className="px-3 py-2 text-right font-semibold">
-                            {money(itemsTotal(detailRow), detailRow.currency ?? "USD")}
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                </div>
-
-                {/* notas */}
-                <div className="text-sm">
-                  <div className="font-medium mb-1 dark:text-gray-300">Notas</div>
-                  <p className="text-gray-700 dark:text-gray-300">{detailRow.notes ?? "—"}</p>
-                </div>
-              </div>
-            </div>
+        <div>
+          <div className="text-gray-500 dark:text-gray-400">Límite</div>
+          <div className="font-medium text-gray-700 dark:text-gray-300">{formatDate(request.deadline)}</div>
+        </div>
+        {activeAssignment && (
+          <div>
+            <div className="text-gray-500 dark:text-gray-400">Progreso</div>
+            <div className="font-medium text-gray-700 dark:text-gray-300">{activeAssignment.progress}%</div>
           </div>
         )}
+      </div>
+    </div>
+  );
+});
 
+const DetailModal = ({
+  isOpen,
+  onClose,
+  request
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  request: PurchaseRequest | null;
+}) => {
+  if (!isOpen || !request) return null;
 
-        {/* Paginación */}
-        <div className="mt-3 flex items-center justify-between text-sm">
-          <div className="text-gray-600 dark:text-gray-400">
-            Página {page} de {totalPages}
-          </div>
-          <div className="flex gap-2">
-            <Button size="sm" variant="primary" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>
-              Anterior
-            </Button>
-            <Button size="sm" variant="primary" disabled={page >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>
-              Siguiente
-            </Button>
+  const statusBadge = getStatusBadge(request.status);
+  const categoryBadge = getCategoryBadge(request.requestCategory);
+  const activeAssignment = request.assignments[0];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
+      <div className="w-full max-w-5xl rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 my-8">
+        <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 p-6 rounded-t-xl">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2">
+                <h3 className="text-xl font-semibold text-gray-800 dark:text-white/90">
+                  {request.reference}
+                </h3>
+                <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${statusBadge.className}`}>
+                  {statusBadge.label}
+                </span>
+                <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${categoryBadge.className}`}>
+                  {request.requestCategory}
+                </span>
+              </div>
+              <p className="text-gray-600 dark:text-gray-400">{request.title}</p>
+            </div>
+            <button
+              onClick={onClose}
+              className="rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
         </div>
-      </ComponentCard>
-    </>
+
+        <div className="p-6 space-y-6 max-h-[calc(100vh-200px)] overflow-y-auto">
+          {/* Información General */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-3">
+              <div>
+                <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Cliente Final</div>
+                <div className="text-base font-semibold text-gray-800 dark:text-white/90">{request.finalClient}</div>
+              </div>
+              <div>
+                <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Solicitante</div>
+                <div className="text-base text-gray-800 dark:text-white/90">{request.requester.fullName}</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">{request.requester.email}</div>
+              </div>
+              {request.project && (
+                <div>
+                  <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Proyecto</div>
+                  <div className="text-base text-gray-800 dark:text-white/90">
+                    {request.project.name}
+                    {request.project.code && <span className="text-sm text-gray-600 dark:text-gray-400"> ({request.project.code})</span>}
+                  </div>
+                </div>
+              )}
+              {request.department && (
+                <div>
+                  <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Departamento</div>
+                  <div className="text-base text-gray-800 dark:text-white/90">{request.department.name}</div>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Tipo de Adquisición</div>
+                <div className="text-base text-gray-800 dark:text-white/90">{request.procurement}</div>
+              </div>
+              {request.deliveryType && (
+                <div>
+                  <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Tipo de Entrega</div>
+                  <div className="text-base text-gray-800 dark:text-white/90">
+                    {request.deliveryType === "ALMACEN" ? "Almacén" : "Proyecto"}
+                  </div>
+                </div>
+              )}
+              <div>
+                <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Fecha de Creación</div>
+                <div className="text-base text-gray-800 dark:text-white/90">{formatDate(request.createdAt)}</div>
+              </div>
+              {request.deadline && (
+                <div>
+                  <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Fecha Límite</div>
+                  <div className="text-base text-gray-800 dark:text-white/90">{formatDate(request.deadline)}</div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Descripción */}
+          {request.description && (
+            <div>
+              <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Descripción</div>
+              <div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-4">
+                <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                  {request.description}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Asignación y Progreso */}
+          {activeAssignment && (
+            <div>
+              <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Estado de Asignación</div>
+              <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Asignado a: {activeAssignment.assignedTo.fullName}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Estado: {activeAssignment.followStatus}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                      {activeAssignment.progress}%
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">Progreso</div>
+                  </div>
+                </div>
+                <div className="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                  <div 
+                    className="h-full bg-blue-500 transition-all duration-300"
+                    style={{ width: `${activeAssignment.progress}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Items Solicitados */}
+          <div>
+            <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
+              Items Solicitados ({request.items.length})
+            </div>
+            <RequestedItemsTable items={request.items} />
+          </div>
+        </div>
+
+        <div className="sticky bottom-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 p-6 rounded-b-xl">
+          <button
+            onClick={onClose}
+            className="w-full rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+          >
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// PAGINATION COMPONENT
+// ============================================================================
+
+const Pagination = React.memo(({
+  currentPage,
+  totalPages,
+  onPageChange
+}: {
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+}) => {
+  const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
+  const maxVisiblePages = 5;
+  
+  let visiblePages = pages;
+  if (totalPages > maxVisiblePages) {
+    const start = Math.max(0, Math.min(currentPage - 2, totalPages - maxVisiblePages));
+    visiblePages = pages.slice(start, start + maxVisiblePages);
+  }
+
+  return (
+    <div className="flex items-center justify-between border-t border-gray-200 dark:border-gray-800 pt-4">
+      <div className="text-sm text-gray-600 dark:text-gray-400">
+        Página {currentPage} de {totalPages}
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-700 dark:hover:bg-gray-800 dark:text-white"
+        >
+          Anterior
+        </button>
+        
+        {visiblePages[0] > 1 && (
+          <>
+            <button
+              onClick={() => onPageChange(1)}
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800 dark:text-white"
+            >
+              1
+            </button>
+            {visiblePages[0] > 2 && <span className="text-gray-400">...</span>}
+          </>
+        )}
+        
+        {visiblePages.map(page => (
+          <button
+            key={page}
+            onClick={() => onPageChange(page)}
+            className={`rounded-lg border px-3 py-1.5 text-sm font-medium ${
+              currentPage === page
+                ? 'border-blue-500 bg-blue-500 text-white'
+                : 'border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800 dark:text-white'
+            }`}
+          >
+            {page}
+          </button>
+        ))}
+        
+        {visiblePages[visiblePages.length - 1] < totalPages && (
+          <>
+            {visiblePages[visiblePages.length - 1] < totalPages - 1 && <span className="text-gray-400">...</span>}
+            <button
+              onClick={() => onPageChange(totalPages)}
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800 dark:text-white"
+            >
+              {totalPages}
+            </button>
+          </>
+        )}
+        
+        <button
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-700 dark:hover:bg-gray-800 dark:text-white"
+        >
+          Siguiente
+        </button>
+      </div>
+    </div>
+  );
+});
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
+
+export default function History() {
+  const { data: requests = [], isLoading } = useAllRequests();
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [dateRange, setDateRange] = useState({ from: "", to: "" });
+  const [selectedRequest, setSelectedRequest] = useState<PurchaseRequest | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
+
+  const handleViewDetails = (request: PurchaseRequest) => {
+    setSelectedRequest(request);
+    setIsModalOpen(true);
+  };
+
+  const handleClearFilters = () => {
+    setSearchQuery("");
+    setStatusFilter("");
+    setCategoryFilter("");
+    setDateRange({ from: "", to: "" });
+    setCurrentPage(1);
+  };
+
+  const filteredRequests = useMemo(() => {
+    return requests.filter(req => {
+      const matchesSearch = searchQuery.trim() === "" || 
+        req.reference.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        req.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        req.finalClient.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        req.requester.fullName.toLowerCase().includes(searchQuery.toLowerCase());
+
+      const matchesStatus = statusFilter === "" || req.status === statusFilter;
+      const matchesCategory = categoryFilter === "" || req.requestCategory === categoryFilter;
+
+      const matchesDateRange = (() => {
+        if (!dateRange.from && !dateRange.to) return true;
+        const createdDate = new Date(req.createdAt);
+        const fromDate = dateRange.from ? new Date(dateRange.from) : null;
+        const toDate = dateRange.to ? new Date(dateRange.to) : null;
+
+        if (fromDate && toDate) {
+          return createdDate >= fromDate && createdDate <= toDate;
+        } else if (fromDate) {
+          return createdDate >= fromDate;
+        } else if (toDate) {
+          return createdDate <= toDate;
+        }
+        return true;
+      })();
+
+      return matchesSearch && matchesStatus && matchesCategory && matchesDateRange;
+    });
+  }, [requests, searchQuery, statusFilter, categoryFilter, dateRange]);
+
+  // useEffect separado para resetear página cuando cambien los filtros
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter, categoryFilter, dateRange]);
+
+  // Calcular paginación
+  const totalPages = Math.ceil(filteredRequests.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedRequests = filteredRequests.slice(startIndex, endIndex);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <p className="text-gray-600 dark:text-gray-400">Cargando historial...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
+        <div className="mb-6">
+          <h2 className="text-2xl font-semibold text-gray-800 dark:text-white/90">
+            Historial de Solicitudes
+          </h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            Todas las solicitudes de cotización del sistema
+          </p>
+        </div>
+
+        <FilterBar
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          statusFilter={statusFilter}
+          setStatusFilter={setStatusFilter}
+          categoryFilter={categoryFilter}
+          setCategoryFilter={setCategoryFilter}
+          dateRange={dateRange}
+          setDateRange={setDateRange}
+          onClearFilters={handleClearFilters}
+        />
+      </div>
+
+      <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
+            Resultados ({filteredRequests.length})
+          </h3>
+          <div className="text-sm text-gray-600 dark:text-gray-400">
+            Mostrando {startIndex + 1}-{Math.min(endIndex, filteredRequests.length)} de {filteredRequests.length}
+          </div>
+        </div>
+
+        {filteredRequests.length === 0 ? (
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-8 text-center dark:border-gray-800 dark:bg-gray-900/50">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              No se encontraron solicitudes con los filtros aplicados.
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="space-y-3 mb-4">
+              {paginatedRequests.map(request => (
+                <RequestCard
+                  key={request.id}
+                  request={request}
+                  onViewDetails={handleViewDetails}
+                />
+              ))}
+            </div>
+
+            {totalPages > 1 && (
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+              />
+            )}
+          </>
+        )}
+      </div>
+
+      <DetailModal
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setSelectedRequest(null);
+        }}
+        request={selectedRequest}
+      />
+    </div>
   );
 }

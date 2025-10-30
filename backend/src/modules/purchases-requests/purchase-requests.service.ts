@@ -439,4 +439,53 @@ export class PurchaseRequestsService {
 
     return uploadedFiles;
   }
+
+  async listAllRequests() {
+    const requests = await this.prisma.purchaseRequest.findMany({
+      include: {
+        requester: {
+          select: {
+            fullName: true,
+            email: true,
+          }
+        },
+        project: {
+          select: {
+            name: true,
+            code: true,
+          }
+        },
+        department: {
+          select: {
+            name: true,
+          }
+        },
+        items: {
+          select: {
+            id: true,
+            description: true,
+            quantity: true,
+            unit: true,
+            itemType: true,
+            sku: true,
+            barcode: true,
+          }
+        },
+        assignments: {
+          where: {
+            followStatus: { not: 'COMPLETED' }
+          },
+          include: {
+            assignedTo: {
+              select: { fullName: true }
+            }
+          },
+          take: 1,
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return requests;
+  }
 }

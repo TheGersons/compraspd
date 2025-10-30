@@ -11,7 +11,7 @@ export default function UserDropdown() {
   //obtener los datos del usuario desde el contexto de autenticación
   const email = user?.email;
   const fullName = user?.fullName;
-  const Role = user?.role;
+  const Role = user?.role?.name;
 
 
   function toggleDropdown() {

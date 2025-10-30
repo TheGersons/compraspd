@@ -1,99 +1,76 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { api, getToken } from "../lib/api";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { usersApi } from "../pages/users/service/userApi";       // Ajusta a tu client real
+import { getToken, removeToken, setToken } from "../lib/api";
 
-// ----------------------------------------------------
-// PASO 1: Tipos del Backend
-// ----------------------------------------------------
-
-// Lo que devuelve el token endpoint /api/v1/auth/me
-type Me = { 
-    sub: string; // ID del usuario
-    email: string; 
-    role: string; // Nombre del rol (ej: "SUPERVISOR") viene directo del token
-}; 
-
-// Lo que devuelve el endpoint de perfil /api/v1/users/:id
-type UserProfileResponse = {
-    id: string;
-    email: string;
-    fullName: string;
-    // El departamento es un objeto anidado (o null)
-    departmentId: string | null; 
-    // El rol es un objeto anidado
-    role: { id: string; name: string; description: string }; 
+type Role = { name: string };
+type User = {
+  id: string;
+  fullName: string;
+  email: string;
+  role?: Role;
+  departmentId?: string;
+  isActive?: boolean;
 };
 
-// ----------------------------------------------------
-// PASO 2: Tipo del Contexto (Lo que usará tu UI)
-// ----------------------------------------------------
-type UserContext = { 
-    id: string; 
-    email: string; 
-    fullName: string; 
-    // Mantenemos solo el nombre del departamento
-    departmentId: string | null; 
-    role: string; // Mantenemos solo el nombre del rol
+type AuthCtx = {
+  user: User | null;
+  isLoading: boolean;
+  login: (token: string) => Promise<void>;
+  refresh: () => Promise<void>;
+  logout: () => void;
 };
-type AuthCtx = { 
-    user: UserContext | null; 
-    refresh: () => Promise<void>; 
-    logout: () => void 
-};
-// ----------------------------------------------------
 
-const Ctx = createContext<AuthCtx>({ user: null, refresh: async () => { }, logout: () => { } });
-export const useAuth = () => useContext(Ctx);
+const Ctx = createContext<AuthCtx>({} as any);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<UserContext | null>(null);
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate();
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  async function refresh() {
+  const refresh = async () => {
     const token = getToken();
-    if (!token) { setUser(null); return; }
-
-    try {
-      // 1) Pide identidad mínima del token (sub, email, role)
-      const me = await api<Me>("/api/v1/auth/me");
-      
-      // 2) Pide perfil completo usando el ID del token ('sub')
-      const profile = await api<UserProfileResponse>(`/api/v1/users/${me.sub}`); 
-
-      // 3) Normaliza a tu tipo UserContext, extrayendo el nombre del rol y departamento
-      setUser({
-        id: me.sub,         
-        email: me.email,
-        fullName: profile.fullName, 
-        
-        // El departamento es opcional y está anidado
-        departmentId: profile.departmentId ?? null,
-        
-        // Aunque el rol viene en 'me', lo confirmamos y lo tomamos del token 
-        // para máxima consistencia y evitar dependencia de profile.role.name
-        role: me.role,       
-      });
-      
-    } catch (e) {
-        console.error("Error al cargar perfil:", e);
-        logout(); 
+    if (!token) {
+      setUser(null);
+      setIsLoading(false);
+      return;
     }
-  }
+    try {
+      // Ajusta: endpoint que devuelve el perfil del usuario actual
+      const me = await usersApi.me(); // <- implementa /api/v1/users/me en backend si aún no
+      setUser(me);
+    } catch {
+      setUser(null);
+      removeToken();
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-  function logout() {
-    localStorage.removeItem("token");
-    sessionStorage.removeItem("token");
-    setUser(null);
-  }
-  
-  // Implementación de useEffect y Provider (se mantiene igual)
   useEffect(() => {
-    void refresh(); 
-    
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === "token") void refresh();
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    // Restaurar sesión al montar
+    void refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return <Ctx.Provider value={{ user, refresh, logout }}>{children}</Ctx.Provider>;
+  const login = async (token: string) => {
+    setToken(token);
+    setIsLoading(true);
+    await refresh();
+  };
+
+  const logout = () => {
+    removeToken();
+    setUser(null);
+    navigate("/signin", { replace: true });
+  };
+
+  const value = useMemo(
+    () => ({ user, isLoading, login, refresh, logout }),
+    [user, isLoading]
+  );
+
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
+
+export const useAuth = () => useContext(Ctx);

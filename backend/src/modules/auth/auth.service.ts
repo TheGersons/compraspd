@@ -60,4 +60,25 @@ export class AuthService {
       expires_in: process.env.JWT_EXPIRES || '1d',
     };
   }
+
+  async me (userId: string){
+    const me = await this.prisma.user.findFirst({
+      where: {
+        id: userId
+      },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        departmentId: true,
+        isActive: true,
+        role: {
+          select: {
+            name: true
+          }
+        }
+      }
+    });
+    return me;
+  }
 }

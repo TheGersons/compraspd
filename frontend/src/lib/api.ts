@@ -4,6 +4,25 @@ export function getToken(): string | null {
   return localStorage.getItem("token") ?? sessionStorage.getItem("token");
 }
 
+export function setToken(token: string, persist = true): void {
+  if (persist) {
+    localStorage.setItem("token", token);
+    sessionStorage.removeItem("token");
+  } else {
+    sessionStorage.setItem("token", token);
+    localStorage.removeItem("token");
+  }
+}
+
+/**
+ * Elimina el token de ambos almacenamientos.
+ * Útil al cerrar sesión o si el token expira.
+ */
+export function removeToken(): void {
+  localStorage.removeItem("token");
+  sessionStorage.removeItem("token");
+}
+
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = getToken();
   const res = await fetch(path, {

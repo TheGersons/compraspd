@@ -90,4 +90,9 @@ export class PurchaseRequestsController {
   ) {
     return this.service.listAssignedTo(me, Number(page ?? 1), Number(pageSize ?? 20));
   }
+
+  @Get('history/all')
+  listAllRequests() {
+    return this.service.listAllRequests();
+  }
 }

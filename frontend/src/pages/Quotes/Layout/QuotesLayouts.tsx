@@ -19,8 +19,9 @@ export default function QuotesLayout() {
   const { user } = useAuth(); // Asegúrate de que este hook exista y devuelva { user: { role } }
 
   // 🛑 Paso 2: Verificar si el usuario tiene permiso de Supervisor
-  const isSupervisor = user && ['SUPERVISOR', 'ADMIN'].includes(user.role?.toUpperCase());
-
+const isSupervisor = user?.role?.name?.toUpperCase() !== undefined
+  ? ['SUPERVISOR', 'ADMIN'].includes(user.role.name.toUpperCase())
+  : false;
   // 🛑 Paso 3: Filtrar las pestañas basado en el rol
   const visibleTabs = allTabs.filter(t => {
     // Si NO requiere rol especial, es visible para todos

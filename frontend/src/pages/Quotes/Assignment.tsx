@@ -576,7 +576,7 @@ const RequestDetail = ({
 
         {/* Card de Productos */}
 
-        
+
         <div className="pt-2 flex gap-2 flex-wrap">
           {request.assignedTo ? (
             <Button size="sm" variant="outline" onClick={onReassign}>
@@ -689,7 +689,7 @@ const SupervisorAssignModal = ({
 
 export default function QuotesAssignment() {
   const navigate = useNavigate();
-  const user = useAuth();
+  const { user } = useAuth();
 
   const [filters, setFilters] = useState<QuoteFilters>({
     preset: "30d",
@@ -791,7 +791,7 @@ export default function QuotesAssignment() {
           entityType: 'PURCHASE_REQUEST',
           entityId: selectedRequest.id,
           assignedToId: assigneeId,
-          requesterId: user?.user?.id,
+          requesterId: user?.id,
           //a eta le ponemos la fecha limite, mas 3 dias para dar tiempo a cotizar
           eta: nuevaFechaISO,
           role: 'SUPERVISOR',
