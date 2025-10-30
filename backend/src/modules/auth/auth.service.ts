@@ -63,7 +63,7 @@ export class AuthService {
 }
 
   async me (userId: string){
-    const me = await this.prisma.user.findFirst({
+    const me = await this.prisma.user.findUnique({
       where: {
         id: userId
       },

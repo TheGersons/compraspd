@@ -147,7 +147,7 @@ const validateForm = (form: FormState, minDeadline: string): ValidationErrors =>
   if (!form.requesterId) {
     errors.requesterId = "Selecciona un solicitante";
   }
-  
+
   // Deadline validation
   if (!form.deadline) {
     errors.deadline = "Requerido";
