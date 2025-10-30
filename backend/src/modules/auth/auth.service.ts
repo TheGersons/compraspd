@@ -5,6 +5,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { User } from '@prisma/client'; // Importamos el tipo base User de Prisma
+import { randomUUID } from 'crypto';
 
 // Definimos un tipo que incluya el nombre del rol
 type UserWithRoleName = User & { role: { name: string } | null };
@@ -18,6 +19,7 @@ export class AuthService {
    */
   async validateUser(email: string, pass: string): Promise<UserWithRoleName> {
     // 1. Cargamos el usuario e incluimos el nombre del rol relacionado
+    console.log('correo: ', email, ' contrasenia:', pass)
     const user = await this.prisma.user.findUnique({ 
       where: { email },
       include: {
@@ -26,6 +28,8 @@ export class AuthService {
         }
       }
     }) as UserWithRoleName; // Hacemos un cast para usar el tipo extendido
+
+    console.log(user.email, user.role?.name, user.fullName)
 
     if (!user || !user.isActive) {
       throw new UnauthorizedException('Credenciales inválidas');
@@ -48,18 +52,15 @@ export class AuthService {
     const roleName = user.role?.name || ''; 
     
     // 2. Incluimos el rol en el payload del JWT
-    const payload = { 
-      sub: user.id, 
-      email: user.email,
-      role: roleName // <-- CLAVE: Rol de texto añadido al token
-    };
+    console.log('en el payload: ', user.fullName, user.id, user.email, roleName, user.role?.name )
+    const payload = { sub: user.id, email: user.email, role: roleName, jti: randomUUID() };
 
     return {
-      access_token: this.jwt.sign(payload),
-      token_type: 'Bearer',
-      expires_in: process.env.JWT_EXPIRES || '1d',
-    };
-  }
+    access_token: this.jwt.sign(payload, { expiresIn: process.env.JWT_EXPIRES || '1d' }),
+    token_type: 'Bearer',
+    expires_in: process.env.JWT_EXPIRES || '1d',
+  };
+}
 
   async me (userId: string){
     const me = await this.prisma.user.findFirst({

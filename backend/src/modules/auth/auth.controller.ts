@@ -12,7 +12,9 @@ export class AuthController {
   @Post('login')
   async login(@Body() dto: LoginDto) {
     const user = await this.auth.validateUser(dto.email, dto.password);
-    return this.auth.sign(user);
+    const sing = this.auth.sign(user);
+    console.log(sing.access_token)
+    return sing;
   }
 
   @UseGuards(JwtAuthGuard)

@@ -62,6 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     removeToken();
     setUser(null);
+    
     navigate("/signin", { replace: true });
   };
 

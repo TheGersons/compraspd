@@ -6,6 +6,7 @@ import Input from "../form/input/InputField";
 import Checkbox from "../form/input/Checkbox";
 import Button from "../ui/button/Button";
 import { useAuth } from "../../context/AuthContext";
+import { setToken } from "../../lib/api";
 
 
 type LoginResponse = { access_token: string; token_type?: string; expires_in?: string };
@@ -42,8 +43,7 @@ export default function SignInForm() {
       console.log("Inicio de sesión exitoso");
 
       const data: LoginResponse = await res.json();
-      const storage = keepLoggedIn ? localStorage : sessionStorage;
-      storage.setItem("token", data.access_token);
+      setToken(data.access_token, keepLoggedIn)
       await refresh();
 
       if(!debug)return;

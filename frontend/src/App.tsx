@@ -62,8 +62,7 @@ export default function App() {
 
             {/* QUOTES */}
             <Route path="/quotes" element={<QuotesLayout />}>
-              <Route index element={<MyQuotes />} />
-              <Route path="all" element={<Quotes />} />
+              <Route index element={<Quotes />} />
               <Route path="new" element={<QuotesNew />} />
               <Route path="my-quotes" element={<MyQuotes />} />
               <Route path="follow-ups" element={<QuotesFollowUps />} />

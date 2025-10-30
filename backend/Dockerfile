@@ -1,15 +1,12 @@
 # ============================
-#  1️⃣ Etapa de dependencias
+#  1️⃣ Etapa de dependencias (para caché)
 # ============================
+# Esta etapa solo copia los archivos de manifiesto para aprovechar la caché de Docker
 FROM node:22-alpine AS deps
 RUN corepack enable && corepack prepare pnpm@9.12.3 --activate
 WORKDIR /app
-
 COPY package.json pnpm-lock.yaml* ./
-RUN pnpm install --frozen-lockfile \
-  && pnpm add multer uuid \
-  && pnpm add -D @types/multer @types/uuid
-
+RUN pnpm install --frozen-lockfile
 
 # ============================
 #  2️⃣ Etapa de build
@@ -18,8 +15,8 @@ FROM node:22-alpine AS build
 RUN corepack enable && corepack prepare pnpm@9.12.3 --activate
 WORKDIR /app
 
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+# Copiamos TODOS los archivos, incluyendo los node_modules de la etapa anterior
+COPY --from=deps /app ./
 
 RUN pnpm db:generate && pnpm build
 
@@ -55,3 +52,4 @@ ENTRYPOINT ["/entrypoint.sh"]
 
 # 🔹 Este CMD será sobrescrito por el entrypoint
 CMD ["pnpm", "start:prod"]
+
