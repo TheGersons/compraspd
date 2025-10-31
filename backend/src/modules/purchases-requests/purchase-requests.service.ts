@@ -522,7 +522,6 @@ export class PurchaseRequestsService {
         },
         assignments: {
           where: {
-            followStatus: { not: 'COMPLETED' },
             requesterId: userId
           },
           include: {
@@ -530,7 +529,7 @@ export class PurchaseRequestsService {
               select: { fullName: true }
             }
           },
-          take: 1,
+
         }
       },
       where: {

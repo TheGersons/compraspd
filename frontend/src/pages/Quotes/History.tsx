@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useMyRequests } from "./hooks/useHistory";
 import { RequestedItemsTable } from "./components/RequestedItemsTable";
+import { translateFollowStatus } from "./utils/translateFollowStatus";
 
 // ============================================================================
 // TYPES
@@ -8,7 +9,7 @@ import { RequestedItemsTable } from "./components/RequestedItemsTable";
 
 type RequestCategory = "LICITACIONES" | "PROYECTOS" | "SUMINISTROS" | "INVENTARIOS";
 type Procurement = "NACIONAL" | "INTERNACIONAL";
-type DeliveryType = "ALMACEN" | "PROYECTO";
+type DeliveryType = "ALMACEN" | "PROYECTO" | "WAREHOUSE" | "PROJECT";
 
 type PRItem = {
   id: string;
@@ -305,9 +306,9 @@ const DetailModal = ({
   const activeAssignment = request.assignments[0];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
-      <div className="w-full max-w-5xl rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 my-8">
-        <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 p-6 rounded-t-xl">
+    <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
+      <div className="w-full max-w-5xl rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 my-8 shadow-xl">
+        <div className="sticky bottom-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-6 rounded-b-xl">
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
@@ -325,7 +326,7 @@ const DetailModal = ({
             </div>
             <button
               onClick={onClose}
-              className="rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              className="rounded-lg p-2 hover:bg-red-800 dark:hover:bg-red-800 transition-colors text-gray-500 dark:text-white hover:text-white"
             >
               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -373,7 +374,7 @@ const DetailModal = ({
                 <div>
                   <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Tipo de Entrega</div>
                   <div className="text-base text-gray-800 dark:text-white/90">
-                    {request.deliveryType === "ALMACEN" ? "Almacén" : "Proyecto"}
+                    {request.deliveryType === "WAREHOUSE" ? "Almacén" : "Proyecto"}
                   </div>
                 </div>
               )}
@@ -413,12 +414,12 @@ const DetailModal = ({
                       Asignado a: {activeAssignment.assignedTo.fullName}
                     </div>
                     <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Estado: {activeAssignment.followStatus}
+                      Estado: {translateFollowStatus(activeAssignment.followStatus)}
                     </div>
                   </div>
                   <div className="text-right">
                     <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                      {activeAssignment.progress}%
+                      {Math.max(activeAssignment.progress,1)}%
                     </div>
                     <div className="text-xs text-gray-500 dark:text-gray-400">Progreso</div>
                   </div>
@@ -426,7 +427,7 @@ const DetailModal = ({
                 <div className="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
                   <div 
                     className="h-full bg-blue-500 transition-all duration-300"
-                    style={{ width: `${activeAssignment.progress}%` }}
+                    style={{ width: `${Math.max(activeAssignment.progress,1)}%` }}
                   />
                 </div>
               </div>
