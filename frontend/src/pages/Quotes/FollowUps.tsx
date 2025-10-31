@@ -10,7 +10,7 @@ import { RequestedItemsTable } from "./components/RequestedItemsTable";
 type FollowStatus = "SUMMITED" | "IN_PROGRESS" | "PAUSED" | "CANCELLED" | "COMPLETED";
 type RequestCategory = "LICITACIONES" | "PROYECTOS" | "SUMINISTROS" | "INVENTARIOS";
 type Procurement = "NACIONAL" | "INTERNACIONAL";
-type DeliveryType = "ALMACEN" | "PROYECTO";
+type DeliveryType = "ALMACEN" | "PROYECTO" | "WAREHOUSE" | "PROJECT";
 
 type ChatFile = {
     id: string;
@@ -49,7 +49,7 @@ type AssignmentRequest = {
         reference: string;
         finalClient: string;
         createdAt: string;
-        deadline: string;
+        quoteDeadline: string;
         requestCategory: RequestCategory;
         procurement: Procurement;
         deliveryType: DeliveryType;
@@ -90,13 +90,13 @@ const shortDate = (date: string | undefined | null) => {
     }).format(d);
 }
 
-const calculateDaysLeft = (deadline: string | undefined | null): number => {
-    if (!deadline) return 99999;
+const calculateDaysLeft = (quoteDeadline: string | undefined | null): number => {
+    if (!quoteDeadline) return 99999;
 
-    const deadlineDate = new Date(deadline);
-    if (isNaN(deadlineDate.getTime())) return 99999;
+    const quoteDeadlineDate = new Date(quoteDeadline);
+    if (isNaN(quoteDeadlineDate.getTime())) return 99999;
 
-    const diff = deadlineDate.getTime() - Date.now();
+    const diff = quoteDeadlineDate.getTime() - Date.now();
     return Math.floor(diff / 86400000);
 };
 
@@ -219,7 +219,7 @@ const DetailHeader = React.memo(({
         </div>
         <div className="text-right text-xs text-gray-500 dark:text-gray-400">
             Creada {shortDate(current.purchaseRequest?.createdAt)}<br />
-            Límite {shortDate(current.purchaseRequest?.deadline)}
+            Límite {shortDate(current.purchaseRequest?.quoteDeadline)}
             {daysLeft >= 0 ? ` • ${daysLeft} días restantes` : ' • atrasada'}
         </div>
     </div>
@@ -406,7 +406,7 @@ export default function QuotesFollowUps() {
     // Derived state
     const isCurrentAssignee = true; // Siempre true porque solo ves tus asignaciones
     const daysLeft = useMemo(() =>
-        current?.purchaseRequest?.deadline ? calculateDaysLeft(current.purchaseRequest.deadline) : 0,
+        current?.purchaseRequest?.quoteDeadline ? calculateDaysLeft(current.purchaseRequest.quoteDeadline) : 0,
         [current]
     );
 
@@ -585,13 +585,13 @@ export default function QuotesFollowUps() {
                                     <div className="rounded-lg ring-1 ring-gray-200 dark:ring-gray-800 p-3">
                                         <div className="text-xs text-gray-500 dark:text-gray-400">Entrega</div>
                                         <div className="font-semibold text-black-800 dark:text-white/90">
-                                            {current.purchaseRequest?.deliveryType === "ALMACEN" ? "Almacén" : "Proyecto"}
+                                            {current.purchaseRequest?.deliveryType === "WAREHOUSE" ? "Almacén" : "Proyecto"}
                                         </div>
                                     </div>
                                     <div className="rounded-lg ring-1 ring-gray-200 dark:ring-gray-800 p-3">
                                         <div className="text-xs text-gray-500 dark:text-gray-400">Proyecto</div>
                                         <div className="font-semibold text-black-800 dark:text-white/90">
-                                            {current.purchaseRequest?.projectId ?? "—"}
+                                            {current.purchaseRequest?.deliveryType !== "WAREHOUSE" ? current.purchaseRequest?.projectId : "N/A"}
                                         </div>
                                     </div>
                                 </div>

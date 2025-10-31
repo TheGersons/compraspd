@@ -51,7 +51,7 @@ export class FollowupsService {
             reference: true,
             finalClient: true, // ✅ Campo agregado al schema
             createdAt: true,
-            deadline: true, // ✅ Campo agregado al schema
+            quoteDeadline: true, // ✅ Campo agregado al schema
             requestCategory: true, // ✅ Campo agregado al schema
             procurement: true, // ✅ Campo agregado al schema
             deliveryType: true, // ✅ Campo agregado al schema

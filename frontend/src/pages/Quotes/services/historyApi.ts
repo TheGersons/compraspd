@@ -14,4 +14,12 @@ export const historyApi = {
     console.log('✅ [API] Requests received:', requests);
     return requests;
   },
+
+
+  async ListMyRequests(){
+    console.log('📋 [API] Fetching my requests...');
+    const requests = await api<any[]>(`${API_BASE_URL}/api/v1/purchase-requests/history/my`);
+    console.log('✅ [API] Requests received:', requests);
+    return requests;
+  }
 };

@@ -95,4 +95,10 @@ export class PurchaseRequestsController {
   listAllRequests() {
     return this.service.listAllRequests();
   }
+  
+  @Get('history/my')
+  listMyRequestsHistory(@Req() req: AuthenticatedRequest) {
+    return this.service.listMyRequestsHistory(req.user.sub);
+  }
+
 }

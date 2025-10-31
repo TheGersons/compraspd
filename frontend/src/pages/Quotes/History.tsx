@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { useAllRequests } from "./hooks/useHistory";
+import { useMyRequests } from "./hooks/useHistory";
 import { RequestedItemsTable } from "./components/RequestedItemsTable";
 
 // ============================================================================
@@ -39,7 +39,7 @@ type PurchaseRequest = {
   requestCategory: RequestCategory;
   procurement: Procurement;
   deliveryType?: DeliveryType;
-  deadline?: string;
+  quoteDeadline?: string;
   createdAt: string;
   updatedAt: string;
   requester: {
@@ -276,7 +276,7 @@ const RequestCard = React.memo(({
         </div>
         <div>
           <div className="text-gray-500 dark:text-gray-400">Límite</div>
-          <div className="font-medium text-gray-700 dark:text-gray-300">{formatDate(request.deadline)}</div>
+          <div className="font-medium text-gray-700 dark:text-gray-300">{formatDate(request.quoteDeadline)}</div>
         </div>
         {activeAssignment && (
           <div>
@@ -381,10 +381,10 @@ const DetailModal = ({
                 <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Fecha de Creación</div>
                 <div className="text-base text-gray-800 dark:text-white/90">{formatDate(request.createdAt)}</div>
               </div>
-              {request.deadline && (
+              {request.quoteDeadline && (
                 <div>
                   <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Fecha Límite</div>
-                  <div className="text-base text-gray-800 dark:text-white/90">{formatDate(request.deadline)}</div>
+                  <div className="text-base text-gray-800 dark:text-white/90">{formatDate(request.quoteDeadline)}</div>
                 </div>
               )}
             </div>
@@ -546,7 +546,7 @@ const Pagination = React.memo(({
 // ============================================================================
 
 export default function History() {
-  const { data: requests = [], isLoading } = useAllRequests();
+  const { data: requests = [], isLoading } = useMyRequests();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");

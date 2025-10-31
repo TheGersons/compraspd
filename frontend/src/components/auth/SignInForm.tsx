@@ -47,7 +47,7 @@ export default function SignInForm() {
       await refresh();
 
       if(!debug)return;
-      navigate("/");
+      navigate("/quotes");
     } catch (err: any) {
       setError(err?.message ?? "Error al iniciar sesión");
     } finally {

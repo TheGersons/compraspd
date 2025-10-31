@@ -488,4 +488,57 @@ export class PurchaseRequestsService {
 
     return requests;
   }
+
+  async listMyRequestsHistory(userId: string) {
+    const requests = await this.prisma.purchaseRequest.findMany({
+      include: {
+        requester: {
+          select: {
+            fullName: true,
+            email: true,
+          }
+        },
+        project: {
+          select: {
+            name: true,
+            code: true,
+          }
+        },
+        department: {
+          select: {
+            name: true,
+          }
+        },
+        items: {
+          select: {
+            id: true,
+            description: true,
+            quantity: true,
+            unit: true,
+            itemType: true,
+            sku: true,
+            barcode: true,
+          }
+        },
+        assignments: {
+          where: {
+            followStatus: { not: 'COMPLETED' },
+            requesterId: userId
+          },
+          include: {
+            assignedTo: {
+              select: { fullName: true }
+            }
+          },
+          take: 1,
+        }
+      },
+      where: {
+        requesterId: userId
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return requests;
+  }
 }

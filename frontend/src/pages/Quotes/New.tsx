@@ -392,7 +392,7 @@ export default function QuotesNew() {
   const [refQuery, setRefQuery] = useState("");
 
   const { data: users = [], isLoading: isLoadingUsers } = useUsers();
-  const [UserId, ] = useState<string | undefined>(auth.user?.id);
+  const UserId = auth.user?.id;
   const [userQuery,] = useState("");
 
   // Filtrar usuarios activos y por búsqueda
@@ -411,7 +411,7 @@ export default function QuotesNew() {
     scope: "nacional",
     requestType: "suministros",
     reference: "",
-    requesterId: undefined,
+    requesterId: UserId,
     deadline: "",
     deliveryPlace: "almacen",
     projectId: undefined,
@@ -430,6 +430,7 @@ export default function QuotesNew() {
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  
   // Update warehouse when available
   useEffect(() => {
     if (warehouses.length > 0 && !form.warehouseId) {
@@ -470,6 +471,7 @@ export default function QuotesNew() {
       ]
     }));
   }, []);
+
 
   const removeLine = useCallback((idx: number) => {
     setForm(prev => ({
@@ -607,7 +609,7 @@ export default function QuotesNew() {
               </label>
               <UserComboBox
                 users={filteredUsers}             // o users si quieres todos
-                value={form.requesterId}
+                value={form.requesterId ?? UserId}
                 onChange={(id) => setField("requesterId", id)}
                 disabled={isLoadingUsers}
               />

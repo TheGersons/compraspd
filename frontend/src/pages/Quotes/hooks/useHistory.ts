@@ -11,3 +11,12 @@ export function useAllRequests() {
     refetchOnWindowFocus: false,
   });
 }
+
+export function useMyRequests() {
+  return useQuery({
+    queryKey: ['my-requests'],
+    queryFn: historyApi.ListMyRequests,
+    staleTime: 30000, // 30 segundos
+    refetchOnWindowFocus: false,
+  });
+}
