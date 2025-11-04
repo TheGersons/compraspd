@@ -418,7 +418,7 @@ export default function MyQuotes() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Request List */}
                 <div className="lg:col-span-1">
-                    <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-4">
+                    <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 my-8 shadow-xl p-4">
                         <div className="mb-3">
                             <input
                                 type="text"
@@ -459,7 +459,7 @@ export default function MyQuotes() {
                 {/* Detail & Chat */}
                 <div className="lg:col-span-2 space-y-6">
                     {/* Detail Card */}
-                    <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-4">
+                    <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 my-8 shadow-xl p-4">
                         <h3 className="font-semibold mb-4 text-gray-800 dark:text-white/90">Detalle de Solicitud</h3>
                         {!current ? (
                             <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -521,7 +521,7 @@ export default function MyQuotes() {
                     </div>
 
                     {/* Chat Card */}
-                    <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-4">
+                    <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 my-8 shadow-xl p-4">
                         <h3 className="font-semibold mb-3 text-gray-800 dark:text-white/90">
                             Chat con {current?.assignment ? 'el supervisor' : 'el equipo'}
                         </h3>

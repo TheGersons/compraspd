@@ -4,15 +4,15 @@ import Button from "../ui/button/Button";
 import IconSearch from "../common/IconSearch";
 
 export type QuoteFilters = {
-    preset?: "7d" | "30d" | "90d" | "custom";
+    preset?: "7d" | "30d" | "90d" | "custom" | undefined;
     range?: { start?: string; end?: string }; // YYYY-MM-DD
-    estado?: "todas" | "abiertas" | "cerradas" | "pendientes" | "en_revision" | "vencidas";
-    tipoSolicitud?: "todas" | "licitaciones" | "proyectos" | "suministros" | "inventarios";
-    tipoCompra?: "todas" | "nacional" | "internacional";
-    proyectoId?: string | "todos";
-    asignadoA?: string | "todos" | "sin_asignar";
-    origen?: "todos" | "crm" | "web" | "manual"; // opcional
-    ordenar?: "recientes" | "antiguas" | "monto_asc" | "monto_desc" | "vence_pronto";
+    estado?: "todas" | "abiertas" | "cerradas" | "pendientes" | "en_revision" | "vencidas" | undefined;
+    tipoSolicitud?: "todas" | "licitaciones" | "proyectos" | "suministros" | "inventarios" | undefined;
+    tipoCompra?: "todas" | "nacional" | "internacional" |"NATIONAL"|"INTERNATIONAL" | undefined;
+    proyectoId?: string | "todos" | undefined;
+    asignadoA?: string | "todos" | "sin_asignar" | undefined;
+    origen?: "todos" | "crm" | "web" | "manual" | undefined; // opcional
+    ordenar?: "recientes" | "antiguas" | "monto_asc" | "monto_desc" | "vence_pronto" | undefined;
     q?: string;
     placeholder?: string;
 };
@@ -131,8 +131,8 @@ export default function Filters({
                     onChange={(e) => set({ tipoCompra: e.target.value as QuoteFilters["tipoCompra"] })}
                 >
                     <option value="todas">Compra: todas</option>
-                    <option value="nacional">Nacional</option>
-                    <option value="internacional">Internacional</option>
+                    <option value="NATIONAL">Nacional</option>
+                    <option value="INTERNATIONAL">Internacional</option>
                 </select>
             </div>
 

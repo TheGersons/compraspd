@@ -269,7 +269,9 @@ const RequestCard = React.memo(({
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
         <div>
           <div className="text-gray-500 dark:text-gray-400">Items</div>
-          <div className="font-medium text-gray-700 dark:text-gray-300">{request.items.length}</div>
+          <div className="font-medium text-gray-700 dark:text-gray-300">{request.items.reduce((total, q) => 
+            total + q.quantity, 0
+          )}</div>
         </div>
         <div>
           <div className="text-gray-500 dark:text-gray-400">Creada</div>
@@ -651,7 +653,7 @@ export default function History() {
         />
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
+      <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 bg-white dark:bg-gray-800 my-8 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
             Resultados ({filteredRequests.length})

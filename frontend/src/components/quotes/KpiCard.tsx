@@ -14,7 +14,7 @@ export default function KpiCard(
   { title:string; value:string|number; hint?:string; tone?:KpiTone; icon?:React.ReactNode }
 ) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+    <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.03] my-8">
       <div className="flex items-center gap-2">
         <span className={`inline-block size-2 rounded-full ${dot[tone]}`} />
         <p className="text-sm text-gray-500 dark:text-gray-400">{title}</p>

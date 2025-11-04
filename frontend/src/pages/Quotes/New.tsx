@@ -563,7 +563,7 @@ export default function QuotesNew() {
         description="Crear nueva cotización en Compras Energia PD"
       />
 
-      <div className="rounded-xl border border-gray-200 p-6 bg-white dark:border-white/10 dark:bg-[#101828]">
+      <div className="rounded-xl border border-gray-200 p-6 bg-white dark:border-gray-700 bg-white dark:bg-white/[0.03] my-8 shadow-xl">
         <h2 className="text-title-sm sm:text-title-md font-semibold text-gray-800 dark:text-white/90">
           Nueva cotización
         </h2>

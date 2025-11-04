@@ -139,7 +139,7 @@ export default function UserComboBox({
                     <button
                         type="button"
                         onClick={clearSelection}
-                        className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-gray-300 text-gray-600 hover:bg-gray-100 dark:border-white/10"
+                        className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-gray-300 text-gray-600 dark:text-white hover:bg-red-600 dark:hover:bg-red-600 dark:border-white/10 dark:bg-gray-900 my-8"
                         aria-label="Limpiar selección"
                         disabled={disabled}
                     >
