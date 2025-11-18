@@ -6,14 +6,14 @@ import { UsersModule } from './modules/users/users.module';
 import { AssignmentsModule } from './modules/assignments/assignments.module';
 import { AttachmentsModule } from './modules/attachments/attachments.module';
 import { CatalogsModule } from './modules/catalogs/catalogs.module';
-import { OffersModule } from './modules/offers/offers.module';
+import { OffersModule } from './modules/prices/offers.module';
 import { PurchaseRequestsModule } from './modules/purchases-requests/purchase-requests.module';
 import { ClientsModule } from './modules/clients/clients.module';
 import { LocationsModule } from './modules/Locations/locations.module';
 import { FollowupsModule } from './modules/followups/followups.module';
 import { rolesModule } from './modules/Roles/roles.module';
 import { DepartmentsModule } from './modules/departments/departments.module';
-import { QuotesModule } from './modules/quotes/quotes.module';
+import { QuotesModule } from './modules/quotations/quotations.module';
 
 @Module({
   imports: [

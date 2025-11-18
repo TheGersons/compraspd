@@ -1,25 +1,30 @@
-import { IsEmail, IsNotEmpty, IsOptional, IsString, isUppercase, MinLength } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+import { IsEmail, IsNotEmpty, IsString, IsUUID, MinLength } from 'class-validator';
 
 export class CreateUserDto {
-    @IsEmail() email!: string;
-    @MinLength(8) password!: string;
-    @IsString() @IsNotEmpty() fullName!: string;
+  @ApiProperty({ example: 'juan.perez@empresa.com' })
+  @IsEmail({}, { message: 'Email inválido' })
+  @IsNotEmpty({ message: 'Email es requerido' })
+  email: string;
 
-    @IsString()  departmentId!: string;
-    @IsString() @IsOptional() costCenter?: string;
+  @ApiProperty({ example: 'Password123!' })
+  @IsString({ message: 'Password debe ser texto' })
+  @MinLength(6, { message: 'Password debe tener al menos 6 caracteres' })
+  @IsNotEmpty({ message: 'Password es requerido' })
+  password: string;
 
-    @IsString() roleId!: string; // un rol 
-    // por usuario
+  @ApiProperty({ example: 'Juan Pérez' })
+  @IsString({ message: 'Nombre debe ser texto' })
+  @IsNotEmpty({ message: 'Nombre es requerido' })
+  nombre: string;
+
+  @ApiProperty({ example: 'uuid-del-departamento' })
+  @IsUUID('4', { message: 'departamentoId debe ser un UUID válido' })
+  @IsNotEmpty({ message: 'departamentoId es requerido' })
+  departamentoId: string;
+
+  @ApiProperty({ example: 'uuid-del-rol' })
+  @IsUUID('4', { message: 'rolId debe ser un UUID válido' })
+  @IsNotEmpty({ message: 'rolId es requerido' })
+  rolId: string;
 }
-
-
-//id -> autogenerado
-//email -> el usuario lo ingresa
-//createdAt -> autogenerado
-//updatedAt -> autogenerado
-//costCenter -> opcional
-//department -> opcional
-//fullName -> el usuario lo ingresa
-//isActive -> autogenerado
-//passwordHash -> autogenerado
-//roleId -> el usuario lo ingresa

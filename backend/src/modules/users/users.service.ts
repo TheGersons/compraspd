@@ -1,166 +1,344 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
-  async create(data: {
-    email: string; password: string; fullName: string;
-    departmentId: string; costCenter?: string; roleId: string;
-  }) {
-    const exists = await this.prisma.user.findUnique({ where: { email: data.email } });
-    if (exists) throw new BadRequestException('Email ya registrado');
+  /**
+   * Crear nuevo usuario
+   */
+  async create(data: CreateUserDto) {
+    // Validar que el email no exista
+    const exists = await this.prisma.usuario.findUnique({ 
+      where: { email: data.email } 
+    });
+    if (exists) {
+      throw new BadRequestException('Email ya registrado');
+    }
 
+    // Validar que el rol exista
+    const rolExists = await this.prisma.rol.findUnique({
+      where: { id: data.rolId }
+    });
+    if (!rolExists) {
+      throw new BadRequestException('Rol no encontrado');
+    }
+
+    // Validar que el departamento exista
+    const deptExists = await this.prisma.departamento.findUnique({
+      where: { id: data.departamentoId }
+    });
+    if (!deptExists) {
+      throw new BadRequestException('Departamento no encontrado');
+    }
+
+    // Hash de la contraseña
     const passwordHash = await bcrypt.hash(data.password, 10);
-    const user = await this.prisma.user.create({
+
+    // Crear usuario
+    const usuario = await this.prisma.usuario.create({
       data: {
         email: data.email,
         passwordHash,
-        fullName: data.fullName,
-        departmentId: data.departmentId,
-        costCenter: data.costCenter,
-        roleId: data.roleId,
+        nombre: data.nombre,
+        departamentoId: data.departamentoId,
+        rolId: data.rolId,
+        activo: true,
       },
-      include: { role: true, department: true },
+      include: { 
+        rol: {
+          select: { id: true, nombre: true, descripcion: true }
+        }, 
+        departamento: {
+          select: { id: true, nombre: true }
+        } 
+      },
     });
-    return user;
+
+    // No devolver el passwordHash en la respuesta
+    const { passwordHash: _, ...usuarioSinPassword } = usuario;
+    return usuarioSinPassword;
   }
 
+  /**
+   * Buscar usuario por ID
+   */
   async findById(id: string) {
-    const user = await this.prisma.user.findUnique({
+    const usuario = await this.prisma.usuario.findUnique({
       where: { id },
       select: {
         id: true,
         email: true,
-        fullName: true,
-        departmentId: true,
-        department: { select: { id: true, name: true } },
-        costCenter: true,
-        isActive: true,
-        createdAt: true,
-        updatedAt: true,
-        role: { select: { id: true, name: true, description: true } },
+        nombre: true,
+        departamentoId: true,
+        departamento: { 
+          select: { id: true, nombre: true } 
+        },
+        activo: true,
+        creado: true,
+        actualizado: true,
+        rol: { 
+          select: { id: true, nombre: true, descripcion: true } 
+        },
       },
     });
-    if (!user) throw new NotFoundException('Usuario no encontrado');
-    return user;
+
+    if (!usuario) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    return usuario;
   }
 
-
-
-  async paginate(params: { page?: number; pageSize?: number; search?: string; roleId?: string; isActive?: boolean }) {
+  /**
+   * Listar todos los usuarios con filtros y paginación
+   */
+  async paginate(params: { 
+    page?: number; 
+    pageSize?: number; 
+    search?: string; 
+    rolId?: string; 
+    activo?: boolean;
+    departamentoId?: string;
+  }) {
     const page = Math.max(1, params.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 20));
 
     const where: any = {};
     const and: any[] = [];
 
+    // Búsqueda por texto
     if (params.search) {
       and.push({
         OR: [
           { email: { contains: params.search, mode: 'insensitive' as const } },
-          { fullName: { contains: params.search, mode: 'insensitive' as const } },
+          { nombre: { contains: params.search, mode: 'insensitive' as const } },
         ],
       });
     }
-    if (params.roleId) {
-      and.push({ roleId: params.roleId });
+
+    // Filtro por rol
+    if (params.rolId) {
+      and.push({ rolId: params.rolId });
     }
-    if (typeof params.isActive === 'boolean') {
-      and.push({ isActive: params.isActive });
+
+    // Filtro por departamento
+    if (params.departamentoId) {
+      and.push({ departamentoId: params.departamentoId });
     }
+
+    // Filtro por estado activo
+    if (typeof params.activo === 'boolean') {
+      and.push({ activo: params.activo });
+    }
+
     if (and.length > 0) {
       where.AND = and;
     }
 
+    // Consulta con transacción para obtener total e items
     const [total, items] = await this.prisma.$transaction([
-      this.prisma.user.count({ where }),
-      this.prisma.user.findMany({
+      this.prisma.usuario.count({ where }),
+      this.prisma.usuario.findMany({
         where,
-        include: { role: true },
-        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          email: true,
+          nombre: true,
+          departamentoId: true,
+          activo: true,
+          creado: true,
+          actualizado: true,
+          rol: {
+            select: { id: true, nombre: true, descripcion: true }
+          },
+          departamento: {
+            select: { id: true, nombre: true }
+          }
+        },
+        orderBy: { creado: 'desc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
     ]);
 
-    return { page, pageSize, total, items };
+    return { 
+      page, 
+      pageSize, 
+      total, 
+      totalPages: Math.ceil(total / pageSize),
+      items 
+    };
   }
 
-  async update(id: string, data: {
-    fullName?: string; departmentId?: string; costCenter?: string; roleId?: string; isActive?: boolean
-  }) {
+  /**
+   * Actualizar usuario
+   */
+  async update(id: string, data: UpdateUserDto) {
     await this.ensureExists(id);
-    return this.prisma.user.update({
+
+    // Validar rol si se proporciona
+    if (data.rolId) {
+      const rolExists = await this.prisma.rol.findUnique({
+        where: { id: data.rolId }
+      });
+      if (!rolExists) {
+        throw new BadRequestException('Rol no encontrado');
+      }
+    }
+
+    // Validar departamento si se proporciona
+    if (data.departamentoId) {
+      const deptExists = await this.prisma.departamento.findUnique({
+        where: { id: data.departamentoId }
+      });
+      if (!deptExists) {
+        throw new BadRequestException('Departamento no encontrado');
+      }
+    }
+
+    const updated = await this.prisma.usuario.update({
       where: { id },
       data: {
-        fullName: data.fullName,
-        departmentId: data.departmentId ?? undefined,
-        costCenter: data.costCenter,
-        roleId: data.roleId,
-        isActive: typeof data.isActive === 'boolean' ? data.isActive : undefined,
+        nombre: data.nombre,
+        departamentoId: data.departamentoId,
+        rolId: data.rolId,
+        activo: typeof data.activo === 'boolean' ? data.activo : undefined,
       },
-      include: { role: true, department: true },
+      include: { 
+        rol: {
+          select: { id: true, nombre: true, descripcion: true }
+        }, 
+        departamento: {
+          select: { id: true, nombre: true }
+        } 
+      },
     });
+
+    const { passwordHash: _, ...usuarioSinPassword } = updated;
+    return usuarioSinPassword;
   }
+
+  /**
+   * Cambiar contraseña de usuario
+   */
   async changePassword(id: string, newPassword: string, oldPassword: string) {
-    await this.ensureExists(id);
-
-    const user = await this.prisma.user.findUnique({ where: { id } });
-    if (!user) throw new NotFoundException('Usuario no encontrado');
-    const compare = await bcrypt.compare(oldPassword, user.passwordHash);
-    if (!compare) throw new BadRequestException('La contraseña actual no coincide');
-
-    const passwordHash = await bcrypt.hash(newPassword, 10);
-    await this.prisma.user.update({ where: { id }, data: { passwordHash } });
-    return { ok: true };
-  }
-
-  async remove(id: string) {
-    await this.ensureExists(id);
-    // borrado lógico recomendable; si quieres físico, deja esta línea
-    return this.prisma.user.update({ where: { id }, data: { isActive: false } });
-  }
-
-  private async ensureExists(id: string) {
-    const u = await this.prisma.user.findUnique({ where: { id } });
-    if (!u) throw new NotFoundException('Usuario no encontrado');
-  }
-
-  async supervisorsList() {
-    const supervisorRole = await this.prisma.role.findFirst({
-      where: { name: 'SUPERVISOR' }, select: { id: true },
+    const usuario = await this.prisma.usuario.findUnique({ 
+      where: { id } 
     });
-    console.log('Supervisor Role:', supervisorRole);
-    if (!supervisorRole) {
-      throw new NotFoundException('Rol de SUPERVISOR no encontrado');
+
+    if (!usuario) {
+      throw new NotFoundException('Usuario no encontrado');
     }
-    const supervisors = await this.prisma.user.findMany({
-      where: { isActive: true, roleId: supervisorRole!.id },
-      select: { id: true, fullName: true, email: true },
-      orderBy: { fullName: 'asc' },
+
+    // Verificar contraseña actual
+    const isPasswordValid = await bcrypt.compare(oldPassword, usuario.passwordHash);
+    if (!isPasswordValid) {
+      throw new BadRequestException('La contraseña actual no coincide');
+    }
+
+    // Hash de la nueva contraseña
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    await this.prisma.usuario.update({ 
+      where: { id }, 
+      data: { passwordHash } 
     });
-    console.log('Supervisores encontrados:', supervisors);
-    if (supervisors.length === 0) {
+
+    return { ok: true, message: 'Contraseña actualizada correctamente' };
+  }
+
+  /**
+   * Desactivar usuario (borrado lógico)
+   */
+  async deactivate(id: string) {
+    await this.ensureExists(id);
+    return this.prisma.usuario.update({ 
+      where: { id }, 
+      data: { activo: false } 
+    });
+  }
+
+  /**
+   * Activar usuario
+   */
+  async activate(id: string) {
+    await this.ensureExists(id);
+    return this.prisma.usuario.update({ 
+      where: { id }, 
+      data: { activo: true } 
+    });
+  }
+
+  /**
+   * Listar supervisores activos
+   */
+  async supervisorsList() {
+    const supervisorRole = await this.prisma.rol.findFirst({
+      where: { nombre: 'SUPERVISOR' },
+      select: { id: true },
+    });
+
+    if (!supervisorRole) {
+      throw new NotFoundException('Rol de SUPERVISOR no encontrado en el sistema');
+    }
+
+    const supervisores = await this.prisma.usuario.findMany({
+      where: { 
+        activo: true, 
+        rolId: supervisorRole.id 
+      },
+      select: { 
+        id: true, 
+        nombre: true, 
+        email: true 
+      },
+      orderBy: { nombre: 'asc' },
+    });
+
+    if (supervisores.length === 0) {
       throw new NotFoundException('No se encontraron supervisores activos');
     }
 
-    return supervisors;
+    return supervisores;
   }
-  
+
+  /**
+   * Listar todos los usuarios
+   */
   async listUsers() {
-    return this.prisma.user.findMany({
-      include: {
-        role: {
-          select: { id: true, name: true, description: true }
+    return this.prisma.usuario.findMany({
+      select: {
+        id: true,
+        email: true,
+        nombre: true,
+        activo: true,
+        departamentoId: true,
+        creado: true,
+        rol: {
+          select: { id: true, nombre: true, descripcion: true }
         },
-        department: {
-          select: { id: true, name: true }
+        departamento: {
+          select: { id: true, nombre: true }
         }
       },
-      orderBy: { fullName: 'asc' }
+      orderBy: { nombre: 'asc' }
     });
+  }
+
+  /**
+   * Método privado: Verificar que el usuario existe
+   */
+  private async ensureExists(id: string) {
+    const usuario = await this.prisma.usuario.findUnique({ 
+      where: { id } 
+    });
+    if (!usuario) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
   }
 }
