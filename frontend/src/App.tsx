@@ -52,6 +52,24 @@ export default function App() {
         {/* públicas solo */}
         <Route path="/signin" element={<PublicOnlyRoute><SignIn /></PublicOnlyRoute>} />
         <Route path="/signup" element={<PublicOnlyRoute><SignUp /></PublicOnlyRoute>} />
+        
+
+            {/* SHOPPING */}
+            <Route path="/shopping" element={<ShoppingLayout />}>
+              <Route index element={<Shopping />} />
+              <Route path="new" element={<ShoppingNew />} />
+              <Route path="follow-ups" element={<ShoppingFollowUps />} />
+              <Route path="history" element={<ShoppingHistory />} />
+              <Route
+                path="assignment"
+                element={
+                  <ProtectedRoute roles={SHOPPING_MANAGER_ROLES}>
+                    <ShoppingAssignment />
+                  </ProtectedRoute>
+                }
+              />
+            </Route>
+
 
         {/* protegidas */}
         <Route element={<ProtectedRoute />}>

@@ -1,0 +1,385 @@
+// ============================================
+// SISTEMA DE COTIZACIONES Y COMPRAS
+// Prisma Schema
+// ============================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearchPostgres"]
+  log             = ["query"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// CATÁLOGOS BASE
+// ============================================
+
+model Area {
+  id         String   @id @default(uuid()) @db.Uuid
+  nombreArea String   @map("nombre_area")
+  creado     DateTime @default(now())
+  
+  tipos Tipo[]
+  
+  @@map("area")
+}
+
+model Tipo {
+  id     String   @id @default(uuid()) @db.Uuid
+  areaId String   @map("area_id") @db.Uuid
+  nombre String
+  creado DateTime @default(now())
+  
+  area         Area          @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  cotizaciones Cotizacion[]
+  
+  @@index([areaId])
+  @@map("tipo")
+}
+
+model Departamento {
+  id     String   @id @default(uuid()) @db.Uuid
+  nombre String
+  creado DateTime @default(now())
+  
+  usuarios Usuario[]
+  
+  @@map("departamento")
+}
+
+model Proyecto {
+  id           String   @id @default(uuid()) @db.Uuid
+  nombre       String
+  descripcion  String?
+  estado       Boolean  @default(true)
+  creado       DateTime @default(now())
+  actualizado  DateTime @default(now()) @updatedAt
+  
+  cotizaciones Cotizacion[]
+  
+  @@map("proyecto")
+}
+
+model Proveedor {
+  id        String    @id @default(uuid()) @db.Uuid
+  nombre    String
+  rtn       String?
+  email     String?
+  telefono  String?
+  direccion String?
+  activo    Boolean   @default(true)
+  creado    DateTime  @default(now())
+  
+  precios        Precios[]
+  compraDetalles CompraDetalle[]
+  
+  @@index([activo])
+  @@map("proveedor")
+}
+
+// ============================================
+// USUARIOS Y PERMISOS
+// ============================================
+
+model Rol {
+  id           String    @id @default(uuid()) @db.Uuid
+  nombre       String    @unique
+  descripcion  String
+  activo       Boolean   @default(true)
+  creado       DateTime  @default(now())
+  actualizado  DateTime? @default(now())
+  
+  usuarios      Usuario[]
+  rolPermisos   RolPermisos[]
+  
+  @@map("rol")
+}
+
+model Permisos {
+  id          String    @id @default(uuid()) @db.Uuid
+  modulo      String
+  accion      String
+  descripcion String?
+  activo      Boolean   @default(true)
+  creado      DateTime  @default(now())
+  
+  rolPermisos RolPermisos[]
+  
+  @@unique([modulo, accion])
+  @@index([modulo])
+  @@index([accion])
+  @@map("permisos")
+}
+
+model RolPermisos {
+  rolId     String   @map("rol_id") @db.Uuid
+  permisoId String   @map("permiso_id") @db.Uuid
+  creado    DateTime @default(now())
+  
+  rol     Rol      @relation(fields: [rolId], references: [id], onDelete: Cascade)
+  permiso Permisos @relation(fields: [permisoId], references: [id], onDelete: Cascade)
+  
+  @@id([rolId, permisoId])
+  @@index([rolId])
+  @@index([permisoId])
+  @@map("rol_permisos")
+}
+
+model Usuario {
+  id              String    @id @default(uuid()) @db.Uuid
+  nombre          String
+  email           String    @unique
+  passwordHash    String    @map("password_hash")
+  rolId           String    @map("rol_id") @db.Uuid
+  departamentoId  String    @map("departamento_id") @db.Uuid
+  activo          Boolean   @default(true)
+  creado          DateTime  @default(now())
+  actualizado     DateTime? @default(now())
+  
+  rol             Rol           @relation(fields: [rolId], references: [id], onDelete: Restrict)
+  departamento    Departamento  @relation(fields: [departamentoId], references: [id], onDelete: Restrict)
+  
+  cotizaciones         Cotizacion[]          @relation("UsuarioSolicitante")
+  seguimientos         Seguimiento[]
+  mensajes             Mensaje[]
+  notificaciones       Notificacion[]
+  participantesChat    ParticipantesChat[]
+  
+  @@index([email])
+  @@index([rolId])
+  @@index([activo])
+  @@map("usuario")
+}
+
+// ============================================
+// PROCESO DE COTIZACIÓN
+// ============================================
+
+model Cotizacion {
+  id                 String    @id @default(uuid()) @db.Uuid
+  tipoCompra         String    @default("NACIONAL") @map("tipo_compra")
+  tipoId             String    @map("tipo_id") @db.Uuid
+  solicitanteId      String    @map("solicitante_id") @db.Uuid
+  lugarEntrega       String    @default("ALMACEN") @map("lugar_entrega")
+  comentarios        String?
+  fechaSolicitud     DateTime  @default(now()) @map("fecha_solicitud")
+  fechaLimite        DateTime  @map("fecha_limite")
+  estado             String    @default("ENVIADA")
+  nombreCotizacion   String    @map("nombre_cotizacion")
+  proyectoId         String?   @map("proyecto_id") @db.Uuid
+  fechaEstimada      DateTime  @map("fecha_estimada")
+  
+  tipo           Tipo               @relation(fields: [tipoId], references: [id], onDelete: Restrict)
+  solicitante    Usuario            @relation("UsuarioSolicitante", fields: [solicitanteId], references: [id], onDelete: Restrict)
+  proyecto       Proyecto?          @relation(fields: [proyectoId], references: [id], onDelete: SetNull)
+  
+  detalles       CotizacionDetalle[]
+  compras        Compra[]
+  
+  @@index([solicitanteId])
+  @@index([estado])
+  @@index([proyectoId])
+  @@index([fechaSolicitud])
+  @@map("cotizacion")
+}
+
+model CotizacionDetalle {
+  id                  String  @id @default(uuid()) @db.Uuid
+  cotizacionId        String  @map("cotizacion_id") @db.Uuid
+  sku                 String?
+  descripcionProducto String  @map("descripcion_producto")
+  cantidad            Int
+  tipoUnidad          String  @map("tipo_unidad")
+  notas               String?
+  preciosId           String? @map("precios_id") @db.Uuid
+  
+  cotizacion Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  precios    Precios?   @relation("PrecioSeleccionado", fields: [preciosId], references: [id], onDelete: SetNull)
+  
+  preciosOfertas Precios[] @relation("PreciosPorDetalle")
+  
+  @@index([cotizacionId])
+  @@index([sku])
+  @@map("cotizacion_detalle")
+}
+
+model Precios {
+  id                   String   @id @default(uuid()) @db.Uuid
+  cotizacionDetalleId  String   @map("cotizacion_detalle_id") @db.Uuid
+  precio               Decimal  @db.Decimal(15, 4)
+  precioDescuento      Decimal? @map("precio_descuento") @db.Decimal(15, 4)
+  proveedorId          String   @map("proveedor_id") @db.Uuid
+  fechaConsulta        DateTime @default(now()) @map("fecha_consulta")
+  ComprobanteDescuento String?  @map("comprobante_descuento")
+
+  cotizacionDetalle       CotizacionDetalle @relation("PreciosPorDetalle", fields: [cotizacionDetalleId], references: [id], onDelete: Cascade)
+  proveedor               Proveedor         @relation(fields: [proveedorId], references: [id], onDelete: Restrict)
+  
+  cotizacionDetalleSeleccionado CotizacionDetalle[] @relation("PrecioSeleccionado")
+  
+  @@index([cotizacionDetalleId])
+  @@index([proveedorId])
+  @@map("precios")
+}
+
+// ============================================
+// PROCESO DE COMPRA
+// ============================================
+
+model Compra {
+  id            String   @id @default(uuid()) @db.Uuid
+  cotizacionId  String   @map("cotizacion_id") @db.Uuid
+  estado        String   @default("PENDIENTE")
+  creacion      DateTime @default(now())
+  actualizado   DateTime @default(now()) @updatedAt
+  
+  cotizacion  Cotizacion      @relation(fields: [cotizacionId], references: [id], onDelete: Restrict)
+  
+  detalles     CompraDetalle[]
+  seguimientos Seguimiento[]   @relation("SeguimientoCompra")
+  
+  @@index([cotizacionId])
+  @@index([estado])
+  @@map("compra")
+}
+
+model CompraDetalle {
+  id                        String    @id @default(uuid()) @db.Uuid
+  compraId                  String    @map("compra_id") @db.Uuid
+  sku                       String?
+  descripcionProducto       String    @map("descripcion_producto")
+  cantidad                  Int
+  tipoUnidad                String    @map("tipo_unidad")
+  notas                     String?
+  precio                    Decimal   @db.Decimal(15, 4)
+  proveedorId               String    @map("proveedor_id") @db.Uuid
+  estado                    String    @default("PRE-COMPRA")
+  fechaCompra               DateTime? @map("fecha_compra")
+  fechaFabricacion          DateTime? @map("fecha_fabricacion")
+  fechaFors                 DateTime? @map("fecha_fors")
+  fechaCif                  DateTime? @map("fecha_cif")
+  fechaRecibido             DateTime? @map("fecha_recibido")
+  fechaUltimaActualizacion  DateTime  @default(now()) @updatedAt @map("fecha_ultima_actualizacion")
+  
+  compra    Compra    @relation(fields: [compraId], references: [id], onDelete: Cascade)
+  proveedor Proveedor @relation(fields: [proveedorId], references: [id], onDelete: Restrict)
+  
+  seguimientos Seguimiento[] @relation("SeguimientoCompraDetalle")
+  
+  @@index([compraId])
+  @@index([proveedorId])
+  @@index([estado])
+  @@index([sku])
+  @@map("compra_detalle")
+}
+
+// ============================================
+// SEGUIMIENTO
+// ============================================
+
+model Seguimiento {
+  id              String    @id @default(uuid()) @db.Uuid
+  compraId        String?   @map("compra_id") @db.Uuid
+  compraDetalleId String?   @map("compra_detalle_id") @db.Uuid
+  userId          String    @map("user_id") @db.Uuid
+  tipo            String
+  detalle         String
+  fecha           DateTime  @default(now())
+  
+  compra        Compra?        @relation("SeguimientoCompra", fields: [compraId], references: [id], onDelete: Cascade)
+  compraDetalle CompraDetalle? @relation("SeguimientoCompraDetalle", fields: [compraDetalleId], references: [id], onDelete: Cascade)
+  usuario       Usuario        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  
+  @@index([compraId])
+  @@index([compraDetalleId])
+  @@index([userId])
+  @@index([fecha])
+  @@map("seguimiento")
+}
+
+// ============================================
+// MENSAJERÍA
+// ============================================
+
+model Chat {
+  id          String   @id @default(uuid()) @db.Uuid
+  creado      DateTime @default(now())
+  actualizado DateTime @default(now()) @updatedAt
+  
+  participantes ParticipantesChat[]
+  mensajes      Mensaje[]
+  
+  @@map("chat")
+}
+
+model ParticipantesChat {
+  chatId       String    @map("chat_id") @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  ultimoLeido  DateTime? @map("ultimo_leido")
+  
+  chat    Chat    @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  usuario Usuario @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@id([chatId, userId])
+  @@index([chatId])
+  @@index([userId])
+  @@map("participantes_chat")
+}
+
+model Mensaje {
+  id           String   @id @default(uuid()) @db.Uuid
+  chatId       String   @map("chat_id") @db.Uuid
+  emisorId     String   @map("emisor_id") @db.Uuid
+  contenido    String
+  tipoMensaje  String   @default("TEXTO") @map("tipo_mensaje")
+  creado       DateTime @default(now())
+  
+  chat     Chat       @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  emisor   Usuario    @relation(fields: [emisorId], references: [id], onDelete: Restrict)
+  
+  adjuntos Adjuntos[]
+  
+  @@index([chatId])
+  @@index([emisorId])
+  @@index([creado])
+  @@map("mensaje")
+}
+
+model Adjuntos {
+  id               String   @id @default(uuid()) @db.Uuid
+  mensajeId        String   @map("mensaje_id") @db.Uuid
+  direccionArchivo String   @map("direccion_archivo")
+  tipoArchivo      String   @map("tipo_archivo")
+  tamanio          BigInt
+  creado           DateTime @default(now())
+  
+  mensaje Mensaje @relation(fields: [mensajeId], references: [id], onDelete: Cascade)
+  
+  @@index([mensajeId])
+  @@map("adjuntos")
+}
+
+// ============================================
+// NOTIFICACIONES
+// ============================================
+
+model Notificacion {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  tipo        String
+  titulo      String
+  descripcion String
+  creada      DateTime @default(now())
+  completada  Boolean  @default(false)
+  
+  usuario Usuario @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([completada])
+  @@index([creada])
+  @@map("notificacion")
+}

@@ -27,7 +27,7 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   {
-    //icono generico para cotizaciones
+    //icono generico para cotizaciones si ss
     icon: <PieChartIcon />,
     name: "Cotizaciones",
     subItems: [
