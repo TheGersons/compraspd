@@ -1,3 +1,4 @@
+/*
 import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
@@ -36,3 +37,5 @@ export class AssignmentsController {
         return this.svc.listMyAssignments(me);
     }
 }    
+
+*/

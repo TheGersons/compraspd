@@ -1,3 +1,5 @@
+/*
+
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreatePurchaseRequestDto } from './dto/create-pr.dto';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -36,6 +38,7 @@ const toEnumDelivery = (v?: string) => {
  * payload. It also connects the authenticated user as the requester and
  * sanitises item payloads so undefined optional properties become null.
  */
+/*
 @Injectable()
 export class PurchaseRequestsService {
   constructor(private readonly prisma: PrismaService) { }
@@ -48,7 +51,7 @@ export class PurchaseRequestsService {
    *
    * @param input The payload for the purchase request
    * @param user The authenticated user creating the request
-   */
+   *//*
   async create(input: CreatePurchaseRequestDto, user: { sub?: string; userId?: string }) {
     // Validate items exist
     if (!input.items || input.items.length === 0) {
@@ -541,3 +544,5 @@ export class PurchaseRequestsService {
     return requests;
   }
 }
+
+*/

@@ -1,5 +1,5 @@
 // src/followups/followups.service.ts
-
+/*
 import { Injectable, UnauthorizedException, NotFoundException } from '@nestjs/common';
 import { Assignment, FollowStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -9,10 +9,7 @@ import { UpdateFollowupDto, SendMessageDto } from './dto/update-followup.dto';
 export class FollowupsService {
   constructor(private prisma: PrismaService) { }
 
-  /**
-   * Valida que la asignación exista y pertenezca al usuario asignado.
-   * @returns El objeto Assignment si la validación es exitosa.
-   */
+ 
   private async ensureAssignee(id: string, userId: string): Promise<Assignment> {
     const assignment = await this.prisma.assignment.findFirst({
       where: {
@@ -214,3 +211,5 @@ export class FollowupsService {
   }
 
 }
+
+*/

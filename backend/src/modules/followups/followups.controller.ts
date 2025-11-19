@@ -1,5 +1,5 @@
 // src/followups/followups.controller.ts
-
+/*
 import { Controller, Get, Param, Patch, Body, Post, UseGuards, Req } from '@nestjs/common';
 import { FollowupsService } from './followups.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -59,11 +59,7 @@ export class FollowupsController {
     return this.followupsService.listItems(purchaseRequestId);
   }
 
-  /*
-    FALTA: Un controlador separado (ej: FileUploadController) con un endpoint POST /files
-    que se encargue de:
-    1. Subir el archivo a S3/Cloud Storage.
-    2. Crear el registro en la tabla 'ChatFile' con el nombre, tamaño y URL.
-    3. Retornar el 'id' del ChatFile creado para ser usado en 'SendMessageDto'.
-  */
+  
 }
+
+*/

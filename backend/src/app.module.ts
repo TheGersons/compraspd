@@ -3,17 +3,21 @@ import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
-import { AssignmentsModule } from './modules/assignments/assignments.module';
+//import { AssignmentsModule } from './modules/assignments/assignments.module';
 import { AttachmentsModule } from './modules/attachments/attachments.module';
-import { CatalogsModule } from './modules/catalogs/catalogs.module';
-import { OffersModule } from './modules/prices/offers.module';
-import { PurchaseRequestsModule } from './modules/purchases-requests/purchase-requests.module';
-import { ClientsModule } from './modules/clients/clients.module';
-import { LocationsModule } from './modules/Locations/locations.module';
-import { FollowupsModule } from './modules/followups/followups.module';
-import { rolesModule } from './modules/Roles/roles.module';
+
+//import { PurchaseRequestsModule } from './modules/purchases-requests/purchase-requests.module';
+//import { FollowupsModule } from './modules/followups/followups.module';
+
 import { DepartmentsModule } from './modules/departments/departments.module';
-import { QuotesModule } from './modules/quotations/quotations.module';
+import { RolesModule } from './modules/Roles/roles.module';
+import { MessagesModule } from './modules/messages/messages.module';
+import { PermissionsModule } from './modules/permissions/permissions.module';
+import { QuotationsModule } from './modules/quotations/quotations.module';
+import { QuotationDetailsModule } from './modules/quotations-details/quotation-details.module';
+
+
+
 
 @Module({
   imports: [
@@ -21,17 +25,18 @@ import { QuotesModule } from './modules/quotations/quotations.module';
     PrismaModule,
     AuthModule,
     UsersModule,
-    AssignmentsModule,
+    MessagesModule,
+    PermissionsModule,
+    QuotationsModule,
+    QuotationDetailsModule,
+    // AssignmentsModule,
     AttachmentsModule,
-    CatalogsModule,
-    OffersModule,
-    PurchaseRequestsModule,
-    ClientsModule,
-    LocationsModule,
-    FollowupsModule,
-    rolesModule,
+    //CatalogsModule,
+    // PurchaseRequestsModule,
+    //FollowupsModule,
+    RolesModule,
     DepartmentsModule,
-    QuotesModule
+
   ],
 })
 export class AppModule { }
