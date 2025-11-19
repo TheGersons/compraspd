@@ -15,6 +15,13 @@ import { MessagesModule } from './modules/messages/messages.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
 import { QuotationsModule } from './modules/quotations/quotations.module';
 import { QuotationDetailsModule } from './modules/quotations-details/quotation-details.module';
+import { PreciosModule } from './modules/prices/precios.module';
+import { CompraDetalleModule } from './modules/compra-detalles/compra-detalle.module';
+import { CompraModule } from './modules/compras/compra.module';
+import { AreasModule } from './modules/catalogs/areas/areas.module';
+import { ProyectosModule } from './modules/catalogs/proyectos/proyectos.module';
+import { TiposModule } from './modules/catalogs/tipos/tipos.module';
+import { ProveedoresModule } from './modules/catalogs/proveedores/proveedores.module';
 
 
 
@@ -31,11 +38,17 @@ import { QuotationDetailsModule } from './modules/quotations-details/quotation-d
     QuotationDetailsModule,
     // AssignmentsModule,
     AttachmentsModule,
-    //CatalogsModule,
     // PurchaseRequestsModule,
     //FollowupsModule,
     RolesModule,
     DepartmentsModule,
+    CompraDetalleModule,
+    CompraModule,
+    PreciosModule,
+    AreasModule,
+    ProyectosModule,
+    TiposModule,
+    ProveedoresModule
 
   ],
 })

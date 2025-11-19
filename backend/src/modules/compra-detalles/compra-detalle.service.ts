@@ -5,8 +5,7 @@ import {
   NotFoundException 
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { UpdateEstadoDetalleDto } from './dto/update-estado-detalle.dto';
-import { UpdateFechasDetalleDto } from './dto/update-fechas-detalle.dto';
+import { UpdateEstadoDetalleDto, UpdateFechasDetalleDto } from './dto/update-estado-detalle.dto';
 
 type UserJwt = { sub: string; role?: string };
 
