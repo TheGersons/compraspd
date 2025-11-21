@@ -1,10 +1,12 @@
 // src/pages/Quotes/components/KpiCard.tsx
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
+import KpiTableModal from './KpiTableModal';
+import { useKpiData } from '../hooks/useKpiData';
+import { KpiColumn } from '../types/kpi.types';
 
-export type KpiTone =
-  | "default" | "success" | "warn" | "danger" | "brand"
-  | "info" | "purple" | "pink" | "orange" | "teal" | "indigo";
+export type KpiTone = "success" | "warn" | "danger" | "info";
+export type KpiType = "summary" | "table";
 
 const colors: Record<KpiTone, {
   dot: string;
@@ -13,14 +15,6 @@ const colors: Record<KpiTone, {
   hoverBorder: string;
   hoverBg: string;
 }> = {
-  default: {
-    dot: "bg-gray-400 dark:bg-gray-300",
-    bg: "bg-white dark:bg-gray-800/55",
-    border: "border-gray-200 dark:border-gray-700/45",
-    hoverBorder: "hover:border-gray-300 dark:hover:border-gray-500/55",
-    hoverBg: "hover:bg-gray-50 dark:hover:bg-gray-700/38"
-  },
-
   success: {
     dot: "bg-emerald-500 dark:bg-emerald-400",
     bg: "bg-emerald-50/50 dark:bg-emerald-900/28",
@@ -45,87 +39,38 @@ const colors: Record<KpiTone, {
     hoverBg: "hover:bg-rose-100/50 dark:hover:bg-rose-900/38"
   },
 
-  brand: {
-    dot: "bg-blue-500 dark:bg-blue-400",
-    bg: "bg-blue-50/50 dark:bg-blue-900/28",
-    border: "border-blue-200 dark:border-blue-700/45",
-    hoverBorder: "hover:border-blue-300 dark:hover:border-blue-400",
-    hoverBg: "hover:bg-blue-100/50 dark:hover:bg-blue-900/38"
-  },
-
   info: {
     dot: "bg-cyan-500 dark:bg-cyan-400",
     bg: "bg-cyan-50/50 dark:bg-cyan-900/28",
     border: "border-cyan-200 dark:border-cyan-700/45",
     hoverBorder: "hover:border-cyan-300 dark:hover:border-cyan-400",
     hoverBg: "hover:bg-cyan-100/50 dark:hover:bg-cyan-900/38"
-  },
-
-  purple: {
-    dot: "bg-purple-500 dark:bg-purple-400",
-    bg: "bg-purple-50/50 dark:bg-purple-900/28",
-    border: "border-purple-200 dark:border-purple-700/45",
-    hoverBorder: "hover:border-purple-300 dark:hover:border-purple-400",
-    hoverBg: "hover:bg-purple-100/50 dark:hover:bg-purple-900/38"
-  },
-
-  pink: {
-    dot: "bg-pink-500 dark:bg-pink-400",
-    bg: "bg-pink-50/50 dark:bg-pink-900/28",
-    border: "border-pink-200 dark:border-pink-700/45",
-    hoverBorder: "hover:border-pink-300 dark:hover:border-pink-400",
-    hoverBg: "hover:bg-pink-100/50 dark:hover:bg-pink-900/38"
-  },
-
-  orange: {
-    dot: "bg-orange-500 dark:bg-orange-400",
-    bg: "bg-orange-50/50 dark:bg-orange-900/28",
-    border: "border-orange-200 dark:border-orange-700/45",
-    hoverBorder: "hover:border-orange-300 dark:hover:border-orange-400",
-    hoverBg: "hover:bg-orange-100/50 dark:hover:bg-orange-900/38"
-  },
-
-  teal: {
-    dot: "bg-teal-500 dark:bg-teal-400",
-    bg: "bg-teal-50/50 dark:bg-teal-900/28",
-    border: "border-teal-200 dark:border-teal-700/45",
-    hoverBorder: "hover:border-teal-300 dark:hover:border-teal-400",
-    hoverBg: "hover:bg-teal-100/50 dark:hover:bg-teal-900/38"
-  },
-
-  indigo: {
-    dot: "bg-indigo-500 dark:bg-indigo-400",
-    bg: "bg-indigo-50/50 dark:bg-indigo-900/28",
-    border: "border-indigo-200 dark:border-indigo-700/45",
-    hoverBorder: "hover:border-indigo-300 dark:hover:border-indigo-400",
-    hoverBg: "hover:bg-indigo-100/50 dark:hover:bg-indigo-900/38"
   }
 };
 
-
-
 export default function KpiCard({
+  id,
   title,
   value,
   hint,
-  tone = "default",
+  tone = "info",
+  type = "summary",
+  columns,
   icon,
-  onClick,
-  details
+  onClick
 }: {
+  id: string;
   title: string;
   value: string | number;
   hint?: string;
   tone?: KpiTone;
+  type?: KpiType;
+  columns?: KpiColumn[];
   icon?: React.ReactNode;
   onClick?: () => void;
-  details?: {
-    source?: string;
-    lastUpdate?: string;
-    trend?: string;
-  };
 }) {
   const [showModal, setShowModal] = useState(false);
+  const { data, loading } = useKpiData(id);
   const theme = colors[tone];
 
   const handleClick = () => {
@@ -136,18 +81,22 @@ export default function KpiCard({
     }
   };
 
-  const modalContent = showModal && createPortal(
+  const handleCloseModal = () => {
+    setShowModal(false);
+  };
+
+  // Modal para tipo "summary"
+  const summaryModalContent = showModal && type === 'summary' && (
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm"
-      onClick={() => setShowModal(false)}
+      onClick={handleCloseModal}
     >
       <div
         className="relative w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-gray-800 dark:bg-gray-900"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Close button */}
         <button
-          onClick={() => setShowModal(false)}
+          onClick={handleCloseModal}
           className="absolute right-4 top-4 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
         >
           <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -155,7 +104,6 @@ export default function KpiCard({
           </svg>
         </button>
 
-        {/* Modal Content */}
         <div className="flex items-start gap-3">
           <span className={`inline-block size-3 rounded-full ${theme.dot} mt-1`} />
           <div className="flex-1">
@@ -178,37 +126,35 @@ export default function KpiCard({
             </p>
           </div>
 
-          {details?.source && (
-            <div>
-              <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                Fuente de datos
-              </p>
-              <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">
-                {details.source}
-              </p>
-            </div>
-          )}
+          {data && 'source' in data && (
+            <>
+              <div>
+                <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                  Fuente de datos
+                </p>
+                <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">
+                  {data.source}
+                </p>
+              </div>
 
-          {details?.lastUpdate && (
-            <div>
-              <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                Última actualización
-              </p>
-              <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">
-                {details.lastUpdate}
-              </p>
-            </div>
-          )}
+              <div>
+                <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                  Última actualización
+                </p>
+                <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">
+                  {data.lastUpdate}
+                </p>
+              </div>
 
-          {details?.trend && (
-            <div>
-              <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                Tendencia
-              </p>
-              <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">
-                {details.trend}
-              </p>
-            </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                  Tendencia
+                </p>
+                <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">
+                  {data.trend}
+                </p>
+              </div>
+            </>
           )}
 
           {hint && (
@@ -225,20 +171,14 @@ export default function KpiCard({
 
         <div className="mt-6 flex justify-end gap-2">
           <button
-            onClick={() => setShowModal(false)}
+            onClick={handleCloseModal}
             className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
           >
             Cerrar
           </button>
-          <button
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600"
-          >
-            Ver más detalles
-          </button>
         </div>
       </div>
-    </div>,
-    document.body
+    </div>
   );
 
   return (
@@ -288,7 +228,7 @@ export default function KpiCard({
 
         {/* Value */}
         <p className="mt-2.5 text-2xl font-bold text-gray-900 dark:text-white/95 tracking-tight">
-          {value}
+          {loading ? '...' : value}
         </p>
 
         {/* Hint */}
@@ -316,7 +256,23 @@ export default function KpiCard({
         </div>
       </div>
 
-      {modalContent}
+      {/* Modal Summary */}
+      {typeof document !== 'undefined' && summaryModalContent && createPortal(
+        summaryModalContent,
+        document.body
+      )}
+
+      {/* Modal Table */}
+      {type === 'table' && columns && data && 'rows' in data && (
+        <KpiTableModal
+          isOpen={showModal}
+          onClose={handleCloseModal}
+          title={title}
+          columns={columns}
+          data={data.rows}
+          tone={tone}
+        />
+      )}
     </>
   );
 }

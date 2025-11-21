@@ -4,12 +4,11 @@ import { api } from '../../../lib/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-type Role = { name: string };
 type User = {
   id: string;
-  fullName: string;
+  nombre: string;
   email: string;
-  role?: Role;
+  role: string;
   departmentId?: string;
   isActive?: boolean;
 };

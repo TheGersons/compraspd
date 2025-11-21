@@ -21,11 +21,15 @@ export default function Filters({
     value,
     onChange,
     proyectos = [],
+    tipos = [], // ✅ Añadido
+    areas = [], // ✅ Añadido
     usuarios = [],
 }: {
     value: QuoteFilters;
     onChange: (f: QuoteFilters) => void;
     proyectos?: { id: string; nombre: string }[];
+    tipos?: { id: string; nombre: string }[]; // ✅ Nueva prop
+    areas?: { nombreArea: string }[]; // ✅ Nueva prop
     usuarios?: { id: string; nombre: string }[];
 }) {
     const [local, setLocal] = useState<QuoteFilters>(value);
@@ -67,7 +71,7 @@ export default function Filters({
         );
         if (local.origen && local.origen !== "todos") arr.push(`Origen: ${local.origen}`);
         if (local.preset === "custom" && local.range?.start) arr.push("Rango: personalizado");
-        if (local.q) arr.push(`Busq: “${local.q}”`);
+        if (local.q) arr.push(`Busq: "${local.q}"`);
         return arr;
     }, [local]);
 
@@ -100,7 +104,8 @@ export default function Filters({
                             value={local.q || ""}
                             onChange={(e) => set({ q: e.target.value })}
                         />
-                        <IconSearch className="size-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" /></div>
+                        <IconSearch className="size-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    </div>
                 </div>
                 <select
                     className="h-11 rounded-lg border px-3 text-sm dark:bg-gray-900 dark:text-white/90 dark:border-gray-700"
@@ -114,17 +119,19 @@ export default function Filters({
                     <option value="cerradas">Cerradas</option>
                     <option value="vencidas">Vencidas</option>
                 </select>
+                
+                {/* ✅ Select dinámico de Tipos */}
                 <select
                     className="h-11 rounded-lg border px-3 text-sm dark:bg-gray-900 dark:text-white/90 dark:border-gray-700"
                     value={local.tipoSolicitud || "todas"}
                     onChange={(e) => set({ tipoSolicitud: e.target.value as QuoteFilters["tipoSolicitud"] })}
                 >
                     <option value="todas">Tipo: todas</option>
-                    <option value="licitaciones">Licitaciones</option>
-                    <option value="proyectos">Proyectos</option>
-                    <option value="suministros">Suministros</option>
-                    <option value="inventarios">Inventarios</option>
+                    {tipos.map(tipo => (
+                        <option key={tipo.id} value={tipo.id}>{tipo.nombre}</option>
+                    ))}
                 </select>
+                
                 <select
                     className="h-11 rounded-lg border px-3 text-sm dark:bg-gray-900 dark:text-white/90 dark:border-gray-700"
                     value={local.tipoCompra || "todas"}
@@ -136,7 +143,7 @@ export default function Filters({
                 </select>
             </div>
 
-            {/* Línea 3: proyecto, asignado, origen, ordenar, rango */}
+            {/* Línea 3: proyecto, asignado, área, ordenar, rango */}
             <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                 <select
                     className="h-11 rounded-lg border px-3 text-sm dark:bg-gray-900 dark:text-white/90 dark:border-gray-700"
@@ -157,15 +164,16 @@ export default function Filters({
                     {usuarios.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
                 </select>
 
+                {/* ✅ Select dinámico de Áreas */}
                 <select
                     className="h-11 rounded-lg border px-3 text-sm dark:bg-gray-900 dark:text-white/90 dark:border-gray-700"
                     value={local.origen || "todos"}
                     onChange={(e) => set({ origen: e.target.value as QuoteFilters["origen"] })}
                 >
-                    <option value="todos">Origen: todos</option>
-                    <option value="crm">CRM</option>
-                    <option value="web">Web</option>
-                    <option value="manual">Manual</option>
+                    <option value="todos">Área: todas</option>
+                    {areas.map((area, idx) => (
+                        <option key={idx} value={area.nombreArea}>{area.nombreArea}</option>
+                    ))}
                 </select>
 
                 <select
@@ -189,7 +197,6 @@ export default function Filters({
                         action={() => set({ 
                             preset: "custom",
                         })}
-
                     />
                 </div>
             </div>

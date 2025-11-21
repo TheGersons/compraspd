@@ -74,7 +74,7 @@ export class QuotationsService {
         fechaEstimada: new Date(quotationData.fechaEstimada),
         comentarios: quotationData.comentarios,
         estado: 'ENVIADA', // Estado inicial
-        solicitanteId: user.sub,
+        solicitanteId: quotationData.solicitanteId,
         tipoId: dto.tipoId,
         proyectoId: dto.proyectoId || null,
         

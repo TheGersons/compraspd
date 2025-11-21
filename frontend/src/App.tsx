@@ -40,99 +40,109 @@ import Images from "./pages/UiElements/Images";
 import Videos from "./pages/UiElements/Videos";
 import LineChart from "./pages/Charts/LineChart";
 import BarChart from "./pages/Charts/BarChart";
+import Dashboard from "./pages/Home/Dashboard";
+import { NotificationProvider } from "./pages/Notifications/context/NotificationContext";
+import NotificationContainer from "./pages/Notifications/components/notifications/NotificationContainer";
+import NotificationPanel from "./pages/Notifications/components/notifications/NotificationPanel";
 
 const SHOPPING_MANAGER_ROLES = ["ADMIN"];
 const QUOTES_SUPERVISOR_ROLES = ["SUPERVISOR", "ADMIN"];
 
 export default function App() {
   return (
-    <>
-      <ScrollToTop />
-      <Routes>
-        {/* públicas solo */}
-        <Route path="/signin" element={<PublicOnlyRoute><SignIn /></PublicOnlyRoute>} />
-        <Route path="/signup" element={<PublicOnlyRoute><SignUp /></PublicOnlyRoute>} />
-        
-
-            {/* SHOPPING */}
-            <Route path="/shopping" element={<ShoppingLayout />}>
-              <Route index element={<Shopping />} />
-              <Route path="new" element={<ShoppingNew />} />
-              <Route path="follow-ups" element={<ShoppingFollowUps />} />
-              <Route path="history" element={<ShoppingHistory />} />
-              <Route
-                path="assignment"
-                element={
-                  <ProtectedRoute roles={SHOPPING_MANAGER_ROLES}>
-                    <ShoppingAssignment />
-                  </ProtectedRoute>
-                }
-              />
-            </Route>
+    <NotificationProvider>
+      <>
+        <ScrollToTop />
+        <Routes>
+          {/* públicas solo */}
+          <Route path="/signin" element={<PublicOnlyRoute><SignIn /></PublicOnlyRoute>} />
+          <Route path="/signup" element={<PublicOnlyRoute><SignUp /></PublicOnlyRoute>} />
 
 
-        {/* protegidas */}
-        <Route element={<ProtectedRoute />}>
-          <Route path="/" element={<Navigate to="/quotes" replace />} />
-
-          <Route element={<AppLayout />}>
-            <Route path="/home" element={<Home />} />
-
-            {/* QUOTES */}
-            <Route path="/quotes" element={<QuotesLayout />}>
-              <Route index element={<Quotes />} />
-              <Route path="new" element={<QuotesNew />} />
-              <Route path="my-quotes" element={<MyQuotes />} />
-              <Route path="follow-ups" element={<QuotesFollowUps />} />
-              <Route path="history" element={<QuotesHistory />} />
-              <Route
-                path="assignment"
-                element={
-                  <ProtectedRoute roles={QUOTES_SUPERVISOR_ROLES}>
-                    <QuotesAssignment />
-                  </ProtectedRoute>
-                }
-              />
-            </Route>
-
-            {/* SHOPPING */}
-            <Route path="/shopping" element={<ShoppingLayout />}>
-              <Route index element={<Shopping />} />
-              <Route path="new" element={<ShoppingNew />} />
-              <Route path="follow-ups" element={<ShoppingFollowUps />} />
-              <Route path="history" element={<ShoppingHistory />} />
-              <Route
-                path="assignment"
-                element={
-                  <ProtectedRoute roles={SHOPPING_MANAGER_ROLES}>
-                    <ShoppingAssignment />
-                  </ProtectedRoute>
-                }
-              />
-            </Route>
-
-            {/* genéricas */}
-            <Route path="/Profiles" element={<Profiles />} />
-            <Route path="/settings" element={<UserProfiles />} />
-            <Route path="/roles" element={<UserProfiles />} />
-            <Route path="/calendar" element={<Calendar />} />
-            <Route path="/blank" element={<Blank />} />
-            <Route path="/form-elements" element={<FormElements />} />
-            <Route path="/basic-tables" element={<BasicTables />} />
-            <Route path="/alerts" element={<Alerts />} />
-            <Route path="/avatars" element={<Avatars />} />
-            <Route path="/badge" element={<Badges />} />
-            <Route path="/buttons" element={<Buttons />} />
-            <Route path="/images" element={<Images />} />
-            <Route path="/videos" element={<Videos />} />
-            <Route path="/line-chart" element={<LineChart />} />
-            <Route path="/bar-chart" element={<BarChart />} />
+          {/* SHOPPING */}
+          <Route path="/shopping" element={<ShoppingLayout />}>
+            <Route index element={<Shopping />} />
+            <Route path="new" element={<ShoppingNew />} />
+            <Route path="follow-ups" element={<ShoppingFollowUps />} />
+            <Route path="history" element={<ShoppingHistory />} />
+            <Route
+              path="assignment"
+              element={
+                <ProtectedRoute roles={SHOPPING_MANAGER_ROLES}>
+                  <ShoppingAssignment />
+                </ProtectedRoute>
+              }
+            />
           </Route>
-        </Route>
 
-        {/* 404 */}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </>
+
+          {/* protegidas */}
+          <Route element={<ProtectedRoute />}>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+
+            <Route element={<AppLayout />}>
+              <Route path="/home" element={<Home />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+
+              {/* QUOTES */}
+              <Route path="/quotes" element={<QuotesLayout />}>
+                <Route index element={<Quotes />} />
+                <Route path="new" element={<QuotesNew />} />
+                <Route path="my-quotes" element={<MyQuotes />} />
+                <Route path="follow-ups" element={<QuotesFollowUps />} />
+                <Route path="history" element={<QuotesHistory />} />
+                <Route
+                  path="assignment"
+                  element={
+                    <ProtectedRoute roles={QUOTES_SUPERVISOR_ROLES}>
+                      <QuotesAssignment />
+                    </ProtectedRoute>
+                  }
+                />
+              </Route>
+
+              {/* SHOPPING */}
+              <Route path="/shopping" element={<ShoppingLayout />}>
+                <Route index element={<Shopping />} />
+                <Route path="new" element={<ShoppingNew />} />
+                <Route path="follow-ups" element={<ShoppingFollowUps />} />
+                <Route path="history" element={<ShoppingHistory />} />
+                <Route
+                  path="assignment"
+                  element={
+                    <ProtectedRoute roles={SHOPPING_MANAGER_ROLES}>
+                      <ShoppingAssignment />
+                    </ProtectedRoute>
+                  }
+                />
+              </Route>
+
+              {/* genéricas */}
+              <Route path="/Profiles" element={<Profiles />} />
+              <Route path="/settings" element={<UserProfiles />} />
+              <Route path="/roles" element={<UserProfiles />} />
+              <Route path="/calendar" element={<Calendar />} />
+              <Route path="/blank" element={<Blank />} />
+              <Route path="/form-elements" element={<FormElements />} />
+              <Route path="/basic-tables" element={<BasicTables />} />
+              <Route path="/alerts" element={<Alerts />} />
+              <Route path="/avatars" element={<Avatars />} />
+              <Route path="/badge" element={<Badges />} />
+              <Route path="/buttons" element={<Buttons />} />
+              <Route path="/images" element={<Images />} />
+              <Route path="/videos" element={<Videos />} />
+              <Route path="/line-chart" element={<LineChart />} />
+              <Route path="/bar-chart" element={<BarChart />} />
+            </Route>
+          </Route>
+
+          {/* 404 */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </>
+      <NotificationContainer />
+      <NotificationPanel />
+    </NotificationProvider>
   );
+
 }

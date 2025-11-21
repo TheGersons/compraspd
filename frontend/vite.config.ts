@@ -8,4 +8,14 @@ export default defineConfig({
   resolve: {
     dedupe: ['react', 'react-dom'],
   },
+  server: {
+    host: '0.0.0.0',
+    port: 5173,
+    proxy: {
+      '/api': {
+        target: 'http://192.168.3.37:3001',  // o 'http://backend:3001' si usas nombre de contenedor
+        changeOrigin: true,
+      },
+    },
+  },
 });

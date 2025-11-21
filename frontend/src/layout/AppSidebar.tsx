@@ -8,6 +8,7 @@ import {
   BoxCubeIcon,
   //CalenderIcon,
   ChevronDownIcon,
+ DocsIcon,
  //GridIcon,
   HorizontaLDots,
   //ListIcon,
@@ -27,8 +28,14 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   {
-    //icono generico para cotizaciones si ss
     icon: <PieChartIcon />,
+    name: "Inicio",
+    path: "/dashboard",
+
+  },
+  {
+    //icono generico para cotizaciones si 
+    icon: <DocsIcon />,
     name: "Cotizaciones",
     subItems: [
       { name: "Resumen", path: "/quotes", pro: false },

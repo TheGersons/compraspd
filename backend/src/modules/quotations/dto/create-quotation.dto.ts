@@ -52,6 +52,10 @@ export class CreateQuotationDto {
   @IsUUID()
   tipoId: string; // requestCategory → tipoId (UUID de tabla Tipo)
 
+  @IsNotEmpty()
+  @IsUUID()
+  solicitanteId: string; // requesterId → solicitanteId (UUID de usuario)
+
   @IsOptional()
   @IsUUID()
   proyectoId?: string; // projectId → proyectoId

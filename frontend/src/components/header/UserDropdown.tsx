@@ -12,8 +12,8 @@ export default function UserDropdown() {
 
   //obtener los datos del usuario desde el contexto de autenticación
   const email = user?.email;
-  const fullName = user?.fullName;
-  const Role = user?.role?.name;
+  const fullName = user?.nombre;
+  const Role = user?.role;
 
 
   function toggleDropdown() {
@@ -37,7 +37,7 @@ export default function UserDropdown() {
           <img src="/images/user/owner.jpg" alt="User" />
         </span>
 
-        <span className="block mr-1 font-medium text-theme-sm">{user?.fullName?.substring(0, spaceBlank(user?.fullName))}</span>
+        <span className="block mr-1 font-medium text-theme-sm">{user?.nombre?.substring(0, spaceBlank(user?.nombre))}</span>
         <svg
           className={`stroke-gray-500 dark:stroke-gray-400 transition-transform duration-200 ${
             isOpen ? "rotate-180" : ""

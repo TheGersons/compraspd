@@ -46,6 +46,9 @@ export class AuthService {
       }
     });
 
+   
+
+
     // Validar existencia
     if (!usuario) {
       this.logger.warn(`Usuario no encontrado: ${email}`);

@@ -3,12 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { usersApi } from "../pages/users/service/userApi";       // Ajusta a tu client real
 import { getToken, removeToken, setToken } from "../lib/api";
 
-type Role = { name: string };
 type User = {
   id: string;
-  fullName: string;
+  nombre: string;
   email: string;
-  role?: Role;
+  role: string;
   departmentId?: string;
   isActive?: boolean;
 };

@@ -1,790 +1,723 @@
-// pages/Quotes/New.tsx
-import { useMemo, useState, useEffect, useCallback } from "react";
-import ScrollArea from "../../components/common/ScrollArea";
-import DatePicker from "../../components/form/date-picker";
-import Button from "../../components/ui/button/Button";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import PageMeta from "../../components/common/PageMeta";
-import { api } from "../../lib/api";
-import { useAuth } from "../../context/AuthContext";
-
-import {
-  CreatePurchaseRequestDto,
-  DeliveryType,
-  ProcurementType,
-  RequestCategory
-} from "../../types/backend-enums";
-import { mapProcurement, toNumberString } from "../../utils/mappers";
-import { useUsers } from "../users/hooks/useUsers";
-import UserComboBox from "./components/ComboBoxUsers";
+import Button from "../../components/ui/button/Button";
+import { useNotifications } from "../Notifications/context/NotificationContext";
+import { getToken } from "../../lib/api";
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-type Scope = "nacional" | "internacional";
-type RequestType = "licitaciones" | "proyectos" | "suministros" | "inventarios";
-type DeliveryPlace = "almacen" | "proyecto";
-type Unit = "und" | "caja" | "kg" | "M" | "Lb";
+type TipoCompra = "NACIONAL" | "INTERNACIONAL";
+type LugarEntrega = "ALMACEN" | "OFICINA" | "PROYECTO" | "OTRO";
+type TipoUnidad = "UNIDAD" | "CAJA" | "PAQUETE" | "METRO" | "KILOGRAMO" | "LITRO" | "OTRO";
 
-type ProductLine = {
-  id: string;
+interface ItemCotizacion {
   sku: string;
-  description: string;
-  quantity: number | "";
-  unit: Unit;
-  extraSpecs: string;
-};
+  descripcionProducto: string;
+  cantidad: number;
+  tipoUnidad: TipoUnidad;
+  notas?: string;
+}
 
-type FormState = {
-  scope: Scope;
-  requestType: RequestType;
-  reference: string;
-  requesterId?: string;
-  deadline: string;
-  deliveryPlace: DeliveryPlace;
-  projectId?: string;
-  warehouseId?: string;
-  comments: string;
-  lines: ProductLine[];
-};
-
-
-type Project = {
+interface Tipo {
   id: string;
-  name: string;
-};
+  nombre: string;
+  areaId: string;
+  area: {
+    id: string;
+    nombreArea: string;
+  };
+}
 
-type Warehouse = {
+interface Usuario {
   id: string;
-  name: string;
-  type: string;
-};
+  email: string;
+  nombre: string;
+  activo: boolean;
+  departamento: {
+    nombre: string;
+  };
+  rol: {
+    nombre: string;
+    descripcion: string;
+  };
+}
+
+interface Proyecto {
+  id: string;
+  nombre: string;
+  descripcion: string;
+  estado: boolean;
+}
 
 // ============================================================================
-// CONSTANTS
+// API SERVICE
 // ============================================================================
 
-const UNITS: Unit[] = ["und", "caja", "kg", "M", "Lb"];
-const STANDARD_REFS = [
-  "REF-UPS-1KVA",
-  "REF-CABLE-CAT6",
-  "REF-SERV-MANTTO",
-  "REF-GEN-DIESEL-30KVA",
-  "REF-SW-24P-POE"
-];
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api/v1";
+const token = getToken();
+const api = {
+   
+  async getTipos(): Promise<Tipo[]> {
 
-const PROJECTS: Project[] = [
-  { id: "PRJ-001", name: "Planta Solar Choluteca" },
-  { id: "PRJ-002", name: "Hospital SPS" },
-  { id: "PRJ-003", name: "Data Center TGU" },
-];
+    const response = await fetch(`${API_BASE_URL}/api/v1/tipos`, {
+      credentials: "include",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (!response.ok) throw new Error("Error al cargar tipos");
+    return response.json();
+  },
 
-const MIN_DAYS_AHEAD = 5;
-const MIN_COMMENT_LENGTH = 10;
-const SKU_REGEX = /^[A-Za-z0-9._-]{3,32}$/;
+  async getUsuarios(): Promise<Usuario[]> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/users/all`, {
+      credentials: "include",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (!response.ok) throw new Error("Error al cargar usuarios");
+    return response.json();
+  },
 
-// ============================================================================
-// UTILITIES
-// ============================================================================
+  async getProyectos(): Promise<Proyecto[]> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/proyectos`, {
+      credentials: "include",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (!response.ok) throw new Error("Error al cargar proyectos");
+    return response.json();
+  },
 
-const formatDateYYYYMMDD = (d: Date): string => {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-};
-
-const addDays = (base: Date, days: number): Date => {
-  const d = new Date(base);
-  d.setDate(d.getDate() + days);
-  return d;
-};
-
-const generateId = (): string =>
-  Math.random().toString(36).substring(2, 9);
-
-const extractErrorMessage = (err: unknown): string => {
-  if (!(err instanceof Error) || !err.message) {
-    return "Error desconocido";
-  }
-
-  try {
-    const parsed = JSON.parse(err.message);
-
-    if (typeof parsed === "string") {
-      return parsed;
+  async crearCotizacion(data: any) {
+    const response = await fetch(`${API_BASE_URL}/api/v1/quotations`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      credentials: "include",
+      body: JSON.stringify(data),
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || "Error al crear cotización");
     }
-
-    if (parsed?.message) {
-      return Array.isArray(parsed.message)
-        ? parsed.message.join(", ")
-        : parsed.message;
-    }
-
-    return JSON.stringify(parsed);
-  } catch {
-    return err.message;
-  }
+    
+    return response.json();
+  },
 };
-
-// ============================================================================
-// VALIDATION
-// ============================================================================
-
-type ValidationErrors = Record<string, string>;
-
-const validateForm = (form: FormState, minDeadline: string): ValidationErrors => {
-  const errors: ValidationErrors = {};
-
-  // Reference validation
-  if (!form.reference) {
-    errors.reference = "Selecciona una referencia";
-  } else if (!STANDARD_REFS.includes(form.reference)) {
-    errors.reference = "Referencia no estandarizada";
-  }
-
-   //Solicitante
-  if (!form.requesterId) {
-    errors.requesterId = "Selecciona un solicitante";
-  }
-
-  // Deadline validation
-  if (!form.deadline) {
-    errors.deadline = "Requerido";
-  } else if (form.deadline < minDeadline) {
-    errors.deadline = `Mínimo ${minDeadline}`;
-  }
-
-  // Delivery place validation
-  if (form.deliveryPlace === "proyecto" && !form.projectId) {
-    errors.projectId = "Selecciona un proyecto";
-  }
-  if (form.deliveryPlace === "almacen" && !form.warehouseId) {
-    errors.warehouseId = "Selecciona un almacén";
-  }
-
-  // Comments validation
-  if (!form.comments || form.comments.trim().length < MIN_COMMENT_LENGTH) {
-    errors.comments = `Mínimo ${MIN_COMMENT_LENGTH} caracteres`;
-  }
-
-  // Product lines validation
-  form.lines.forEach((ln, i) => {
-    if (!ln.sku || !SKU_REGEX.test(ln.sku)) {
-      errors[`lines.${i}.sku`] = "SKU inválido (3-32, A-Z 0-9 . _ -)";
-    }
-
-    if (!ln.description || ln.description.trim().length < 3) {
-      errors[`lines.${i}.description`] = "Descripción muy corta";
-    }
-
-    const qty = Number(ln.quantity);
-    if (ln.quantity === "" || Number.isNaN(qty) || qty <= 0 || !Number.isFinite(qty)) {
-      errors[`lines.${i}.quantity`] = "Cantidad > 0";
-    } else if (!Number.isInteger(qty)) {
-      errors[`lines.${i}.quantity`] = "Debe ser entero";
-    }
-
-    if (!UNITS.includes(ln.unit)) {
-      errors[`lines.${i}.unit`] = "Unidad inválida";
-    }
-
-    if (ln.extraSpecs.trim().length > 0 && ln.extraSpecs.trim().length < 2) {
-      errors[`lines.${i}.extraSpecs`] = "Especificaciones muy cortas";
-    }
-  });
-
-  return errors;
-};
-
-// ============================================================================
-// CUSTOM HOOKS
-// ============================================================================
-
-
-const useWarehouses = () => {
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    const fetchWarehouses = async () => {
-      setIsLoading(true);
-
-      try {
-        const response = await api<Warehouse[]>("/api/v1/locations/warehouses");
-        setWarehouses(response || []);
-        console.log("Warehouses loaded:", response?.length);
-      } catch (err) {
-        console.error("Error loading warehouses:", err);
-        setWarehouses([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchWarehouses();
-  }, []);
-
-  return { warehouses, isLoading };
-};
-
-// ============================================================================
-// SUB-COMPONENTS
-// ============================================================================
-
-
-const ReferenceSelector = ({
-  selectedRef,
-  query,
-  onQueryChange,
-  onSelectRef,
-  onClearRef
-}: {
-  selectedRef: string;
-  query: string;
-  onQueryChange: (query: string) => void;
-  onSelectRef: (ref: string) => void;
-  onClearRef: () => void;
-}) => {
-  const filteredRefs = useMemo(
-    () => STANDARD_REFS.filter(r => r.toLowerCase().includes(query.toLowerCase())),
-    [query]
-  );
-
-  if (selectedRef) {
-    return (
-      <div className="inline-flex items-center gap-2 rounded-full bg-brand-50 px-3 py-1 text-xs text-brand-700 dark:bg-white/10 dark:text-brand-300">
-        {selectedRef}
-        <button
-          type="button"
-          onClick={onClearRef}
-          className="opacity-70 hover:opacity-100"
-        >
-          ×
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex gap-2">
-      <input
-        className="flex-1 rounded-lg border border-gray-300 bg-white p-2 text-sm placeholder-gray-400 dark:border-white/10 dark:bg-[#101828] dark:text-gray-100"
-        placeholder="Buscar…"
-        value={query}
-        onChange={e => onQueryChange(e.target.value)}
-      />
-      <select
-        className="min-w-60 rounded-lg border border-gray-300 bg-white p-2 text-sm dark:border-white/10 dark:bg-[#101828] dark:text-gray-100"
-        onChange={e => {
-          onSelectRef(e.target.value);
-          e.currentTarget.selectedIndex = 0;
-        }}
-      >
-        <option value="">Selecciona…</option>
-        {filteredRefs.map(r => (
-          <option key={r} value={r}>{r}</option>
-        ))}
-      </select>
-    </div>
-  );
-};
-
-const ProductLineRow = ({
-  line,
-  index,
-  errors,
-  onChange,
-  onRemove
-}: {
-  line: ProductLine;
-  index: number;
-  errors: ValidationErrors;
-  onChange: (index: number, patch: Partial<ProductLine>) => void;
-  onRemove: (index: number) => void;
-}) => (
-  <tr className="text-sm text-gray-700 dark:text-gray-200">
-    <td className="px-3 py-2 align-top">
-      <input
-        value={line.sku}
-        onChange={e => onChange(index, { sku: e.target.value })}
-        placeholder="ABC-123"
-        className="w-40 rounded-lg border border-gray-300 bg-white p-2 text-sm dark:border-white/10 dark:bg-[#101828] dark:text-gray-100"
-      />
-      {errors[`lines.${index}.sku`] && (
-        <p className="mt-1 text-xs text-rose-400">{errors[`lines.${index}.sku`]}</p>
-      )}
-    </td>
-
-    <td className="px-3 py-2 align-top">
-      <input
-        value={line.description}
-        onChange={e => onChange(index, { description: e.target.value })}
-        placeholder="Descripción del producto"
-        className="min-w-64 rounded-lg border border-gray-300 bg-white p-2 text-sm dark:border-white/10 dark:bg-[#101828] dark:text-gray-100"
-      />
-      {errors[`lines.${index}.description`] && (
-        <p className="mt-1 text-xs text-rose-400">{errors[`lines.${index}.description`]}</p>
-      )}
-    </td>
-
-    <td className="px-3 py-2 align-top">
-      <input
-        inputMode="numeric"
-        pattern="[0-9]*"
-        value={line.quantity}
-        onChange={e => {
-          const v = e.target.value;
-          onChange(index, { quantity: v === "" ? "" : Number(v.replace(/\D/g, "")) });
-        }}
-        className="w-24 rounded-lg border border-gray-300 bg-white p-2 text-sm text-right dark:border-white/10 dark:bg-[#101828] dark:text-gray-100"
-      />
-      {errors[`lines.${index}.quantity`] && (
-        <p className="mt-1 text-xs text-rose-400">{errors[`lines.${index}.quantity`]}</p>
-      )}
-    </td>
-
-    <td className="px-3 py-2 align-top">
-      <select
-        value={line.unit}
-        onChange={e => onChange(index, { unit: e.target.value as Unit })}
-        className="w-28 rounded-lg border border-gray-300 bg-white p-2 text-sm dark:border-white/10 dark:bg-[#101828] dark:text-gray-100"
-      >
-        {UNITS.map(u => (
-          <option key={u} value={u}>{u.toUpperCase()}</option>
-        ))}
-      </select>
-    </td>
-
-    <td className="px-3 py-2 align-top">
-      <input
-        value={line.extraSpecs}
-        onChange={e => onChange(index, { extraSpecs: e.target.value })}
-        placeholder="Especificaciones adicionales"
-        className="min-w-64 rounded-lg border border-gray-300 bg-white p-2 text-sm dark:border-white/10 dark:bg-[#101828] dark:text-gray-100"
-      />
-      {errors[`lines.${index}.extraSpecs`] && (
-        <p className="mt-1 text-xs text-rose-400">{errors[`lines.${index}.extraSpecs`]}</p>
-      )}
-    </td>
-
-    <td className="px-3 py-2 align-top">
-      <Button size="xs" variant="danger" onClick={() => onRemove(index)}>
-        Quitar
-      </Button>
-    </td>
-  </tr>
-);
 
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
-export default function QuotesNew() {
-  const auth = useAuth();
-  const { warehouses } = useWarehouses();
+export default function New() {
+  const navigate = useNavigate();
+  const { addNotification } = useNotifications();
 
-  // Date constraints
-  const minDateObj = useMemo(() => addDays(new Date(), MIN_DAYS_AHEAD), []);
-  const minDeadline = useMemo(() => formatDateYYYYMMDD(minDateObj), [minDateObj]);
+  // Estado del formulario
+  const [nombreCotizacion, setNombreCotizacion] = useState("");
+  const [tipoCompra, setTipoCompra] = useState<TipoCompra>("NACIONAL");
+  const [lugarEntrega, setLugarEntrega] = useState<LugarEntrega>("ALMACEN");
+  const [fechaLimite, setFechaLimite] = useState("");
+  const [fechaEstimada, setFechaEstimada] = useState("");
+  const [comentarios, setComentarios] = useState("");
+  const [tipoId, setTipoId] = useState("");
+  const [solicitanteId, setSolicitanteId] = useState("");
+  const [searchSolicitante, setSearchSolicitante] = useState("");
+  const [proyectoId, setProyectoId] = useState("");
+  const [items, setItems] = useState<ItemCotizacion[]>([
+    { sku: "", descripcionProducto: "", cantidad: 1, tipoUnidad: "UNIDAD", notas: "" },
+  ]);
 
-  // Search queries
-  const [refQuery, setRefQuery] = useState("");
+  // Catálogos
+  const [tipos, setTipos] = useState<Tipo[]>([]);
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [proyectos, setProyectos] = useState<Proyecto[]>([]);
 
-  const { data: users = [], isLoading: isLoadingUsers } = useUsers();
-  const UserId = auth.user?.id;
-  const [userQuery,] = useState("");
+  // Estados de carga y errores
+  const [loading, setLoading] = useState(false);
+  const [loadingCatalogos, setLoadingCatalogos] = useState(true);
 
-  // Filtrar usuarios activos y por búsqueda
-  const filteredUsers = useMemo(() => {
-    const active = users.filter(u => u.isActive);
-    if (!userQuery) return active;
-    const q = userQuery.toLowerCase();
-    return active.filter(u => u.fullName.toLowerCase().includes(q));
-  }, [users, userQuery]);
-
-  const requester = users.find(user => user.id === UserId) || null;
-
-
-  // Form state
-  const [form, setForm] = useState<FormState>({
-    scope: "nacional",
-    requestType: "suministros",
-    reference: "",
-    requesterId: UserId,
-    deadline: "",
-    deliveryPlace: "almacen",
-    projectId: undefined,
-    warehouseId: warehouses[0]?.id,
-    comments: "",
-    lines: [{
-      id: generateId(),
-      sku: "",
-      description: "",
-      quantity: "",
-      unit: "und",
-      extraSpecs: ""
-    }],
-  });
-
-  const [errors, setErrors] = useState<ValidationErrors>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  
-  // Update warehouse when available
+  // Cargar catálogos al montar
   useEffect(() => {
-    if (warehouses.length > 0 && !form.warehouseId) {
-      setForm(prev => ({ ...prev, warehouseId: warehouses[0].id }));
-    }
-  }, [warehouses, form.warehouseId]);
-
-  // Form field setters
-  const setField = useCallback(<K extends keyof FormState>(
-    key: K,
-    value: FormState[K]
-  ) => {
-    setForm(prev => ({ ...prev, [key]: value }));
+    cargarCatalogos();
   }, []);
 
-  const updateLine = useCallback((idx: number, patch: Partial<ProductLine>) => {
-    setForm(prev => ({
-      ...prev,
-      lines: prev.lines.map((line, i) =>
-        i === idx ? { ...line, ...patch } : line
-      )
-    }));
-  }, []);
-
-  const addLine = useCallback(() => {
-    setForm(prev => ({
-      ...prev,
-      lines: [
-        ...prev.lines,
-        {
-          id: generateId(),
-          sku: "",
-          description: "",
-          quantity: "",
-          unit: "und",
-          extraSpecs: ""
-        }
-      ]
-    }));
-  }, []);
-
-
-  const removeLine = useCallback((idx: number) => {
-    setForm(prev => ({
-      ...prev,
-      lines: prev.lines.filter((_, i) => i !== idx)
-    }));
-  }, []);
-
-  const handleDeliveryPlaceChange = useCallback((place: DeliveryPlace) => {
-    setForm(prev => ({
-      ...prev,
-      deliveryPlace: place,
-      projectId: place === "almacen" ? undefined : prev.projectId,
-      warehouseId: place === "proyecto" ? undefined : prev.warehouseId
-    }));
-  }, []);
-
-  const buildPayload = useCallback((formData: FormState): CreatePurchaseRequestDto => {
-    return {
-      requesterId: UserId !== undefined ? UserId : "",
-      departmentId: requester?.departmentId ?? "",
-      procurement: mapProcurement(formData.scope) as ProcurementType,
-      requestCategory: formData.requestType.toUpperCase() as RequestCategory,
-      reference: formData.reference,
-      clientId: formData.requesterId || null,
-      quoteDeadline: `${formData.deadline}T00:00:00.000Z`,
-      dueDate: `${formData.deadline}T00:00:00.000Z`,
-      deliveryType: formData.deliveryPlace.toUpperCase() as DeliveryType,
-      warehouseId: warehouses[0]?.id || null,
-      locationId: warehouses[0]?.id || null,
-      locationName: warehouses[0]?.name || null,
-      projectId: formData.projectId || "",
-      comments: formData.comments.trim() || null,
-      title: `Solicitud - ${formData.requestType.toUpperCase()} - ${formData.reference}`,
-      description: formData.comments.trim() || "Sin descripción",
-      items: formData.lines.map(l => ({
-        sku: l.sku.trim(),
-        description: l.description.trim(),
-        quantity: toNumberString(l.quantity),
-        unit: l.unit.toUpperCase(),
-        extraSpecs: l.extraSpecs || "",
-        requiredCurrency: formData.scope === "nacional" ? "HNL" : "USD",
-        productId: null,
-        itemType: "PRODUCT",
-      })),
-    };
-  }, [auth.user, warehouses]);
-
-  const onSubmit = async (ev: React.FormEvent) => {
-    ev.preventDefault();
-
-    const validationErrors = validateForm(form, minDeadline);
-    setErrors(validationErrors);
-    console.log(Object.keys(validationErrors))
-    console.log(Object.keys(validationErrors).length)
-    console.log(validationErrors)
-    if (Object.keys(validationErrors).length > 0) {
-      return;
-    }
-
-    setIsSubmitting(true);
-
+  const cargarCatalogos = async () => {
     try {
-      const payload = buildPayload(form);
-      console.log("Sending payload:", payload);
+      setLoadingCatalogos(true);
+      const [tiposData, usuariosData, proyectosData] = await Promise.all([
+        api.getTipos(),
+        api.getUsuarios(),
+        api.getProyectos(),
+      ]);
+      setTipos(tiposData);
+      setUsuarios(usuariosData.filter(u => u.activo));
+      setProyectos(proyectosData.filter(p => p.estado));
 
-      const created = await api<{ id: string }>("/api/v1/purchase-requests", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-
-      console.log("Created response:", created);
-      alert(`Solicitud creada correctamente con id: ${created.id}`);
-
-      window.location.href = "/quotes/new";
-    } catch (err) {
-      const errorMessage = extractErrorMessage(err);
-      console.error("API Error:", errorMessage);
-      alert(`Ocurrió un error al enviar la solicitud: ${errorMessage}`);
+      // Obtener usuario actual del localStorage o contexto
+      const currentUserStr = localStorage.getItem('user');
+      if (currentUserStr) {
+        try {
+          const currentUser = JSON.parse(currentUserStr);
+          // Buscar el usuario en la lista cargada
+          const usuarioActual = usuariosData.find(u => u.id === currentUser.id);
+          if (usuarioActual) {
+            setSolicitanteId(usuarioActual.id);
+          }
+        } catch (error) {
+          console.error('Error al parsear usuario:', error);
+        }
+      }
+    } catch (error) {
+      console.error("Error al cargar catálogos:", error);
+      addNotification(
+        "danger",
+        "Error al cargar datos",
+        "No se pudieron cargar los catálogos necesarios. Por favor, recarga la página.",
+        { priority: "critical", source: "Nueva Cotización" }
+      );
     } finally {
-      setIsSubmitting(false);
+      setLoadingCatalogos(false);
     }
   };
 
+  // Manejo de items
+  const agregarItem = () => {
+    setItems([
+      ...items,
+      { sku: "", descripcionProducto: "", cantidad: 1, tipoUnidad: "UNIDAD", notas: "" },
+    ]);
+  };
+
+  const eliminarItem = (index: number) => {
+    if (items.length === 1) {
+      addNotification("warn", "Atención", "Debe haber al menos un item en la cotización.");
+      return;
+    }
+    setItems(items.filter((_, i) => i !== index));
+  };
+
+  const actualizarItem = (index: number, campo: keyof ItemCotizacion, valor: any) => {
+    const nuevosItems = [...items];
+    nuevosItems[index] = { ...nuevosItems[index], [campo]: valor };
+    setItems(nuevosItems);
+  };
+
+  // Validación
+  const validarFormulario = (): string | null => {
+    if (!nombreCotizacion.trim()) return "El nombre de la cotización es obligatorio";
+    if (!tipoId) return "Debe seleccionar un tipo de cotización";
+    if (!solicitanteId) return "Debe seleccionar un solicitante";
+    if (!proyectoId) return "Debe seleccionar un proyecto";
+    if (!fechaLimite) return "La fecha límite es obligatoria";
+    if (!fechaEstimada) return "La fecha estimada es obligatoria";
+
+    // Validar fechas
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const limite = new Date(fechaLimite);
+    const estimada = new Date(fechaEstimada);
+
+    if (limite < hoy) return "La fecha límite no puede ser en el pasado";
+    if (estimada < hoy) return "La fecha estimada no puede ser en el pasado";
+    if (estimada > limite) return "La fecha estimada no puede ser posterior a la fecha límite";
+
+    // Validar items
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (!item.sku.trim()) return `El SKU del item ${i + 1} es obligatorio`;
+      if (!item.descripcionProducto.trim()) return `La descripción del item ${i + 1} es obligatoria`;
+      if (item.cantidad <= 0) return `La cantidad del item ${i + 1} debe ser mayor a 0`;
+    }
+
+    return null;
+  };
+
+  // Submit
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Validar
+    const error = validarFormulario();
+    if (error) {
+      addNotification("warn", "Validación", error, { priority: "medium" });
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Preparar datos
+      const payload = {
+        nombreCotizacion: nombreCotizacion.trim(),
+        tipoCompra,
+        lugarEntrega,
+        fechaLimite: new Date(fechaLimite).toISOString(),
+        fechaEstimada: new Date(fechaEstimada).toISOString(),
+        comentarios: comentarios.trim() || undefined,
+        tipoId,
+        solicitanteId,
+        proyectoId,
+        items: items.map(item => ({
+          sku: item.sku.trim(),
+          descripcionProducto: item.descripcionProducto.trim(),
+          cantidad: item.cantidad,
+          tipoUnidad: item.tipoUnidad,
+          notas: item.notas?.trim() || undefined,
+        })),
+      };
+
+      const resultado = await api.crearCotizacion(payload);
+
+      addNotification(
+        "success",
+        "¡Cotización creada!",
+        `La cotización "${resultado.nombreCotizacion}" ha sido creada exitosamente.`,
+        {
+          priority: "medium",
+          source: "Nueva Cotización",
+          actionUrl: `/quotes/${resultado.id}`,
+        }
+      );
+
+      // Redirigir
+      setTimeout(() => {
+        navigate("/quotes");
+      }, 1500);
+    } catch (error: any) {
+      console.error("Error al crear cotización:", error);
+      addNotification(
+        "danger",
+        "Error al crear cotización",
+        error.message || "Ocurrió un error inesperado. Intenta nuevamente.",
+        { priority: "critical", source: "Nueva Cotización" }
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loadingCatalogos) {
+    return (
+      <>
+        <PageMeta title="Nueva Cotización" description="Crear una nueva cotización" />
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-solid border-blue-600 border-r-transparent"></div>
+            <p className="mt-4 text-sm text-gray-600 dark:text-gray-400">
+              Cargando formulario...
+            </p>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
-      <PageMeta
-        title="Nueva Cotización | Compras Energia PD"
-        description="Crear nueva cotización en Compras Energia PD"
-      />
+      <PageMeta title="Nueva Cotización" description="Crear una nueva cotización" />
 
-      <div className="rounded-xl border border-gray-200 p-6 bg-white dark:border-gray-700 bg-white dark:bg-white/[0.03] my-8 shadow-xl">
-        <h2 className="text-title-sm sm:text-title-md font-semibold text-gray-800 dark:text-white/90">
-          Nueva cotización
-        </h2>
+      <div className="mb-6">
+        <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white">
+          Nueva Cotización
+        </h1>
+        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+          Complete el formulario para crear una nueva solicitud de cotización
+        </p>
+      </div>
 
-        <div className="h-6" />
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Información General */}
+        <div className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
+            Información General
+          </h2>
 
-        <form onSubmit={onSubmit} className="space-y-8">
-          {/* Purchase Type Section */}
-          <section className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Nombre */}
             <div>
-              <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">
-                Tipo de compra
+              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Nombre de la Cotización <span className="text-rose-500">*</span>
               </label>
-              <select
-                className="w-full rounded-lg border border-gray-300 bg-white p-2 text-sm dark:border-white/10 dark:bg-[#101828] dark:text-gray-100"
-                value={form.scope}
-                onChange={e => setField("scope", e.target.value as Scope)}
-              >
-                <option value="nacional">Nacional</option>
-                <option value="internacional">Internacional</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">
-                Tipo de solicitud
-              </label>
-              <select
-                className="w-full rounded-lg border border-gray-300 bg-white p-2 text-sm dark:border-white/10 dark:bg-[#101828] dark:text-gray-100"
-                value={form.requestType}
-                onChange={e => setField("requestType", e.target.value as RequestType)}
-              >
-                <option value="licitaciones">Licitaciones</option>
-                <option value="proyectos">Proyectos</option>
-                <option value="suministros">Suministros</option>
-                <option value="inventarios">Inventarios</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">
-                Solicitante
-              </label>
-              <UserComboBox
-                users={filteredUsers}             // o users si quieres todos
-                value={form.requesterId ?? UserId}
-                onChange={(id) => setField("requesterId", id)}
-                disabled={isLoadingUsers}
+              <input
+                type="text"
+                value={nombreCotizacion}
+                onChange={(e) => setNombreCotizacion(e.target.value)}
+                className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-2.5 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+                placeholder="Ej: Cotización Laptops Octubre"
+                required
               />
-              {errors.requesterId && (
-                <p className="mt-1 text-xs text-rose-400">{errors.requesterId}</p>
-              )}
             </div>
 
-
+            {/* Tipo de Compra */}
             <div>
-              <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">
-                Fecha límite de cotización
-              </label>
-              <DatePicker
-                id="deadline"
-                defaultDate={form.deadline || undefined}
-                minDate={minDateObj}
-                onChange={dates =>
-                  setField("deadline", dates[0] ? formatDateYYYYMMDD(dates[0]) : "")
-                }
-              />
-              {errors.deadline && (
-                <p className="mt-1 text-xs text-rose-400">{errors.deadline}</p>
-              )}
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Mínimo {MIN_DAYS_AHEAD} días a partir de hoy.
-              </p>
-            </div>
-          </section>
-
-          {/* Delivery Section */}
-          <section className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">
-                Lugar de entrega
+              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Tipo de Compra <span className="text-rose-500">*</span>
               </label>
               <select
-                className="w-full rounded-lg border border-gray-300 bg-white p-2 text-sm dark:border-white/10 dark:bg-[#101828] dark:text-gray-100"
-                value={form.deliveryPlace}
-                onChange={e => handleDeliveryPlaceChange(e.target.value as DeliveryPlace)}
+                value={tipoCompra}
+                onChange={(e) => setTipoCompra(e.target.value as TipoCompra)}
+                className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-2.5 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+                required
               >
-                <option value="almacen">Almacén</option>
-                <option value="proyecto">Proyecto</option>
+                <option value="NACIONAL">Nacional</option>
+                <option value="INTERNACIONAL">Internacional</option>
               </select>
             </div>
 
-            {form.deliveryPlace === "proyecto" && (
-              <div>
-                <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">
-                  Proyecto
-                </label>
-                <select
-                  className="w-full rounded-lg border border-gray-300 bg-white p-2 text-sm dark:border-white/10 dark:bg-[#101828] dark:text-gray-100"
-                  value={form.projectId ?? ""}
-                  onChange={e => setField("projectId", e.target.value || undefined)}
-                >
-                  <option value="">Selecciona…</option>
-                  {PROJECTS.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-                {errors.projectId && (
-                  <p className="mt-1 text-xs text-rose-400">{errors.projectId}</p>
+            {/* Tipo */}
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Tipo/Categoría <span className="text-rose-500">*</span>
+              </label>
+              <select
+                value={tipoId}
+                onChange={(e) => setTipoId(e.target.value)}
+                className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-2.5 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+                required
+              >
+                <option value="">Seleccione un tipo</option>
+                {tipos.map((tipo) => (
+                  <option key={tipo.id} value={tipo.id}>
+                    {tipo.nombre} - {tipo.area.nombreArea}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Proyecto */}
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Proyecto <span className="text-rose-500">*</span>
+              </label>
+              <select
+                value={proyectoId}
+                onChange={(e) => setProyectoId(e.target.value)}
+                className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-2.5 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+                required
+              >
+                <option value="">Seleccione un proyecto</option>
+                {proyectos.map((proyecto) => (
+                  <option key={proyecto.id} value={proyecto.id}>
+                    {proyecto.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Solicitante - Combobox con búsqueda */}
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Solicitante <span className="text-rose-500">*</span>
+              </label>
+              <div className="relative">
+                {solicitanteId ? (
+                  // Mostrar usuario seleccionado con botón X
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 rounded-lg border-2 border-gray-300 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                      {usuarios.find(u => u.id === solicitanteId)?.nombre || 'Usuario seleccionado'}
+                      <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                        {usuarios.find(u => u.id === solicitanteId)?.departamento.nombre}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSolicitanteId('');
+                        setSearchSolicitante('');
+                      }}
+                      className="flex h-[42px] w-[42px] items-center justify-center rounded-lg border-2 border-rose-300 bg-rose-50 text-rose-600 transition-colors hover:bg-rose-100 dark:border-rose-700 dark:bg-rose-900/30 dark:text-rose-400 dark:hover:bg-rose-900/50"
+                      title="Limpiar solicitante"
+                    >
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ) : (
+                  // Input de búsqueda + lista filtrada
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={searchSolicitante}
+                      onChange={(e) => setSearchSolicitante(e.target.value)}
+                      placeholder="Buscar solicitante por nombre..."
+                      className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-2.5 pr-10 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+                    />
+                    <svg 
+                      className="absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400"
+                      fill="none" 
+                      viewBox="0 0 24 24" 
+                      stroke="currentColor"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    
+                    {searchSolicitante && (
+                      <div className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg border-2 border-gray-300 bg-white shadow-lg dark:border-gray-600 dark:bg-gray-700">
+                        {usuarios
+                          .filter(u => 
+                            u.nombre.toLowerCase().includes(searchSolicitante.toLowerCase())
+                          )
+                          .slice(0, 20)
+                          .map(usuario => (
+                            <button
+                              key={usuario.id}
+                              type="button"
+                              onClick={() => {
+                                setSolicitanteId(usuario.id);
+                                setSearchSolicitante('');
+                              }}
+                              className="w-full px-4 py-2.5 text-left text-sm transition-colors hover:bg-blue-50 dark:hover:bg-blue-900/30"
+                            >
+                              <div className="font-medium text-gray-900 dark:text-white">
+                                {usuario.nombre}
+                              </div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                {usuario.departamento.nombre} • {usuario.rol.nombre}
+                              </div>
+                            </button>
+                          ))}
+                        {usuarios.filter(u => 
+                          u.nombre.toLowerCase().includes(searchSolicitante.toLowerCase())
+                        ).length === 0 && (
+                          <div className="px-4 py-3 text-center text-sm text-gray-500 dark:text-gray-400">
+                            No se encontraron resultados
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
-
-            {form.deliveryPlace === "almacen" && warehouses.length > 0 && (
-              <div>
-                <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">
-                  Almacén
-                </label>
-                <p className="w-full rounded-lg border border-gray-300 bg-gray-100 p-2 text-sm dark:border-white/10 dark:bg-[#101828] dark:text-gray-100">
-                  {warehouses[0]?.name || "Cargando..."}
-                </p>
-              </div>
-            )}
-          </section>
-
-          {/* Reference Section */}
-          <section className="space-y-2">
-            <label className="block text-sm text-gray-600 dark:text-gray-300">
-              Referencia estandarizada
-            </label>
-            <ReferenceSelector
-              selectedRef={form.reference}
-              query={refQuery}
-              onQueryChange={setRefQuery}
-              onSelectRef={ref => setField("reference", ref)}
-              onClearRef={() => setField("reference", "")}
-            />
-            {errors.reference && (
-              <p className="text-xs text-rose-400">{errors.reference}</p>
-            )}
-          </section>
-
-          {/* Comments Section */}
-          <section>
-            <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">
-              Comentarios / Justificación
-            </label>
-            <textarea
-              rows={4}
-              maxLength={1500}
-              className="w-full rounded-lg border border-gray-300 bg-white p-2 text-sm placeholder-gray-400 dark:border-white/10 dark:bg-[#101828] dark:text-gray-100"
-              placeholder="Detalles y razón de la solicitud…"
-              value={form.comments}
-              onChange={e => setField("comments", e.target.value)}
-            />
-            {errors.comments && (
-              <p className="mt-1 text-xs text-rose-400">{errors.comments}</p>
-            )}
-          </section>
-
-          {/* Product Lines Section */}
-          <section className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">
-                Detalle de productos
-              </h3>
-              <Button size="sm" onClick={addLine}>
-                + Agregar ítem
-              </Button>
             </div>
 
-            <ScrollArea orientation="x">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-white/10">
-                <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500 dark:bg-[#101828] dark:text-gray-300">
-                  <tr>
-                    <th className="px-3 py-2">SKU</th>
-                    <th className="px-3 py-2">Descripción</th>
-                    <th className="px-3 py-2">Cantidad</th>
-                    <th className="px-3 py-2">Unidad</th>
-                    <th className="px-3 py-2">Notas</th>
-                    <th className="px-3 py-2"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-white/10">
-                  {form.lines.map((ln, i) => (
-                    <ProductLineRow
-                      key={ln.id}
-                      line={ln}
-                      index={i}
-                      errors={errors}
-                      onChange={updateLine}
-                      onRemove={removeLine}
-                    />
-                  ))}
-                  {form.lines.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="px-3 py-6 text-center text-xs text-gray-500 dark:text-gray-400">
-                        No hay ítems. Agrega el primero.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </ScrollArea>
-          </section>
+            {/* Lugar de Entrega */}
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Lugar de Entrega <span className="text-rose-500">*</span>
+              </label>
+              <select
+                value={lugarEntrega}
+                onChange={(e) => setLugarEntrega(e.target.value as LugarEntrega)}
+                className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-2.5 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+                required
+              >
+                <option value="ALMACEN">Almacén</option>
+                <option value="OFICINA">Oficina</option>
+                <option value="PROYECTO">Proyecto</option>
+                <option value="OTRO">Otro</option>
+              </select>
+            </div>
 
-          {/* Actions */}
-          <div className="flex justify-end gap-3">
+            {/* Fecha Límite */}
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Fecha Límite <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="date"
+                value={fechaLimite}
+                onChange={(e) => setFechaLimite(e.target.value)}
+                min={new Date().toISOString().split("T")[0]}
+                className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-2.5 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+                required
+              />
+            </div>
+
+            {/* Fecha Estimada */}
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Fecha Estimada de Entrega <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="date"
+                value={fechaEstimada}
+                onChange={(e) => setFechaEstimada(e.target.value)}
+                min={new Date().toISOString().split("T")[0]}
+                className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-2.5 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+                required
+              />
+            </div>
+
+            {/* Comentarios */}
+            <div className="md:col-span-2">
+              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Comentarios/Observaciones
+              </label>
+              <textarea
+                value={comentarios}
+                onChange={(e) => setComentarios(e.target.value)}
+                rows={3}
+                className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-2.5 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+                placeholder="Información adicional sobre la cotización..."
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Items */}
+        <div className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Items de la Cotización
+            </h2>
             <Button
-              variant="danger"
-              onClick={() => window.history.back()}
-              disabled={isSubmitting}
+              onClick={agregarItem}
+              size="sm"
+              variant="primary"
+              className="flex items-center gap-2"
             >
-              Cancelar
-            </Button>
-            <Button disabled={isSubmitting}>
-              {isSubmitting ? "Guardando..." : "Guardar solicitud"}
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Agregar Item
             </Button>
           </div>
-        </form>
-      </div>
+
+          <div className="space-y-4">
+            {items.map((item, index) => (
+              <div
+                key={index}
+                className="rounded-lg border-2 border-gray-200 bg-gray-50 p-4 dark:border-gray-600 dark:bg-gray-700/50"
+              >
+                <div className="mb-3 flex items-center justify-between">
+                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    Item #{index + 1}
+                  </span>
+                  {items.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => eliminarItem(index)}
+                      className="rounded-lg p-1.5 text-rose-600 transition-colors hover:bg-rose-100 dark:text-rose-400 dark:hover:bg-rose-900/30"
+                    >
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                  {/* SKU */}
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
+                      SKU <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={item.sku}
+                      onChange={(e) => actualizarItem(index, "sku", e.target.value)}
+                      className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+                      placeholder="LAP-001"
+                      required
+                    />
+                  </div>
+
+                  {/* Descripción */}
+                  <div className="md:col-span-2">
+                    <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
+                      Descripción del Producto <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={item.descripcionProducto}
+                      onChange={(e) => actualizarItem(index, "descripcionProducto", e.target.value)}
+                      className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+                      placeholder="Laptop Dell Latitude 5420"
+                      required
+                    />
+                  </div>
+
+                  {/* Cantidad */}
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
+                      Cantidad <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      value={item.cantidad}
+                      onChange={(e) => actualizarItem(index, "cantidad", parseInt(e.target.value) || 1)}
+                      min="1"
+                      className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+                      required
+                    />
+                  </div>
+
+                  {/* Tipo de Unidad */}
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
+                      Tipo Unidad <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                      value={item.tipoUnidad}
+                      onChange={(e) => actualizarItem(index, "tipoUnidad", e.target.value)}
+                      className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+                      required
+                    >
+                      <option value="UNIDAD">Unidad</option>
+                      <option value="CAJA">Caja</option>
+                      <option value="PAQUETE">Paquete</option>
+                      <option value="METRO">Metro</option>
+                      <option value="KILOGRAMO">Kilogramo</option>
+                      <option value="LITRO">Litro</option>
+                      <option value="OTRO">Otro</option>
+                    </select>
+                  </div>
+
+                  {/* Notas */}
+                  <div className="md:col-span-2 lg:col-span-3">
+                    <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
+                      Notas/Especificaciones
+                    </label>
+                    <input
+                      type="text"
+                      value={item.notas || ""}
+                      onChange={(e) => actualizarItem(index, "notas", e.target.value)}
+                      className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+                      placeholder="Preferiblemente con SSD"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Botones */}
+        <div className="flex items-center justify-end gap-3">
+          <Button
+            onClick={() => navigate("/quotes")}
+            variant="secondary"
+            disabled={loading}
+          >
+            Cancelar
+          </Button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-3.5 text-sm text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading ? (
+              <>
+                <div className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-white border-r-transparent"></div>
+                Creando...
+              </>
+            ) : (
+              "Crear Cotización"
+            )}
+          </button>
+        </div>
+      </form>
     </>
   );
 }

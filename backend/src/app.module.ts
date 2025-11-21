@@ -22,6 +22,8 @@ import { AreasModule } from './modules/catalogs/areas/areas.module';
 import { ProyectosModule } from './modules/catalogs/proyectos/proyectos.module';
 import { TiposModule } from './modules/catalogs/tipos/tipos.module';
 import { ProveedoresModule } from './modules/catalogs/proveedores/proveedores.module';
+import { NotificacionModule } from './modules/notifications/notificacion.module';
+import { SeguimientoModule } from './modules/seguimientos/seguimiento.module';
 
 
 
@@ -48,7 +50,9 @@ import { ProveedoresModule } from './modules/catalogs/proveedores/proveedores.mo
     AreasModule,
     ProyectosModule,
     TiposModule,
-    ProveedoresModule
+    ProveedoresModule,
+    NotificacionModule,
+    SeguimientoModule
 
   ],
 })
