@@ -7,4 +7,9 @@ export class CreateAreaDto {
   @MinLength(3, { message: 'nombreArea debe tener al menos 3 caracteres' })
   @IsNotEmpty({ message: 'nombreArea es requerido' })
   nombreArea: string;
+
+  @ApiProperty({ example: 'Área encargada de las compras', description: 'tipo', required: true })
+  @IsString({ message: 'tipo debe ser texto' })
+  @IsNotEmpty({ message: 'tipo es requerido' })
+  tipo: string; 
 }

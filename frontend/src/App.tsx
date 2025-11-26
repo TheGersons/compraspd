@@ -44,6 +44,8 @@ import Dashboard from "./pages/Home/Dashboard";
 import { NotificationProvider } from "./pages/Notifications/context/NotificationContext";
 import NotificationContainer from "./pages/Notifications/components/notifications/NotificationContainer";
 import NotificationPanel from "./pages/Notifications/components/notifications/NotificationPanel";
+import Projects from "./pages/projects/Projects";
+import NewProject from "./pages/projects/NewProject";
 
 const SHOPPING_MANAGER_ROLES = ["ADMIN"];
 const QUOTES_SUPERVISOR_ROLES = ["SUPERVISOR", "ADMIN"];
@@ -116,6 +118,11 @@ export default function App() {
                   }
                 />
               </Route>
+
+              {/* Proyectos */}
+              <Route path="/projects" element={<Projects />} />
+              <Route path="/projects/new" element={<NewProject />} />
+              <Route path="/projects/edit/:id" element={<NewProject />} />
 
               {/* genéricas */}
               <Route path="/Profiles" element={<Profiles />} />

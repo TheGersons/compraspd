@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { ShoppingCart, /*, User*/ 
-User} from "lucide-react";
+User,
+UtilityPole} from "lucide-react";
 
 // Assume these icons are imported from an icon library
 import {
@@ -56,6 +57,14 @@ const navItems: NavItem[] = [
       { name: "Seguimiento", path: "/shopping/follow-ups", pro: false },
       { name: "Historial", path: "/shopping/history", pro: false },
       { name: "Asignación", path: "/shopping/assignment", pro: false },
+    ],
+  },{
+    //icono generico para cotizaciones si 
+    icon: <UtilityPole />,
+    name: "Proyectos",
+    subItems: [
+      { name: "ver Proyectos", path: "/projects", pro: false },
+      { name: "Nuevo Proyecto", path: "/projects/new", pro: false },
     ],
   },
   /*

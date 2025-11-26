@@ -59,7 +59,18 @@ interface Proyecto {
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api/v1";
 const token = getToken();
 const api = {
-   
+
+  async getCurrentUser(): Promise<Usuario> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
+      credentials: "include",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (!response.ok) throw new Error("Error al obtener usuario actual");
+    return response.json();
+  },
+
   async getTipos(): Promise<Tipo[]> {
 
     const response = await fetch(`${API_BASE_URL}/api/v1/tipos`, {
@@ -104,12 +115,12 @@ const api = {
       credentials: "include",
       body: JSON.stringify(data),
     });
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.message || "Error al crear cotización");
     }
-    
+
     return response.json();
   },
 };
@@ -127,7 +138,6 @@ export default function New() {
   const [tipoCompra, setTipoCompra] = useState<TipoCompra>("NACIONAL");
   const [lugarEntrega, setLugarEntrega] = useState<LugarEntrega>("ALMACEN");
   const [fechaLimite, setFechaLimite] = useState("");
-  const [fechaEstimada, setFechaEstimada] = useState("");
   const [comentarios, setComentarios] = useState("");
   const [tipoId, setTipoId] = useState("");
   const [solicitanteId, setSolicitanteId] = useState("");
@@ -163,20 +173,18 @@ export default function New() {
       setUsuarios(usuariosData.filter(u => u.activo));
       setProyectos(proyectosData.filter(p => p.estado));
 
-      // Obtener usuario actual del localStorage o contexto
-      const currentUserStr = localStorage.getItem('user');
-      if (currentUserStr) {
-        try {
-          const currentUser = JSON.parse(currentUserStr);
-          // Buscar el usuario en la lista cargada
-          const usuarioActual = usuariosData.find(u => u.id === currentUser.id);
-          if (usuarioActual) {
-            setSolicitanteId(usuarioActual.id);
-          }
-        } catch (error) {
-          console.error('Error al parsear usuario:', error);
+      // Obtener usuario actual del endpoint /auth/me
+      try {
+        const currentUser = await api.getCurrentUser();
+        const usuarioActual = usuariosData.find(u => u.id === currentUser.id);
+        if (usuarioActual) {
+          setSolicitanteId(usuarioActual.id);
+          console.log('✅ Solicitante auto-completado:', usuarioActual.nombre);
         }
+      } catch (error) {
+        console.log('⚠️ No se pudo obtener usuario actual:', error);
       }
+
     } catch (error) {
       console.error("Error al cargar catálogos:", error);
       addNotification(
@@ -189,6 +197,18 @@ export default function New() {
       setLoadingCatalogos(false);
     }
   };
+
+  useEffect(() => {
+    if (!proyectoId && lugarEntrega === "PROYECTO") {
+      setLugarEntrega("ALMACEN");
+      addNotification(
+        "info",
+        "Lugar de entrega actualizado",
+        "Se cambió a Almacén porque no hay proyecto seleccionado.",
+        { priority: "low" }
+      );
+    }
+  }, [proyectoId]);
 
   // Manejo de items
   const agregarItem = () => {
@@ -219,17 +239,13 @@ export default function New() {
     if (!solicitanteId) return "Debe seleccionar un solicitante";
     if (!proyectoId) return "Debe seleccionar un proyecto";
     if (!fechaLimite) return "La fecha límite es obligatoria";
-    if (!fechaEstimada) return "La fecha estimada es obligatoria";
 
-    // Validar fechas
+    // Validar fecha
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
     const limite = new Date(fechaLimite);
-    const estimada = new Date(fechaEstimada);
 
     if (limite < hoy) return "La fecha límite no puede ser en el pasado";
-    if (estimada < hoy) return "La fecha estimada no puede ser en el pasado";
-    if (estimada > limite) return "La fecha estimada no puede ser posterior a la fecha límite";
 
     // Validar items
     for (let i = 0; i < items.length; i++) {
@@ -256,13 +272,15 @@ export default function New() {
     try {
       setLoading(true);
 
+      const fechaEstimadaDefault = new Date();
+      fechaEstimadaDefault.setDate(fechaEstimadaDefault.getDate() + 30); // +30 días
       // Preparar datos
       const payload = {
         nombreCotizacion: nombreCotizacion.trim(),
         tipoCompra,
         lugarEntrega,
         fechaLimite: new Date(fechaLimite).toISOString(),
-        fechaEstimada: new Date(fechaEstimada).toISOString(),
+        fechaEstimada: fechaEstimadaDefault.toISOString(),
         comentarios: comentarios.trim() || undefined,
         tipoId,
         solicitanteId,
@@ -453,19 +471,19 @@ export default function New() {
                       placeholder="Buscar solicitante por nombre..."
                       className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-2.5 pr-10 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
                     />
-                    <svg 
+                    <svg
                       className="absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400"
-                      fill="none" 
-                      viewBox="0 0 24 24" 
+                      fill="none"
+                      viewBox="0 0 24 24"
                       stroke="currentColor"
                     >
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
-                    
+
                     {searchSolicitante && (
                       <div className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg border-2 border-gray-300 bg-white shadow-lg dark:border-gray-600 dark:bg-gray-700">
                         {usuarios
-                          .filter(u => 
+                          .filter(u =>
                             u.nombre.toLowerCase().includes(searchSolicitante.toLowerCase())
                           )
                           .slice(0, 20)
@@ -487,13 +505,13 @@ export default function New() {
                               </div>
                             </button>
                           ))}
-                        {usuarios.filter(u => 
+                        {usuarios.filter(u =>
                           u.nombre.toLowerCase().includes(searchSolicitante.toLowerCase())
                         ).length === 0 && (
-                          <div className="px-4 py-3 text-center text-sm text-gray-500 dark:text-gray-400">
-                            No se encontraron resultados
-                          </div>
-                        )}
+                            <div className="px-4 py-3 text-center text-sm text-gray-500 dark:text-gray-400">
+                              No se encontraron resultados
+                            </div>
+                          )}
                       </div>
                     )}
                   </div>
@@ -509,14 +527,19 @@ export default function New() {
               <select
                 value={lugarEntrega}
                 onChange={(e) => setLugarEntrega(e.target.value as LugarEntrega)}
-                className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-2.5 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+                className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-2.5 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
                 required
               >
                 <option value="ALMACEN">Almacén</option>
-                <option value="OFICINA">Oficina</option>
-                <option value="PROYECTO">Proyecto</option>
-                <option value="OTRO">Otro</option>
+                <option value="PROYECTO" disabled={!proyectoId}>
+                  Proyecto {!proyectoId && '(Seleccione un proyecto primero)'}
+                </option>
               </select>
+              {lugarEntrega === "PROYECTO" && !proyectoId && (
+                <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                  ⚠️ Debe seleccionar un proyecto para usar esta opción
+                </p>
+              )}
             </div>
 
             {/* Fecha Límite */}
@@ -528,21 +551,6 @@ export default function New() {
                 type="date"
                 value={fechaLimite}
                 onChange={(e) => setFechaLimite(e.target.value)}
-                min={new Date().toISOString().split("T")[0]}
-                className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-2.5 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
-                required
-              />
-            </div>
-
-            {/* Fecha Estimada */}
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Fecha Estimada de Entrega <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="date"
-                value={fechaEstimada}
-                onChange={(e) => setFechaEstimada(e.target.value)}
                 min={new Date().toISOString().split("T")[0]}
                 className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-2.5 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
                 required

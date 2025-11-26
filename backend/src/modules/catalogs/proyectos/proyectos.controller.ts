@@ -1,6 +1,7 @@
 import { 
   Body, 
   Controller, 
+  Delete, // ← AGREGADO
   Get, 
   Param, 
   Patch, 
@@ -84,5 +85,14 @@ export class ProyectosController {
   @ApiResponse({ status: 200, description: 'Proyecto abierto exitosamente' })
   open(@Param('id', ParseUUIDPipe) id: string) {
     return this.proyectosService.open(id);
+  }
+
+  @Delete(':id') // ← AGREGADO
+  @ApiOperation({ summary: 'Eliminar proyecto (solo si no tiene cotizaciones)' })
+  @ApiResponse({ status: 200, description: 'Proyecto eliminado exitosamente' })
+  @ApiResponse({ status: 400, description: 'No se puede eliminar porque tiene cotizaciones' })
+  @ApiResponse({ status: 404, description: 'Proyecto no encontrado' })
+  delete(@Param('id', ParseUUIDPipe) id: string) {
+    return this.proyectosService.delete(id);
   }
 }

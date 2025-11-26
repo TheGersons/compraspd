@@ -37,6 +37,7 @@ export class ProyectosService {
         id: true,
         nombre: true,
         descripcion: true,
+        criticidad: true, // ← AGREGADO
         estado: true,
         creado: true,
         actualizado: true,
@@ -105,16 +106,23 @@ export class ProyectosService {
       throw new ConflictException('Ya existe un proyecto con ese nombre');
     }
 
+    // Validar criticidad (1-10)
+    if (data.criticidad !== undefined && (data.criticidad < 1 || data.criticidad > 10)) {
+      throw new BadRequestException('La criticidad debe estar entre 1 y 10');
+    }
+
     return this.prisma.proyecto.create({
       data: {
         nombre: data.nombre,
         descripcion: data.descripcion,
+        criticidad: data.criticidad ?? 5, // ← AGREGADO con default 5
         estado: true
       },
       select: {
         id: true,
         nombre: true,
         descripcion: true,
+        criticidad: true, // ← AGREGADO
         estado: true,
         creado: true
       }
@@ -144,17 +152,24 @@ export class ProyectosService {
       }
     }
 
+    // Validar criticidad si se proporciona
+    if (data.criticidad !== undefined && (data.criticidad < 1 || data.criticidad > 10)) {
+      throw new BadRequestException('La criticidad debe estar entre 1 y 10');
+    }
+
     return this.prisma.proyecto.update({
       where: { id },
       data: {
         nombre: data.nombre,
         descripcion: data.descripcion,
+        criticidad: data.criticidad, // ← AGREGADO
         estado: data.estado
       },
       select: {
         id: true,
         nombre: true,
         descripcion: true,
+        criticidad: true, // ← AGREGADO
         estado: true,
         actualizado: true
       }
@@ -183,6 +198,36 @@ export class ProyectosService {
       where: { id },
       data: { estado: true }
     });
+  }
+
+  /**
+   * Eliminar proyecto (soft delete - solo si no tiene cotizaciones)
+   */
+  async delete(id: string) {
+    await this.ensureExists(id);
+
+    // Verificar que no tenga cotizaciones
+    const proyecto = await this.prisma.proyecto.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: { cotizaciones: true }
+        }
+      }
+    });
+
+    if (proyecto!._count.cotizaciones > 0) {
+      throw new BadRequestException(
+        `No se puede eliminar el proyecto porque tiene ${proyecto!._count.cotizaciones} cotización(es) asociada(s). Ciérrelo en su lugar.`
+      );
+    }
+
+    // Eliminar proyecto
+    await this.prisma.proyecto.delete({
+      where: { id }
+    });
+
+    return { message: 'Proyecto eliminado exitosamente' };
   }
 
   /**

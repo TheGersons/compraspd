@@ -75,7 +75,8 @@ export class AreasService {
 
     return this.prisma.area.create({
       data: {
-        nombreArea: data.nombreArea
+        nombreArea: data.nombreArea,
+        tipo: data.tipo
       },
       select: {
         id: true,

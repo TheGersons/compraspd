@@ -1,20 +1,54 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsOptional, IsString, MinLength } from 'class-validator';
+// ============================================================================
+// dto/update-proyecto.dto.ts
+// ============================================================================
+
+import { ApiProperty } from '@nestjs/swagger';
+import { 
+  IsString, 
+  IsOptional, 
+  IsBoolean, 
+  MaxLength,
+  IsInt,
+  Min,
+  Max
+} from 'class-validator';
 
 export class UpdateProyectoDto {
-  @ApiPropertyOptional({ example: 'Modernización de Oficinas 2025 - Fase 2' })
-  @IsString({ message: 'nombre debe ser texto' })
-  @MinLength(3, { message: 'nombre debe tener al menos 3 caracteres' })
+  @ApiProperty({ 
+    description: 'Nombre del proyecto',
+    required: false 
+  })
+  @IsString()
   @IsOptional()
+  @MaxLength(200)
   nombre?: string;
 
-  @ApiPropertyOptional({ example: 'Descripción actualizada del proyecto' })
-  @IsString({ message: 'descripcion debe ser texto' })
+  @ApiProperty({ 
+    description: 'Descripción del proyecto',
+    required: false 
+  })
+  @IsString()
   @IsOptional()
+  @MaxLength(1000)
   descripcion?: string;
 
-  @ApiPropertyOptional({ example: true, description: 'true=activo, false=cerrado' })
-  @IsBoolean({ message: 'estado debe ser booleano' })
+  @ApiProperty({
+    description: 'Nivel de criticidad del proyecto (1-10)',
+    required: false,
+    minimum: 1,
+    maximum: 10
+  })
+  @IsInt({ message: 'La criticidad debe ser un número entero' })
+  @Min(1, { message: 'La criticidad mínima es 1' })
+  @Max(10, { message: 'La criticidad máxima es 10' })
+  @IsOptional()
+  criticidad?: number;
+
+  @ApiProperty({ 
+    description: 'Estado del proyecto (true=activo, false=cerrado)',
+    required: false 
+  })
+  @IsBoolean()
   @IsOptional()
   estado?: boolean;
 }

@@ -3,14 +3,16 @@ import PageMeta from "../../components/common/PageMeta";
 import Button from "../../components/ui/button/Button";
 import { useKpiGenerator } from "./hooks/useKpiGenerator";
 import { KpiData } from "./types/kpi.types";
-import KpiCard from "./components/KpiCard";
 import { useKpiMonitor } from "./hooks/useKPIMonitor";
+import DashboardGerencia from "./DashboardGerencia";
+import KpiCard from "./components/KpiCard";
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
 type Area = "Proyectos" | "Comercial" | "Área Técnica" | "Operativa";
+type VistaType = "operativa" | "gerencial";
 
 // ============================================================================
 // CAROUSEL COMPONENT
@@ -206,10 +208,12 @@ function KpiCarousel({
 
 export default function Dashboard() {
     const [selectedArea, setSelectedArea] = useState<Area | "Todas">("Todas");
+    const [vista, setVista] = useState<VistaType>("operativa");
     const { cotizacionesKpis, comprasKpis, importExportKpis, loading } = useKpiGenerator();
-
-    useKpiMonitor(cotizacionesKpis, comprasKpis, importExportKpis);
     
+    // Monitor de KPIs - genera notificaciones automáticas
+    useKpiMonitor(cotizacionesKpis, comprasKpis, importExportKpis);
+
     if (loading) {
         return (
             <>
@@ -229,6 +233,38 @@ export default function Dashboard() {
         );
     }
 
+    // Si la vista es gerencial, renderizar DashboardGerencia
+    if (vista === "gerencial") {
+        return (
+            <>
+                <PageMeta
+                    title="Dashboard Gerencial"
+                    description="Vista ejecutiva de seguimiento"
+                />
+                
+                {/* Toggle de Vista */}
+                <div className="mb-6 flex items-center justify-between">
+                    <div className="flex items-center gap-3 rounded-xl border-2 border-gray-200 bg-white p-1.5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                        <button
+                            onClick={() => setVista("operativa")}
+                            className="rounded-lg px-4 py-2 text-sm font-medium transition-colors text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+                        >
+                            Vista Operativa
+                        </button>
+                        <button
+                            onClick={() => setVista("gerencial")}
+                            className="rounded-lg px-4 py-2 text-sm font-medium transition-colors bg-blue-600 text-white shadow-sm"
+                        >
+                            Vista Gerencial
+                        </button>
+                    </div>
+                </div>
+
+                <DashboardGerencia />
+            </>
+        );
+    }
+
     return (
         <>
             <PageMeta
@@ -244,26 +280,44 @@ export default function Dashboard() {
                     </h1>
                 </div>
 
-                {/* Filtro de Área */}
-                <div className="flex items-center gap-2">
-                    <label
-                        htmlFor="area-filter"
-                        className="text-xs font-medium text-gray-600 dark:text-gray-400"
-                    >
-                        Área:
-                    </label>
-                    <select
-                        id="area-filter"
-                        value={selectedArea}
-                        onChange={(e) => setSelectedArea(e.target.value as Area | "Todas")}
-                        className="h-9 min-w-[160px] rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-750 dark:focus:border-blue-600"
-                    >
-                        <option value="Todas">Todas las áreas</option>
-                        <option value="Proyectos">Proyectos</option>
-                        <option value="Comercial">Comercial</option>
-                        <option value="Área Técnica">Área Técnica</option>
-                        <option value="Operativa">Operativa</option>
-                    </select>
+                <div className="flex items-center gap-3">
+                    {/* Toggle de Vista */}
+                    <div className="flex items-center gap-1 rounded-lg border-2 border-gray-200 bg-white p-1 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                        <button
+                            onClick={() => setVista("operativa")}
+                            className="rounded-md px-3 py-1.5 text-xs font-medium transition-colors bg-blue-600 text-white shadow-sm"
+                        >
+                            Operativa
+                        </button>
+                        <button
+                            onClick={() => setVista("gerencial")}
+                            className="rounded-md px-3 py-1.5 text-xs font-medium transition-colors text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+                        >
+                            Gerencial
+                        </button>
+                    </div>
+
+                    {/* Filtro de Área */}
+                    <div className="flex items-center gap-2">
+                        <label
+                            htmlFor="area-filter"
+                            className="text-xs font-medium text-gray-600 dark:text-gray-400"
+                        >
+                            Área:
+                        </label>
+                        <select
+                            id="area-filter"
+                            value={selectedArea}
+                            onChange={(e) => setSelectedArea(e.target.value as Area | "Todas")}
+                            className="h-9 min-w-[160px] rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-750 dark:focus:border-blue-600"
+                        >
+                            <option value="Todas">Todas las áreas</option>
+                            <option value="Proyectos">Proyectos</option>
+                            <option value="Comercial">Comercial</option>
+                            <option value="Área Técnica">Área Técnica</option>
+                            <option value="Operativa">Operativa</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 

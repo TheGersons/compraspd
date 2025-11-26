@@ -7,7 +7,7 @@ import { UsersModule } from './modules/users/users.module';
 import { AttachmentsModule } from './modules/attachments/attachments.module';
 
 //import { PurchaseRequestsModule } from './modules/purchases-requests/purchase-requests.module';
-//import { FollowupsModule } from './modules/followups/followups.module';
+import { FollowUpsModule } from './modules/followups/followups.module';
 
 import { DepartmentsModule } from './modules/departments/departments.module';
 import { RolesModule } from './modules/Roles/roles.module';
@@ -41,7 +41,7 @@ import { SeguimientoModule } from './modules/seguimientos/seguimiento.module';
     // AssignmentsModule,
     AttachmentsModule,
     // PurchaseRequestsModule,
-    //FollowupsModule,
+    FollowUpsModule,
     RolesModule,
     DepartmentsModule,
     CompraDetalleModule,

@@ -1,6 +1,6 @@
 // ============================================
 // SISTEMA DE COTIZACIONES Y COMPRAS
-// Prisma Schema
+// Prisma Schema - ACTUALIZADO
 // ============================================
 
 generator client {
@@ -21,10 +21,13 @@ datasource db {
 model Area {
   id         String   @id @default(uuid()) @db.Uuid
   nombreArea String   @map("nombre_area")
+  tipo       String   // "proyectos" | "comercial" | "tecnica" | "operativa"
+  icono      String?
   creado     DateTime @default(now())
   
   tipos Tipo[]
   
+  @@index([tipo])
   @@map("area")
 }
 
@@ -55,12 +58,16 @@ model Proyecto {
   id           String   @id @default(uuid()) @db.Uuid
   nombre       String
   descripcion  String?
+  criticidad   Int      @default(5) // 1-10, donde 10 es más crítico
   estado       Boolean  @default(true)
   creado       DateTime @default(now())
   actualizado  DateTime @default(now()) @updatedAt
   
-  cotizaciones Cotizacion[]
+  cotizaciones     Cotizacion[]
+  estadosProductos EstadoProducto[]
   
+  @@index([criticidad])
+  @@index([estado])
   @@map("proyecto")
 }
 
@@ -148,6 +155,8 @@ model Usuario {
   mensajes             Mensaje[]
   notificaciones       Notificacion[]
   participantesChat    ParticipantesChat[]
+  cotizacionesSupervisadas Cotizacion[]        @relation("SupervisorCotizacion")
+  historialCotizaciones    HistorialCotizacion[]
   
   @@index([email])
   @@index([rolId])
@@ -160,30 +169,51 @@ model Usuario {
 // ============================================
 
 model Cotizacion {
-  id                 String    @id @default(uuid()) @db.Uuid
-  tipoCompra         String    @default("NACIONAL") @map("tipo_compra")
-  tipoId             String    @map("tipo_id") @db.Uuid
-  solicitanteId      String    @map("solicitante_id") @db.Uuid
-  lugarEntrega       String    @default("ALMACEN") @map("lugar_entrega")
-  comentarios        String?
-  fechaSolicitud     DateTime  @default(now()) @map("fecha_solicitud")
-  fechaLimite        DateTime  @map("fecha_limite")
-  estado             String    @default("ENVIADA")
-  nombreCotizacion   String    @map("nombre_cotizacion")
-  proyectoId         String?   @map("proyecto_id") @db.Uuid
-  fechaEstimada      DateTime  @map("fecha_estimada")
+  id                      String    @id @default(uuid()) @db.Uuid
+  tipoCompra              String    @default("NACIONAL") @map("tipo_compra")
+  tipoId                  String    @map("tipo_id") @db.Uuid
+  solicitanteId           String    @map("solicitante_id") @db.Uuid
+  lugarEntrega            String    @default("ALMACEN") @map("lugar_entrega")
+  comentarios             String?
+  fechaSolicitud          DateTime  @default(now()) @map("fecha_solicitud")
+  fechaLimite             DateTime  @map("fecha_limite")
+  estado                  String    @default("PENDIENTE") // ← CAMBIAR default de "ENVIADA" a "PENDIENTE"
+  nombreCotizacion        String    @map("nombre_cotizacion")
+  proyectoId              String?   @map("proyecto_id") @db.Uuid
+  fechaEstimada           DateTime  @map("fecha_estimada")
   
-  tipo           Tipo               @relation(fields: [tipoId], references: [id], onDelete: Restrict)
-  solicitante    Usuario            @relation("UsuarioSolicitante", fields: [solicitanteId], references: [id], onDelete: Restrict)
-  proyecto       Proyecto?          @relation(fields: [proyectoId], references: [id], onDelete: SetNull)
+  // ========================================
+  // NUEVOS CAMPOS
+  // ========================================
+  supervisorResponsableId String?   @map("supervisor_responsable_id") @db.Uuid
+  chatId                  String?   @unique @map("chat_id") @db.Uuid
+  aprobadaParcialmente    Boolean   @default(false) @map("aprobada_parcialmente")
+  todosProductosAprobados Boolean   @default(false) @map("todos_productos_aprobados")
+  fechaAprobacion         DateTime? @map("fecha_aprobacion")
   
-  detalles       CotizacionDetalle[]
-  compras        Compra[]
+  // Relaciones existentes
+  tipo                Tipo               @relation(fields: [tipoId], references: [id], onDelete: Restrict)
+  solicitante         Usuario            @relation("UsuarioSolicitante", fields: [solicitanteId], references: [id], onDelete: Restrict)
+  proyecto            Proyecto?          @relation(fields: [proyectoId], references: [id], onDelete: SetNull)
+  
+  // ========================================
+  // NUEVAS RELACIONES
+  // ========================================
+  supervisorResponsable Usuario?            @relation("SupervisorCotizacion", fields: [supervisorResponsableId], references: [id], onDelete: SetNull)
+  chat                  Chat?               @relation(fields: [chatId], references: [id], onDelete: SetNull)
+  historial             HistorialCotizacion[]
+  
+  // Relaciones existentes
+  detalles            CotizacionDetalle[]
+  compras             Compra[]
+  estadosProductos   EstadoProducto[]
   
   @@index([solicitanteId])
   @@index([estado])
   @@index([proyectoId])
   @@index([fechaSolicitud])
+  @@index([supervisorResponsableId]) // ← NUEVO
+  @@index([chatId])                   // ← NUEVO
   @@map("cotizacion")
 }
 
@@ -200,12 +230,87 @@ model CotizacionDetalle {
   cotizacion Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
   precios    Precios?   @relation("PrecioSeleccionado", fields: [preciosId], references: [id], onDelete: SetNull)
   
-  preciosOfertas Precios[] @relation("PreciosPorDetalle")
+  preciosOfertas   Precios[]        @relation("PreciosPorDetalle")
+  estadosProductos EstadoProducto[]
   
   @@index([cotizacionId])
   @@index([sku])
   @@map("cotizacion_detalle")
 }
+
+model Pais {
+  id     String  @id @default(uuid()) @db.Uuid
+  nombre String  @unique @db.VarChar(100) // "China", "USA", "México"
+  codigo String  @unique @db.VarChar(3)   // "CN", "US", "MX"
+  activo Boolean @default(true)
+  
+  creado      DateTime @default(now())
+  actualizado DateTime @default(now()) @updatedAt
+
+  // Relaciones
+  estadosProductos EstadoProducto[]
+  timelinesSKU     TimelineSKU[]
+
+  @@map("pais")
+  @@index([activo])
+}
+
+model TimelineSKU {
+  id  String @id @default(uuid()) @db.Uuid
+  sku String @db.VarChar(255) // SKU del producto
+  
+  // País y transporte default para este SKU
+  paisOrigenId      String?       @db.Uuid
+  paisOrigen        Pais?         @relation(fields: [paisOrigenId], references: [id])
+  medioTransporte   MedioTransporte @default(MARITIMO)
+  
+  // Timeline de días entre procesos (null = proceso no aplica para este SKU)
+  diasCotizadoADescuento      Int? // null si no pasa por descuento
+  diasDescuentoAComprado      Int?
+  diasCompradoAPagado         Int?
+  diasPagadoASeguimiento1     Int?
+  diasSeguimiento1AFob        Int? // null si no es importación
+  diasFobABl                  Int? // null si no es marítimo
+  diasBlASeguimiento2         Int?
+  diasSeguimiento2ACif        Int? // null si no es importación
+  diasCifARecibido            Int?
+  
+  // Total calculado (solo suma los que no son null)
+  diasTotalesEstimados Int
+  
+  // Observaciones
+  notas String? @db.Text
+  
+  creado      DateTime @default(now())
+  actualizado DateTime @default(now()) @updatedAt
+
+  @@map("timeline_sku")
+  @@unique([sku]) // Un timeline por SKU
+  @@index([sku])
+  @@index([paisOrigenId])
+}
+
+enum MedioTransporte {
+  MARITIMO
+  TERRESTRE
+  AEREO
+  
+  @@map("medio_transporte")
+}
+enum EstadoCotizacion {
+  PENDIENTE           // Recién creada, esperando configuración supervisor
+  EN_CONFIGURACION    // Supervisor está configurando timeline
+  APROBADA_PARCIAL    // Algunos productos aprobados
+  APROBADA_COMPLETA   // Todos los productos aprobados
+  EN_PROCESO          // En proceso de compra
+  COMPLETADA          // Todos los productos recibidos
+  CANCELADA           // Cancelada
+  
+  @@map("estado_cotizacion")
+}
+
+// Y actualizar campo estado en Cotizacion:
+// estado EstadoCotizacion @default(PENDIENTE)
 
 model Precios {
   id                   String   @id @default(uuid()) @db.Uuid
@@ -239,8 +344,9 @@ model Compra {
   
   cotizacion  Cotizacion      @relation(fields: [cotizacionId], references: [id], onDelete: Restrict)
   
-  detalles     CompraDetalle[]
-  seguimientos Seguimiento[]   @relation("SeguimientoCompra")
+  detalles         CompraDetalle[]
+  seguimientos     Seguimiento[]   @relation("SeguimientoCompra")
+  estadosProductos EstadoProducto[]
   
   @@index([cotizacionId])
   @@index([estado])
@@ -268,13 +374,137 @@ model CompraDetalle {
   compra    Compra    @relation(fields: [compraId], references: [id], onDelete: Cascade)
   proveedor Proveedor @relation(fields: [proveedorId], references: [id], onDelete: Restrict)
   
-  seguimientos Seguimiento[] @relation("SeguimientoCompraDetalle")
+  seguimientos     Seguimiento[]    @relation("SeguimientoCompraDetalle")
+  estadosProductos EstadoProducto[]
   
   @@index([compraId])
   @@index([proveedorId])
   @@index([estado])
   @@index([sku])
   @@map("compra_detalle")
+}
+
+// ============================================
+// NUEVA TABLA: ESTADOS Y SEGUIMIENTO DE PRODUCTOS
+// ============================================
+
+model EstadoProducto {
+  id String @id @default(uuid()) @db.Uuid
+  
+  // Referencias flexibles
+  proyectoId          String? @db.Uuid
+  cotizacionId        String? @db.Uuid
+  cotizacionDetalleId String? @db.Uuid
+  compraId            String? @db.Uuid
+  compraDetalleId     String? @db.Uuid
+  
+  // Identificación
+  sku         String  @db.VarChar(255)
+  descripcion String  @db.Text
+  
+  // ========================================
+  // NUEVOS CAMPOS - País y Transporte
+  // ========================================
+  paisOrigenId    String?           @db.Uuid
+  paisOrigen      Pais?             @relation(fields: [paisOrigenId], references: [id])
+  medioTransporte MedioTransporte?
+  
+  // ========================================
+  // 10 estados booleanos
+  // ========================================
+  cotizado           Boolean @default(false)
+  conDescuento       Boolean @default(false)
+  comprado           Boolean @default(false)
+  pagado             Boolean @default(false)
+  primerSeguimiento  Boolean @default(false)
+  enFOB              Boolean @default(false)
+  conBL              Boolean @default(false)
+  segundoSeguimiento Boolean @default(false)
+  enCIF              Boolean @default(false)
+  recibido           Boolean @default(false)
+  
+  // ========================================
+  // 10 fechas para tracking temporal
+  // ========================================
+  fechaCotizado           DateTime?
+  fechaConDescuento       DateTime?
+  fechaComprado           DateTime?
+  fechaPagado             DateTime?
+  fechaPrimerSeguimiento  DateTime?
+  fechaEnFOB              DateTime?
+  fechaConBL              DateTime?
+  fechaSegundoSeguimiento DateTime?
+  fechaEnCIF              DateTime?
+  fechaRecibido           DateTime?
+  
+  // ========================================
+  // NUEVOS CAMPOS - Fechas límite por proceso
+  // ========================================
+  // Estas se calculan automáticamente desde el timeline del SKU
+  fechaLimiteCotizado           DateTime?
+  fechaLimiteConDescuento       DateTime?
+  fechaLimiteComprado           DateTime?
+  fechaLimitePagado             DateTime?
+  fechaLimitePrimerSeguimiento  DateTime?
+  fechaLimiteEnFOB              DateTime?
+  fechaLimiteConBL              DateTime?
+  fechaLimiteSegundoSeguimiento DateTime?
+  fechaLimiteEnCIF              DateTime?
+  fechaLimiteRecibido           DateTime?
+  
+  // ========================================
+  // CÁLCULOS DE RETRASO Y CRITICIDAD
+  // ========================================
+  diasRetrasoActual Int     @default(0) // Días de retraso en el proceso actual
+  criticidad        Int     @default(5) // 1-10, calculado automáticamente
+  nivelCriticidad   String  @default("MEDIO") // "BAJO", "MEDIO", "ALTO"
+  
+  // Info adicional
+  proveedor      String?  @db.VarChar(255)
+  responsable    String?  @db.VarChar(255)
+  precioUnitario Decimal? @db.Decimal(15, 4)
+  precioTotal    Decimal? @db.Decimal(15, 4)
+  cantidad       Int?
+  observaciones  String?  @db.Text
+  estadoGeneral  String   @default("warn") @db.VarChar(20) // "success", "warn", "danger"
+  
+  // Metadata
+  creado      DateTime @default(now())
+  actualizado DateTime @default(now()) @updatedAt
+  
+  // Relaciones
+  proyecto          Proyecto?          @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  cotizacion        Cotizacion?        @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  cotizacionDetalle CotizacionDetalle? @relation(fields: [cotizacionDetalleId], references: [id], onDelete: Cascade)
+  compra            Compra?            @relation(fields: [compraId], references: [id], onDelete: Cascade)
+  compraDetalle     CompraDetalle?     @relation(fields: [compraDetalleId], references: [id], onDelete: Cascade)
+  aprobadoPorSupervisor Boolean  @default(false) @map("aprobado_por_supervisor")
+  fechaAprobacion       DateTime? @map("fecha_aprobacion")
+
+  @@map("estado_producto")
+  @@index([proyectoId])
+  @@index([cotizacionId])
+  @@index([sku])
+  @@index([criticidad])
+  @@index([nivelCriticidad])
+  @@index([paisOrigenId])
+  @@index([medioTransporte])
+}
+model ProcesoPersonalizado {
+  id             String  @id @default(uuid()) @db.Uuid
+  nombre         String  @db.VarChar(100) // "Inspección de Calidad"
+  codigo         String  @unique @db.VarChar(50) // "INSPECCION_CALIDAD"
+  orden          Int     // Posición en el flujo (1, 2, 3...)
+  esObligatorio  Boolean @default(false)
+  descripcion    String? @db.Text
+  activo         Boolean @default(true)
+  
+  creado      DateTime @default(now())
+  actualizado DateTime @default(now()) @updatedAt
+  
+  @@map("proceso_personalizado")
+  @@index([activo])
+  @@index([orden])
 }
 
 // ============================================
@@ -313,7 +543,29 @@ model Chat {
   participantes ParticipantesChat[]
   mensajes      Mensaje[]
   
+  // ========================================
+  // NUEVA RELACIÓN
+  // ========================================
+  cotizacion    Cotizacion? // ← Relación inversa uno-a-uno
+  
   @@map("chat")
+}
+
+model HistorialCotizacion {
+  id           String   @id @default(uuid()) @db.Uuid
+  cotizacionId String   @map("cotizacion_id") @db.Uuid
+  usuarioId    String   @map("usuario_id") @db.Uuid
+  accion       String   // "TIMELINE_CONFIGURADO", "PAIS_MODIFICADO", "APROBADO_PARCIAL", "APROBADO_TOTAL"
+  detalles     Json     // { sku?, productoId?, campoModificado, valorAnterior, valorNuevo }
+  creado       DateTime @default(now())
+  
+  cotizacion Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  usuario    Usuario    @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  
+  @@index([cotizacionId])
+  @@index([usuarioId])
+  @@index([creado])
+  @@map("historial_cotizacion")
 }
 
 model ParticipantesChat {
