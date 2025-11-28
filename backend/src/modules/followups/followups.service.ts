@@ -45,8 +45,9 @@ export class FollowUpsService {
       where: { id: user.sub },
       include: { rol: true }
     });
-
-    if (!usuario?.rol.nombre.toLowerCase().includes('supervisor')) {
+    let rol = usuario?.rol.nombre.toLowerCase() === 'supervisor' ? true : false;
+    rol = rol || usuario?.rol.nombre.toLowerCase() === 'admin' ? true : false;
+    if (!rol) {
       throw new ForbiddenException('Solo supervisores pueden acceder a esta función');
     }
 
@@ -57,7 +58,7 @@ export class FollowUpsService {
     // Construir filtros
     const where: any = {
       estado: {
-        in: ['PENDIENTE', 'EN_CONFIGURACION', 'APROBADA_PARCIAL']
+        in: ['ENVIADA' ,'PENDIENTE', 'EN_CONFIGURACION', 'APROBADA_PARCIAL']
       }
     };
 

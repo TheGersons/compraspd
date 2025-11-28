@@ -370,4 +370,125 @@ export class QuotationsService {
     const role = (user.role || '').toUpperCase();
     return role === 'SUPERVISOR' || role === 'ADMIN';
   }
+
+  // ============================================================================
+// AGREGAR ESTE MÉTODO EN quotations.service.ts
+// ============================================================================
+
+/**
+ * Obtiene todas las cotizaciones del usuario actual (como solicitante)
+ * Con estadísticas de aprobación y progreso
+ * Para vista MyQuotes del frontend
+ */
+async getMyCotizaciones(user: UserJwt) {
+  const cotizaciones = await this.prisma.cotizacion.findMany({
+    where: { 
+      solicitanteId: user.sub 
+    },
+    include: {
+      solicitante: {
+        select: { 
+          id: true, 
+          nombre: true, 
+          email: true,
+          departamento: {
+            select: { nombre: true }
+          }
+        }
+      },
+      supervisorResponsable: {
+        select: { 
+          id: true, 
+          nombre: true, 
+          email: true 
+        }
+      },
+      proyecto: {
+        select: { 
+          id: true, 
+          nombre: true,
+          criticidad: true
+        }
+      },
+      tipo: {
+        select: {
+          id: true,
+          nombre: true,
+          area: { 
+            select: { 
+              id: true,
+              nombreArea: true 
+            } 
+          }
+        }
+      },
+      detalles: {
+        select: { 
+          id: true,
+          sku: true,
+          descripcionProducto: true,
+          cantidad: true,
+          tipoUnidad: true
+        }
+      },
+      estadosProductos: {
+        select: { 
+          id: true,
+          sku: true,
+          aprobadoPorSupervisor: true,
+          criticidad: true,
+          nivelCriticidad: true,
+          diasRetrasoActual: true,
+          paisOrigen: {
+            select: { nombre: true }
+          },
+          medioTransporte: true
+        }
+      }
+    },
+    orderBy: { fechaSolicitud: 'desc' }
+  });
+
+  // Calcular estadísticas de aprobación por cotización
+  return cotizaciones.map(cot => {
+    const totalProductos = cot.detalles.length;
+    const productosAprobados = cot.estadosProductos.filter(
+      ep => ep.aprobadoPorSupervisor
+    ).length;
+    const productosPendientes = totalProductos - productosAprobados;
+    const porcentajeAprobado = totalProductos > 0 
+      ? Math.round((productosAprobados / totalProductos) * 100) 
+      : 0;
+
+    return {
+      id: cot.id,
+      nombreCotizacion: cot.nombreCotizacion,
+      estado: cot.estado,
+      fechaSolicitud: cot.fechaSolicitud,
+      fechaLimite: cot.fechaLimite,
+      fechaEstimada: cot.fechaEstimada,
+      aprobadaParcialmente: cot.aprobadaParcialmente,
+      todosProductosAprobados: cot.todosProductosAprobados,
+      comentarios: cot.comentarios,
+      tipoCompra: cot.tipoCompra,
+      lugarEntrega: cot.lugarEntrega,
+      chatId: cot.chatId,
+      
+      // Relaciones
+      solicitante: cot.solicitante,
+      supervisorResponsable: cot.supervisorResponsable,
+      proyecto: cot.proyecto,
+      tipo: cot.tipo,
+      
+      // Estadísticas calculadas
+      totalProductos,
+      productosAprobados,
+      productosPendientes,
+      porcentajeAprobado,
+      
+      // NO incluir detalles completos aquí para reducir payload
+      // El frontend pedirá los detalles con getById si es necesario
+    };
+  });
+}
 }

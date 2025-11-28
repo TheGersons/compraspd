@@ -46,7 +46,7 @@ export class PreciosService {
     }
 
     // Solo permitir ofertas si la cotización está EN_REVISION o ENVIADA
-    if (!['ENVIADA', 'EN_REVISION'].includes(detalle.cotizacion.estado)) {
+    if (!['ENVIADA', 'EN_REVISION', 'EN_CONFIGURACION', 'APROBADA_PARCIAL'].includes(detalle.cotizacion.estado)) {
       throw new BadRequestException(
         `No se pueden agregar ofertas a una cotización en estado ${detalle.cotizacion.estado}`
       );

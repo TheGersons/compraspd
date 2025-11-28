@@ -1,11 +1,11 @@
-import { 
-  Body, 
-  Controller, 
-  Get, 
-  Param, 
-  Patch, 
-  Post, 
-  Query, 
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
   UseGuards,
   ParseUUIDPipe
 } from '@nestjs/common';
@@ -31,7 +31,7 @@ type UserJwt = { sub: string; role?: string };
 @Controller('api/v1/quotations')
 @UseGuards(AuthGuard('jwt'))
 export class QuotationsController {
-  constructor(private readonly service: QuotationsService) {}
+  constructor(private readonly service: QuotationsService) { }
 
   /**
    * POST /api/v1/quotations
@@ -86,6 +86,16 @@ export class QuotationsController {
     });
   }
 
+   /**
+ * GET /api/v1/quotations/my-quotations
+ * Obtener mis cotizaciones con estadísticas de aprobación
+ * Para vista del solicitante (MyQuotes)
+ */
+  @Get('my-quotations')
+  getMyCotizaciones(@CurrentUser() user: UserJwt) {
+    return this.service.getMyCotizaciones(user);
+  }
+
   /**
    * GET /api/v1/quotations/:id
    * Obtiene una cotización específica con todos sus detalles
@@ -125,4 +135,6 @@ export class QuotationsController {
   ) {
     return this.service.changeStatus(id, dto.estado, user);
   }
+
+ 
 }

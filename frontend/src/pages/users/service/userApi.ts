@@ -8,9 +8,14 @@ type User = {
   id: string;
   nombre: string;
   email: string;
-  role: string;
+  rol: rol;
   departmentId?: string;
   isActive?: boolean;
+};
+
+type rol = {
+  id: string;
+  nombre: string;
 };
 
 export const usersApi = {

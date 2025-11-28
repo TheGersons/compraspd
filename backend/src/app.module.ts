@@ -24,6 +24,7 @@ import { TiposModule } from './modules/catalogs/tipos/tipos.module';
 import { ProveedoresModule } from './modules/catalogs/proveedores/proveedores.module';
 import { NotificacionModule } from './modules/notifications/notificacion.module';
 import { SeguimientoModule } from './modules/seguimientos/seguimiento.module';
+import { CountriesModule } from './modules/countries/paises.module';
 
 
 
@@ -52,7 +53,8 @@ import { SeguimientoModule } from './modules/seguimientos/seguimiento.module';
     TiposModule,
     ProveedoresModule,
     NotificacionModule,
-    SeguimientoModule
+    SeguimientoModule,
+    CountriesModule,
 
   ],
 })

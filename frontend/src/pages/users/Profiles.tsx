@@ -1,9 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
-import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from "./hooks/useUsers.ts";
-import { useRoles } from "./hooks/useRoles.ts";
-import { useDepartments } from "./hooks/useDepartments.ts";
+import { getToken } from "../../lib/api";
+import { useNotifications } from "../Notifications/context/NotificationContext";
 
 // ============================================================================
 // TYPES
@@ -11,35 +10,113 @@ import { useDepartments } from "./hooks/useDepartments.ts";
 
 type Role = {
   id: string;
-  name: string;
-  description?: string;
+  nombre: string;
+  descripcion?: string;
 };
 
 type Department = {
   id: string;
-  name: string;
+  nombre: string;
 };
 
 type User = {
   id: string;
   email: string;
-  fullName: string;
-  isActive: boolean;
-  costCenter?: string;
-  createdAt: string;
-  updatedAt: string;
-  role: Role;
-  department?: Department;
+  nombre: string;
+  activo: boolean;
+  creado: string;
+  actualizado: string;
+  rol: Role;
+  departamento?: Department;
 };
 
 type UserFormData = {
   email: string;
-  fullName: string;
+  nombre: string;
   password?: string;
-  roleId: string;
-  departmentId?: string;
-  costCenter?: string;
-  isActive: boolean;
+  rolId: string;
+  departamentoId?: string;
+  activo: boolean;
+};
+
+// ============================================================================
+// API SERVICE
+// ============================================================================
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const token = getToken();
+
+const api = {
+  async getUsers() {
+    const response = await fetch(`${API_BASE_URL}/api/v1/users/all`, {
+      credentials: "include",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error("Error al cargar usuarios");
+    return response.json();
+  },
+
+  async createUser(data: UserFormData) {
+    const response = await fetch(`${API_BASE_URL}/api/v1/users`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || "Error al crear usuario");
+    }
+    return response.json();
+  },
+
+  async updateUser(userId: string, data: Partial<UserFormData>) {
+    const response = await fetch(`${API_BASE_URL}/api/v1/users/${userId}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || "Error al actualizar usuario");
+    }
+    return response.json();
+  },
+
+  async deactivateUser(userId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/v1/users/${userId}/deactivate`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error("Error al desactivar usuario");
+    return response.json();
+  },
+
+  async getRoles() {
+    const response = await fetch(`${API_BASE_URL}/api/v1/roles`, {
+      credentials: "include",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error("Error al cargar roles");
+    return response.json();
+  },
+
+  async getDepartments() {
+    const response = await fetch(`${API_BASE_URL}/api/v1/departments`, {
+      credentials: "include",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error("Error al cargar departamentos");
+    return response.json();
+  },
 };
 
 // ============================================================================
@@ -60,14 +137,14 @@ const UserCard = React.memo(({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
           <h4 className="font-semibold text-gray-800 dark:text-white/90 truncate">
-            {user.fullName}
+            {user.nombre}
           </h4>
           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-            user.isActive 
+            user.activo 
               ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
               : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400'
           }`}>
-            {user.isActive ? 'Activo' : 'Inactivo'}
+            {user.activo ? 'Activo' : 'Inactivo'}
           </span>
         </div>
         <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
@@ -75,16 +152,11 @@ const UserCard = React.memo(({
         </p>
         <div className="mt-2 flex flex-wrap gap-2 text-xs">
           <span className="rounded-md bg-blue-100 px-2 py-1 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-            {user.role.name}
+            {user.rol.nombre}
           </span>
-          {user.department && (
+          {user.departamento && (
             <span className="rounded-md bg-purple-100 px-2 py-1 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
-              {user.department.name}
-            </span>
-          )}
-          {user.costCenter && (
-            <span className="rounded-md bg-gray-100 px-2 py-1 text-gray-700 dark:bg-gray-800 dark:text-gray-400">
-              CC: {user.costCenter}
+              {user.departamento.nombre}
             </span>
           )}
         </div>
@@ -100,7 +172,7 @@ const UserCard = React.memo(({
           onClick={() => onDelete(user.id)}
           className="rounded-lg bg-red-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-600 transition-colors"
         >
-          Eliminar
+          Desactivar
         </button>
       </div>
     </div>
@@ -124,34 +196,31 @@ const UserModal = ({
 }) => {
   const [formData, setFormData] = useState<UserFormData>({
     email: user?.email || '',
-    fullName: user?.fullName || '',
+    nombre: user?.nombre || '',
     password: '',
-    roleId: user?.role.id || '',
-    departmentId: user?.department?.id || '',
-    costCenter: user?.costCenter || '',
-    isActive: user?.isActive ?? true,
+    rolId: user?.rol.id || '',
+    departamentoId: user?.departamento?.id || '',
+    activo: user?.activo ?? true,
   });
 
   React.useEffect(() => {
     if (user) {
       setFormData({
         email: user.email,
-        fullName: user.fullName,
+        nombre: user.nombre,
         password: '',
-        roleId: user.role.id,
-        departmentId: user.department?.id || '',
-        costCenter: user.costCenter || '',
-        isActive: user.isActive,
+        rolId: user.rol.id,
+        departamentoId: user.departamento?.id || '',
+        activo: user.activo,
       });
     } else {
       setFormData({
         email: '',
-        fullName: '',
+        nombre: '',
         password: '',
-        roleId: '',
-        departmentId: '',
-        costCenter: '',
-        isActive: true,
+        rolId: '',
+        departamentoId: '',
+        activo: true,
       });
     }
   }, [user]);
@@ -189,8 +258,8 @@ const UserModal = ({
               <input
                 type="text"
                 required
-                value={formData.fullName}
-                onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                value={formData.nombre}
+                onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
                 className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
               />
             </div>
@@ -210,15 +279,15 @@ const UserModal = ({
 
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                {user ? 'Nueva Contraseña (opcional)' : 'Contraseña *'}
+                Contraseña {!user && '*'}
               </label>
               <input
                 type="password"
                 required={!user}
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                placeholder={user ? 'Dejar vacío para no cambiar' : 'Contraseña'}
                 className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                placeholder={user ? 'Dejar vacío para no cambiar' : ''}
               />
             </div>
 
@@ -228,14 +297,14 @@ const UserModal = ({
               </label>
               <select
                 required
-                value={formData.roleId}
-                onChange={(e) => setFormData({ ...formData, roleId: e.target.value })}
+                value={formData.rolId}
+                onChange={(e) => setFormData({ ...formData, rolId: e.target.value })}
                 className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
               >
                 <option value="">Seleccionar rol</option>
                 {roles.map(role => (
                   <option key={role.id} value={role.id}>
-                    {role.name}
+                    {role.nombre}
                   </option>
                 ))}
               </select>
@@ -243,50 +312,39 @@ const UserModal = ({
 
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Departamento
+                Departamento *
               </label>
               <select
-                required={!user}
-                value={formData.departmentId}
-                onChange={(e) => setFormData({ ...formData, departmentId: e.target.value })}
+                required
+                value={formData.departamentoId}
+                onChange={(e) => setFormData({ ...formData, departamentoId: e.target.value })}
                 className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
               >
-                <option value="">Seleccionar un departamento</option>
+                <option value="">Seleccionar departamento</option>
                 {departments.map(dept => (
                   <option key={dept.id} value={dept.id}>
-                    {dept.name}
+                    {dept.nombre}
                   </option>
                 ))}
               </select>
             </div>
 
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Centro de Costo
+            <div className="flex items-center">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.activo}
+                  onChange={(e) => setFormData({ ...formData, activo: e.target.checked })}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-500 focus:ring-2 focus:ring-blue-500"
+                />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Usuario Activo
+                </span>
               </label>
-              <input
-                type="text"
-                value={formData.costCenter}
-                onChange={(e) => setFormData({ ...formData, costCenter: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-              />
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="isActive"
-              checked={formData.isActive}
-              onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-              className="h-4 w-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
-            />
-            <label htmlFor="isActive" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Usuario activo
-            </label>
-          </div>
-
-          <div className="flex justify-end gap-3 border-t border-gray-200 pt-4 dark:border-gray-800">
+          <div className="flex justify-end gap-3 pt-4">
             <button
               type="button"
               onClick={onClose}
@@ -298,7 +356,7 @@ const UserModal = ({
               type="submit"
               className="rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600"
             >
-              {user ? 'Actualizar' : 'Crear'}
+              {user ? 'Actualizar' : 'Crear'} Usuario
             </button>
           </div>
         </form>
@@ -310,7 +368,7 @@ const UserModal = ({
 const DeleteConfirmModal = ({ 
   isOpen, 
   onClose, 
-  onConfirm,
+  onConfirm, 
   userName 
 }: { 
   isOpen: boolean;
@@ -324,10 +382,10 @@ const DeleteConfirmModal = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
         <h3 className="mb-4 text-xl font-semibold text-gray-800 dark:text-white/90">
-          Confirmar Eliminación
+          Confirmar Desactivación
         </h3>
         <p className="mb-6 text-sm text-gray-600 dark:text-gray-400">
-          ¿Estás seguro de que deseas eliminar al usuario <strong>{userName}</strong>? Esta acción no se puede deshacer.
+          ¿Estás seguro de que deseas desactivar al usuario <strong>{userName}</strong>?
         </p>
         <div className="flex justify-end gap-3">
           <button
@@ -340,7 +398,7 @@ const DeleteConfirmModal = ({
             onClick={onConfirm}
             className="rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600"
           >
-            Eliminar
+            Desactivar
           </button>
         </div>
       </div>
@@ -353,20 +411,45 @@ const DeleteConfirmModal = ({
 // ============================================================================
 
 export default function Profiles() {
-  const { data: users = [], isLoading } = useUsers();
-  const { data: roles = [],} = useRoles(); // ✅ Datos reales
-  const { data: departments = [],} = useDepartments(); // ✅ Datos reales
-  const createUserMutation = useCreateUser();
-  const updateUserMutation = useUpdateUser();
-  const deleteUserMutation = useDeleteUser();
+  const { addNotification } = useNotifications();
 
+  // Estados
+  const [users, setUsers] = useState<User[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Estados de UI
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterActive, setFilterActive] = useState<'all' | 'active' | 'inactive'>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterActive, setFilterActive] = useState<'all' | 'active' | 'inactive'>('all');
 
+  // Cargar datos iniciales
+  useEffect(() => {
+    loadInitialData();
+  }, []);
+
+  const loadInitialData = async () => {
+    try {
+      setIsLoading(true);
+      const [usersData, rolesData, depsData] = await Promise.all([
+        api.getUsers(),
+        api.getRoles(),
+        api.getDepartments(),
+      ]);
+      setUsers(usersData);
+      setRoles(rolesData);
+      setDepartments(depsData);
+    } catch (error) {
+      console.error("Error loading data:", error);
+      addNotification("danger", "Error", "Error al cargar los datos");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleCreate = () => {
     setSelectedUser(null);
@@ -379,44 +462,42 @@ export default function Profiles() {
   };
 
   const handleSave = async (data: UserFormData) => {
-    // 1. Limpiamos los datos antes de enviar
-    const cleanedData = {
-        ...data,
-        // Si departmentId es '', lo forzamos a undefined o lo omitimos si el backend acepta 'null' o undefined
-        // (Dejaremos la lógica en el modal para el departmentId, ver sección 2)
-        // CostCenter es opcional en el backend (costCenter?: string), si es '', lo ponemos a undefined para omitirlo
-        costCenter: data.costCenter?.trim() === '' ? undefined : data.costCenter,
-    };
-
-    // 2. Comprobamos que departmentId tiene valor si estamos creando
-    if (!selectedUser && cleanedData.departmentId === '') {
-        // Podrías lanzar un toast o un error aquí para notificar al usuario.
-        console.error('El departamento es obligatorio para crear un nuevo usuario.');
-        alert('Por favor, selecciona un Rol y un Departamento.'); // Aviso simple
-        return; 
-    }
-    
-    // Si la data está limpia, procedemos
     try {
-        if (selectedUser) {
-            // El backend del update debe manejar la limpieza o el DTO debe ser más flexible
-            await updateUserMutation.mutateAsync({ userId: selectedUser.id, data: cleanedData });
-        } else {
-            // El DTO de CreateUserDto requiere password y el backend requiere roleId/departmentId
-            await createUserMutation.mutateAsync(cleanedData); 
+      if (selectedUser) {
+        // Actualizar - no enviar password si está vacío
+        const updateData: Partial<UserFormData> = {
+          nombre: data.nombre,
+          email: data.email,
+          rolId: data.rolId,
+          departamentoId: data.departamentoId || undefined,
+          activo: data.activo,
+        };
+        
+        await api.updateUser(selectedUser.id, updateData);
+        addNotification("success", "Éxito", "Usuario actualizado correctamente");
+      } else {
+        // Crear - password es requerido
+        if (!data.password) {
+          addNotification("danger", "Error", "La contraseña es requerida");
+          return;
+        }
+        if (!data.rolId || !data.departamentoId) {
+          addNotification("danger", "Error", "Rol y Departamento son requeridos");
+          return;
         }
         
-        setIsModalOpen(false);
-        setSelectedUser(null);
-        // Opcional: Invalida las queries (si usas react-query/tanstack-query) para actualizar la lista
-        // queryClient.invalidateQueries('users'); 
+        await api.createUser(data);
+        addNotification("success", "Éxito", "Usuario creado correctamente");
+      }
+      
+      setIsModalOpen(false);
+      setSelectedUser(null);
+      await loadInitialData(); // Recargar lista
     } catch (error: any) {
-        console.error('Error saving user:', error);
-        const errorMessage = error.response?.data?.message || 'Error desconocido al guardar usuario.';
-        console.error('Error saving user:', errorMessage);
-        // TODO: Mostrar el error de validación del backend (ej: Email ya registrado) al usuario.
+      console.error("Error saving user:", error);
+      addNotification("danger", "Error", error.message || "Error al guardar usuario");
     }
-};
+  };
 
   const handleDeleteClick = (user: User) => {
     setUserToDelete(user);
@@ -427,25 +508,28 @@ export default function Profiles() {
     if (!userToDelete) return;
     
     try {
-      await deleteUserMutation.mutateAsync(userToDelete.id);
+      await api.deactivateUser(userToDelete.id);
+      addNotification("success", "Éxito", "Usuario desactivado correctamente");
       setIsDeleteModalOpen(false);
       setUserToDelete(null);
+      await loadInitialData(); // Recargar lista
     } catch (error) {
-      console.error('Error deleting user:', error);
+      console.error("Error deactivating user:", error);
+      addNotification("danger", "Error", "Error al desactivar usuario");
     }
   };
 
-  // Filter users
+  // Filtrar usuarios
   const filteredUsers = users.filter(user => {
     const matchesSearch = 
-      user.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      user.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.role.name.toLowerCase().includes(searchQuery.toLowerCase());
+      user.rol.nombre.toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchesActiveFilter = 
       filterActive === 'all' ||
-      (filterActive === 'active' && user.isActive) ||
-      (filterActive === 'inactive' && !user.isActive);
+      (filterActive === 'active' && user.activo) ||
+      (filterActive === 'inactive' && !user.activo);
     
     return matchesSearch && matchesActiveFilter;
   });
@@ -453,7 +537,7 @@ export default function Profiles() {
   if (isLoading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <p className="text-gray-600 dark:text-gray-400">Cargando usuarios...</p>
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
       </div>
     );
   }
@@ -557,13 +641,13 @@ export default function Profiles() {
           <div className="rounded-lg bg-green-50 p-4 dark:bg-green-900/20">
             <p className="text-sm text-green-600 dark:text-green-400">Usuarios Activos</p>
             <p className="mt-1 text-2xl font-semibold text-green-700 dark:text-green-300">
-              {users.filter(u => u.isActive).length}
+              {users.filter(u => u.activo).length}
             </p>
           </div>
           <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
             <p className="text-sm text-gray-600 dark:text-gray-400">Usuarios Inactivos</p>
             <p className="mt-1 text-2xl font-semibold text-gray-700 dark:text-gray-300">
-              {users.filter(u => !u.isActive).length}
+              {users.filter(u => !u.activo).length}
             </p>
           </div>
         </div>
@@ -589,7 +673,7 @@ export default function Profiles() {
           setUserToDelete(null);
         }}
         onConfirm={handleDeleteConfirm}
-        userName={userToDelete?.fullName || ''}
+        userName={userToDelete?.nombre || ''}
       />
     </>
   );
