@@ -1,269 +1,560 @@
 // mocks/mocks_proyectos.ts
 import { Proyecto, DetalleProducto } from '../types/gerencia.types';
 
-export const PROYECTOS_ACTIVOS: Proyecto[] = [
+/**
+ * ÁREA PROYECTOS - 6 proyectos
+ * Total productos: 147
+ */
+export const PROYECTOS_PROYECTOS: Proyecto[] = [
   {
-    id: 'proj-001',
-    nombre: 'Proyecto Jamastran',
-    estado: 'success',
-    criticidad: 3,
-    responsable: 'María García',
-    fechaInicio: '2024-10-01',
-    fechaLimite: '2025-12-31',
-    resumen: {
-      totalProductos: 89,
-      cotizados: 78,
-      conDescuento: 34,
-      comprados: 67,
-      pagados: 61,
-      primerSeguimiento: 54,
-      enFOB: 45,
-      conBL: 38,
-      segundoSeguimiento: 34,
-      enCIF: 29
-    }
-  },
-  {
-    id: 'proj-002',
-    nombre: 'Proyecto X',
+    id: 'proj-p01',
+    nombre: 'Ampliación Planta Norte',
     estado: 'danger',
     criticidad: 9,
-    responsable: 'Carlos López',
-    fechaInicio: '2024-11-15',
-    fechaLimite: '2025-06-30',
-    resumen: {
-      totalProductos: 67,
-      cotizados: 54,
-      conDescuento: 23,
-      comprados: 38,
-      pagados: 31,
-      primerSeguimiento: 24,
-      enFOB: 18,
-      conBL: 12,
-      segundoSeguimiento: 9,
-      enCIF: 6
-    }
-  },
-  {
-    id: 'proj-003',
-    nombre: 'Proyecto Y',
-    estado: 'danger',
-    criticidad: 10,
-    responsable: 'Ana Martínez',
+    responsable: 'María García',
     fechaInicio: '2024-09-01',
     fechaLimite: '2025-03-31',
     resumen: {
-      totalProductos: 124,
-      cotizados: 98,
-      conDescuento: 45,
-      comprados: 72,
-      pagados: 56,
-      primerSeguimiento: 41,
-      enFOB: 28,
-      conBL: 19,
-      segundoSeguimiento: 14,
+      totalProductos: 45,
+      cotizados: 45,
+      conDescuento: 32,
+      comprados: 28,
+      pagados: 24,
+      primerSeguimiento: 20,
+      enFOB: 16,
+      conBL: 12,
+      segundoSeguimiento: 8,
+      enCIF: 4
+    }
+  },
+  {
+    id: 'proj-p02',
+    nombre: 'Modernización Sistema SCADA',
+    estado: 'warn',
+    criticidad: 7,
+    responsable: 'Carlos López',
+    fechaInicio: '2024-08-15',
+    fechaLimite: '2025-02-28',
+    resumen: {
+      totalProductos: 28,
+      cotizados: 28,
+      conDescuento: 19,
+      comprados: 17,
+      pagados: 15,
+      primerSeguimiento: 13,
+      enFOB: 11,
+      conBL: 9,
+      segundoSeguimiento: 7,
+      enCIF: 5
+    }
+  },
+  {
+    id: 'proj-p03',
+    nombre: 'Renovación Equipos Protección',
+    estado: 'danger',
+    criticidad: 10,
+    responsable: 'Ana Martínez',
+    fechaInicio: '2024-10-01',
+    fechaLimite: '2025-01-15',
+    resumen: {
+      totalProductos: 32,
+      cotizados: 30,
+      conDescuento: 18,
+      comprados: 15,
+      pagados: 12,
+      primerSeguimiento: 9,
+      enFOB: 7,
+      conBL: 5,
+      segundoSeguimiento: 3,
+      enCIF: 2
+    }
+  },
+  {
+    id: 'proj-p04',
+    nombre: 'Proyecto Transmisión 230KV',
+    estado: 'success',
+    criticidad: 3,
+    responsable: 'Juan Pérez',
+    fechaInicio: '2024-07-01',
+    fechaLimite: '2025-06-30',
+    resumen: {
+      totalProductos: 18,
+      cotizados: 18,
+      conDescuento: 14,
+      comprados: 14,
+      pagados: 13,
+      primerSeguimiento: 12,
+      enFOB: 11,
+      conBL: 10,
+      segundoSeguimiento: 9,
       enCIF: 8
     }
   },
   {
-    id: 'proj-004',
-    nombre: 'Proyecto Z',
+    id: 'proj-p05',
+    nombre: 'Instalación Subestación',
+    estado: 'warn',
+    criticidad: 6,
+    responsable: 'Laura Fernández',
+    fechaInicio: '2024-09-15',
+    fechaLimite: '2025-04-30',
+    resumen: {
+      totalProductos: 15,
+      cotizados: 14,
+      conDescuento: 10,
+      comprados: 10,
+      pagados: 9,
+      primerSeguimiento: 8,
+      enFOB: 7,
+      conBL: 6,
+      segundoSeguimiento: 5,
+      enCIF: 3
+    }
+  },
+  {
+    id: 'proj-p06',
+    nombre: 'Automatización Líneas',
     estado: 'success',
     criticidad: 2,
-    responsable: 'Juan Pérez',
-    fechaInicio: '2024-08-01',
+    responsable: 'Pedro Ramírez',
+    fechaInicio: '2024-06-01',
     fechaLimite: '2025-08-31',
     resumen: {
-      totalProductos: 56,
-      cotizados: 53,
-      conDescuento: 18,
-      comprados: 49,
-      pagados: 47,
-      primerSeguimiento: 45,
-      enFOB: 42,
-      conBL: 39,
-      segundoSeguimiento: 38,
-      enCIF: 36
-    }
-  },
-  {
-    id: 'proj-005',
-    nombre: 'Proyecto A',
-    estado: 'warn',
-    criticidad: 7,
-    responsable: 'Laura Fernández',
-    fechaInicio: '2024-10-15',
-    fechaLimite: '2025-05-31',
-    resumen: {
-      totalProductos: 78,
-      cotizados: 67,
-      conDescuento: 28,
-      comprados: 54,
-      pagados: 47,
-      primerSeguimiento: 38,
-      enFOB: 31,
-      conBL: 26,
-      segundoSeguimiento: 23,
-      enCIF: 19
-    }
-  },
-  {
-    id: 'proj-006',
-    nombre: 'Proyecto B',
-    estado: 'warn',
-    criticidad: 5,
-    responsable: 'Pedro Ramírez',
-    fechaInicio: '2024-07-01',
-    fechaLimite: '2025-02-28',
-    resumen: {
-      totalProductos: 36,
-      cotizados: 35,
-      conDescuento: 12,
-      comprados: 33,
-      pagados: 31,
-      primerSeguimiento: 29,
-      enFOB: 27,
-      conBL: 24,
-      segundoSeguimiento: 22,
-      enCIF: 20
+      totalProductos: 9,
+      cotizados: 7,
+      conDescuento: 5,
+      comprados: 5,
+      pagados: 5,
+      primerSeguimiento: 5,
+      enFOB: 4,
+      conBL: 3,
+      segundoSeguimiento: 2,
+      enCIF: 1
     }
   }
 ];
 
-export const PROYECTOS_ORDENADOS = [...PROYECTOS_ACTIVOS].sort((a, b) => b.criticidad - a.criticidad);
+/**
+ * ÁREA COMERCIAL - 4 proyectos
+ * Total productos: 98
+ */
+export const PROYECTOS_COMERCIAL: Proyecto[] = [
+  {
+    id: 'proj-c01',
+    nombre: 'Equipamiento Oficinas Centrales',
+    estado: 'warn',
+    criticidad: 5,
+    responsable: 'Roberto Sánchez',
+    fechaInicio: '2024-10-01',
+    fechaLimite: '2025-02-28',
+    resumen: {
+      totalProductos: 38,
+      cotizados: 38,
+      conDescuento: 27,
+      comprados: 22,
+      pagados: 20,
+      primerSeguimiento: 18,
+      enFOB: 16,
+      conBL: 14,
+      segundoSeguimiento: 11,
+      enCIF: 9
+    }
+  },
+  {
+    id: 'proj-c02',
+    nombre: 'Mobiliario Nueva Sucursal',
+    estado: 'success',
+    criticidad: 3,
+    responsable: 'Claudia Morales',
+    fechaInicio: '2024-08-01',
+    fechaLimite: '2025-05-31',
+    resumen: {
+      totalProductos: 25,
+      cotizados: 25,
+      conDescuento: 18,
+      comprados: 15,
+      pagados: 14,
+      primerSeguimiento: 12,
+      enFOB: 11,
+      conBL: 9,
+      segundoSeguimiento: 8,
+      enCIF: 6
+    }
+  },
+  {
+    id: 'proj-c03',
+    nombre: 'Renovación Flota Vehículos',
+    estado: 'danger',
+    criticidad: 8,
+    responsable: 'Fernando Ortiz',
+    fechaInicio: '2024-11-01',
+    fechaLimite: '2025-01-31',
+    resumen: {
+      totalProductos: 22,
+      cotizados: 20,
+      conDescuento: 15,
+      comprados: 11,
+      pagados: 9,
+      primerSeguimiento: 8,
+      enFOB: 7,
+      conBL: 6,
+      segundoSeguimiento: 5,
+      enCIF: 4
+    }
+  },
+  {
+    id: 'proj-c04',
+    nombre: 'Sistemas Punto Venta',
+    estado: 'success',
+    criticidad: 4,
+    responsable: 'Diana Castro',
+    fechaInicio: '2024-07-15',
+    fechaLimite: '2025-03-15',
+    resumen: {
+      totalProductos: 13,
+      cotizados: 12,
+      conDescuento: 7,
+      comprados: 6,
+      pagados: 6,
+      primerSeguimiento: 5,
+      enFOB: 4,
+      conBL: 3,
+      segundoSeguimiento: 3,
+      enCIF: 2
+    }
+  }
+];
 
+/**
+ * ÁREA TÉCNICA - 3 proyectos
+ * Total productos: 76
+ */
+export const PROYECTOS_TECNICA: Proyecto[] = [
+  {
+    id: 'proj-t01',
+    nombre: 'Laboratorio Calibración',
+    estado: 'warn',
+    criticidad: 6,
+    responsable: 'Miguel Ángel Ruiz',
+    fechaInicio: '2024-09-01',
+    fechaLimite: '2025-03-31',
+    resumen: {
+      totalProductos: 34,
+      cotizados: 33,
+      conDescuento: 24,
+      comprados: 22,
+      pagados: 19,
+      primerSeguimiento: 17,
+      enFOB: 14,
+      conBL: 12,
+      segundoSeguimiento: 9,
+      enCIF: 7
+    }
+  },
+  {
+    id: 'proj-t02',
+    nombre: 'Instrumental Medición',
+    estado: 'success',
+    criticidad: 4,
+    responsable: 'Patricia Núñez',
+    fechaInicio: '2024-08-01',
+    fechaLimite: '2025-04-30',
+    resumen: {
+      totalProductos: 27,
+      cotizados: 26,
+      conDescuento: 19,
+      comprados: 17,
+      pagados: 15,
+      primerSeguimiento: 13,
+      enFOB: 11,
+      conBL: 9,
+      segundoSeguimiento: 8,
+      enCIF: 6
+    }
+  },
+  {
+    id: 'proj-t03',
+    nombre: 'Herramientas Especializadas',
+    estado: 'danger',
+    criticidad: 7,
+    responsable: 'Rodrigo Vargas',
+    fechaInicio: '2024-10-15',
+    fechaLimite: '2025-02-15',
+    resumen: {
+      totalProductos: 15,
+      cotizados: 14,
+      conDescuento: 9,
+      comprados: 9,
+      pagados: 8,
+      primerSeguimiento: 7,
+      enFOB: 6,
+      conBL: 5,
+      segundoSeguimiento: 4,
+      enCIF: 3
+    }
+  }
+];
+
+/**
+ * ÁREA OPERATIVA - 5 proyectos
+ * Total productos: 112
+ */
+export const PROYECTOS_OPERATIVA: Proyecto[] = [
+  {
+    id: 'proj-o01',
+    nombre: 'Equipamiento Taller Principal',
+    estado: 'success',
+    criticidad: 3,
+    responsable: 'Alberto Mendoza',
+    fechaInicio: '2024-07-01',
+    fechaLimite: '2025-07-31',
+    resumen: {
+      totalProductos: 35,
+      cotizados: 35,
+      conDescuento: 26,
+      comprados: 24,
+      pagados: 22,
+      primerSeguimiento: 20,
+      enFOB: 18,
+      conBL: 15,
+      segundoSeguimiento: 12,
+      enCIF: 10
+    }
+  },
+  {
+    id: 'proj-o02',
+    nombre: 'Maquinaria Pesada',
+    estado: 'danger',
+    criticidad: 8,
+    responsable: 'Gabriela Torres',
+    fechaInicio: '2024-10-01',
+    fechaLimite: '2025-02-28',
+    resumen: {
+      totalProductos: 28,
+      cotizados: 27,
+      conDescuento: 19,
+      comprados: 17,
+      pagados: 14,
+      primerSeguimiento: 12,
+      enFOB: 10,
+      conBL: 8,
+      segundoSeguimiento: 6,
+      enCIF: 4
+    }
+  },
+  {
+    id: 'proj-o03',
+    nombre: 'Herramientas Manuales',
+    estado: 'success',
+    criticidad: 2,
+    responsable: 'Héctor Jiménez',
+    fechaInicio: '2024-06-15',
+    fechaLimite: '2025-06-15',
+    resumen: {
+      totalProductos: 24,
+      cotizados: 23,
+      conDescuento: 17,
+      comprados: 16,
+      pagados: 15,
+      primerSeguimiento: 13,
+      enFOB: 11,
+      conBL: 9,
+      segundoSeguimiento: 8,
+      enCIF: 6
+    }
+  },
+  {
+    id: 'proj-o04',
+    nombre: 'Equipos Seguridad Industrial',
+    estado: 'warn',
+    criticidad: 5,
+    responsable: 'Isabel Ramírez',
+    fechaInicio: '2024-09-01',
+    fechaLimite: '2025-03-31',
+    resumen: {
+      totalProductos: 16,
+      cotizados: 15,
+      conDescuento: 11,
+      comprados: 9,
+      pagados: 8,
+      primerSeguimiento: 7,
+      enFOB: 6,
+      conBL: 5,
+      segundoSeguimiento: 4,
+      enCIF: 3
+    }
+  },
+  {
+    id: 'proj-o05',
+    nombre: 'Vehículos Utilitarios',
+    estado: 'warn',
+    criticidad: 6,
+    responsable: 'Jorge Medina',
+    fechaInicio: '2024-10-15',
+    fechaLimite: '2025-04-15',
+    resumen: {
+      totalProductos: 9,
+      cotizados: 8,
+      conDescuento: 5,
+      comprados: 5,
+      pagados: 4,
+      primerSeguimiento: 3,
+      enFOB: 2,
+      conBL: 2,
+      segundoSeguimiento: 1,
+      enCIF: 1
+    }
+  }
+];
+
+// Ordenar por criticidad
+export const PROYECTOS_ORDENADOS = [...PROYECTOS_PROYECTOS].sort((a, b) => b.criticidad - a.criticidad);
+export const PROYECTOS_COMERCIAL_ORDENADOS = [...PROYECTOS_COMERCIAL].sort((a, b) => b.criticidad - a.criticidad);
+export const PROYECTOS_TECNICA_ORDENADOS = [...PROYECTOS_TECNICA].sort((a, b) => b.criticidad - a.criticidad);
+export const PROYECTOS_OPERATIVA_ORDENADOS = [...PROYECTOS_OPERATIVA].sort((a, b) => b.criticidad - a.criticidad);
+
+/**
+ * DETALLE DE PRODUCTOS - Para vista de nivel 3
+ * Esta es una muestra de 8 productos para el área de proyectos
+ */
 export const DETALLE_PRODUCTOS_PROYECTOS: DetalleProducto[] = [
   {
-    id: 'prod-001',
-    sku: 'LAP-DELL-5420',
-    descripcion: 'Laptop Dell Latitude 5420, i7, 16GB RAM, 512GB SSD',
-    cantidad: 25,
-    cotizacionId: 'cot-001',
-    cotizacionNombre: 'COT-2024-089',
-    proveedor: 'TechSupply Inc.',
+    id: 'prod-p001',
+    sku: 'TRF-500KVA',
+    descripcion: 'Transformador trifásico 500 KVA 13.8/0.48 KV',
+    cantidad: 3,
+    cotizacionId: 'cot-p-001',
+    cotizacionNombre: 'COT-PROY-001',
+    proveedor: 'ABB Transformers',
     responsable: 'María García',
+    proceso: 'primerSeguimiento',
+    estado: 'warn',
+    fechaSolicitud: '2024-09-15',
+    fechaEstimada: '2024-12-20',
+    diasRetraso: 3,
+    precioUnitario: 18500.00,
+    precioTotal: 55500.00
+  },
+  {
+    id: 'prod-p002',
+    sku: 'CBL-4/0-AWG',
+    descripcion: 'Cable conductor aluminio 4/0 AWG 600V',
+    cantidad: 2500,
+    cotizacionId: 'cot-p-002',
+    cotizacionNombre: 'COT-PROY-002',
+    proveedor: 'Conductores del Norte',
+    responsable: 'María García',
+    proceso: 'enFOB',
+    estado: 'danger',
+    fechaSolicitud: '2024-09-20',
+    fechaEstimada: '2024-11-30',
+    diasRetraso: 12,
+    precioUnitario: 8.50,
+    precioTotal: 21250.00,
+    observaciones: 'Retraso en embarque'
+  },
+  {
+    id: 'prod-p003',
+    sku: 'PLC-S7-1500',
+    descripcion: 'PLC Siemens S7-1500 CPU 1515-2 PN',
+    cantidad: 4,
+    cotizacionId: 'cot-p-008',
+    cotizacionNombre: 'COT-SCADA-001',
+    proveedor: 'Siemens AG',
+    responsable: 'Carlos López',
     proceso: 'enCIF',
     estado: 'success',
-    fechaSolicitud: '2024-10-15',
-    fechaEstimada: '2024-11-30',
-    precioUnitario: 850.00,
-    precioTotal: 21250.00,
-    observaciones: 'Entrega adelantada'
-  },
-  {
-    id: 'prod-002',
-    sku: 'MON-LG-27',
-    descripcion: 'Monitor LG 27" 4K IPS',
-    cantidad: 50,
-    cotizacionId: 'cot-001',
-    cotizacionNombre: 'COT-2024-089',
-    proveedor: 'Display Solutions',
-    responsable: 'María García',
-    proceso: 'pagados',
-    estado: 'warn',
-    fechaSolicitud: '2024-10-20',
-    fechaEstimada: '2024-12-15',
-    precioUnitario: 320.00,
-    precioTotal: 16000.00
-  },
-  {
-    id: 'prod-003',
-    sku: 'SRV-HP-DL380',
-    descripcion: 'Servidor HP ProLiant DL380 Gen10',
-    cantidad: 4,
-    cotizacionId: 'cot-002',
-    cotizacionNombre: 'COT-2024-091',
-    proveedor: 'Enterprise Systems',
-    responsable: 'Carlos López',
-    proceso: 'primerSeguimiento',
-    estado: 'danger',
-    fechaSolicitud: '2024-09-10',
+    fechaSolicitud: '2024-08-20',
     fechaEstimada: '2024-11-15',
-    diasRetraso: 10,
-    precioUnitario: 4500.00,
-    precioTotal: 18000.00,
-    observaciones: 'Retraso en importación'
+    precioUnitario: 4200.00,
+    precioTotal: 16800.00
   },
   {
-    id: 'prod-004',
-    sku: 'SW-CISCO-48',
-    descripcion: 'Switch Cisco Catalyst 2960-X 48 puertos',
-    cantidad: 12,
-    cotizacionId: 'cot-003',
-    cotizacionNombre: 'COT-2024-092',
-    proveedor: 'Network Pro',
+    id: 'prod-p004',
+    sku: 'HMI-TP1500',
+    descripcion: 'Panel HMI táctil 15" Comfort Panel',
+    cantidad: 6,
+    cotizacionId: 'cot-p-008',
+    cotizacionNombre: 'COT-SCADA-001',
+    proveedor: 'Siemens AG',
+    responsable: 'Carlos López',
+    proceso: 'segundoSeguimiento',
+    estado: 'success',
+    fechaSolicitud: '2024-08-20',
+    fechaEstimada: '2024-11-15',
+    precioUnitario: 2800.00,
+    precioTotal: 16800.00
+  },
+  {
+    id: 'prod-p005',
+    sku: 'RLE-SEL-751A',
+    descripcion: 'Relé protección diferencial SEL-751A',
+    cantidad: 5,
+    cotizacionId: 'cot-p-015',
+    cotizacionNombre: 'COT-PROT-001',
+    proveedor: 'Schweitzer Engineering',
     responsable: 'Ana Martínez',
-    proceso: 'comprados',
-    estado: 'success',
-    fechaSolicitud: '2024-11-01',
-    fechaEstimada: '2024-12-20',
-    precioUnitario: 890.00,
-    precioTotal: 10680.00
-  },
-  {
-    id: 'prod-005',
-    sku: 'UPS-APC-3000',
-    descripcion: 'UPS APC Smart-UPS 3000VA',
-    cantidad: 8,
-    cotizacionId: 'cot-004',
-    cotizacionNombre: 'COT-2024-093',
-    proveedor: 'Power Solutions',
-    responsable: 'Juan Pérez',
-    proceso: 'cotizados',
-    estado: 'warn',
-    fechaSolicitud: '2024-11-20',
-    fechaEstimada: '2025-01-10',
-    precioUnitario: 1200.00,
-    precioTotal: 9600.00
-  },
-  {
-    id: 'prod-006',
-    sku: 'CAB-CAT6A',
-    descripcion: 'Cable Cat6A 305m color azul',
-    cantidad: 20,
-    cotizacionId: 'cot-005',
-    cotizacionNombre: 'COT-2024-094',
-    proveedor: 'Cabling Systems',
-    responsable: 'Laura Fernández',
-    proceso: 'enBL',
-    estado: 'success',
-    fechaSolicitud: '2024-09-15',
-    fechaEstimada: '2024-10-30',
-    precioUnitario: 245.00,
-    precioTotal: 4900.00,
-    observaciones: 'En aduana'
-  },
-  {
-    id: 'prod-007',
-    sku: 'CAM-SEC-001',
-    descripcion: 'Cámara IP 4MP exterior visión nocturna',
-    cantidad: 35,
-    cotizacionId: 'cot-006',
-    cotizacionNombre: 'COT-2024-095',
-    proveedor: 'Security Systems',
-    responsable: 'Laura Fernández',
     proceso: 'conDescuento',
-    estado: 'warn',
-    fechaSolicitud: '2024-11-05',
-    fechaEstimada: '2024-12-25',
-    precioUnitario: 180.00,
-    precioTotal: 6300.00,
+    estado: 'danger',
+    fechaSolicitud: '2024-10-05',
+    fechaEstimada: '2024-12-15',
+    diasRetraso: 8,
+    precioUnitario: 3200.00,
+    precioTotal: 16000.00,
     observaciones: 'Negociando descuento por volumen'
   },
   {
-    id: 'prod-008',
-    sku: 'FW-FORTINET-200',
-    descripcion: 'Firewall FortiGate 200E',
+    id: 'prod-p006',
+    sku: 'PNL-MCC-800A',
+    descripcion: 'Panel MCC 800A 480V con 12 arrancadores',
     cantidad: 2,
-    cotizacionId: 'cot-007',
-    cotizacionNombre: 'COT-2024-096',
-    proveedor: 'Cybersecurity Inc',
-    responsable: 'Pedro Ramírez',
-    proceso: 'enFOB',
+    cotizacionId: 'cot-p-001',
+    cotizacionNombre: 'COT-PROY-001',
+    proveedor: 'Schneider Electric',
+    responsable: 'María García',
+    proceso: 'comprados',
+    estado: 'warn',
+    fechaSolicitud: '2024-09-10',
+    fechaEstimada: '2024-12-30',
+    diasRetraso: 2,
+    precioUnitario: 15600.00,
+    precioTotal: 31200.00
+  },
+  {
+    id: 'prod-p007',
+    sku: 'UPS-APC-10K',
+    descripcion: 'UPS APC Smart-UPS 10KVA Online',
+    cantidad: 3,
+    cotizacionId: 'cot-p-004',
+    cotizacionNombre: 'COT-TRANS-001',
+    proveedor: 'APC by Schneider',
+    responsable: 'Juan Pérez',
+    proceso: 'enCIF',
     estado: 'success',
-    fechaSolicitud: '2024-10-08',
-    fechaEstimada: '2024-11-28',
-    precioUnitario: 3200.00,
-    precioTotal: 6400.00
+    fechaSolicitud: '2024-07-15',
+    fechaEstimada: '2024-10-30',
+    precioUnitario: 5400.00,
+    precioTotal: 16200.00
+  },
+  {
+    id: 'prod-p008',
+    sku: 'SW-IND-24P',
+    descripcion: 'Switch industrial managed 24 puertos gigabit',
+    cantidad: 8,
+    cotizacionId: 'cot-p-008',
+    cotizacionNombre: 'COT-SCADA-001',
+    proveedor: 'Cisco Systems',
+    responsable: 'Carlos López',
+    proceso: 'pagados',
+    estado: 'success',
+    fechaSolicitud: '2024-08-25',
+    fechaEstimada: '2024-11-20',
+    precioUnitario: 1850.00,
+    precioTotal: 14800.00
   }
 ];
+
+// Similar para otras áreas (comercial, técnica, operativa)
+export const DETALLE_PRODUCTOS_COMERCIAL: DetalleProducto[] = [];
+export const DETALLE_PRODUCTOS_TECNICA: DetalleProducto[] = [];
+export const DETALLE_PRODUCTOS_OPERATIVA: DetalleProducto[] = [];

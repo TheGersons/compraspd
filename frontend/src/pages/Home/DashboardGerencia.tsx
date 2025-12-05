@@ -1,6 +1,6 @@
-// DashboardGerencia.tsx
+// DashboardGerencia.tsx - MODIFICADO
 import { useState } from 'react';
-import { NavegacionContext, Area, Proyecto } from './types/gerencia.types';
+import { NavegacionContext, Area, Proyecto, EtapaDetalle } from './types/gerencia.types';
 import Breadcrumbs from './components/gerencia/Breadcrumbs';
 import AreaCard from './components/gerencia/AreaCard';
 import ProyectoCarousel from './components/gerencia/ProyectoCarousel';
@@ -8,6 +8,7 @@ import PanelProyectos from './components/gerencia/PanelProyectos';
 import TablaResumen from './components/gerencia/TablaResumen';
 import DetalleTabla from './components/gerencia/DetalleTabla';
 import GraficoComparativo from './components/gerencia/GraficoComparativo';
+import ModalDetalleProductos from './components/gerencia/ModalDetalleProductos';
 
 // Mocks
 import { AREAS_PRINCIPALES } from './mocks/mocks_areas';
@@ -27,6 +28,7 @@ import {
   PROYECTOS_OPERATIVA_ORDENADOS,
   DETALLE_PRODUCTOS_OPERATIVA
 } from './mocks/mocks_operativa';
+import { getProductosDetalladosPorArea } from './mocks/mocks_productos_detallados';
 import Button from '../../components/ui/button/Button';
 
 export default function DashboardGerencia() {
@@ -34,6 +36,10 @@ export default function DashboardGerencia() {
     nivel: 1
   });
   const [proyectoSeleccionado, setProyectoSeleccionado] = useState<Proyecto | null>(null);
+  
+  // Estados para el modal
+  const [modalAbierto, setModalAbierto] = useState(false);
+  const [etapaModal, setEtapaModal] = useState<EtapaDetalle>('total');
 
   // Obtener proyectos según área
   const getProyectosPorArea = () => {
@@ -69,7 +75,13 @@ export default function DashboardGerencia() {
     }
   };
 
-  // Obtener todos los proyectos para el carrusel (combinados y ordenados)
+  // Obtener productos detallados para modal
+  const getProductosDetalladosModal = () => {
+    if (!navegacion.area) return [];
+    return getProductosDetalladosPorArea(navegacion.area.tipo);
+  };
+
+  // Obtener todos los proyectos para el carrusel
   const getTodosProyectos = () => {
     const todos = [
       ...PROYECTOS_PROYECTOS,
@@ -111,6 +123,12 @@ export default function DashboardGerencia() {
 
   const handleVerDetalle = () => {
     setNavegacion((prev) => ({ ...prev, nivel: 3 }));
+  };
+
+  // Handler para abrir modal desde tabla
+  const handleVerDetalleEtapa = (etapaKey: string) => {
+    setEtapaModal(etapaKey as EtapaDetalle);
+    setModalAbierto(true);
   };
 
   const handleNavigate = (nivel: 1 | 2 | 3) => {
@@ -162,17 +180,17 @@ export default function DashboardGerencia() {
         </div>
       )}
 
-      {/* NIVEL 1: Vista General con Áreas */}
+      {/* NIVEL 1: Vista General con Áreas - SIN TABLAS */}
       {navegacion.nivel === 1 && (
         <div className="space-y-8">
-          {/* Áreas Principales - Grid 2x2 */}
+          {/* Áreas Principales - Grid 2x2 - SOLO CARDS */}
           <div className="grid gap-6 lg:grid-cols-2">
             {AREAS_PRINCIPALES.map((area) => (
               <AreaCard key={area.id} area={area} onClick={() => handleSelectArea(area)} />
             ))}
           </div>
 
-          {/* Gráfico Comparativo - NUEVO */}
+          {/* Gráfico Comparativo */}
           <GraficoComparativo
             proyectosProyectos={PROYECTOS_PROYECTOS}
             proyectosComercial={PROYECTOS_COMERCIAL_ORDENADOS}
@@ -180,7 +198,7 @@ export default function DashboardGerencia() {
             proyectosOperativa={PROYECTOS_OPERATIVA_ORDENADOS}
           />
 
-          {/* Carrusel de Proyectos Activos - ABAJO */}
+          {/* Carrusel de Proyectos Activos */}
           <div className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
             <div className="mb-4">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">
@@ -195,11 +213,12 @@ export default function DashboardGerencia() {
         </div>
       )}
 
-      {/* NIVEL 2: Panel lateral + Tabla de resumen */}
+      {/* NIVEL 2: Panel lateral + Tabla de resumen CON BOTÓN VER DETALLE */}
       {navegacion.nivel === 2 && navegacion.area && (
         <div className="flex gap-6">
           {/* Panel lateral de proyectos */}
           <PanelProyectos
+            tipoArea={navegacion.area.tipo}
             proyectos={getProyectosPorArea()}
             proyectoSeleccionado={proyectoSeleccionado}
             onSelectProyecto={handleSelectProyecto}
@@ -226,11 +245,13 @@ export default function DashboardGerencia() {
                   </div>
                 </div>
 
-                {/* Tabla de resumen */}
+                {/* Tabla de resumen con botones Ver Detalle */}
                 <TablaResumen
                   resumen={proyectoSeleccionado.resumen}
                   titulo="Resumen de Procesos"
                   subtitulo={`Distribución de ${proyectoSeleccionado.resumen.totalProductos} productos en las diferentes etapas`}
+                  onVerDetalle={handleVerDetalleEtapa}
+                  productosDetallados={getProductosDetalladosModal()}
                 />
               </>
             ) : (
@@ -266,6 +287,15 @@ export default function DashboardGerencia() {
           </div>
         </div>
       )}
+
+      {/* MODAL DE DETALLES */}
+      <ModalDetalleProductos
+        isOpen={modalAbierto}
+        onClose={() => setModalAbierto(false)}
+        etapa={etapaModal}
+        productos={getProductosDetalladosModal()}
+        nombreProyecto={proyectoSeleccionado?.nombre || ''}
+      />
     </div>
   );
 }

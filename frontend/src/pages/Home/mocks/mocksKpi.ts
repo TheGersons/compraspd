@@ -1,3 +1,4 @@
+// mocks/mocksKpi.ts
 type KpiData = {
   title: string;
   value: number | string;
@@ -10,13 +11,26 @@ type KpiData = {
   };
 };
 
+/**
+ * KPIS CONSISTENTES CON MOCKS DE GERENCIA
+ * 
+ * Total productos en sistema: 433
+ * - Área Proyectos: 147 productos
+ * - Área Comercial: 98 productos
+ * - Área Técnica: 76 productos
+ * - Área Operativa: 112 productos
+ * 
+ * Total proyectos activos: 18
+ * - Área Proyectos: 6 proyectos
+ * - Área Comercial: 4 proyectos
+ * - Área Técnica: 3 proyectos
+ * - Área Operativa: 5 proyectos
+ */
 
 // ============================================================================
-// MOCK DATA - Con más variedad de tonos y elementos extendidos
+// COTIZACIONES
 // ============================================================================
-
 export const MOCK_COTIZACIONES: KpiData[] = [
-  // --- Elementos Originales ---
   {
     title: "Cotizaciones Totales",
     value: 156,
@@ -31,7 +45,7 @@ export const MOCK_COTIZACIONES: KpiData[] = [
   {
     title: "En Revisión",
     value: 23,
-    tone: "success",
+    tone: "info",
     hint: "Requieren atención",
     details: {
       source: "Estado: EN_REVISION",
@@ -40,19 +54,19 @@ export const MOCK_COTIZACIONES: KpiData[] = [
     }
   },
   {
-    title: "Vencidas",
-    value: 6,
-    tone: "warn",
-    hint: "Ultimos 30 días",
+    title: "Aprobadas",
+    value: 89,
+    tone: "success",
+    hint: "Este mes",
     details: {
-      source: "Estado: APROBADA",
+      source: "Estado: APROBADA_COMPLETA/PARCIAL",
       lastUpdate: "Hace 1 minuto",
       trend: "↑ +8% vs mes anterior"
     }
   },
   {
     title: "Pendientes",
-    value: 12,
+    value: 32,
     tone: "warn",
     hint: "Sin asignar",
     details: {
@@ -63,7 +77,7 @@ export const MOCK_COTIZACIONES: KpiData[] = [
   },
   {
     title: "Monto Total",
-    value: "L 2.5M",
+    value: "L 8.7M",
     tone: "success",
     hint: "En proceso",
     details: {
@@ -74,31 +88,30 @@ export const MOCK_COTIZACIONES: KpiData[] = [
   },
   {
     title: "Promedio Días",
-    value: "4.2",
-    tone: "warn",
+    value: "3.8",
+    tone: "success",
     hint: "Tiempo respuesta",
     details: {
       source: "Fecha solicitud vs aprobación",
       lastUpdate: "Actualización diaria",
-      trend: "↓ Mejoró 0.5 días"
+      trend: "↓ Mejoró 0.4 días"
     }
   },
-  // --- 12 Elementos Adicionales ---
   {
     title: "Rechazadas",
-    value: 32,
-    tone: "success",
+    value: 12,
+    tone: "warn",
     hint: "Últimos 30 días",
     details: {
       source: "Estado: RECHAZADA",
       lastUpdate: "Hace 15 minutos",
-      trend: "↑ +3% vs mes anterior"
+      trend: "↓ -3% vs mes anterior"
     }
   },
   {
     title: "Monto Aprobado",
-    value: "L 1.8M",
-    tone: "warn",
+    value: "L 6.2M",
+    tone: "success",
     hint: "Acumulado mes",
     details: {
       source: "Suma de cotizaciones APROBADA",
@@ -108,199 +121,251 @@ export const MOCK_COTIZACIONES: KpiData[] = [
   },
 ];
 
+// ============================================================================
+// COMPRAS Y PRODUCTOS
+// ============================================================================
 export const MOCK_COMPRAS: KpiData[] = [
-  // --- Elementos Originales ---
   {
-    title: "Órdenes Activas",
-    value: 45,
-    tone: "success",
-    hint: "En tránsito",
-    details: {
-      source: "Compras en estado PENDIENTE",
-      lastUpdate: "Tiempo real",
-      trend: "↑ +3 esta semana"
-    }
-  },
-  {
-    title: "Pre-Compra",
-    value: 18,
-    tone: "danger",
-    hint: "Por confirmar",
-    details: {
-      source: "Items en PRE-COMPRA",
-      lastUpdate: "Hace 5 minutos",
-      trend: "→ Estable"
-    }
-  },
-  {
-    title: "Fabricación",
-    value: 12,
-    tone: "danger",
-    hint: "En producción",
-    details: {
-      source: "Items en FABRICACION",
-      lastUpdate: "Hace 8 minutos",
-      trend: "↓ -2 completados hoy"
-    }
-  },
-  {
-    title: "En FORS",
-    value: 8,
-    tone: "success",
-    hint: "Documentación",
-    details: {
-      source: "Items en FORS",
-      lastUpdate: "Hace 15 minutos",
-      trend: "→ En proceso"
-    }
-  },
-  {
-    title: "CIF",
-    value: 5,
-    tone: "success",
-    hint: "Por recibir",
-    details: {
-      source: "Items en CIF",
-      lastUpdate: "Hace 20 minutos",
-      trend: "↑ +2 llegaron a aduana"
-    }
-  },
-  {
-    title: "Completadas",
-    value: 234,
-    tone: "success",
-    hint: "Este año",
-    details: {
-      source: "Compras COMPLETADA",
-      lastUpdate: "Actualización diaria",
-      trend: "↑ +145% vs año anterior"
-    }
-  },
-  // --- 12 Elementos Adicionales ---
-  {
-    title: "Facturas Pendientes",
-    value: 25,
-    tone: "danger",
-    hint: "Por pagar o recibir",
-    details: {
-      source: "Cuentas por pagar",
-      lastUpdate: "Hace 1 hora",
-      trend: "↑ +5 vs ayer"
-    }
-  },
-  {
-    title: "Proveedores Activos",
-    value: 85,
-    tone: "success",
-    hint: "Con transacciones recientes",
-    details: {
-      source: "Maestro de proveedores",
-      lastUpdate: "Actualización semanal",
-      trend: "→ Estable"
-    }
-  },
-  {
-    title: "Requisiciones Nuevas",
-    value: 7,
+    title: "Productos Activos",
+    value: 433,
     tone: "info",
-    hint: "Ingresadas hoy",
+    hint: "En seguimiento",
     details: {
-      source: "Módulo de Solicitudes",
+      source: "Vista gerencial - Total",
       lastUpdate: "Tiempo real",
-      trend: "↑ +2 vs promedio"
+      trend: "→ Constante"
+    }
+  },
+  {
+    title: "Proyectos Activos",
+    value: 18,
+    tone: "success",
+    hint: "En ejecución",
+    details: {
+      source: "4 áreas operativas",
+      lastUpdate: "Actualización diaria",
+      trend: "→ Estable"
+    }
+  },
+  {
+    title: "Cotizados",
+    value: 418,
+    tone: "success",
+    hint: "96.5% del total",
+    details: {
+      source: "Productos con cotización",
+      lastUpdate: "Hace 5 minutos",
+      trend: "↑ +15 esta semana"
+    }
+  },
+  {
+    title: "Con Descuento",
+    value: 295,
+    tone: "warn",
+    hint: "68% del total",
+    details: {
+      source: "Solicitudes de descuento",
+      lastUpdate: "Hace 8 minutos",
+      trend: "↑ En negociación"
+    }
+  },
+  {
+    title: "Comprados",
+    value: 266,
+    tone: "success",
+    hint: "61% del total",
+    details: {
+      source: "Órdenes de compra emitidas",
+      lastUpdate: "Hace 15 minutos",
+      trend: "↑ +12 hoy"
+    }
+  },
+  {
+    title: "Pagados",
+    value: 232,
+    tone: "success",
+    hint: "54% del total",
+    details: {
+      source: "Pagos procesados",
+      lastUpdate: "Hace 20 minutos",
+      trend: "↑ +8 hoy"
+    }
+  },
+  {
+    title: "En FOB",
+    value: 172,
+    tone: "warn",
+    hint: "40% del total",
+    details: {
+      source: "Productos embarcados",
+      lastUpdate: "Hace 30 minutos",
+      trend: "→ En tránsito"
+    }
+  },
+  {
+    title: "En CIF",
+    value: 84,
+    tone: "info",
+    hint: "19% del total",
+    details: {
+      source: "Productos en aduana",
+      lastUpdate: "Hace 45 minutos",
+      trend: "↑ +5 liberados hoy"
+    }
+  },
+  {
+    title: "Productos Críticos",
+    value: 47,
+    tone: "danger",
+    hint: "Con atrasos >5 días",
+    details: {
+      source: "Criticidad alta",
+      lastUpdate: "Tiempo real",
+      trend: "↑ Requieren atención"
     }
   },
 ];
 
+// ============================================================================
+// IMPORT/EXPORT Y LOGÍSTICA
+// ============================================================================
 export const MOCK_IMPORT_EXPORT: KpiData[] = [
-  // --- Elementos Originales ---
   {
     title: "Importaciones Activas",
-    value: 15,
-    tone: "warn",
-    hint: "En proceso",
+    value: 172,
+    tone: "info",
+    hint: "FOB + BL + Seguimientos",
     details: {
-      source: "Tipo: INTERNACIONAL",
+      source: "Productos en tránsito",
       lastUpdate: "Hace 30 minutos",
-      trend: "↑ +3 esta semana"
+      trend: "↑ +8 esta semana"
     }
   },
   {
     title: "En Aduana",
-    value: 6,
+    value: 84,
     tone: "warn",
     hint: "Por liberar",
     details: {
-      source: "Estado CIF + documentación",
+      source: "Estado CIF",
       lastUpdate: "Hace 1 hora",
       trend: "→ En trámite"
     }
   },
   {
-    title: "Exportaciones",
-    value: 8,
+    title: "Primer Seguimiento",
+    value: 202,
     tone: "success",
-    hint: "Este mes",
+    hint: "47% del total",
     details: {
-      source: "Tipo: EXPORTACION",
+      source: "Tracking inicial",
       lastUpdate: "Actualización diaria",
-      trend: "↑ +60% vs mes anterior"
+      trend: "↑ +10 actualizados"
     }
   },
   {
-    title: "Documentos Pendientes",
-    value: 4,
-    tone: "danger",
-    hint: "Requieren acción",
+    title: "Segundo Seguimiento",
+    value: 160,
+    tone: "success",
+    hint: "37% del total",
     details: {
-      source: "Documentos sin completar",
+      source: "Tracking avanzado",
+      lastUpdate: "Actualización diaria",
+      trend: "↑ +7 actualizados"
+    }
+  },
+  {
+    title: "Con BL",
+    value: 144,
+    tone: "success",
+    hint: "Bill of Lading emitido",
+    details: {
+      source: "Documentación completa",
       lastUpdate: "Hace 2 horas",
-      trend: "↓ -1 vs ayer"
-    }
-  },
-  {
-    title: "Valor Total",
-    value: "$850K",
-    tone: "danger",
-    hint: "En tránsito",
-    details: {
-      source: "Suma de import/export activos",
-      lastUpdate: "Actualización diaria",
-      trend: "↑ +20% vs mes anterior"
+      trend: "↑ +4 hoy"
     }
   },
   {
     title: "Días Promedio",
-    value: "12.5",
+    value: "42",
     tone: "warn",
-    hint: "Tiempo despacho",
+    hint: "Compra a recepción",
     details: {
-      source: "Inicio a liberación",
+      source: "Tiempo total de importación",
       lastUpdate: "Cálculo semanal",
-      trend: "↓ Mejoró 2 días"
-    }
-  },
-  // --- 12 Elementos Adicionales ---
-  {
-    title: "Import. Liberadas Hoy",
-    value: 2,
-    tone: "success",
-    hint: "Listas para bodega",
-    details: {
-      source: "Estado: LIBERADA",
-      lastUpdate: "Hace 15 minutos",
-      trend: "↑ +1 vs promedio"
+      trend: "→ Dentro de rango"
     }
   },
   {
-    title: "Costos Fijos ($)",
-    value: "$15K",
-    tone: "danger",
-    hint: "Acumulado mes",
+    title: "Valor en Tránsito",
+    value: "$3.2M",
+    tone: "info",
+    hint: "FOB + CIF activos",
     details: {
-      source: "Fletes y Aduanales",
+      source: "Suma productos embarcados",
       lastUpdate: "Actualización diaria",
-      trend: "→ Estable"
+      trend: "↑ +$450K esta semana"
+    }
+  },
+  {
+    title: "Liberados Esta Semana",
+    value: 18,
+    tone: "success",
+    hint: "Listos para bodega",
+    details: {
+      source: "CIF completados",
+      lastUpdate: "Hace 3 horas",
+      trend: "↑ +4 vs semana anterior"
+    }
+  },
+];
+
+// ============================================================================
+// RESUMEN POR ÁREA
+// ============================================================================
+export const MOCK_AREAS: KpiData[] = [
+  {
+    title: "Área Proyectos",
+    value: "147 prod",
+    tone: "purple",
+    hint: "6 proyectos activos",
+    details: {
+      source: "Infraestructura y energía",
+      lastUpdate: "Tiempo real",
+      trend: "→ 3 críticos, 2 normales, 1 adelantado"
+    }
+  },
+  {
+    title: "Área Comercial",
+    value: "98 prod",
+    tone: "indigo",
+    hint: "4 proyectos activos",
+    details: {
+      source: "Equipamiento y vehículos",
+      lastUpdate: "Tiempo real",
+      trend: "→ 1 crítico, 1 normal, 2 adelantados"
+    }
+  },
+  {
+    title: "Área Técnica",
+    value: "76 prod",
+    tone: "teal",
+    hint: "3 proyectos activos",
+    details: {
+      source: "Instrumental y laboratorio",
+      lastUpdate: "Tiempo real",
+      trend: "→ 1 crítico, 1 normal, 1 adelantado"
+    }
+  },
+  {
+    title: "Área Operativa",
+    value: "112 prod",
+    tone: "orange",
+    hint: "5 proyectos activos",
+    details: {
+      source: "Maquinaria y herramientas",
+      lastUpdate: "Tiempo real",
+      trend: "→ 1 crítico, 2 normales, 2 adelantados"
     }
   },
 ];

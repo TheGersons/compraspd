@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import PageMeta from "../../components/common/PageMeta";
 import { getToken } from "../../lib/api";
 import { useNotifications } from "../Notifications/context/NotificationContext";
+import Historial from "./components/Historial";
 
 // ============================================================================
 // TYPES
@@ -1439,92 +1440,9 @@ export default function FollowUps() {
                         </div>
                       )}
 
-                      {/* TAB 3: HISTORIAL */}
+                      {/* Tab 3: Historial */}
                       {vistaActiva === "historial" && (
-                        <div className="space-y-4">
-                          {historial.length === 0 ? (
-                            <div className="flex h-64 flex-col items-center justify-center text-center">
-                              <svg className="mb-4 h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                              <p className="text-gray-600 dark:text-gray-400">
-                                No hay cambios registrados
-                              </p>
-                            </div>
-                          ) : (
-                            <div className="space-y-3">
-                              {historial.map((cambio) => (
-                                <div
-                                  key={cambio.id}
-                                  className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-700/50"
-                                >
-                                  <div className="flex items-start gap-3">
-                                    {/* Icono según tipo de acción */}
-                                    <div className="flex-shrink-0">
-                                      {cambio.accion.includes("APROBADO") && (
-                                        <div className="rounded-full bg-green-100 p-2 dark:bg-green-900/30">
-                                          <svg className="h-5 w-5 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                          </svg>
-                                        </div>
-                                      )}
-                                      {cambio.accion.includes("TIMELINE") && (
-                                        <div className="rounded-full bg-blue-100 p-2 dark:bg-blue-900/30">
-                                          <svg className="h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                          </svg>
-                                        </div>
-                                      )}
-                                      {cambio.accion.includes("SUPERVISOR") && (
-                                        <div className="rounded-full bg-purple-100 p-2 dark:bg-purple-900/30">
-                                          <svg className="h-5 w-5 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                          </svg>
-                                        </div>
-                                      )}
-                                      {cambio.accion.includes("CREADA") && (
-                                        <div className="rounded-full bg-gray-100 p-2 dark:bg-gray-800">
-                                          <svg className="h-5 w-5 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                          </svg>
-                                        </div>
-                                      )}
-                                    </div>
-
-                                    <div className="flex-1">
-                                      {/* Acción y usuario */}
-                                      <div className="mb-1 flex items-center justify-between">
-                                        <span className="font-medium text-gray-900 dark:text-white">
-                                          {cambio.accion.replace(/_/g, " ")}
-                                        </span>
-                                        <span className="text-xs text-gray-500 dark:text-gray-500">
-                                          {formatFecha(cambio.creado)}
-                                        </span>
-                                      </div>
-
-                                      {/* Usuario */}
-                                      <p className="mb-2 text-sm text-gray-600 dark:text-gray-400">
-                                        Por: {cambio.usuario.nombre}
-                                      </p>
-
-                                      {/* Detalles */}
-                                      {cambio.detalles && Object.keys(cambio.detalles).length > 0 && (
-                                        <details className="text-sm">
-                                          <summary className="cursor-pointer text-blue-600 hover:text-blue-700 dark:text-blue-400">
-                                            Ver detalles
-                                          </summary>
-                                          <pre className="mt-2 overflow-auto rounded bg-gray-800 p-2 text-xs text-gray-300">
-                                            {JSON.stringify(cambio.detalles, null, 2)}
-                                          </pre>
-                                        </details>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
+                        <Historial cambios={historial} />
                       )}
                       {vistaActiva === "precios" && (
                         <div className="space-y-4">
