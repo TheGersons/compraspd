@@ -31,12 +31,13 @@ import {
 import { getProductosDetalladosPorArea } from './mocks/mocks_productos_detallados';
 import Button from '../../components/ui/button/Button';
 
+
 export default function DashboardGerencia() {
   const [navegacion, setNavegacion] = useState<NavegacionContext>({
     nivel: 1
   });
   const [proyectoSeleccionado, setProyectoSeleccionado] = useState<Proyecto | null>(null);
-  
+
   // Estados para el modal
   const [modalAbierto, setModalAbierto] = useState(false);
   const [etapaModal, setEtapaModal] = useState<EtapaDetalle>('total');
@@ -190,13 +191,6 @@ export default function DashboardGerencia() {
             ))}
           </div>
 
-          {/* Gráfico Comparativo */}
-          <GraficoComparativo
-            proyectosProyectos={PROYECTOS_PROYECTOS}
-            proyectosComercial={PROYECTOS_COMERCIAL_ORDENADOS}
-            proyectosTecnica={PROYECTOS_TECNICA_ORDENADOS}
-            proyectosOperativa={PROYECTOS_OPERATIVA_ORDENADOS}
-          />
 
           {/* Carrusel de Proyectos Activos */}
           <div className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
@@ -210,6 +204,15 @@ export default function DashboardGerencia() {
             </div>
             <ProyectoCarousel proyectos={getTodosProyectos()} />
           </div>
+
+
+          {/* Gráfico Comparativo */}
+          <GraficoComparativo
+            proyectosProyectos={PROYECTOS_PROYECTOS}
+            proyectosComercial={PROYECTOS_COMERCIAL_ORDENADOS}
+            proyectosTecnica={PROYECTOS_TECNICA_ORDENADOS}
+            proyectosOperativa={PROYECTOS_OPERATIVA_ORDENADOS}
+          />
         </div>
       )}
 

@@ -206,7 +206,7 @@ export class PreciosService {
     }
 
     // Solo permitir edición si cotización está EN_REVISION o ENVIADA
-    if (!['ENVIADA', 'EN_REVISION'].includes(current.cotizacionDetalle.cotizacion.estado)) {
+    if (!['ENVIADA', 'EN_REVISION','EN_CONFIGURACION'].includes(current.cotizacionDetalle.cotizacion.estado)) {
       throw new BadRequestException(
         'No se pueden modificar ofertas de una cotización ya procesada'
       );
@@ -299,7 +299,7 @@ export class PreciosService {
     }
 
     // Solo permitir selección en estado EN_REVISION
-    if (precio.cotizacionDetalle.cotizacion.estado !== 'EN_REVISION') {
+    if (precio.cotizacionDetalle.cotizacion.estado !== 'EN_REVISION' && precio.cotizacionDetalle.cotizacion.estado !== 'EN_CONFIGURACION') {
       throw new BadRequestException(
         'Solo se pueden seleccionar ofertas cuando la cotización está EN_REVISION'
       );
