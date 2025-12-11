@@ -11,7 +11,6 @@ const allTabs = [
   { to: "/quotes/follow-ups", label: "Seguimiento", supervisorOnly: true }, 
   { to: "/quotes/history", label: "Historial" },
   // 🛑 Solo para Supervisores/Administradores
-  { to: "/quotes/assignment", label: "Asignación", supervisorOnly: true },
 ];
 
 export default function QuotesLayout() {

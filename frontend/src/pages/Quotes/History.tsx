@@ -299,7 +299,7 @@ function ModalDetalle({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div className="fixed inset-0 z-5000 flex items-center justify-center bg-black/50 p-4">
       <div className="w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl border-2 border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-800">
         {/* Header */}
         <div className="flex items-center justify-between border-b-2 border-gray-200 bg-gray-50 px-6 py-4 dark:border-gray-700 dark:bg-gray-900">

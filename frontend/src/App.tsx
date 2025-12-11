@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "./router/ProtectedRoute";
 import PublicOnlyRoute from "./router/PublicOnlyRoute";
 import { ScrollToTop } from "./components/common/ScrollToTop";
+import { Toaster } from 'react-hot-toast';
 
 // Layouts
 import AppLayout from "./layout/AppLayout";
@@ -54,12 +55,69 @@ export default function App() {
   return (
     <NotificationProvider>
       <>
+        {/* ========================================
+            🔔 TOASTER - Notificaciones globales
+            ======================================== */}
+        <Toaster
+          position="top-right"
+          reverseOrder={false}
+          gutter={8}
+          containerClassName=""
+          containerStyle={{}}
+          toastOptions={{
+            // Opciones por defecto para todos los toasts
+            duration: 4000,
+            style: {
+              background: '#363636',
+              color: '#fff',
+              borderRadius: '10px',
+              padding: '16px',
+              fontSize: '14px',
+              fontWeight: '500',
+              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+            },
+            
+            // Estilos específicos por tipo
+            success: {
+              duration: 3000,
+              style: {
+                background: '#10b981',
+              },
+              iconTheme: {
+                primary: '#fff',
+                secondary: '#10b981',
+              },
+            },
+            
+            error: {
+              duration: 5000,
+              style: {
+                background: '#ef4444',
+              },
+              iconTheme: {
+                primary: '#fff',
+                secondary: '#ef4444',
+              },
+            },
+            
+            loading: {
+              style: {
+                background: '#3b82f6',
+              },
+              iconTheme: {
+                primary: '#fff',
+                secondary: '#3b82f6',
+              },
+            },
+          }}
+        />
+
         <ScrollToTop />
+        
         <Routes>
           {/* públicas solo */}
           <Route path="/signin" element={<PublicOnlyRoute><SignIn /></PublicOnlyRoute>} />
           <Route path="/signup" element={<PublicOnlyRoute><SignUp /></PublicOnlyRoute>} />
-
 
           {/* SHOPPING */}
           <Route path="/shopping" element={<ShoppingLayout />}>
@@ -76,7 +134,6 @@ export default function App() {
               }
             />
           </Route>
-
 
           {/* protegidas */}
           <Route element={<ProtectedRoute />}>
@@ -151,5 +208,4 @@ export default function App() {
       <NotificationPanel />
     </NotificationProvider>
   );
-
 }

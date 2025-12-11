@@ -44,7 +44,6 @@ const navItems: NavItem[] = [
       { name: "Mis cotizaciónes", path: "/quotes/my-quotes", pro: false},
       { name: "Seguimiento", path: "/quotes/follow-ups", pro: false },
       { name: "Historial", path: "/quotes/history", pro: false },
-      { name: "Asignación", path: "/quotes/assignment", pro: false },
     ],
   },
   {

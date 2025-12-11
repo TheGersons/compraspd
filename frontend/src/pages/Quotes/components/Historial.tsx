@@ -35,9 +35,11 @@ type DetalleExtra = {
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 const token = getToken();
 
+
 async function obtenerProducto(productoId: string): Promise<ProductoInfo | null> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/quotation-details/${productoId}`, {
+    // Cambiar a usar el nuevo endpoint
+    const response = await fetch(`${API_BASE_URL}/api/v1/quotation-details/by-estado/${productoId}`, {
       credentials: "include",
       headers: { Authorization: `Bearer ${token}` },
     });

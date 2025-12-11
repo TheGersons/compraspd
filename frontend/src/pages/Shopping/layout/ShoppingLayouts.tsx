@@ -5,7 +5,6 @@ const tabs = [
   { to: "/shopping/new", label: "Nueva compra" },
   { to: "/shopping/follow-ups", label: "Seguimiento" },
   { to: "/shopping/history", label: "Historial" },
-  { to: "/shopping/assignment", label: "Asignación" },
 ];
 
 export default function ShoppingLayout() {
