@@ -1,3 +1,5 @@
+// src/auth/jwt.strategy.ts - VERSIÓN CON VALIDACIÓN DE SESIÓN
+
 import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy, StrategyOptions } from 'passport-jwt';
@@ -44,6 +46,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   /**
    * Valida el payload del JWT y devuelve el objeto usuario
    * que estará disponible en req.user
+   * 
+   * NUEVO: También valida que la sesión esté activa en DB
    */
   async validate(payload: RawJwtPayload): Promise<JwtUser> {
     this.logger.debug(`Validando token JWT para usuario: ${payload.sub}`);
@@ -76,17 +80,22 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Usuario inactivo');
     }
 
-    // 3. Normalizar rol (mayúsculas para consistencia)
+    // 3. NUEVO: Validar que la sesión esté activa en DB
+    if (isString(payload.jti)) {
+      const sesionActiva = await this.validarSesion(payload.jti);
+      
+      if (!sesionActiva) {
+        this.logger.warn(`Sesión inválida o expirada: ${payload.jti}`);
+        throw new UnauthorizedException('Sesión expirada o cerrada');
+      }
+    }
+
+    // 4. Normalizar rol (mayúsculas para consistencia)
     const role = isString(payload.role) 
       ? payload.role.toUpperCase() 
       : usuario.rol?.nombre?.toUpperCase() || 'USER';
 
     const nombre = isString(payload.nombre) ? payload.nombre : '';
-
-    // 4. Opcional: Validar JTI contra una blacklist (para logout/revocación)
-    // if (payload.jti && await this.isTokenBlacklisted(payload.jti)) {
-    //   throw new UnauthorizedException('Token revocado');
-    // }
 
     this.logger.debug(`Token validado exitosamente para: ${payload.email}`);
 
@@ -101,11 +110,51 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   /**
-   * (Opcional) Método para verificar si un token está en blacklist
-   * Útil para implementar logout o revocación de tokens
+   * Valida que una sesión esté activa en DB
    */
-  // private async isTokenBlacklisted(jti: string): Promise<boolean> {
-  //   // Implementar con Redis o tabla en DB
-  //   return false;
-  // }
+  private async validarSesion(jti: string): Promise<boolean> {
+    try {
+      const sesion = await this.prisma.sesion.findUnique({
+        where: { jti },
+        select: {
+          activa: true,
+          expiraEn: true
+        }
+      });
+
+      if (!sesion) {
+        this.logger.debug(`Sesión no encontrada: ${jti}`);
+        return false;
+      }
+
+      if (!sesion.activa) {
+        this.logger.debug(`Sesión inactiva: ${jti}`);
+        return false;
+      }
+
+      // Verificar expiración
+      if (new Date() > sesion.expiraEn) {
+        this.logger.debug(`Sesión expirada: ${jti}`);
+        
+        // Marcar como inactiva
+        await this.prisma.sesion.update({
+          where: { jti },
+          data: { activa: false }
+        }).catch(() => {}); // Ignorar errores en actualización
+        
+        return false;
+      }
+
+      // Actualizar último acceso (async, no esperar)
+      this.prisma.sesion.update({
+        where: { jti },
+        data: { ultimoAcceso: new Date() }
+      }).catch(() => {}); // Ignorar errores en actualización
+
+      return true;
+    } catch (error) {
+      this.logger.error(`Error al validar sesión ${jti}:`, error);
+      return false;
+    }
+  }
 }

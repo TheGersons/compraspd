@@ -1,13 +1,19 @@
+// src/auth/auth.controller.ts - VERSIÓN COMPLETA
+
 import { 
   Body, 
   Controller, 
   Get, 
   Post, 
+  Delete,
+  Param,
   Req, 
   UseGuards, 
   Logger,
   HttpCode,
-  HttpStatus
+  HttpStatus,
+  Headers,
+  Ip
 } from '@nestjs/common';
 import { 
   ApiTags, 
@@ -28,43 +34,35 @@ export class AuthController {
 
   /**
    * Login - Autenticación de usuario
+   * Crea sesión en DB y devuelve access + refresh tokens
    */
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Iniciar sesión con email y contraseña' })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Login exitoso',
-    schema: {
-      properties: {
-        access_token: { type: 'string' },
-        token_type: { type: 'string', example: 'Bearer' },
-        expires_in: { type: 'string', example: '1d' },
-        user: {
-          type: 'object',
-          properties: {
-            id: { type: 'string' },
-            email: { type: 'string' },
-            nombre: { type: 'string' },
-            role: { type: 'string' }
-          }
-        }
-      }
-    }
-  })
-  @ApiResponse({ 
-    status: 401, 
-    description: 'Credenciales inválidas o usuario inactivo' 
-  })
-  async login(@Body() dto: LoginDto) {
+  @ApiResponse({ status: 200, description: 'Login exitoso' })
+  @ApiResponse({ status: 401, description: 'Credenciales inválidas' })
+  async login(
+    @Body() dto: LoginDto,
+    @Headers('user-agent') userAgent?: string,
+    @Ip() ip?: string
+  ) {
     this.logger.log(`Intento de login: ${dto.email}`);
     
     const usuario = await this.authService.validateUser(dto.email, dto.password);
-    const token = this.authService.sign(usuario);
+    
+    // Detectar dispositivo/navegador
+    const metadata = this.parseUserAgent(userAgent);
+    
+    const result = await this.authService.sign(usuario, {
+      ip,
+      userAgent,
+      dispositivo: metadata.dispositivo,
+      navegador: metadata.navegador
+    });
     
     this.logger.log(`Login exitoso: ${usuario.email} - Rol: ${usuario.rol?.nombre}`);
     
-    return token;
+    return result;
   }
 
   /**
@@ -74,71 +72,116 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Obtener información del usuario autenticado' })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Información del usuario obtenida exitosamente',
-    schema: {
-      properties: {
-        id: { type: 'string' },
-        nombre: { type: 'string' },
-        email: { type: 'string' },
-        departamentoId: { type: 'string' },
-        activo: { type: 'boolean' },
-        creado: { type: 'string', format: 'date-time' },
-        rol: {
-          type: 'object',
-          properties: {
-            id: { type: 'string' },
-            nombre: { type: 'string' },
-            descripcion: { type: 'string' }
-          }
-        },
-        departamento: {
-          type: 'object',
-          properties: {
-            id: { type: 'string' },
-            nombre: { type: 'string' }
-          }
-        }
-      }
-    }
-  })
-  @ApiResponse({ 
-    status: 401, 
-    description: 'No autorizado - Token inválido o expirado' 
-  })
+  @ApiResponse({ status: 200, description: 'Información obtenida' })
+  @ApiResponse({ status: 401, description: 'No autorizado' })
   async me(@Req() req: any) {
     const userId = req.user?.sub;
-    
     this.logger.debug(`Usuario solicitando /me: ${userId}`);
-    
     return this.authService.me(userId);
   }
 
   /**
-   * (Opcional) Logout - Revocar token
-   * Requiere implementar blacklist de tokens
+   * Refresh - Renovar access token usando refresh token
    */
-  // @Post('logout')
-  // @UseGuards(JwtAuthGuard)
-  // @ApiBearerAuth()
-  // @HttpCode(HttpStatus.OK)
-  // @ApiOperation({ summary: 'Cerrar sesión (revocar token)' })
-  // @ApiResponse({ status: 200, description: 'Sesión cerrada exitosamente' })
-  // async logout(@Req() req: any) {
-  //   const jti = req.user?.jti;
-  //   // Implementar blacklist de tokens aquí
-  //   // await this.authService.blacklistToken(jti);
-  //   return { ok: true, message: 'Sesión cerrada' };
-  // }
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Renovar access token' })
+  @ApiResponse({ status: 200, description: 'Token renovado' })
+  @ApiResponse({ status: 401, description: 'Refresh token inválido' })
+  async refresh(@Body() body: { refresh_token: string }) {
+    this.logger.log('Renovando token...');
+    return this.authService.refreshToken(body.refresh_token);
+  }
 
   /**
-   * (Opcional) Refresh Token - Renovar token de acceso
+   * Logout - Cerrar sesión actual
    */
-  // @Post('refresh')
-  // @ApiOperation({ summary: 'Renovar token de acceso' })
-  // @ApiResponse({ status: 200, description: 'Token renovado' })
-  // async refresh(@Body() dto: RefreshTokenDto) {
-  //   return this.authService.refreshToken(dto.refresh_token);
-  // }
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Cerrar sesión actual' })
+  @ApiResponse({ status: 200, description: 'Sesión cerrada' })
+  async logout(@Req() req: any) {
+    const jti = req.user?.jti;
+    this.logger.log(`Cerrando sesión: ${jti}`);
+    return this.authService.logout(jti);
+  }
+
+  /**
+   * Logout All - Cerrar todas las sesiones del usuario
+   */
+  @Post('logout-all')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Cerrar todas las sesiones del usuario' })
+  @ApiResponse({ status: 200, description: 'Todas las sesiones cerradas' })
+  async logoutAll(@Req() req: any) {
+    const userId = req.user?.sub;
+    this.logger.log(`Cerrando todas las sesiones: ${userId}`);
+    return this.authService.logoutAll(userId);
+  }
+
+  /**
+   * List Sessions - Listar sesiones activas del usuario
+   */
+  @Get('sessions')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Listar sesiones activas' })
+  @ApiResponse({ status: 200, description: 'Lista de sesiones' })
+  async listSessions(@Req() req: any) {
+    const userId = req.user?.sub;
+    return this.authService.listSessions(userId);
+  }
+
+  /**
+   * Revoke Session - Cerrar una sesión específica
+   */
+  @Delete('sessions/:sessionId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Cerrar una sesión específica' })
+  @ApiResponse({ status: 200, description: 'Sesión cerrada' })
+  async revokeSession(
+    @Param('sessionId') sessionId: string,
+    @Req() req: any
+  ) {
+    const userId = req.user?.sub;
+    this.logger.log(`Usuario ${userId} cerrando sesión: ${sessionId}`);
+    
+    // Verificar que la sesión pertenece al usuario
+    await this.authService.revokeSession(sessionId, userId);
+    
+    return { ok: true, message: 'Sesión cerrada' };
+  }
+
+  /**
+   * Helper: Parse user agent string
+   */
+  private parseUserAgent(userAgent?: string) {
+    if (!userAgent) {
+      return { dispositivo: 'unknown', navegador: 'unknown' };
+    }
+
+    const ua = userAgent.toLowerCase();
+    
+    // Detectar dispositivo
+    let dispositivo = 'web';
+    if (ua.includes('mobile') || ua.includes('android') || ua.includes('iphone')) {
+      dispositivo = 'mobile';
+    } else if (ua.includes('electron')) {
+      dispositivo = 'desktop';
+    }
+
+    // Detectar navegador
+    let navegador = 'unknown';
+    if (ua.includes('chrome')) navegador = 'Chrome';
+    else if (ua.includes('firefox')) navegador = 'Firefox';
+    else if (ua.includes('safari')) navegador = 'Safari';
+    else if (ua.includes('edge')) navegador = 'Edge';
+
+    return { dispositivo, navegador };
+  }
 }

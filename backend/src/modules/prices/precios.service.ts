@@ -298,10 +298,12 @@ export class PreciosService {
       throw new NotFoundException('Oferta no encontrada');
     }
 
-    // Solo permitir selección en estado EN_REVISION
+    // Solo permitir selección en estado EN_CONFIGURACION o EN_REVISION
     if (precio.cotizacionDetalle.cotizacion.estado !== 'EN_REVISION' && precio.cotizacionDetalle.cotizacion.estado !== 'EN_CONFIGURACION') {
       throw new BadRequestException(
-        'Solo se pueden seleccionar ofertas cuando la cotización está EN_REVISION'
+        `Solo se pueden seleccionar ofertas cuando la cotización está EN_REVISION` +
+        ` o EN_CONFIGURACION. Estado actual: ${precio.cotizacionDetalle.cotizacion.estado}`
+         
       );
     }
 
@@ -378,4 +380,145 @@ export class PreciosService {
     const role = (user.role || '').toUpperCase();
     return role === 'SUPERVISOR' || role === 'ADMIN';
   }
+
+
+  /**
+   * Solicitar descuento para un precio
+   * Guarda el comprobante (imagen/link) de la solicitud
+   */
+  async solicitarDescuento(
+    precioId: string,
+    comprobanteDescuento: string,
+    user: UserJwt
+  ) {
+    const precio = await this.prisma.precios.findUnique({
+      where: { id: precioId },
+      include: {
+        cotizacionDetalle: {
+          include: {
+            cotizacion: {
+              select: { solicitanteId: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!precio) {
+      throw new NotFoundException('Precio no encontrado');
+    }
+
+    // Validar permisos
+    const isOwner = precio.cotizacionDetalle.cotizacion.solicitanteId === user.sub;
+    const isSupervisor = this.isSupervisorOrAdmin(user);
+
+    if (!isOwner && !isSupervisor) {
+      throw new ForbiddenException('No tienes permiso para solicitar descuento');
+    }
+
+    // Validar que el comprobante no esté vacío
+    if (!comprobanteDescuento || comprobanteDescuento.trim() === '') {
+      throw new BadRequestException('Debe proporcionar un comprobante de descuento');
+    }
+
+    // Actualizar el precio con el comprobante
+    const precioActualizado = await this.prisma.precios.update({
+      where: { id: precioId },
+      data: {
+        ComprobanteDescuento: comprobanteDescuento,
+      },
+      include: {
+        proveedor: {
+          select: {
+            id: true,
+            nombre: true,
+          },
+        },
+      },
+    });
+
+    return {
+      ok: true,
+      message: 'Descuento solicitado correctamente',
+      precio: precioActualizado,
+    };
+  }
+
+  /**
+   * Agregar resultado de descuento
+   * Si fue aprobado: precioDescuento < precio
+   * Si fue denegado: precioDescuento = precio
+   */
+  async resultadoDescuento(
+    precioId: string,
+    precioDescuento: number,
+    user: UserJwt
+  ) {
+    const precio = await this.prisma.precios.findUnique({
+      where: { id: precioId },
+      include: {
+        cotizacionDetalle: {
+          include: {
+            cotizacion: {
+              select: { solicitanteId: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!precio) {
+      throw new NotFoundException('Precio no encontrado');
+    }
+
+    // Validar permisos
+    const isOwner = precio.cotizacionDetalle.cotizacion.solicitanteId === user.sub;
+    const isSupervisor = this.isSupervisorOrAdmin(user);
+
+    if (!isOwner && !isSupervisor) {
+      throw new ForbiddenException('No tienes permiso para agregar resultado de descuento');
+    }
+
+    // Validar que se haya solicitado descuento primero
+    if (!precio.ComprobanteDescuento) {
+      throw new BadRequestException(
+        'Debe solicitar el descuento antes de agregar el resultado'
+      );
+    }
+
+    // Validar que el precio de descuento sea válido
+    if (precioDescuento <= 0) {
+      throw new BadRequestException('El precio de descuento debe ser mayor a 0');
+    }
+
+    // Actualizar el precio con el descuento
+    const precioActualizado = await this.prisma.precios.update({
+      where: { id: precioId },
+      data: {
+        precioDescuento: precioDescuento,
+      },
+      include: {
+        proveedor: {
+          select: {
+            id: true,
+            nombre: true,
+          },
+        },
+      },
+    });
+
+    // Determinar si fue aprobado o denegado
+    const fueAprobado = Number(precioDescuento) < Number(precio.precio);
+    const mensaje = fueAprobado
+      ? 'Descuento aprobado y registrado'
+      : 'Descuento denegado y registrado';
+
+    return {
+      ok: true,
+      message: mensaje,
+      precio: precioActualizado,
+      aprobado: fueAprobado,
+    };
+  }
+  
 }

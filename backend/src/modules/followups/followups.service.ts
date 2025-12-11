@@ -587,6 +587,85 @@ export class FollowUpsService {
     if (!cotizacion) {
       throw new NotFoundException('Cotización no encontrada');
     }
+    // ============================================================================
+    // VALIDACIONES ANTES DE APROBAR
+    // ============================================================================
+    for (const aprobacion of dto.productos) {
+    if (aprobacion.aprobado) {
+      // Encontrar el estado producto
+      const estadoProducto = cotizacion.estadosProductos.find(
+        ep => ep.id === aprobacion.estadoProductoId
+      );
+
+      if (!estadoProducto) {
+        throw new BadRequestException(
+          `Producto ${aprobacion.estadoProductoId} no encontrado`
+        );
+      }
+
+      // Buscar el detalle correspondiente por SKU
+      const detalle = await this.prisma.cotizacionDetalle.findFirst({
+        where: {
+          cotizacionId: cotizacionId,
+          sku: estadoProducto.sku
+        },
+        include: {
+          precios: {
+            select: {
+              id: true,
+              precio: true,
+              precioDescuento: true,
+              ComprobanteDescuento: true
+            }
+          }
+        }
+      });
+
+      if (!detalle) {
+        throw new BadRequestException(
+          `No se encontró el detalle para el producto ${estadoProducto.sku}`
+        );
+      }
+
+      // VALIDACIÓN 1: Debe tener precio seleccionado
+      if (!detalle.preciosId) {
+        throw new BadRequestException(
+          `El producto "${estadoProducto.sku}" debe tener un precio seleccionado antes de aprobarlo`
+        );
+      }
+
+      // Obtener el precio seleccionado
+      const precioSeleccionado = await this.prisma.precios.findUnique({
+        where: { id: detalle.preciosId }
+      });
+
+      if (!precioSeleccionado) {
+        throw new BadRequestException(
+          `No se encontró el precio seleccionado para "${estadoProducto.sku}"`
+        );
+      }
+
+      // VALIDACIÓN 2: Debe tener comprobante de descuento solicitado
+      if (!precioSeleccionado.ComprobanteDescuento) {
+        throw new BadRequestException(
+          `El producto "${estadoProducto.sku}" debe tener una solicitud de descuento con comprobante antes de aprobarlo. ` +
+          `Por favor, solicite el descuento primero.`
+        );
+      }
+
+      // VALIDACIÓN 3: Debe tener resultado de descuento (aprobado o denegado)
+      if (precioSeleccionado.precioDescuento === null) {
+        throw new BadRequestException(
+          `El producto "${estadoProducto.sku}" debe tener el resultado del descuento (aprobado o denegado) antes de aprobarlo. ` +
+          `Por favor, agregue el resultado del descuento.`
+        );
+      }
+    }
+  }
+
+  // ============================================================================
+  // SI TODAS LAS VALIDACIONES PASARON, PROCEDER CON LA APROBACIÓN
+  // ============================================================================
 
     type CambioAprobacion = {
       estadoProductoId: string;
@@ -594,6 +673,7 @@ export class FollowUpsService {
       aprobado: boolean;
     };
 
+    let CambioAprobacion
     // Procesar aprobaciones en transacción
     const resultado = await this.prisma.$transaction(async (tx) => {
       const cambios: CambioAprobacion[] = [];
@@ -632,6 +712,7 @@ export class FollowUpsService {
             }
           }
         });
+        CambioAprobacion = aprobacion.aprobado ? 'PRODUCTO_APROBADO' : 'PRODUCTO_DESAPROBADO';
 
         cambios.push({
           estadoProductoId: aprobacion.estadoProductoId,
@@ -652,11 +733,16 @@ export class FollowUpsService {
       const todosAprobados = productosAprobados === totalProductos && totalProductos > 0;
 
       // Actualizar cotización
-      const nuevoEstado = todosAprobados
+      let nuevoEstado = todosAprobados
         ? 'APROBADA_COMPLETA'
         : aprobadaParcialmente
           ? 'APROBADA_PARCIAL'
           : cotizacion.estado;
+
+      if (CambioAprobacion === 'PRODUCTO_DESAPROBADO')
+      {
+        nuevoEstado = 'EN_CONFIGURACION';
+      }
 
       await tx.cotizacion.update({
         where: { id: cotizacionId },

@@ -25,12 +25,17 @@ import { ProveedoresModule } from './modules/catalogs/proveedores/proveedores.mo
 import { NotificacionModule } from './modules/notifications/notificacion.module';
 import { SeguimientoModule } from './modules/seguimientos/seguimiento.module';
 import { CountriesModule } from './modules/countries/paises.module';
+import { HistorialGeneralModule } from './modules/historial/historial-general.module';
+import { ScheduleModule } from '@nestjs/schedule';
+import { SessionCleanupService } from './cron/session-cleanup.service';
+
 
 
 
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     AuthModule,
@@ -55,7 +60,11 @@ import { CountriesModule } from './modules/countries/paises.module';
     NotificacionModule,
     SeguimientoModule,
     CountriesModule,
+    HistorialGeneralModule,
 
+  ],
+  providers: [
+    SessionCleanupService
   ],
 })
 export class AppModule { }

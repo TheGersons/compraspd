@@ -1,10 +1,11 @@
-import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
+// src/auth/auth.service.ts - VERSIÓN ACTUALIZADA CON SESIONES
+
+import { Injectable, UnauthorizedException, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { randomUUID } from 'crypto';
 
-// Tipo extendido de Usuario con el nombre del rol
 type UsuarioWithRoleName = {
   id: string;
   email: string;
@@ -15,23 +16,29 @@ type UsuarioWithRoleName = {
   rol: { nombre: string } | null;
 };
 
+type LoginMetadata = {
+  ip?: string;
+  userAgent?: string;
+  dispositivo?: string;
+  navegador?: string;
+};
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
 
   constructor(
-    private prisma: PrismaService, 
+    private prisma: PrismaService,
     private jwt: JwtService
   ) {}
 
   /**
-   * Valida las credenciales del usuario y carga su rol
+   * Valida las credenciales del usuario
    */
   async validateUser(email: string, pass: string): Promise<UsuarioWithRoleName> {
     this.logger.debug(`Intentando autenticar usuario: ${email}`);
 
-    // Buscar usuario con su rol
-    const usuario = await this.prisma.usuario.findUnique({ 
+    const usuario = await this.prisma.usuario.findUnique({
       where: { email },
       select: {
         id: true,
@@ -46,70 +53,373 @@ export class AuthService {
       }
     });
 
-   
-
-
-    // Validar existencia
     if (!usuario) {
       this.logger.warn(`Usuario no encontrado: ${email}`);
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
-    // Validar que esté activo
     if (!usuario.activo) {
-      this.logger.warn(`Usuario inactivo intentó iniciar sesión: ${email}`);
+      this.logger.warn(`Usuario inactivo: ${email}`);
       throw new UnauthorizedException('Usuario inactivo');
     }
 
-    // Validar contraseña
     const isPasswordValid = await bcrypt.compare(pass, usuario.passwordHash);
     if (!isPasswordValid) {
-      this.logger.warn(`Contraseña incorrecta para usuario: ${email}`);
+      this.logger.warn(`Contraseña incorrecta: ${email}`);
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
-    this.logger.log(`Usuario autenticado exitosamente: ${email} - Rol: ${usuario.rol?.nombre}`);
-    
+    this.logger.log(`Usuario autenticado: ${email}`);
     return usuario;
   }
 
-  /**
-   * Genera el token JWT con el payload del usuario
-   */
-  sign(usuario: UsuarioWithRoleName) {
-    const roleName = usuario.rol?.nombre || 'USER';
+  // AGREGAR ESTOS MÉTODOS A auth.service.ts
+
+/**
+ * Genera tokens y crea sesión en DB
+ * IMPORTANTE: Cierra sesiones anteriores del mismo dispositivo
+ */
+async sign(usuario: UsuarioWithRoleName, metadata?: LoginMetadata) {
+  const roleName = usuario.rol?.nombre || 'USER';
+
+  // 1. CERRAR SESIONES ANTERIORES DEL MISMO DISPOSITIVO
+  // Esto evita sesiones duplicadas
+  if (metadata?.userAgent) {
+    await this.prisma.sesion.updateMany({
+      where: {
+        usuarioId: usuario.id,
+        userAgent: metadata.userAgent,
+        activa: true
+      },
+      data: { activa: false }
+    });
     
-    const payload = { 
-      sub: usuario.id,
+    this.logger.log(`Sesiones anteriores cerradas para: ${usuario.email}`);
+  }
+
+  // Generar IDs únicos
+  const jti = randomUUID();
+  const refreshJti = randomUUID();
+
+  // Configuración de expiración
+  const accessTokenExpiry = process.env.JWT_EXPIRES || '15m';
+  const refreshTokenExpiry = process.env.JWT_REFRESH_EXPIRES || '7d';
+
+  // Payload del access token
+  const accessPayload = {
+    sub: usuario.id,
+    email: usuario.email,
+    nombre: usuario.nombre,
+    role: roleName,
+    jti: jti
+  };
+
+  // Payload del refresh token
+  const refreshPayload = {
+    sub: usuario.id,
+    jti: refreshJti,
+    type: 'refresh'
+  };
+
+  // Generar tokens
+  const accessToken = this.jwt.sign(accessPayload, { expiresIn: accessTokenExpiry });
+  const refreshToken = this.jwt.sign(refreshPayload, { expiresIn: refreshTokenExpiry });
+
+  // Calcular fechas de expiración
+  const now = new Date();
+  const accessExpiry = new Date(now.getTime() + this.parseExpiry(accessTokenExpiry));
+  const refreshExpiry = new Date(now.getTime() + this.parseExpiry(refreshTokenExpiry));
+
+  // 2. LIMITAR NÚMERO DE SESIONES ACTIVAS (opcional)
+  // Mantener máximo 5 sesiones activas por usuario
+  const sesionesActivas = await this.prisma.sesion.count({
+    where: {
+      usuarioId: usuario.id,
+      activa: true
+    }
+  });
+
+  if (sesionesActivas >= 5) {
+    // Cerrar la sesión más antigua
+    const sesionMasAntigua = await this.prisma.sesion.findFirst({
+      where: {
+        usuarioId: usuario.id,
+        activa: true
+      },
+      orderBy: { creado: 'asc' }
+    });
+
+    if (sesionMasAntigua) {
+      await this.prisma.sesion.update({
+        where: { id: sesionMasAntigua.id },
+        data: { activa: false }
+      });
+      
+      this.logger.log(`Sesión antigua cerrada para mantener límite de 5`);
+    }
+  }
+
+  // 3. Guardar nueva sesión en DB
+  await this.prisma.sesion.create({
+    data: {
+      usuarioId: usuario.id,
+      token: accessToken,
+      jti: jti,
+      refreshToken: refreshToken,
+      userAgent: metadata?.userAgent,
+      ip: metadata?.ip,
+      dispositivo: metadata?.dispositivo,
+      navegador: metadata?.navegador,
+      expiraEn: accessExpiry,
+      refreshExpiraEn: refreshExpiry,
+      activa: true
+    }
+  });
+
+  this.logger.log(`Nueva sesión creada para: ${usuario.email} (JTI: ${jti})`);
+
+  return {
+    access_token: accessToken,
+    refresh_token: refreshToken,
+    token_type: 'Bearer',
+    expires_in: accessTokenExpiry,
+    user: {
+      id: usuario.id,
       email: usuario.email,
       nombre: usuario.nombre,
-      role: roleName,
-      jti: randomUUID() // Token ID único para tracking/revocación
-    };
+      role: roleName
+    }
+  };
+}
 
-    this.logger.debug(`Generando token para usuario: ${usuario.email}`);
+/**
+ * NUEVO: Limpia sesiones expiradas automáticamente
+ * Llamar al inicio de la aplicación
+ */
+async cleanExpiredSessions() {
+  try {
+    const now = new Date();
+    
+    const result = await this.prisma.sesion.updateMany({
+      where: {
+        OR: [
+          { expiraEn: { lt: now } },
+          { refreshExpiraEn: { lt: now } }
+        ],
+        activa: true
+      },
+      data: { activa: false }
+    });
 
-    const expiresIn = process.env.JWT_EXPIRES || '1d';
+    this.logger.log(`Sesiones expiradas limpiadas: ${result.count}`);
 
-    return {
-      access_token: this.jwt.sign(payload, { expiresIn }),
-      token_type: 'Bearer',
-      expires_in: expiresIn,
-      user: {
-        id: usuario.id,
-        email: usuario.email,
-        nombre: usuario.nombre,
-        role: roleName
+    return { count: result.count };
+  } catch (error) {
+    this.logger.error('Error al limpiar sesiones:', error);
+    return { count: 0 };
+  }
+}
+
+/**
+ * NUEVO: Elimina físicamente sesiones inactivas viejas (más de 30 días)
+ * Para mantener la tabla limpia
+ */
+async deleteOldSessions() {
+  try {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const result = await this.prisma.sesion.deleteMany({
+      where: {
+        activa: false,
+        actualizado: { lt: thirtyDaysAgo }
       }
-    };
+    });
+
+    this.logger.log(`Sesiones antiguas eliminadas: ${result.count}`);
+
+    return { count: result.count };
+  } catch (error) {
+    this.logger.error('Error al eliminar sesiones antiguas:', error);
+    return { count: 0 };
+  }
+}
+
+  
+
+  /**
+   * Renueva el access token usando un refresh token válido
+   */
+  async refreshToken(refreshToken: string) {
+    try {
+      // Verificar refresh token
+      const payload = this.jwt.verify(refreshToken);
+
+      if (payload.type !== 'refresh') {
+        throw new UnauthorizedException('Token inválido');
+      }
+
+      // Buscar sesión en DB
+      const sesion = await this.prisma.sesion.findUnique({
+        where: { refreshToken },
+        include: {
+          usuario: {
+            include: {
+              rol: {
+                select: { nombre: true }
+              }
+            }
+          }
+        }
+      });
+
+      if (!sesion || !sesion.activa) {
+        throw new UnauthorizedException('Sesión inválida o expirada');
+      }
+
+      // Verificar que no haya expirado
+      if (new Date() > sesion.refreshExpiraEn) {
+        await this.prisma.sesion.update({
+          where: { id: sesion.id },
+          data: { activa: false }
+        });
+        throw new UnauthorizedException('Sesión expirada');
+      }
+
+      // Generar nuevo access token
+      const newJti = randomUUID();
+      const accessTokenExpiry = process.env.JWT_EXPIRES || '15m';
+
+      const accessPayload = {
+        sub: sesion.usuario.id,
+        email: sesion.usuario.email,
+        nombre: sesion.usuario.nombre,
+        role: sesion.usuario.rol?.nombre || 'USER',
+        jti: newJti
+      };
+
+      const newAccessToken = this.jwt.sign(accessPayload, { expiresIn: accessTokenExpiry });
+      const accessExpiry = new Date(Date.now() + this.parseExpiry(accessTokenExpiry));
+
+      // Actualizar sesión con nuevo access token
+      await this.prisma.sesion.update({
+        where: { id: sesion.id },
+        data: {
+          token: newAccessToken,
+          jti: newJti,
+          expiraEn: accessExpiry,
+          ultimoAcceso: new Date()
+        }
+      });
+
+      this.logger.log(`Token renovado para: ${sesion.usuario.email}`);
+
+      return {
+        access_token: newAccessToken,
+        token_type: 'Bearer',
+        expires_in: accessTokenExpiry
+      };
+    } catch (error) {
+      this.logger.error('Error al renovar token:', error);
+      throw new UnauthorizedException('Refresh token inválido');
+    }
   }
 
   /**
-   * Obtiene información del usuario actual (endpoint /me)
+   * Valida que una sesión esté activa en DB
+   */
+  async validateSession(jti: string): Promise<boolean> {
+    const sesion = await this.prisma.sesion.findUnique({
+      where: { jti },
+      select: {
+        activa: true,
+        expiraEn: true
+      }
+    });
+
+    if (!sesion || !sesion.activa) {
+      return false;
+    }
+
+    // Verificar expiración
+    if (new Date() > sesion.expiraEn) {
+      await this.prisma.sesion.update({
+        where: { jti },
+        data: { activa: false }
+      });
+      return false;
+    }
+
+    // Actualizar último acceso
+    await this.prisma.sesion.update({
+      where: { jti },
+      data: { ultimoAcceso: new Date() }
+    });
+
+    return true;
+  }
+
+  /**
+   * Cierra sesión invalidando el token en DB
+   */
+  async logout(jti: string) {
+    try {
+      await this.prisma.sesion.updateMany({
+        where: { jti },
+        data: { activa: false }
+      });
+
+      this.logger.log(`Sesión cerrada: ${jti}`);
+
+      return { ok: true, message: 'Sesión cerrada exitosamente' };
+    } catch (error) {
+      this.logger.error('Error al cerrar sesión:', error);
+      throw new UnauthorizedException('Error al cerrar sesión');
+    }
+  }
+
+  /**
+   * Cierra todas las sesiones de un usuario
+   */
+  async logoutAll(usuarioId: string) {
+    await this.prisma.sesion.updateMany({
+      where: {
+        usuarioId,
+        activa: true
+      },
+      data: { activa: false }
+    });
+
+    this.logger.log(`Todas las sesiones cerradas para usuario: ${usuarioId}`);
+
+    return { ok: true, message: 'Todas las sesiones cerradas' };
+  }
+
+  /**
+   * Lista sesiones activas de un usuario
+   */
+  async listSessions(usuarioId: string) {
+    return this.prisma.sesion.findMany({
+      where: {
+        usuarioId,
+        activa: true
+      },
+      select: {
+        id: true,
+        dispositivo: true,
+        navegador: true,
+        ip: true,
+        creado: true,
+        ultimoAcceso: true,
+        expiraEn: true
+      },
+      orderBy: { ultimoAcceso: 'desc' }
+    });
+  }
+  /**
+       * Obtiene información del usuario actual
    */
   async me(userId: string) {
-    this.logger.debug(`Obteniendo información del usuario: ${userId}`);
-
     const usuario = await this.prisma.usuario.findUnique({
       where: { id: userId },
       select: {
@@ -135,32 +445,125 @@ export class AuthService {
       }
     });
 
-    if (!usuario) {
-      this.logger.warn(`Usuario no encontrado para /me: ${userId}`);
-      throw new UnauthorizedException('Usuario no encontrado');
-    }
-
-    if (!usuario.activo) {
-      this.logger.warn(`Usuario inactivo accedió a /me: ${userId}`);
-      throw new UnauthorizedException('Usuario inactivo');
+    if (!usuario || !usuario.activo) {
+      throw new UnauthorizedException('Usuario no encontrado o inactivo');
     }
 
     return usuario;
   }
 
   /**
-   * Validar si un token es válido (útil para refresh tokens futuros)
+   * Revoca una sesión específica (solo si pertenece al usuario)
    */
-  async validateToken(token: string): Promise<boolean> {
-    try {
-      const payload = this.jwt.verify(token);
-      const usuario = await this.prisma.usuario.findUnique({
-        where: { id: payload.sub },
-        select: { activo: true }
-      });
-      return usuario?.activo ?? false;
-    } catch (error) {
-      return false;
+  async revokeSession(sessionId: string, usuarioId: string) {
+    const sesion = await this.prisma.sesion.findUnique({
+      where: { id: sessionId },
+      select: { usuarioId: true }
+    });
+
+    if (!sesion) {
+      throw new NotFoundException('Sesión no encontrada');
     }
+
+    if (sesion.usuarioId !== usuarioId) {
+      throw new ForbiddenException('No tienes permiso para cerrar esta sesión');
+    }
+
+    await this.prisma.sesion.update({
+      where: { id: sessionId },
+      data: { activa: false }
+    });
+
+    this.logger.log(`Sesión revocada: ${sessionId}`);
+
+    return { ok: true, message: 'Sesión cerrada' };
   }
+
+  /**
+   * Helper: Convierte string de expiración a milisegundos
+   */
+  private parseExpiry(expiry: string): number {
+    const units: Record<string, number> = {
+      s: 1000,
+      m: 60 * 1000,
+      h: 60 * 60 * 1000,
+      d: 24 * 60 * 60 * 1000
+    };
+
+    const match = expiry.match(/^(\d+)([smhd])$/);
+    if (!match) return 15 * 60 * 1000; // Default 15 minutos
+
+    const [, value, unit] = match;
+    return parseInt(value) * units[unit];
+  }
+
+  // AGREGAR ESTE MÉTODO A auth.service.ts
+
+/**
+ * Obtiene estadísticas de sesiones para reportes
+ */
+async getSessionStats() {
+  try {
+    const [
+      activeSessions,
+      uniqueUsers,
+      webSessions,
+      mobileSessions,
+      desktopSessions
+    ] = await Promise.all([
+      // Total de sesiones activas
+      this.prisma.sesion.count({
+        where: { activa: true }
+      }),
+      
+      // Usuarios únicos con sesión activa
+      this.prisma.sesion.groupBy({
+        by: ['usuarioId'],
+        where: { activa: true },
+        _count: true
+      }),
+      
+      // Sesiones web
+      this.prisma.sesion.count({
+        where: {
+          activa: true,
+          dispositivo: 'web'
+        }
+      }),
+      
+      // Sesiones móviles
+      this.prisma.sesion.count({
+        where: {
+          activa: true,
+          dispositivo: 'mobile'
+        }
+      }),
+      
+      // Sesiones desktop
+      this.prisma.sesion.count({
+        where: {
+          activa: true,
+          dispositivo: 'desktop'
+        }
+      })
+    ]);
+
+    return {
+      activeSessions,
+      uniqueUsers: uniqueUsers.length,
+      webSessions,
+      mobileSessions,
+      desktopSessions
+    };
+  } catch (error) {
+    this.logger.error('Error al obtener estadísticas de sesiones:', error);
+    return {
+      activeSessions: 0,
+      uniqueUsers: 0,
+      webSessions: 0,
+      mobileSessions: 0,
+      desktopSessions: 0
+    };
+  }
+}
 }

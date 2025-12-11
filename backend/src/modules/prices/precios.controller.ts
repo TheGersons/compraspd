@@ -128,4 +128,34 @@ export class PreciosController {
   ) {
     return this.preciosService.delete(id, user);
   }
+
+  /**
+   * PATCH /api/v1/precios/:id/solicitar-descuento
+   * Solicita descuento para un precio
+   */
+  @Patch(':id/solicitar-descuento')
+  @ApiOperation({ summary: 'Solicitar descuento para un precio' })
+  @ApiResponse({ status: 200, description: 'Descuento solicitado' })
+  solicitarDescuento(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: { comprobanteDescuento: string },
+    @CurrentUser() user: UserJwt
+  ) {
+    return this.preciosService.solicitarDescuento(id, dto.comprobanteDescuento, user);
+  }
+
+  /**
+   * PATCH /api/v1/precios/:id/resultado-descuento
+   * Agrega resultado de solicitud de descuento
+   */
+  @Patch(':id/resultado-descuento')
+  @ApiOperation({ summary: 'Agregar resultado de descuento' })
+  @ApiResponse({ status: 200, description: 'Resultado agregado' })
+  resultadoDescuento(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: { precioDescuento: number },
+    @CurrentUser() user: UserJwt
+  ) {
+    return this.preciosService.resultadoDescuento(id, dto.precioDescuento, user);
+  }
 }

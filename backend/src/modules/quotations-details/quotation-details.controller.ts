@@ -1,11 +1,11 @@
-import { 
-  Body, 
-  Controller, 
-  Delete, 
-  Get, 
-  Param, 
-  Patch, 
-  Post, 
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
   UseGuards,
   ParseUUIDPipe,
   HttpCode,
@@ -34,7 +34,7 @@ type UserJwt = { sub: string; role?: string };
 @Controller('api/v1/quotation-details')
 @UseGuards(AuthGuard('jwt'))
 export class QuotationDetailsController {
-  constructor(private readonly service: QuotationDetailsService) {}
+  constructor(private readonly service: QuotationDetailsService) { }
 
   /**
    * POST /api/v1/quotation-details
@@ -123,5 +123,18 @@ export class QuotationDetailsController {
     @CurrentUser() user: UserJwt
   ) {
     return this.service.bulkUpdate(cotizacionId, dto, user);
+  }
+
+  /**
+ * GET /api/v1/quotation-details/by-estado/:estadoProductoId
+ * Obtiene un detalle a partir del ID de estado_producto
+ * Útil para el historial
+ */
+  @Get('by-estado/:estadoProductoId')
+  getByEstadoProducto(
+    @Param('estadoProductoId', ParseUUIDPipe) estadoProductoId: string,
+    @CurrentUser() user: UserJwt
+  ) {
+    return this.service.getByEstadoProductoId(estadoProductoId, user);
   }
 }

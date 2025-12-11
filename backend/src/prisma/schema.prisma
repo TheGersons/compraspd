@@ -157,6 +157,7 @@ model Usuario {
   participantesChat    ParticipantesChat[]
   cotizacionesSupervisadas Cotizacion[]        @relation("SupervisorCotizacion")
   historialCotizaciones    HistorialCotizacion[]
+  sesiones             Sesion[]
   
   @@index([email])
   @@index([rolId])
@@ -634,4 +635,43 @@ model Notificacion {
   @@index([completada])
   @@index([creada])
   @@map("notificacion")
+}
+
+// ============================================
+// SESIONES DE USUARIO
+// ============================================
+
+model Sesion {
+  id              String   @id @default(uuid()) @db.Uuid
+  usuarioId       String   @map("usuario_id") @db.Uuid
+  token           String   @unique // JWT Token completo
+  jti             String   @unique // Token ID único (del payload)
+  refreshToken    String?  @unique @map("refresh_token") // Para renovar sesión
+  
+  // Metadata del dispositivo/navegador
+  userAgent       String?  @map("user_agent") @db.Text
+  ip              String?
+  dispositivo     String?  // "web", "mobile", "desktop"
+  navegador       String?  // "Chrome", "Firefox", etc
+  
+  // Control de expiración
+  expiraEn        DateTime @map("expira_en") // Cuándo expira el access_token
+  refreshExpiraEn DateTime @map("refresh_expira_en") // Cuándo expira el refresh_token
+  
+  // Estado de la sesión
+  activa          Boolean  @default(true)
+  ultimoAcceso    DateTime @default(now()) @map("ultimo_acceso")
+  
+  // Timestamps
+  creado          DateTime @default(now())
+  actualizado     DateTime @default(now()) @updatedAt
+  
+  // Relación
+  usuario         Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  
+  @@index([usuarioId])
+  @@index([jti])
+  @@index([activa])
+  @@index([expiraEn])
+  @@map("sesion")
 }

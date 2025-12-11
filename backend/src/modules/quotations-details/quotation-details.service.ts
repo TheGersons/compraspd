@@ -1,8 +1,8 @@
-import { 
-  BadRequestException, 
-  ForbiddenException, 
-  Injectable, 
-  NotFoundException 
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateQuotationDetailDto } from './dto/create-detail.dto';
@@ -17,7 +17,7 @@ type UserJwt = { sub: string; role?: string };
  */
 @Injectable()
 export class QuotationDetailsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   /**
    * Crea un nuevo detalle/item en una cotización existente
@@ -212,7 +212,7 @@ export class QuotationDetailsService {
     const isOwner = current.cotizacion.solicitanteId === user.sub;
     const isSupervisor = this.isSupervisorOrAdmin(user);
 
-    const canEdit = 
+    const canEdit =
       (isOwner && current.cotizacion.estado === 'ENVIADA') ||
       (isSupervisor && ['ENVIADA', 'EN_REVISION'].includes(current.cotizacion.estado));
 
@@ -276,7 +276,7 @@ export class QuotationDetailsService {
     const isOwner = detalle.cotizacion.solicitanteId === user.sub;
     const isSupervisor = this.isSupervisorOrAdmin(user);
 
-    const canDelete = 
+    const canDelete =
       (isOwner && detalle.cotizacion.estado === 'ENVIADA') ||
       (isSupervisor && ['ENVIADA', 'EN_REVISION'].includes(detalle.cotizacion.estado));
 
@@ -311,8 +311,8 @@ export class QuotationDetailsService {
    * Útil para edición completa de la cotización desde el frontend
    */
   async bulkUpdate(
-    cotizacionId: string, 
-    dto: BulkUpdateDetailsDto, 
+    cotizacionId: string,
+    dto: BulkUpdateDetailsDto,
     user: UserJwt
   ) {
     // Verificar cotización
@@ -333,7 +333,7 @@ export class QuotationDetailsService {
     const isOwner = cotizacion.solicitanteId === user.sub;
     const isSupervisor = this.isSupervisorOrAdmin(user);
 
-    const canEdit = 
+    const canEdit =
       (isOwner && cotizacion.estado === 'ENVIADA') ||
       (isSupervisor && ['ENVIADA', 'EN_REVISION'].includes(cotizacion.estado));
 
@@ -427,5 +427,53 @@ export class QuotationDetailsService {
   private isSupervisorOrAdmin(user: UserJwt): boolean {
     const role = (user.role || '').toUpperCase();
     return role === 'SUPERVISOR' || role === 'ADMIN';
+  }
+
+
+
+  async getByEstadoProductoId(estadoProductoId: string, user: UserJwt) {
+    // Buscar el estado_producto
+    const estadoProducto = await this.prisma.estadoProducto.findUnique({
+      where: { id: estadoProductoId },
+      include: {
+        cotizacionDetalle: {
+          include: {
+            cotizacion: {
+              select: {
+                id: true,
+                nombreCotizacion: true,
+                solicitanteId: true,
+              }
+            },
+            precios: {
+              include: {
+                proveedor: {
+                  select: {
+                    id: true,
+                    nombre: true,
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!estadoProducto || !estadoProducto.cotizacionDetalle) {
+      throw new NotFoundException('Detalle no encontrado');
+    }
+
+    const detalle = estadoProducto.cotizacionDetalle;
+
+    // Validar permisos
+    const isOwner = detalle.cotizacion.solicitanteId === user.sub;
+    const isSupervisor = this.isSupervisorOrAdmin(user);
+
+    if (!isOwner && !isSupervisor) {
+      throw new ForbiddenException('No tienes permiso para ver este detalle');
+    }
+
+    return detalle;
   }
 }
