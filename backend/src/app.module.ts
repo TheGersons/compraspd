@@ -5,10 +5,8 @@ import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 //import { AssignmentsModule } from './modules/assignments/assignments.module';
 import { AttachmentsModule } from './modules/attachments/attachments.module';
-
 //import { PurchaseRequestsModule } from './modules/purchases-requests/purchase-requests.module';
 import { FollowUpsModule } from './modules/followups/followups.module';
-
 import { DepartmentsModule } from './modules/departments/departments.module';
 import { RolesModule } from './modules/Roles/roles.module';
 import { MessagesModule } from './modules/messages/messages.module';
@@ -28,6 +26,8 @@ import { CountriesModule } from './modules/countries/paises.module';
 import { HistorialGeneralModule } from './modules/historial/historial-general.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { SessionCleanupService } from './cron/session-cleanup.service';
+import { TimelineSKUModule } from './modules/timeline-sku/timeline-sku.module';
+import { EstadoProductoModule } from './modules/estado-producto/estado-producto.module';
 
 
 
@@ -44,9 +44,7 @@ import { SessionCleanupService } from './cron/session-cleanup.service';
     PermissionsModule,
     QuotationsModule,
     QuotationDetailsModule,
-    // AssignmentsModule,
     AttachmentsModule,
-    // PurchaseRequestsModule,
     FollowUpsModule,
     RolesModule,
     DepartmentsModule,
@@ -61,6 +59,8 @@ import { SessionCleanupService } from './cron/session-cleanup.service';
     SeguimientoModule,
     CountriesModule,
     HistorialGeneralModule,
+    TimelineSKUModule,
+    EstadoProductoModule,
 
   ],
   providers: [

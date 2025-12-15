@@ -1,4 +1,4 @@
-// src/lib/api.ts - VERSIÓN MEJORADA SIN BLOQUEOS
+// src/lib/api.ts
 
 // ============================================================================
 // MANEJO DE TOKENS
@@ -30,6 +30,20 @@ export function setUser(user: any): void {
 export function getUser(): any | null {
   const userData = localStorage.getItem("user");
   return userData ? JSON.parse(userData) : null;
+}
+
+// ============================================================================
+// BACKWARDS COMPATIBILITY (mantener compatibilidad con código antiguo)
+// ============================================================================
+
+export function setToken(token: string, persist = true): void {
+  console.warn("setToken() is deprecated, use setTokens() instead");
+  localStorage.setItem("access_token", token);
+}
+
+export function removeToken(): void {
+  console.warn("removeToken() is deprecated, use removeTokens() instead");
+  removeTokens();
 }
 
 // ============================================================================
@@ -100,7 +114,7 @@ async function refreshAccessToken(): Promise<string | null> {
 }
 
 // ============================================================================
-// FUNCIÓN API MEJORADA
+// FUNCIÓN API MEJORADA (NO BLOQUEA)
 // ============================================================================
 
 /**
@@ -193,18 +207,4 @@ export async function apiNoRefresh<T>(
   }
 
   return response.json() as Promise<T>;
-}
-
-// ============================================================================
-// BACKWARDS COMPATIBILITY
-// ============================================================================
-
-export function setToken(token: string, _persist = true): void {
-  console.warn("setToken() is deprecated, use setTokens() instead");
-  localStorage.setItem("access_token", token);
-}
-
-export function removeToken(): void {
-  console.warn("removeToken() is deprecated, use removeTokens() instead");
-  removeTokens();
 }

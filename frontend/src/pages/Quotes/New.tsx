@@ -4,6 +4,9 @@ import PageMeta from "../../components/common/PageMeta";
 import Button from "../../components/ui/button/Button";
 import { useNotifications } from "../Notifications/context/NotificationContext";
 import { getToken } from "../../lib/api";
+import { LoadingScreen } from "../../components/common/LoadingScreen"; // ← AGREGAR
+import { error } from "console";
+
 
 // ============================================================================
 // TYPES
@@ -56,11 +59,12 @@ interface Proyecto {
 // API SERVICE
 // ============================================================================
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api/v1";
-const token = getToken();
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 const api = {
 
   async getCurrentUser(): Promise<Usuario> {
+    try {
+    const token = await getToken();
     const response = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
       credentials: "include",
       headers: {
@@ -69,10 +73,16 @@ const api = {
     });
     if (!response.ok) throw new Error("Error al obtener usuario actual");
     return response.json();
+    }catch (error) {
+      throw error;
+    }finally {
+      
+    }
+    
   },
 
   async getTipos(): Promise<Tipo[]> {
-
+    const token = await getToken();
     const response = await fetch(`${API_BASE_URL}/api/v1/tipos`, {
       credentials: "include",
       headers: {
@@ -84,6 +94,7 @@ const api = {
   },
 
   async getUsuarios(): Promise<Usuario[]> {
+    const token = await getToken();
     const response = await fetch(`${API_BASE_URL}/api/v1/users/all`, {
       credentials: "include",
       headers: {
@@ -95,6 +106,7 @@ const api = {
   },
 
   async getProyectos(): Promise<Proyecto[]> {
+    const token = await getToken();
     const response = await fetch(`${API_BASE_URL}/api/v1/proyectos`, {
       credentials: "include",
       headers: {
@@ -106,6 +118,7 @@ const api = {
   },
 
   async crearCotizacion(data: any) {
+    const token = await getToken();
     const response = await fetch(`${API_BASE_URL}/api/v1/quotations`, {
       method: "POST",
       headers: {
@@ -132,6 +145,8 @@ const api = {
 export default function New() {
   const navigate = useNavigate();
   const { addNotification } = useNotifications();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null); // ← AGREGAR
 
   // Estado del formulario
   const [nombreCotizacion, setNombreCotizacion] = useState("");
@@ -162,8 +177,11 @@ export default function New() {
   }, []);
 
   const cargarCatalogos = async () => {
+    
     try {
+      setIsLoading(true);
       setLoadingCatalogos(true);
+      setError(null); // ← AGREGAR
       const [tiposData, usuariosData, proyectosData] = await Promise.all([
         api.getTipos(),
         api.getUsuarios(),
@@ -187,6 +205,7 @@ export default function New() {
 
     } catch (error) {
       console.error("Error al cargar catálogos:", error);
+      setError("No se pudieron cargar los catálogos necesarios. Por favor, recarga la página.");
       addNotification(
         "danger",
         "Error al cargar datos",
@@ -194,6 +213,7 @@ export default function New() {
         { priority: "critical", source: "Nueva Cotización" }
       );
     } finally {
+      setIsLoading(false);
       setLoadingCatalogos(false);
     }
   };
@@ -324,23 +344,29 @@ export default function New() {
     }
   };
 
-  if (loadingCatalogos) {
-    return (
-      <>
-        <PageMeta title="Nueva Cotización" description="Crear una nueva cotización" />
-        <div className="flex items-center justify-center h-96">
-          <div className="text-center">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-solid border-blue-600 border-r-transparent"></div>
-            <p className="mt-4 text-sm text-gray-600 dark:text-gray-400">
-              Cargando formulario...
-            </p>
-          </div>
-        </div>
-      </>
-    );
-  }
+  // 🔧 AGREGAR ESTO ANTES DEL return (
+if (loadingCatalogos) {
+  return <LoadingScreen message="Cargando formulario de cotización..." />;
+}
 
+if (error) {
   return (
+    <div className="flex items-center justify-center min-h-[400px]">
+      <div className="text-center">
+        <p className="text-red-600 mb-4">{error}</p>
+        <button
+          onClick={cargarCatalogos}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg"
+        >
+          Reintentar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Tu return ( original aquí...
+return (
     <>
       <PageMeta title="Nueva Cotización" description="Crear una nueva cotización" />
 

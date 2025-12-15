@@ -127,6 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(userData);
       saveUser(userData);
       setIsLoading(false);
+      setTimeout(() => void refresh(), 100); // Refrescar en segundo plano
     } else {
       // Si no, obtenerla del backend
       setIsLoading(true);

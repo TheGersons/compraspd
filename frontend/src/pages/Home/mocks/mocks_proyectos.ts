@@ -8,7 +8,7 @@ import { Proyecto, DetalleProducto } from '../types/gerencia.types';
 export const PROYECTOS_PROYECTOS: Proyecto[] = [
   {
     id: 'proj-p01',
-    nombre: 'Ampliación Planta Norte',
+    nombre: 'Proyecto A',
     estado: 'danger',
     criticidad: 9,
     responsable: 'María García',
@@ -29,7 +29,7 @@ export const PROYECTOS_PROYECTOS: Proyecto[] = [
   },
   {
     id: 'proj-p02',
-    nombre: 'Modernización Sistema SCADA',
+    nombre: 'Proyecto B',
     estado: 'warn',
     criticidad: 7,
     responsable: 'Carlos López',
@@ -50,7 +50,7 @@ export const PROYECTOS_PROYECTOS: Proyecto[] = [
   },
   {
     id: 'proj-p03',
-    nombre: 'Renovación Equipos Protección',
+    nombre: 'Proyecto C',
     estado: 'danger',
     criticidad: 10,
     responsable: 'Ana Martínez',
@@ -71,7 +71,7 @@ export const PROYECTOS_PROYECTOS: Proyecto[] = [
   },
   {
     id: 'proj-p04',
-    nombre: 'Proyecto Transmisión 230KV',
+    nombre: 'Proyecto W',
     estado: 'success',
     criticidad: 3,
     responsable: 'Juan Pérez',
@@ -92,7 +92,7 @@ export const PROYECTOS_PROYECTOS: Proyecto[] = [
   },
   {
     id: 'proj-p05',
-    nombre: 'Instalación Subestación',
+    nombre: 'Proyecto X',
     estado: 'warn',
     criticidad: 6,
     responsable: 'Laura Fernández',
@@ -113,7 +113,7 @@ export const PROYECTOS_PROYECTOS: Proyecto[] = [
   },
   {
     id: 'proj-p06',
-    nombre: 'Automatización Líneas',
+    nombre: 'Proyecto Y',
     estado: 'success',
     criticidad: 2,
     responsable: 'Pedro Ramírez',

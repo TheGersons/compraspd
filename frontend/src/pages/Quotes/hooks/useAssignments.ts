@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { assignmentsApi } from '../services/assignmentsApi';
 
+/*
 export function useMyAssignments() {
   return useQuery({
     queryKey: ['my-assignments'],
@@ -10,7 +11,7 @@ export function useMyAssignments() {
     staleTime: Infinity,
   });
 }
-
+*/
 export function useAssignmentChat(assignmentId: string | null) {
   return useQuery({
     queryKey: ['assignment-chat', assignmentId],

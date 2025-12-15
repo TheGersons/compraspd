@@ -1,739 +1,957 @@
-import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { useLocation } from "react-router-dom";
-import { useMyAssignments, useAssignmentChat, useUpdateFollowUp, useSendChat, loadItems } from "../Quotes/hooks/useAssignments";
-import { assignmentsApi } from "../Quotes/services/assignmentsApi";
-import { RequestedItemsTable } from "../Quotes/components/RequestedItemsTable";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
+import PageMeta from "../../components/common/PageMeta";
+import { getToken } from "../../lib/api";
+import { useNotifications } from "../Notifications/context/NotificationContext";
+
 // ============================================================================
-// TYPES - Actualizado para coincidir con el backend
+// TYPES
 // ============================================================================
 
-type FollowStatus = "SUMMITED" | "IN_PROGRESS" | "PAUSED" | "CANCELLED" | "COMPLETED";
-type RequestCategory = "LICITACIONES" | "PROYECTOS" | "SUMINISTROS" | "INVENTARIOS";
-type Procurement = "NACIONAL" | "INTERNACIONAL";
-type DeliveryType = "ALMACEN" | "PROYECTO" | "WAREHOUSE" | "PROJECT";
+type TimelineItem = {
+  estado: string;
+  completado: boolean;
+  fecha?: Date | string | null;
+  fechaLimite?: Date | string | null;
+  diasRetraso: number;
+  enTiempo: boolean;
+};
 
-type ChatFile = {
+type EstadoProducto = {
+  id: string;
+  sku: string;
+  descripcion: string;
+  cantidad?: number;
+  precioUnitario?: number;
+  precioTotal?: number;
+  proveedor?: string;
+  responsable?: string;
+  observaciones?: string;
+  
+  // 10 estados booleanos
+  cotizado: boolean;
+  conDescuento: boolean;
+  comprado: boolean;
+  pagado: boolean;
+  primerSeguimiento: boolean;
+  enFOB: boolean;
+  conBL: boolean;
+  segundoSeguimiento: boolean;
+  enCIF: boolean;
+  recibido: boolean;
+  
+  // Fechas reales
+  fechaCotizado?: string | null;
+  fechaConDescuento?: string | null;
+  fechaComprado?: string | null;
+  fechaPagado?: string | null;
+  fechaPrimerSeguimiento?: string | null;
+  fechaEnFOB?: string | null;
+  fechaConBL?: string | null;
+  fechaSegundoSeguimiento?: string | null;
+  fechaEnCIF?: string | null;
+  fechaRecibido?: string | null;
+  
+  // Fechas límite
+  fechaLimiteCotizado?: string | null;
+  fechaLimiteConDescuento?: string | null;
+  fechaLimiteComprado?: string | null;
+  fechaLimitePagado?: string | null;
+  fechaLimitePrimerSeguimiento?: string | null;
+  fechaLimiteEnFOB?: string | null;
+  fechaLimiteConBL?: string | null;
+  fechaLimiteSegundoSeguimiento?: string | null;
+  fechaLimiteEnCIF?: string | null;
+  fechaLimiteRecibido?: string | null;
+  
+  // Criticidad y retrasos
+  criticidad: number;
+  nivelCriticidad: string;
+  diasRetrasoActual: number;
+  estadoGeneral: string;
+  
+  // Relaciones
+  proyecto?: {
     id: string;
-    name: string;
-    sizeBytes: number;
-    url: string;
-};
-
-type ChatMsg = {
+    nombre: string;
+    criticidad: number;
+  };
+  cotizacion?: {
     id: string;
-    senderId: string;
-    body?: string;
-    createdAt: string;
-    files: ChatFile[];
-    sender?: {  // ✅ Añade esto
-        id: string;
-        fullName: string;
-    };
-};
-
-// Tipo que coincide con la respuesta del backend
-type AssignmentRequest = {
+    nombreCotizacion: string;
+  };
+  paisOrigen?: {
     id: string;
-    assignmentId: string;
-    assignedToId: string;
-    progress: number;
-    eta?: string;
-    followStatus: FollowStatus;
-    priorityRequested: boolean;
-    createdAt: string;
-    updatedAt: string;
-
-    // Datos anidados de purchaseRequest
-    purchaseRequest: {
-        id: string;
-        reference: string;
-        finalClient: string;
-        createdAt: string;
-        quoteDeadline: string;
-        requestCategory: RequestCategory;
-        procurement: Procurement;
-        deliveryType: DeliveryType;
-        projectId: string | null;
-        comments: string;
-    } | null;
-
-    // Datos del asignado
-    assignedTo: {
-        fullName: string;
-    };
+    nombre: string;
+    codigo: string;
+  };
+  medioTransporte?: string;
+  
+  // Aprobación
+  aprobadoPorSupervisor: boolean;
+  fechaAprobacion?: string | null;
+  
+  // Timeline calculado
+  estadoActual?: string;
+  progreso?: number;
+  timeline?: TimelineItem[];
 };
 
 // ============================================================================
-// UTILITIES
+// API SERVICE
 // ============================================================================
 
-const formatDateForInput = (isoDate: string | null | undefined): string => {
-    if (!isoDate) return "";
-    try {
-        const date = new Date(isoDate);
-        // Formato yyyy-MM-dd para input type="date"
-        return date.toISOString().split('T')[0];
-    } catch {
-        return "";
-    }
-};
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const token = getToken();
 
-const shortDate = (date: string | undefined | null) => {
-    if (!date) return "—";
-    const d = new Date(date);
-    if (isNaN(d.getTime())) return "—";
+const api = {
+  async getEstadosProductos(filters?: {
+    proyectoId?: string;
+    cotizacionId?: string;
+    sku?: string;
+    nivelCriticidad?: string;
+    page?: number;
+    pageSize?: number;
+  }) {
+    const params = new URLSearchParams();
+    if (filters?.proyectoId) params.append("proyectoId", filters.proyectoId);
+    if (filters?.cotizacionId) params.append("cotizacionId", filters.cotizacionId);
+    if (filters?.sku) params.append("sku", filters.sku);
+    if (filters?.nivelCriticidad) params.append("nivelCriticidad", filters.nivelCriticidad);
+    if (filters?.page) params.append("page", String(filters.page));
+    if (filters?.pageSize) params.append("pageSize", String(filters.pageSize));
 
-    return new Intl.DateTimeFormat("es-HN", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "2-digit"
-    }).format(d);
-}
-
-const calculateDaysLeft = (quoteDeadline: string | undefined | null): number => {
-    if (!quoteDeadline) return 99999;
-
-    const quoteDeadlineDate = new Date(quoteDeadline);
-    if (isNaN(quoteDeadlineDate.getTime())) return 99999;
-
-    const diff = quoteDeadlineDate.getTime() - Date.now();
-    return Math.floor(diff / 86400000);
-};
-
-// ============================================================================
-// SUB-COMPONENTS
-// ============================================================================
-// En FollowUps.tsx - Modifica ProgressControl para agregar botón de guardar
-
-
-const ProgressControl2 = React.memo(({
-    progress,
-    eta,
-    priorityRequested,
-    disabled,
-    onProgressChange,
-    onEtaChange,
-    onRequestPriority,
-    onSave // ✅ NUEVO
-}: {
-    progress: number;
-    eta: string;
-    priorityRequested: boolean;
-    disabled: boolean;
-    onProgressChange: (value: number) => void;
-    onEtaChange: (value: string) => void;
-    onRequestPriority: () => void;
-    onSave: () => void; // ✅ NUEVO
-}) => (
-    <div className="rounded-lg ring-1 ring-gray-200 dark:ring-gray-800 p-3 grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div>
-            <div className="text-xs font-semibold text-black-800 dark:text-white/90 mb-1">
-                Progreso actual: {progress}%
-            </div>
-            <input
-                type="range"
-                min={0}
-                max={100}
-                value={progress}
-                onChange={(e) => onProgressChange(Number(e.target.value))}
-                className="w-full"
-                disabled={disabled}
-            />
-            <div className="text-sm font-semibold text-black-800 dark:text-white/90 mt-1">
-                {progress}%
-            </div>
-        </div>
-        <div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                Fecha de finalización (estimada)
-            </div>
-            <input
-                type="date"
-                value={eta}
-                onChange={(e) => onEtaChange(e.target.value)}
-                className="w-full rounded-md ring-1 ring-inset ring-gray-300 bg-white px-2 py-1 text-sm dark:bg-gray-900 dark:text-gray-200 dark:ring-gray-700"
-                disabled={disabled}
-            />
-        </div>
-        <div className="flex flex-col gap-2">
-            {/* ✅ NUEVO: Botón de guardar */}
-            <button
-                className="px-4 py-2 rounded-lg bg-green-500 text-white text-sm font-medium hover:bg-green-600 disabled:opacity-50"
-                onClick={onSave}
-                disabled={disabled}
-            >
-                Guardar Progreso
-            </button>
-            <button
-                className={`px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 ${priorityRequested
-                    ? "ring-1 ring-gray-300 text-gray-600 dark:ring-gray-700 dark:text-gray-400"
-                    : "bg-blue-500 text-white hover:bg-blue-600"
-                    }`}
-                onClick={onRequestPriority}
-                disabled={priorityRequested || disabled}
-            >
-                {priorityRequested ? "Solicitud enviada" : "Solicitar prioridad"}
-            </button>
-        </div>
-    </div>
-));
-const AssignmentListItem = React.memo(({
-    req,
-    isSelected,
-    onClick
-}: {
-    req: AssignmentRequest;
-    isSelected: boolean;
-    onClick: () => void;
-}) => (
-    <button
-        className={`w-full text-left p-3 rounded-lg ring-1 ring-gray-200 dark:ring-gray-800 hover:bg-gray-50 dark:hover:bg-white/5 ${isSelected ? "outline outline-2 outline-blue-500" : ""
-            }`}
-        onClick={onClick}
-    >
-        <div className="font-medium truncate font-semibold text-black-800 dark:text-white/90">
-            {req.purchaseRequest?.reference || req.id} — {req.purchaseRequest?.finalClient || "N/A"}
-        </div>
-        <div className="text-xs text-black-800 dark:text-white/90">
-            Asignado a {req.assignedTo.fullName} • Estado: {req.followStatus}
-        </div>
-    </button>
-));
-
-const DetailHeader = React.memo(({
-    current,
-    daysLeft
-}: {
-    current: AssignmentRequest;
-    daysLeft: number;
-}) => (
-    <div className="flex items-start justify-between gap-2">
-        <div>
-            <h3 className="text-base font-semibold text-black-800 dark:text-white/90">
-                {current.purchaseRequest?.reference || current.id} — {current.purchaseRequest?.finalClient || "N/A"}
-            </h3>
-            <div className="text-xs text-black-800 dark:text-white/90">
-                Tipo {current.purchaseRequest?.requestCategory} • {current.purchaseRequest?.procurement} •
-                Asignado a {current.assignedTo.fullName}
-            </div>
-        </div>
-        <div className="text-right text-xs text-gray-500 dark:text-gray-400">
-            Creada {shortDate(current.purchaseRequest?.createdAt)}<br />
-            Límite {shortDate(current.purchaseRequest?.quoteDeadline)}
-            {daysLeft >= 0 ? ` • ${daysLeft} días restantes` : ' • atrasada'}
-        </div>
-    </div>
-));
-
-/*
-const ProgressControl = React.memo(({
-    progress,
-    eta,
-    priorityRequested,
-    disabled,
-    onProgressChange,
-    onEtaChange,
-    onRequestPriority
-}: {
-    progress: number;
-    eta: string;
-    priorityRequested: boolean;
-    disabled: boolean;
-    onProgressChange: (value: number) => void;
-    onEtaChange: (value: string) => void;
-    onRequestPriority: () => void;
-}) => (
-    <div className="rounded-lg ring-1 ring-gray-200 dark:ring-gray-800 p-3 grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div>
-            <div className="text-xs font-semibold text-black-800 dark:text-white/90 mb-1">
-                Progreso actual: {progress}%
-            </div>
-            <input
-                type="range"
-                min={0}
-                max={100}
-                value={progress}
-                onChange={(e) => onProgressChange(Number(e.target.value))}
-                className="w-full"
-                disabled={disabled}
-            />
-            <div className="text-sm font-semibold text-black-800 dark:text-white/90 mt-1">
-                {progress}%
-            </div>
-        </div>
-        <div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                Fecha de finalización (estimada)
-            </div>
-            <input
-                type="date"
-                value={eta}
-                onChange={(e) => onEtaChange(e.target.value)}
-                className="w-full rounded-md ring-1 ring-inset ring-gray-300 bg-white px-2 py-1 text-sm dark:bg-gray-900 dark:text-gray-200 dark:ring-gray-700"
-                disabled={disabled}
-            />
-        </div>
-        <div className="flex items-end gap-2">
-            <button
-                className={`px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 ${priorityRequested
-                    ? "ring-1 ring-gray-300 text-gray-600 dark:ring-gray-700 dark:text-gray-400"
-                    : "bg-blue-500 text-white hover:bg-blue-600"
-                    }`}
-                onClick={onRequestPriority}
-                disabled={priorityRequested || disabled}
-            >
-                {priorityRequested ? "Solicitud enviada" : "Solicitar prioridad"}
-            </button>
-        </div>
-    </div>
-));
-*/
-
-const StatusActions = React.memo(({
-    currentStatus,
-    disabled,
-    onSetStatus
-}: {
-    currentStatus: FollowStatus;
-    disabled: boolean;
-    onSetStatus: (status: FollowStatus) => void;
-}) => {
-    const isFinalized = currentStatus === "CANCELLED" || currentStatus === "COMPLETED";
-
-    return (
-        <div className="flex flex-wrap gap-2">
-            <button
-                className="px-4 py-2 rounded-lg bg-blue-500 text-white text-sm font-medium hover:bg-blue-600 disabled:opacity-50"
-                onClick={() => onSetStatus("IN_PROGRESS")}
-                disabled={currentStatus === "IN_PROGRESS" || disabled}
-            >
-                En progreso
-            </button>
-            <button
-                className="px-4 py-2 rounded-lg bg-yellow-500 text-white text-sm font-medium hover:bg-yellow-600 disabled:opacity-50"
-                onClick={() => onSetStatus(currentStatus !== "PAUSED" ? "PAUSED" : "IN_PROGRESS")}
-                disabled={isFinalized || disabled}
-            >
-                {currentStatus !== "PAUSED" ? "Pausar" : "Reanudar"}
-            </button>
-            <button
-                className="px-4 py-2 rounded-lg bg-red-500 text-white text-sm font-medium hover:bg-red-600 disabled:opacity-50"
-                onClick={() => onSetStatus("CANCELLED")}
-                disabled={isFinalized || disabled}
-            >
-                Cancelar
-            </button>
-            <button
-                className="px-4 py-2 rounded-lg bg-green-500 text-white text-sm font-medium hover:bg-green-600 disabled:opacity-50"
-                onClick={() => onSetStatus("COMPLETED")}
-                disabled={isFinalized || disabled}
-            >
-                Finalizar
-            </button>
-        </div>
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/estado-productos?${params}`,
+      {
+        credentials: "include",
+        headers: { Authorization: `Bearer ${token}` },
+      }
     );
-});
+    if (!response.ok) throw new Error("Error al cargar productos");
+    return response.json();
+  },
 
-const ChatMessage = React.memo(({
-    message,
-    isFromCurrentUser,
-    senderName
-}: {
-    message: ChatMsg;
-    isFromCurrentUser: boolean;
-    senderName: string;
-}) => (
-    <div
-        className={`max-w-[80%] rounded-lg px-3 py-2 text-sm shadow-sm ${isFromCurrentUser
-            ? "ml-auto bg-blue-500 text-white"
-            : "mr-auto bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-50 ring-1 ring-gray-300 dark:ring-gray-700"
-            }`}
-    >
-        <div className="text-[11px] opacity-70 mb-0.5">
-            {senderName} • {formatDateForInput(message.createdAt)}
-        </div>
-        {message.body && <div className="whitespace-pre-wrap">{message.body}</div>}
-        {message.files?.length > 0 && (
-            <ul className="mt-1 space-y-1">
-                {message.files.map(f => (
-                    <li key={f.id} className="text-[12px] underline break-all">
-                        <a href={f.url} target="_blank" rel="noopener noreferrer">
-                            {f.name}
-                        </a>
-                        <span className="opacity-70"> ({Math.round(f.sizeBytes / 1024)} KB)</span>
-                    </li>
-                ))}
-            </ul>
-        )}
-    </div>
-));
+  async getEstadoProductoById(id: string) {
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/estado-productos/${id}`,
+      {
+        credentials: "include",
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+    if (!response.ok) throw new Error("Error al cargar detalle");
+    return response.json();
+  },
+
+  async getTimeline(id: string) {
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/estado-productos/${id}/timeline`,
+      {
+        credentials: "include",
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+    if (!response.ok) throw new Error("Error al cargar timeline");
+    return response.json();
+  },
+
+  async avanzarEstado(id: string, observacion?: string) {
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/estado-productos/${id}/avanzar`,
+      {
+        method: "PATCH",
+        credentials: "include",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ observacion }),
+      }
+    );
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || "Error al avanzar estado");
+    }
+    return response.json();
+  },
+
+  async cambiarEstado(id: string, estado: string, observacion?: string) {
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/estado-productos/${id}/estado`,
+      {
+        method: "PATCH",
+        credentials: "include",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ estado, observacion }),
+      }
+    );
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || "Error al cambiar estado");
+    }
+    return response.json();
+  },
+
+  async actualizarFechas(id: string, fechas: any) {
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/estado-productos/${id}/fechas`,
+      {
+        method: "PATCH",
+        credentials: "include",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(fechas),
+      }
+    );
+    if (!response.ok) throw new Error("Error al actualizar fechas");
+    return response.json();
+  },
+
+  async actualizarFechasLimite(id: string, fechasLimite: any) {
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/estado-productos/${id}/fechas-limite`,
+      {
+        method: "PATCH",
+        credentials: "include",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(fechasLimite),
+      }
+    );
+    if (!response.ok) throw new Error("Error al actualizar fechas límite");
+    return response.json();
+  },
+
+  async aprobarProducto(id: string, aprobado: boolean, observaciones?: string) {
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/estado-productos/${id}/aprobar`,
+      {
+        method: "PATCH",
+        credentials: "include",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ aprobado, observaciones }),
+      }
+    );
+    if (!response.ok) throw new Error("Error al aprobar producto");
+    return response.json();
+  },
+};
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+const ESTADOS_LABELS: Record<string, string> = {
+  cotizado: "Cotizado",
+  conDescuento: "Con Descuento",
+  comprado: "Comprado",
+  pagado: "Pagado",
+  primerSeguimiento: "1er Seguimiento",
+  enFOB: "En FOB",
+  conBL: "Con BL",
+  segundoSeguimiento: "2do Seguimiento",
+  enCIF: "En CIF",
+  recibido: "Recibido",
+};
+
+const ESTADOS_ICONOS: Record<string, string> = {
+  cotizado: "📋",
+  conDescuento: "💰",
+  comprado: "🛒",
+  pagado: "💳",
+  primerSeguimiento: "📞",
+  enFOB: "🚢",
+  conBL: "📄",
+  segundoSeguimiento: "📞",
+  enCIF: "🌊",
+  recibido: "📦",
+};
+
+const getEstadoActual = (producto: EstadoProducto): string => {
+  const estados = [
+    "recibido",
+    "enCIF",
+    "segundoSeguimiento",
+    "conBL",
+    "enFOB",
+    "primerSeguimiento",
+    "pagado",
+    "comprado",
+    "conDescuento",
+    "cotizado",
+  ];
+
+  for (const estado of estados) {
+    if (producto[estado as keyof EstadoProducto]) {
+      return estado;
+    }
+  }
+  return "cotizado";
+};
+
+const calcularProgreso = (producto: EstadoProducto): number => {
+  const estados = [
+    producto.cotizado,
+    producto.conDescuento,
+    producto.comprado,
+    producto.pagado,
+    producto.primerSeguimiento,
+    producto.enFOB,
+    producto.conBL,
+    producto.segundoSeguimiento,
+    producto.enCIF,
+    producto.recibido,
+  ];
+  const completados = estados.filter(Boolean).length;
+  return Math.round((completados / 10) * 100);
+};
+
+const getCriticidadColor = (nivel: string) => {
+  const colores: Record<string, string> = {
+    BAJO: "text-green-600 dark:text-green-400",
+    MEDIO: "text-yellow-600 dark:text-yellow-400",
+    ALTO: "text-red-600 dark:text-red-400",
+  };
+  return colores[nivel] || "text-gray-600";
+};
+
+const getCriticidadBadge = (nivel: string) => {
+  const badges: Record<string, string> = {
+    BAJO: "🟢 Bajo",
+    MEDIO: "🟡 Medio",
+    ALTO: "🔴 Alto",
+  };
+  return badges[nivel] || nivel;
+};
+
+const getCriticidadBg = (nivel: string) => {
+  const bgs: Record<string, string> = {
+    BAJO: "bg-green-50 border-green-200 dark:bg-green-900/10 dark:border-green-800",
+    MEDIO: "bg-yellow-50 border-yellow-200 dark:bg-yellow-900/10 dark:border-yellow-800",
+    ALTO: "bg-red-50 border-red-200 dark:bg-red-900/10 dark:border-red-800",
+  };
+  return bgs[nivel] || "bg-gray-50 border-gray-200";
+};
+
+const formatDate = (date: string | Date | null | undefined): string => {
+  if (!date) return "-";
+  const d = new Date(date);
+  return d.toLocaleDateString("es-ES", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+};
+
+const formatDateTime = (date: string | Date | null | undefined): string => {
+  if (!date) return "-";
+  const d = new Date(date);
+  return d.toLocaleDateString("es-ES", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const calcularDiasRetraso = (
+  fechaReal: string | null | undefined,
+  fechaLimite: string | null | undefined
+): number => {
+  if (!fechaLimite) return 0;
+  const fechaComparar = fechaReal ? new Date(fechaReal) : new Date();
+  const limite = new Date(fechaLimite);
+  const diff = fechaComparar.getTime() - limite.getTime();
+  return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
+};
 
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
-export default function QuotesFollowUps() {
-    type LocationState = {
-        fromAssignment?: boolean;
-        selected?: AssignmentRequest
-    };
-    const locationState = useLocation().state as LocationState | undefined;
+export default function ShoppingFollowUps() {
+  const { addNotification } = useNotifications();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-    // React Query hooks
-    const { data: temporalList = [], isLoading } = useMyAssignments();
-    //filtra las asignaciones que están en estado IN_PROGRESS, PAUSED o SUMMITED
-    const assignedList = temporalList.filter(assignment =>
-        ["IN_PROGRESS", "PAUSED", "SUBMITTED"].includes(assignment.followStatus)
-    );
-    const updateFollowUpMutation = useUpdateFollowUp();
-    const sendChatMutation = useSendChat();
+  // Estados principales
+  const [productos, setProductos] = useState<EstadoProducto[]>([]);
+  const [productoSeleccionado, setProductoSeleccionado] = useState<EstadoProducto | null>(null);
+  const [timeline, setTimeline] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadingDetalle, setLoadingDetalle] = useState(false);
+  const [loadingAccion, setLoadingAccion] = useState(false);
 
-    // State
-    const [current, setCurrent] = useState<AssignmentRequest | null>(null);
-    const [status, setStatus] = useState<FollowStatus>("IN_PROGRESS");
-    const [progress, setProgress] = useState<number>(0);
-    const [eta, setEta] = useState<string>("");
-    const [priorityRequested, setPriorityRequested] = useState<boolean>(false);
-    const [input, setInput] = useState<string>("");
-    const [files, setFiles] = useState<File[]>([]);
+  // Filtros
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filtroNivel, setFiltroNivel] = useState<string>("");
 
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const chatEndRef = useRef<HTMLDivElement>(null);
+  // UI States
+  const [showEditFechas, setShowEditFechas] = useState(false);
+  const [showCambiarEstado, setShowCambiarEstado] = useState(false);
+  const [estadoSeleccionado, setEstadoSeleccionado] = useState("");
+  const [observacion, setObservacion] = useState("");
 
-    // Chat query - solo se ejecuta cuando hay un current seleccionado
-    const { data: chat = [] } = useAssignmentChat(current?.id || null);
+  // ============================================================================
+  // EFFECTS
+  // ============================================================================
 
-    // Derived state
-    const isCurrentAssignee = true; // Siempre true porque solo ves tus asignaciones
-    const daysLeft = useMemo(() =>
-        current?.purchaseRequest?.quoteDeadline ? calculateDaysLeft(current.purchaseRequest.quoteDeadline) : 0,
-        [current]
-    );
+  useEffect(() => {
+    cargarProductos();
+  }, [filtroNivel]);
 
-    const [isTableVisible, setIsTableVisible] = useState(false)
-    const tableContentRef = useRef<HTMLDivElement>(null);
-    const { data: items = [], } = loadItems(current?.purchaseRequest?.id !== undefined ? current.purchaseRequest.id : null);
-
-    const toggleTable = () => {
-        setIsTableVisible(prev => !prev);
+  useEffect(() => {
+    const productoId = searchParams.get("producto");
+    if (productoId && productos.length > 0) {
+      const producto = productos.find((p) => p.id === productoId);
+      if (producto) {
+        seleccionarProducto(producto);
+      }
     }
-    // Handlers
-    const handleSaveProgress = useCallback(async () => {
-        if (!current) return;
+  }, [searchParams, productos]);
 
-        try {
-            await updateFollowUpMutation.mutateAsync({
-                assignmentId: current.id,
-                data: { progress, eta: eta || undefined }
-            });
-        } catch (error) {
-            console.error("Error saving progress:", error);
-        }
-    }, [current, progress, eta, updateFollowUpMutation]);
+  // ============================================================================
+  // FUNCTIONS
+  // ============================================================================
 
-    const handleAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const list = e.target.files;
-        if (!list) return;
-        setFiles(prev => [...prev, ...Array.from(list)]);
-        if (fileInputRef.current) fileInputRef.current.value = "";
-    };
+  const cargarProductos = async () => {
+    try {
+      setLoading(true);
+      const data = await api.getEstadosProductos({
+        nivelCriticidad: filtroNivel || undefined,
+        pageSize: 100,
+      });
+      setProductos(data.items || []);
+    } catch (error) {
+      console.error("Error al cargar productos:", error);
+      addNotification("danger", "Error", "Error al cargar productos");
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  const seleccionarProducto = async (producto: EstadoProducto) => {
+    try {
+      setLoadingDetalle(true);
+      setProductoSeleccionado(producto);
+      setSearchParams({ producto: producto.id });
+      
+      const [detalle, timelineData] = await Promise.all([
+        api.getEstadoProductoById(producto.id),
+        api.getTimeline(producto.id),
+      ]);
+      
+      setProductoSeleccionado(detalle);
+      setTimeline(timelineData);
+    } catch (error) {
+      console.error("Error al cargar detalle:", error);
+      addNotification("danger", "Error", "Error al cargar detalle del producto");
+    } finally {
+      setLoadingDetalle(false);
+    }
+  };
 
-    const [isSendingMessage,] = useState(false);
+  const handleAvanzarEstado = async () => {
+    if (!productoSeleccionado) return;
 
-    const sendMsg = async () => {
-        if (!current || (!input.trim() && files.length === 0)) return;
+    try {
+      setLoadingAccion(true);
+      await api.avanzarEstado(productoSeleccionado.id, observacion);
+      addNotification("success", "Éxito", "Estado avanzado correctamente");
+      setObservacion("");
+      await seleccionarProducto(productoSeleccionado);
+      await cargarProductos();
+    } catch (error: any) {
+      console.error("Error al avanzar estado:", error);
+      addNotification("danger", "Error", error.message || "Error al avanzar estado");
+    } finally {
+      setLoadingAccion(false);
+    }
+  };
 
-        try {
-            let uploadedFiles: ChatFile[] = [];
-            if (files.length > 0) {
-                uploadedFiles = await assignmentsApi.uploadFiles(files);
-            }
+  const handleCambiarEstado = async () => {
+    if (!productoSeleccionado || !estadoSeleccionado) return;
 
-            const fileIds = uploadedFiles.map(f => f.id);
-            await sendChatMutation.mutateAsync({
-                assignmentId: current.id,
-                body: input.trim() || null,
-                fileIds
-            });
+    try {
+      setLoadingAccion(true);
+      await api.cambiarEstado(productoSeleccionado.id, estadoSeleccionado, observacion);
+      addNotification("success", "Éxito", "Estado cambiado correctamente");
+      setShowCambiarEstado(false);
+      setEstadoSeleccionado("");
+      setObservacion("");
+      await seleccionarProducto(productoSeleccionado);
+      await cargarProductos();
+    } catch (error: any) {
+      console.error("Error al cambiar estado:", error);
+      addNotification("danger", "Error", error.message || "Error al cambiar estado");
+    } finally {
+      setLoadingAccion(false);
+    }
+  };
 
-            setInput("");
-            setFiles([]);
+  const filteredProductos = productos.filter((p) =>
+    p.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    p.descripcion.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    p.proyecto?.nombre.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-            // ✅ Scroll al final después de enviar
-            setTimeout(() => {
-                chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-            }, 100);
-        } catch (error) {
-            console.error("Error sending message:", error);
-        }
-    };
+  // ============================================================================
+  // RENDER
+  // ============================================================================
 
-    const requestPriorityBump = async () => {
-        if (!current) return;
-        try {
-            await updateFollowUpMutation.mutateAsync({
-                assignmentId: current.id,
-                data: { priorityRequested: true }
-            });
-            setPriorityRequested(true);
-        } catch (error) {
-            console.error("Error requesting priority:", error);
-        }
-    };
-
-    const actionSetStatus = async (s: FollowStatus) => {
-        if (!current) return;
-        try {
-            await updateFollowUpMutation.mutateAsync({
-                assignmentId: current.id,
-                data: { followStatus: s }
-            });
-            setStatus(s);
-        } catch (error) {
-            console.error("Error updating status:", error);
-        }
-    };
-
-    // Effects
-    useEffect(() => {
-        if (locationState?.selected) {
-            setCurrent(locationState.selected);
-        } else if (assignedList.length > 0 && !current) {
-            setCurrent(assignedList[0]);
-        }
-    }, [locationState, assignedList, current]);
-
-
-    useEffect(() => {
-        if (!current) {
-            console.log('⚠️ No hay asignación seleccionada');
-            return;
-        }
-
-        console.log('📋 Asignación seleccionada:', {
-            id: current.id,
-            assignmentId: current.assignmentId,
-            reference: current.purchaseRequest?.reference
-        });
-
-        setStatus(current.followStatus);
-        setProgress(current.progress);
-        setEta(formatDateForInput(current.eta));
-        setPriorityRequested(current.priorityRequested);
-
-
-    }, [current?.id, chat.length]);
-
-    useEffect(() => {
-        console.log('Chat actualizado:', {
-            assignmentId: current?.id,
-            messageCount: chat.length,
-            messages: chat
-        });
-    }, [chat, current?.id]);
-
-
-
-    if (isLoading) return <div className="p-6 text-center">Cargando asignaciones...</div>;
-
+  if (loading) {
     return (
-        <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
-            <h2 className="text-2xl font-semibold text-gray-800 dark:text-white/90">
-                Seguimiento de solicitudes
-            </h2>
-
-            <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Assignment List */}
-                <div className="lg:col-span-1">
-                    <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 my-8 shadow-xl p-4">
-                        <h3 className="font-semibold mb-3 text-gray-800 dark:text-white/90">Mis Asignadas</h3>
-                        {!assignedList?.length ? (
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                                No hay solicitudes asignadas.
-                            </p>
-                        ) : (
-                            <ul className="space-y-2">
-                                {assignedList.map(req => (
-                                    <li key={req.id}>
-                                        <AssignmentListItem
-                                            req={req}
-                                            isSelected={current?.id === req.id}
-                                            onClick={() => setCurrent(req)}
-                                        />
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                    </div>
-                </div>
-
-                {/* Detail & Chat */}
-                <div className="lg:col-span-2 space-y-6">
-                    {/* Detail Card */}
-                    <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 my-8 shadow-xl p-4">
-                        <h3 className="font-semibold mb-3 text-gray-800 dark:text-white/90">Detalle y Avance</h3>
-                        {!current ? (
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                                Selecciona una solicitud.
-                            </p>
-                        ) : (
-                            <div className="space-y-3">
-                                <DetailHeader current={current} daysLeft={daysLeft} />
-
-                                <div className="grid grid-cols-2 gap-3 text-sm">
-                                    <div className="rounded-lg ring-1 ring-gray-200 dark:ring-gray-800 p-3">
-                                        <div className="text-xs text-gray-500 dark:text-gray-400">Entrega</div>
-                                        <div className="font-semibold text-black-800 dark:text-white/90">
-                                            {current.purchaseRequest?.deliveryType === "WAREHOUSE" ? "Almacén" : "Proyecto"}
-                                        </div>
-                                    </div>
-                                    <div className="rounded-lg ring-1 ring-gray-200 dark:ring-gray-800 p-3">
-                                        <div className="text-xs text-gray-500 dark:text-gray-400">Proyecto</div>
-                                        <div className="font-semibold text-black-800 dark:text-white/90">
-                                            {current.purchaseRequest?.deliveryType !== "WAREHOUSE" ? current.purchaseRequest?.projectId : "N/A"}
-                                        </div>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={toggleTable}
-                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors 
-                            ${isTableVisible
-                                            ? 'bg-gray-400 text-gray-800 hover:bg-gray-500' // Estilo al mostrar
-                                            : 'bg-blue-500 text-white hover:bg-blue-600'  // Estilo al ocultar
-                                        }`}
-                                >
-                                    {/* 5. Cambiar el texto del botón */}
-                                    {isTableVisible ? 'Ocultar productos' : `Ver ${items.length} productos solicitados`}
-                                </button>
-
-                                {/* 6. WRAPPER ANIMADO */}
-                                <div
-                                    ref={tableContentRef}
-                                    style={{
-                                        // Controla la altura. Si está visible, usa la altura real del contenido. Si no, 0.
-                                        height: isTableVisible ? tableContentRef.current?.scrollHeight : 0,
-                                    }}
-                                    className="overflow-hidden transition-all duration-300 ease-in-out mt-4" // Clases de Tailwind para la animación
-                                >
-                                    {/* 7. Renderiza el componente de la tabla */}
-                                    <RequestedItemsTable items={items} />
-                                </div>
-
-                                <p className="text-sm text-gray-700 dark:text-gray-300">
-                                    <span className="font-medium">Comentarios:</span> {current.purchaseRequest?.comments || "Sin comentarios"}
-                                </p>
-
-                                <ProgressControl2
-                                    progress={progress}
-                                    eta={eta}
-                                    priorityRequested={priorityRequested}
-                                    disabled={!isCurrentAssignee}
-                                    onProgressChange={setProgress}
-                                    onEtaChange={setEta}
-                                    onRequestPriority={requestPriorityBump}
-                                    onSave={handleSaveProgress} // ✅ NUEVO
-                                />
-
-                                <StatusActions
-                                    currentStatus={status}
-                                    disabled={!isCurrentAssignee}
-                                    onSetStatus={actionSetStatus}
-                                />
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Chat Card */}
-                    <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 my-8 shadow-xl p-4">
-                        <h3 className="font-semibold mb-3 text-gray-800 dark:text-white/90">Chat con solicitante</h3>
-                        {!current ? (
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                                Selecciona una solicitud.
-                            </p>
-                        ) : (
-                            <div className="flex flex-col h-[420px]">
-                                <div className="flex-1 overflow-auto rounded-lg ring-1 ring-gray-200 dark:ring-gray-800 p-3 space-y-3">
-
-
-                                    {chat.length === 0 ? (
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">Sin mensajes.</p>
-                                    ) : (
-                                        chat.map(m => {
-                                            console.log('🔍 Rendering message:', m); // Debug
-                                            return (
-                                                <ChatMessage
-                                                    key={m.id}
-                                                    message={m}
-                                                    isFromCurrentUser={m.senderId === current.assignedToId}
-                                                    senderName={
-                                                        m.sender?.fullName ||
-                                                        (m.senderId === current.assignedToId
-                                                            ? current.assignedTo.fullName
-                                                            : current.purchaseRequest?.finalClient || "Cliente")
-                                                    }
-                                                />
-                                            );
-                                        })
-                                    )}
-                                    <div ref={chatEndRef} />
-                                </div>
-
-                                {files.length > 0 && (
-                                    <div className="mt-2 rounded-lg ring-1 ring-gray-200 dark:ring-gray-800 p-2">
-                                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Adjuntos:</div>
-                                        <ul className="flex flex-wrap gap-2">
-                                            {files.map(f => (
-                                                <li key={f.name} className="text-xs rounded-md px-2 py-1 ring-1 ring-gray-200 dark:ring-gray-800 dark:text-white">
-                                                    {f.name}
-                                                    <button
-                                                        className="ml-2 underline text-red-500"
-                                                        onClick={() => setFiles(prev => prev.filter(file => file.name !== f.name))}
-                                                    >
-                                                        quitar
-                                                    </button>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
-                                )}
-
-                                <div className="mt-2 flex items-end gap-2">
-                                    <textarea
-                                        value={input}
-                                        onChange={(e) => setInput(e.target.value)}
-                                        className="flex-1 min-h-[44px] max-h-40 rounded-lg ring-1 ring-gray-300 bg-white px-3 py-2 text-sm dark:bg-gray-900 dark:text-gray-200 dark:ring-gray-700"
-                                        placeholder="Escribe un mensaje…"
-                                        disabled={!isCurrentAssignee}
-                                    />
-                                    <input
-                                        ref={fileInputRef}
-                                        type="file"
-                                        multiple
-                                        onChange={handleAttach}
-                                        className="hidden"
-                                        disabled={!isCurrentAssignee}
-                                    />
-                                    <button
-                                        className="px-4 py-2 rounded-lg ring-1 ring-gray-300 text-sm font-medium hover:bg-gray-50 dark:ring-gray-700 dark:hover:bg-gray-800 dark:text-white disabled:opacity-50"
-                                        onClick={() => fileInputRef.current?.click()}
-                                        disabled={!isCurrentAssignee}
-                                    >
-                                        Adjuntar
-                                    </button>
-                                    <button
-                                        className="px-4 py-2 rounded-lg bg-blue-500 text-white text-sm font-medium hover:bg-blue-600 disabled:opacity-50"
-                                        onClick={sendMsg}
-                                        disabled={!isCurrentAssignee || (!input.trim() && files.length === 0) || isSendingMessage}
-                                    >
-                                        {isSendingMessage ? "Enviando..." : "Enviar"}
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-        </div>
+      <div className="flex h-64 items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+      </div>
     );
+  }
+
+  return (
+    <>
+      <PageMeta description="Seguimiento detallado de productos" title="Shopping Follow-Ups" />
+
+      <div className="space-y-4">
+        {/* Header */}
+        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+          <h2 className="text-2xl font-semibold text-gray-800 dark:text-white/90">
+            Seguimiento de Productos
+          </h2>
+          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+            Tracking detallado de las 10 etapas del proceso logístico
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          {/* Panel Izquierdo - Lista de Productos */}
+          <div className="lg:col-span-1">
+            <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+              {/* Filtros */}
+              <div className="mb-4 space-y-3">
+                <input
+                  type="text"
+                  placeholder="Buscar por SKU, descripción o proyecto..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                />
+
+                <select
+                  value={filtroNivel}
+                  onChange={(e) => setFiltroNivel(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                >
+                  <option value="">Todas las criticidades</option>
+                  <option value="BAJO">🟢 Bajo</option>
+                  <option value="MEDIO">🟡 Medio</option>
+                  <option value="ALTO">🔴 Alto</option>
+                </select>
+              </div>
+
+              {/* Lista de Productos */}
+              <div className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto">
+                {filteredProductos.length === 0 ? (
+                  <div className="py-8 text-center">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      No hay productos
+                    </p>
+                  </div>
+                ) : (
+                  filteredProductos.map((producto) => {
+                    const estadoActual = getEstadoActual(producto);
+                    const progreso = calcularProgreso(producto);
+                    const isSelected = productoSeleccionado?.id === producto.id;
+
+                    return (
+                      <button
+                        key={producto.id}
+                        onClick={() => seleccionarProducto(producto)}
+                        className={`w-full rounded-lg border p-3 text-left transition-all ${
+                          isSelected
+                            ? "border-blue-500 bg-blue-50 dark:border-blue-600 dark:bg-blue-900/20"
+                            : "border-gray-200 hover:border-blue-300 dark:border-gray-700 dark:hover:border-blue-600"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-sm font-medium text-gray-900 dark:text-white truncate">
+                                {producto.sku}
+                              </span>
+                              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${getCriticidadColor(producto.nivelCriticidad)}`}>
+                                {getCriticidadBadge(producto.nivelCriticidad)}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
+                              {producto.descripcion}
+                            </p>
+                            <div className="mt-2 flex items-center gap-2">
+                              <span className="text-xs text-gray-500">
+                                {ESTADOS_ICONOS[estadoActual]} {ESTADOS_LABELS[estadoActual]}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Progress Bar */}
+                        <div className="mt-2">
+                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+                            <div
+                              className={`h-full rounded-full transition-all ${
+                                producto.nivelCriticidad === "ALTO"
+                                  ? "bg-red-600"
+                                  : producto.nivelCriticidad === "MEDIO"
+                                  ? "bg-yellow-500"
+                                  : "bg-green-600"
+                              }`}
+                              style={{ width: `${progreso}%` }}
+                            />
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Panel Derecho - Detalle del Producto */}
+          <div className="lg:col-span-2">
+            {!productoSeleccionado ? (
+              <div className="rounded-xl border border-gray-200 bg-white p-12 text-center dark:border-gray-800 dark:bg-gray-900">
+                <svg
+                  className="mx-auto h-16 w-16 text-gray-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                  />
+                </svg>
+                <p className="mt-4 text-gray-600 dark:text-gray-400">
+                  Selecciona un producto para ver el detalle
+                </p>
+              </div>
+            ) : loadingDetalle ? (
+              <div className="flex h-64 items-center justify-center rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Información General */}
+                <div className={`rounded-xl border p-6 ${getCriticidadBg(productoSeleccionado.nivelCriticidad)}`}>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                          {productoSeleccionado.sku}
+                        </h3>
+                        <span className={`rounded-full px-3 py-1 text-sm font-medium ${getCriticidadColor(productoSeleccionado.nivelCriticidad)}`}>
+                          {getCriticidadBadge(productoSeleccionado.nivelCriticidad)}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-gray-700 dark:text-gray-300">
+                        {productoSeleccionado.descripcion}
+                      </p>
+                      
+                      <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
+                        {productoSeleccionado.proyecto && (
+                          <div>
+                            <span className="text-gray-600 dark:text-gray-400">Proyecto:</span>
+                            <p className="font-medium text-gray-900 dark:text-white">
+                              {productoSeleccionado.proyecto.nombre}
+                            </p>
+                          </div>
+                        )}
+                        {productoSeleccionado.proveedor && (
+                          <div>
+                            <span className="text-gray-600 dark:text-gray-400">Proveedor:</span>
+                            <p className="font-medium text-gray-900 dark:text-white">
+                              {productoSeleccionado.proveedor}
+                            </p>
+                          </div>
+                        )}
+                        {productoSeleccionado.cantidad && (
+                          <div>
+                            <span className="text-gray-600 dark:text-gray-400">Cantidad:</span>
+                            <p className="font-medium text-gray-900 dark:text-white">
+                              {productoSeleccionado.cantidad} unidades
+                            </p>
+                          </div>
+                        )}
+                        {productoSeleccionado.precioTotal && (
+                          <div>
+                            <span className="text-gray-600 dark:text-gray-400">Precio Total:</span>
+                            <p className="font-medium text-gray-900 dark:text-white">
+                              ${Number(productoSeleccionado.precioTotal).toLocaleString()}
+                            </p>
+                          </div>
+                        )}
+                        {productoSeleccionado.paisOrigen && (
+                          <div>
+                            <span className="text-gray-600 dark:text-gray-400">País Origen:</span>
+                            <p className="font-medium text-gray-900 dark:text-white">
+                              🌍 {productoSeleccionado.paisOrigen.nombre}
+                            </p>
+                          </div>
+                        )}
+                        {productoSeleccionado.medioTransporte && (
+                          <div>
+                            <span className="text-gray-600 dark:text-gray-400">Transporte:</span>
+                            <p className="font-medium text-gray-900 dark:text-white">
+                              {productoSeleccionado.medioTransporte === "MARITIMO" && "🚢 Marítimo"}
+                              {productoSeleccionado.medioTransporte === "AEREO" && "✈️ Aéreo"}
+                              {productoSeleccionado.medioTransporte === "TERRESTRE" && "🚛 Terrestre"}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Progreso General */}
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium text-gray-700 dark:text-gray-300">
+                        Progreso General
+                      </span>
+                      <span className="font-semibold text-gray-900 dark:text-white">
+                        {calcularProgreso(productoSeleccionado)}%
+                      </span>
+                    </div>
+                    <div className="mt-2 h-3 w-full overflow-hidden rounded-full bg-white/50 dark:bg-gray-800/50">
+                      <div
+                        className={`h-full rounded-full transition-all ${
+                          productoSeleccionado.nivelCriticidad === "ALTO"
+                            ? "bg-red-600"
+                            : productoSeleccionado.nivelCriticidad === "MEDIO"
+                            ? "bg-yellow-500"
+                            : "bg-green-600"
+                        }`}
+                        style={{ width: `${calcularProgreso(productoSeleccionado)}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Acciones Rápidas */}
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleAvanzarEstado}
+                    disabled={loadingAccion || productoSeleccionado.recibido}
+                    className="flex-1 rounded-lg bg-blue-600 px-4 py-3 font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loadingAccion ? "Procesando..." : "⏩ Avanzar al Siguiente Estado"}
+                  </button>
+                  <button
+                    onClick={() => setShowCambiarEstado(true)}
+                    disabled={loadingAccion}
+                    className="rounded-lg border border-blue-600 px-4 py-3 font-medium text-blue-600 hover:bg-blue-50 dark:border-blue-500 dark:text-blue-400 dark:hover:bg-blue-900/20"
+                  >
+                    Cambiar Estado
+                  </button>
+                </div>
+
+                {/* Timeline de 10 Etapas */}
+                {timeline && (
+                  <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
+                    <h4 className="mb-6 text-lg font-semibold text-gray-900 dark:text-white">
+                      Timeline del Proceso (10 Etapas)
+                    </h4>
+
+                    <div className="space-y-4">
+                      {timeline.timeline?.map((item: TimelineItem, index: number) => {
+                        const diasRetraso = item.diasRetraso || 0;
+                        const isRetrasado = diasRetraso > 0;
+                        const isCompletado = item.completado;
+
+                        return (
+                          <div
+                            key={index}
+                            className={`relative rounded-lg border p-4 ${
+                              isCompletado
+                                ? isRetrasado
+                                  ? "border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-900/10"
+                                  : "border-green-300 bg-green-50 dark:border-green-800 dark:bg-green-900/10"
+                                : "border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className={`flex h-10 w-10 items-center justify-center rounded-full text-lg ${
+                                    isCompletado
+                                      ? isRetrasado
+                                        ? "bg-red-200 dark:bg-red-800"
+                                        : "bg-green-200 dark:bg-green-800"
+                                      : "bg-gray-200 dark:bg-gray-700"
+                                  }`}
+                                >
+                                  {ESTADOS_ICONOS[item.estado] || "📌"}
+                                </div>
+                                <div>
+                                  <h5 className="font-medium text-gray-900 dark:text-white">
+                                    {ESTADOS_LABELS[item.estado] || item.estado}
+                                  </h5>
+                                  <div className="mt-1 flex items-center gap-4 text-xs text-gray-600 dark:text-gray-400">
+                                    {item.fecha && (
+                                      <span>✅ {formatDate(item.fecha)}</span>
+                                    )}
+                                    {item.fechaLimite && (
+                                      <span>🎯 Límite: {formatDate(item.fechaLimite)}</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="text-right">
+                                {isCompletado ? (
+                                  isRetrasado ? (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-red-600 px-3 py-1 text-xs font-medium text-white">
+                                      ⏰ {diasRetraso} días de retraso
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-green-600 px-3 py-1 text-xs font-medium text-white">
+                                      ✅ En tiempo
+                                    </span>
+                                  )
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-gray-300 px-3 py-1 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+                                    ⏳ Pendiente
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Resumen del Timeline */}
+                    <div className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50">
+                      <div className="grid grid-cols-3 gap-4 text-center text-sm">
+                        <div>
+                          <p className="text-gray-600 dark:text-gray-400">Criticidad</p>
+                          <p className={`mt-1 text-lg font-semibold ${getCriticidadColor(timeline.nivelCriticidad)}`}>
+                            {timeline.criticidad}/10
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-gray-600 dark:text-gray-400">Progreso</p>
+                          <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                            {timeline.progreso}%
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-gray-600 dark:text-gray-400">Retraso Total</p>
+                          <p className={`mt-1 text-lg font-semibold ${timeline.diasRetrasoTotal > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                            {timeline.diasRetrasoTotal} días
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Observaciones */}
+                {productoSeleccionado.observaciones && (
+                  <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+                    <h5 className="font-medium text-gray-900 dark:text-white">Observaciones</h5>
+                    <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                      {productoSeleccionado.observaciones}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Modal Cambiar Estado */}
+        {showCambiarEstado && productoSeleccionado && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-800 dark:bg-gray-900">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Cambiar Estado del Producto
+              </h3>
+              
+              <div className="mt-4 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Seleccionar Estado
+                  </label>
+                  <select
+                    value={estadoSeleccionado}
+                    onChange={(e) => setEstadoSeleccionado(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                  >
+                    <option value="">Selecciona un estado...</option>
+                    <option value="cotizado">📋 Cotizado</option>
+                    <option value="conDescuento">💰 Con Descuento</option>
+                    <option value="comprado">🛒 Comprado</option>
+                    <option value="pagado">💳 Pagado</option>
+                    <option value="primerSeguimiento">📞 1er Seguimiento</option>
+                    <option value="enFOB">🚢 En FOB</option>
+                    <option value="conBL">📄 Con BL</option>
+                    <option value="segundoSeguimiento">📞 2do Seguimiento</option>
+                    <option value="enCIF">🌊 En CIF</option>
+                    <option value="recibido">📦 Recibido</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Observación (opcional)
+                  </label>
+                  <textarea
+                    value={observacion}
+                    onChange={(e) => setObservacion(e.target.value)}
+                    rows={3}
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                    placeholder="Agrega una observación sobre este cambio..."
+                  />
+                </div>
+              </div>
+
+              <div className="mt-6 flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowCambiarEstado(false);
+                    setEstadoSeleccionado("");
+                    setObservacion("");
+                  }}
+                  className="flex-1 rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleCambiarEstado}
+                  disabled={!estadoSeleccionado || loadingAccion}
+                  className="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {loadingAccion ? "Guardando..." : "Guardar Cambio"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
 }
