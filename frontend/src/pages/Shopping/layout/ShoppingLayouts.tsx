@@ -3,8 +3,8 @@ import { useAuth } from "../../../context/AuthContext";
 
 const allTabs = [
   { to: "/shopping", label: "Resumen", end: true },
-  { to: "/shopping/new", label: "Nueva compra", supervisorOnly: true },
   { to: "/shopping/follow-ups", label: "Seguimiento", supervisorOnly: true },
+  { to: "/shopping/assignment", label: "Asignaciones", supervisorOnly: true },
   { to: "/shopping/history", label: "Historial", supervisorOnly: true },
 ];
 

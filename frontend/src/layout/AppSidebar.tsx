@@ -52,10 +52,9 @@ const navItems: NavItem[] = [
     name: "Compras",
     subItems: [
       { name: "Resumen", path: "/shopping", pro: false },
-      { name: "Nueva Compra", path: "/shopping/new", pro: false },
       { name: "Seguimiento", path: "/shopping/follow-ups", pro: false },
-      { name: "Historial", path: "/shopping/history", pro: false },
       { name: "Asignación", path: "/shopping/assignment", pro: false },
+      { name: "Historial", path: "/shopping/history", pro: false },
     ],
   },{
     //icono generico para cotizaciones si 

@@ -1,969 +1,796 @@
-// pages/Quotes/Assignment.tsx
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
 import PageMeta from "../../components/common/PageMeta";
-import ComponentCard from "../../components/common/ComponentCard";
-import Filters, { QuoteFilters } from "../../components/quotes/filters";
-import Alert from "../../components/ui/alert/Alert";
-import Button from "../../components/ui/button/Button";
-import { api } from "../../lib/api";
-import { FormatDateApi } from "../../lib/FormatDateApi"
-import { useAuth } from "../../context/AuthContext";
-import { RequestedItemsTable } from "../Quotes/components/RequestedItemsTable";
-import getDeadlineMessage from "../Quotes/lib/Deadline";
-
+import { getToken } from "../../lib/api";
+import { useNotifications } from "../Notifications/context/NotificationContext";
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-type requestCategory = "licitaciones" | "proyectos" | "suministros" | "inventarios";
-type Scope = "nacional" | "internacional" | "NACIONAL" | "INTERNACIONAL";
-type DeliveryPlace = "almacen" | "proyecto";
-type Urgency = "critical" | "high" | "medium" | "low" | "normal";
-type AlertVariant = "success" | "error" | "warning" | "info";
+type MedioTransporte = "MARITIMO" | "TERRESTRE" | "AEREO";
 
-export interface AssignmentRequest {
-  id: string;
-  reference: string;
-  finalClient: string;            // siempre string
-  createdAt: string;
-  quoteDeadlineISO: string;
-  quoteDeadline: string;
-  requestCategory: requestCategory;
-  procuremet: Scope;              // <- typo preservado
-  deliveryPlace: DeliveryPlace;   // derivado de deliveryType
-  projectId?: string;
-  description: string;
-  assignedTo?: string;
-  requesterName: string;          // nombre de la persona asignada o undefined
-  // extras útiles
-  assignedToId?: string;
-  progress?: number;
-  followStatus?: string;
-  items?: RequestItem[];
-}
-
-type ApiPurchaseRequest = {
-  id: string;
-  reference: string;
-  createdAt: string;
-  quoteDeadline: string;
-  requestCategory: string;     // "SUMINISTROS" | ...
-  procurement: string;         // "NATIONAL" | "INTERNATIONAL"
-  deliveryType: string;        // "WAREHOUSE" | "PROJECT"
-  description: string | null;
-  finalClient: string;
-  items: Array<{
-    id: string;
-    sku?: string;
-    description: string;
-    quantity: number;
-    unit: string;
-    extraSpecs?: Record<string, any>;
-  }>[][] | null;
-  requester: {
-    id: string;
-    fullName: string;
-  };
-  assignments: Array<{
-    id: string;
-    assignedToId: string | null;
-    progress: number | null;
-    followStatus: string | null;
-    assignedTo: { id: string; fullName: string } | null;
-  }>;
-};
-
-type Supervisor = {
-  id: string;
-  fullName: string;
-  email: string;
-}
-
-interface usuarios {
+type Pais = {
   id: string;
   nombre: string;
+  codigo: string;
+  activo: boolean;
 };
 
-
-interface UrgencyConfig {
-  variant: AlertVariant;
-  pill: string;
-  label: string;
-  textColor: string;
-  borderClass?: string;
-}
-
-const MOCK_PROJECTS = [
-  { id: "proj_1", nombre: "Proyecto Alpha" },
-  { id: "proj_2", nombre: "Proyecto Beta" },
-  { id: "proj_3", nombre: "Proyecto Gamma" },
-];
-
-
-
-// ============================================================================
-// CONSTANTS
-// ============================================================================
-
-const URGENCY_CONFIG: Record<Urgency, UrgencyConfig> = {
-  critical: {
-    variant: "error",
-    pill: "bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-300",
-    label: "Crítica",
-    textColor: "text-gray-700 dark:text-gray-300",
-    borderClass: "border-l-4 border-red-600 bg-red-50/50 hover:bg-red-100/70",
-  },
-  high: {
-    variant: "warning",
-    pill: "bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300",
-    label: "Alta",
-    textColor: "text-gray-700 dark:text-gray-300",
-    borderClass: "border-l-4 border-amber-500 bg-amber-50/50 hover:bg-amber-100/70",
-  },
-  medium: {
-    variant: "info",
-    pill: "bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-300",
-    label: "Media",
-    textColor: "text-gray-700 dark:text-gray-300",
-    borderClass: "border-l-4 border-blue-500 bg-blue-50/50 hover:bg-blue-100/70",
-  },
-  low: {
-    variant: "success",
-    pill: "bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-300",
-    label: "Baja",
-    textColor: "text-gray-700 dark:text-gray-300",
-    borderClass: "border-l-4 border-green-500 bg-green-50/50 hover:bg-green-100/70",
-  },
-  normal: {
-    variant: "success",
-    pill: "bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-300",
-    label: "Normal",
-    textColor: "text-gray-700 dark:text-gray-300",
-    borderClass: "border-l-4 border-gray-300 bg-white hover:bg-gray-50",
-  },
-};
-
-
-const calculateDaysDifference = (deadline: string): number => {
-  return Math.floor((new Date(deadline).getTime() - Date.now()) / 86400000);
-};
-
-const getUrgency = (deadline: string): Urgency => {
-  const days = calculateDaysDifference(deadline);
-
-  if (days < 0) return "critical"; // Vencida
-  if (days <= 1) return "high";     // Hoy y mañana
-  if (days <= 5) return "medium";   // 2 a 5 días
-  if (days <= 14) return "low";     // 6 a 14 días
-  return "normal";                  // Más de 14 días
-};
-
-
-const calculateUrgencyScore = (request: AssignmentRequest): number => {
-  const days = calculateDaysDifference(request.quoteDeadlineISO);
-  if (days < 0) return -2;
-  if (days <= 1) return -1;
-  return days;
-};
-
-// ============================================================================
-// HOOKS
-// ============================================================================
-
-// Asegúrate de que calculateDaysDifference esté importada y use el string ISO.
-
-// Assignment.tsx (Actualización del hook useFilteredRequests)
-// Asegúrate de importar useMemo: import { useEffect, useMemo, useState } from "react";
-
-const useFilteredRequests = (
-  requests: AssignmentRequest[],
-  filters: QuoteFilters
-) => {
-  return useMemo(() => {
-    let filtered = requests;
-
-    // ===========================================
-    // 1. Filtrar por Presets de Días
-    // ===========================================
-    let maxDays: number | null = null;
-    if (filters.preset === "7d") maxDays = 7;
-    else if (filters.preset === "30d") maxDays = 30;
-    else if (filters.preset === "90d") maxDays = 90;
-
-    if (maxDays !== null) {
-      filtered = filtered.filter((r) => {
-        const diffDays = calculateDaysDifference(r.quoteDeadlineISO);
-        // Incluye solicitudes vencidas (días < 0) siempre que la fecha límite no exceda maxDays desde hoy.
-        return diffDays <= maxDays;
-      });
-    }
-
-    // Nota: El filtro 'custom' no se aplica aquí ya que requiere la información de 'range'
-    // (start/end) que no estás pasando al hook, y 'filters.range' es undefined
-    // después de aplicar el preset en filters.tsx.
-    // Si necesitas filtrar por rango de fechas (start/end),
-    // necesitarás implementarlo y probablemente pasar el rango de DatePicker a este hook.
-    // Por simplicidad, se omite el filtro de rango 'custom' basado en YYYY-MM-DD.
-    // ===========================================
-
-
-    // ===========================================
-    // 2. Filtrar por Otros Criterios
-    // ===========================================
-
-    // Filtro por Estado (estado): No se aplica aquí porque las AssignmentRequest no tienen un campo 'estado'
-    // mapeado del backend. El componente Filters usa 'estado' pero la lista AssignmentRequest
-    // solo tiene `progress` y `followStatus`.
-
-    // Filtro por Tipo de Solicitud (tipoSolicitud)
-    if (filters.tipoSolicitud && filters.tipoSolicitud !== "todas") {
-      filtered = filtered.filter(
-        (r) => r.requestCategory === filters.tipoSolicitud?.toUpperCase()
-      );
-    }
-
-    // Filtro por Tipo de Compra (tipoCompra)
-    if (filters.tipoCompra && filters.tipoCompra !== "todas") {
-      // En filters.tsx tienes: 'nacional' | 'internacional'
-      // En AssignmentRequest tienes: 'procuremet' que es 'nacional' | 'internacional' | 'NACIONAL' | 'INTERNACIONAL'
-      filtered = filtered.filter(
-        (r) => r.procuremet.toLowerCase() === filters.tipoCompra
-      );
-    }
-
-    // Filtro por Proyecto (proyectoId)
-    if (filters.proyectoId && filters.proyectoId !== "todos") {
-      filtered = filtered.filter(
-        (r) => r.projectId === filters.proyectoId
-      );
-    }
-
-    // Filtro por Asignado A (asignadoA)
-    // if (filters.asignadoA && filters.asignadoA !== "todos") {
-    //   if (filters.asignadoA === "sin_asignar") {
-    //     filtered = filtered.filter((r) => !r.assignedToId);
-    //   } else {
-    //     // Asume que el valor es un ID de usuario
-    //     filtered = filtered.filter((r) => r.assignedToId === filters.asignadoA);
-    //   }
-    // }
-
-    //habra 2 filtros fijos 'asignado a:todos como estaba antes y 'sin asignar'
-    //Luego se agregara una lista de usuarios ya cargada para filtrar por usuario especifico
-    if (filters.asignadoA && filters.asignadoA !== "todos") {
-      if (filters.asignadoA === "sin_asignar") {
-        filtered = filtered.filter((r) => !r.assignedToId);
-      } else {
-        // Filtrar por usuario específico
-        filtered = filtered.filter((r) => r.assignedToId === filters.asignadoA);
-      }
-    }
-
-    // Filtro por Origen (origen): No se puede aplicar ya que AssignmentRequest no tiene un campo 'origen'.
-
-    // Filtro de Búsqueda (q)
-    if (filters.q) {
-      const qLower = filters.q.toLowerCase();
-      filtered = filtered.filter(
-        (r) =>
-          r.reference.toLowerCase().includes(qLower) ||
-          r.finalClient.toLowerCase().includes(qLower) ||
-          r.description.toLowerCase().includes(qLower) ||
-          r.items?.some(i => i.sku?.toLowerCase().includes(qLower) || i.description.toLowerCase().includes(qLower))
-      );
-    }
-
-    // ===========================================
-    // 3. Aplicar Ordenamiento (Ordenar)
-    // ===========================================
-
-    // Nota: El ordenamiento se hace por urgencia en useSortedRequests,
-    // que se aplica a toda la data, y luego se pasa a este hook.
-    // Para respetar `filters.ordenar`, debemos mover esa lógica aquí
-    // o aplicarla después del filtrado.
-
-    // Por ahora, para mantener la separación: este hook solo filtra.
-    // El ordenamiento por urgencia actual (en useSortedRequests) está bien para la vista de asignación.
-    // Si quieres aplicar el orden de `filters.ordenar`, deberás integrarlo aquí.
-
-    return filtered;
-
-  }, [
-    requests,
-    filters.preset,
-    filters.tipoSolicitud,
-    filters.tipoCompra,
-    filters.proyectoId,
-    filters.asignadoA,
-    filters.q,
-    // No se incluyen 'estado', 'origen', 'ordenar' o 'range'
-  ]);
-};
-
-const useListSorter = (requests: AssignmentRequest[], sortBy: QuoteFilters["ordenar"] = "recientes") => {
-  return useMemo(() => {
-    let sorted = [...requests];
-
-    // Ordenamiento por Urgencia (el más importante para asignación)
-    sorted.sort((a, b) => {
-      const sa = Number.isFinite(calculateUrgencyScore(a)) ? calculateUrgencyScore(a) : 0;
-      const sb = Number.isFinite(calculateUrgencyScore(b)) ? calculateUrgencyScore(b) : 0;
-      return sa - sb; // Menor puntuación (más urgente) va primero.
-    });
-
-    // Aquí se ignoran los demás 'ordenar' del filters.tsx (monto_asc, etc.)
-    // si quieres respetarlos, debes añadirlos aquí.
-
-    return sorted;
-  }, [requests, sortBy]);
-};
-
-
-const usePartitionedRequests = (requests: AssignmentRequest[]) => {
-  return useMemo(() => {
-    const pending = requests.filter(r => !r.assignedTo);
-    const assigned = requests.filter(r => !!r.assignedTo);
-    return { pending, assigned };
-  }, [requests]);
-};
-
-// ============================================================================
-// COMPONENTS
-// ============================================================================
-
-interface RequestRowProps {
-  request: AssignmentRequest;
-  onSelect: (id: string) => void;
-}
-
-const RequestRow = ({ request, onSelect }: RequestRowProps) => {
-  const urgency = getUrgency(request.quoteDeadlineISO);
-  const config = URGENCY_CONFIG[urgency];
-
-  return (
-    <li
-      className="p-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 rounded-lg transition-colors"
-      onClick={() => onSelect(request.id)}
-    >
-      <div className="flex items-start gap-2">
-        <Alert
-          variant={config.variant}
-          title={`${request.requestCategory} – ${request.requesterName}`}
-          message={`${request.assignedTo ? `Asignado a ${request.assignedTo} • ` : ""
-            }${getDeadlineMessage(request.quoteDeadline)}`}
-        />
-        <span
-          className={`mt-1 px-2 py-0.5 rounded-full text-xs shrink-0 ${config.pill}`}
-        >
-          {config.label}
-        </span>
-      </div>
-      <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-        {request.description}
-      </div>
-    </li>
-  );
-};
-
-interface RequestListProps {
-  title: string;
-  requests: AssignmentRequest[];
-  onSelectRequest: (id: string) => void;
-  emptyMessage?: string;
-  itemsPerPage?: number;
-}
-
-const RequestList = ({
-  title,
-  requests,
-  onSelectRequest,
-  emptyMessage = "No hay solicitudes.",
-  itemsPerPage = 4,
-}: RequestListProps) => {
-  const [currentPage, setCurrentPage] = useState(1);
-
-  //ordenar requests por urgencia
-  const sortedRequests = useListSorter(requests);
-
-  // Calcular paginación
-  const totalPages = Math.ceil(sortedRequests.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedRequests = sortedRequests.slice(startIndex, endIndex);
-
-  //imprimimos la sorted requests para debug
-  useEffect(() => {
-    console.log("Sorted Requests:", sortedRequests);
-    console.log("Paginated Requests:", paginatedRequests);
-    console.log("Requests", requests);
-    console.log("lengths:", { sorted: sortedRequests.length, paginated: paginatedRequests.length, original: requests.length });
-  }, [sortedRequests]);
-
-  // Resetear a página 1 si hay cambios en los requests
-  const handlePageChange = (page: number) => {
-    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
-  };
-
-  return (
-    <ComponentCard title={title}>
-      {requests.length === 0 ? (
-        <p className="text-gray-500 dark:text-gray-400 p-4">{emptyMessage}</p>
-      ) : (
-        <>
-          {/* Lista paginada */}
-          <ul className="space-y-2">
-            {paginatedRequests.map((req) => (
-              <RequestRow
-                key={req.id}
-                request={req}
-                onSelect={onSelectRequest}
-              />
-            ))}
-          </ul>
-
-          {/* Controles de paginación */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 dark:text-gray-300">
-              <div className="text-sm text-gray-600 dark:text-gray-400">
-                {startIndex + 1} - {Math.min(endIndex, requests.length)} de {requests.length}
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  className="px-3 py-1 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-800 dark:border-gray-600 dark:text-gray-300"
-                >
-                  ← Anterior
-                </button>
-
-                <div className="flex items-center gap-2">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                    <button
-                      key={page}
-                      onClick={() => handlePageChange(page)}
-                      className={`w-8 h-8 text-sm rounded ${currentPage === page
-                        ? 'bg-blue-600 text-white'
-                        : 'border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800'
-                        }`}
-                    >
-                      {page}
-                    </button>
-                  ))}
-                </div>
-
-                <button
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                  className="px-3 py-1 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-800 dark:border-gray-600 dark:text-gray-300"
-                >
-                  Siguiente →
-                </button>
-              </div>
-            </div>
-          )}
-        </>
-      )}
-    </ComponentCard>
-  );
-};
-
-interface DetailFieldProps {
-  label: string;
-  value: string;
-}
-
-const DetailField = ({ label, value }: DetailFieldProps) => {
-  return (
-    <div className="rounded-lg ring-1 ring-gray-200 dark:ring-gray-800 p-3">
-      <div className="text-xs opacity-70">{label}</div>
-      <div className="font-medium">{value}</div>
-    </div>
-  );
-};
-
-interface RequestDetailProps {
-  request: AssignmentRequest | null;
-  onAssign: () => void;
-  onReassign: () => void;
-  onFollowUp: () => void;
-}
-
-interface RequestItem {
+type TimelineSKU = {
   id: string;
-  sku?: string;
-  description: string;
-  quantity: number;
-  unit: string;
-  extraSpecs?: string;
-}
-
-const RequestDetail = ({
-  request,
-  onAssign,
-  onReassign,
-  onFollowUp,
-}: RequestDetailProps) => {
-  if (!request) {
-    return (
-      <ComponentCard title="Detalle">
-        <p className="text-gray-500 dark:text-gray-400 p-4">
-          Selecciona una solicitud para ver sus detalles.
-        </p>
-      </ComponentCard>
-    );
-  }
-
-  const urgency = getUrgency(request.quoteDeadlineISO);
-  const config = URGENCY_CONFIG[urgency];
-  const items: RequestItem[] = request.items || [];
-
-  return (
-    <div className="space-y-6">
-      {/* Card de Info General */}
-      <ComponentCard title="Detalle General">
-        <div className={`space-y-3 p-2 ${config.textColor}`}>
-          <h3 className="text-lg font-medium">
-            {request.requestCategory} – {request.requesterName}
-          </h3>
-
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <DetailField label="Referencia" value={request.reference} />
-            <DetailField
-              label="Tipo"
-              value={
-                request.requestCategory.charAt(0).toUpperCase() +
-                request.requestCategory.slice(1)
-              }
-            />
-            <DetailField
-              label="Creada"
-              value={FormatDateApi(request.createdAt)}
-            />
-            <DetailField
-              label="Fecha límite"
-              value={FormatDateApi(request.quoteDeadline)}
-            />
-            <DetailField
-              label="Entrega"
-              value={
-                request.deliveryPlace === "almacen" ? "Almacén" : "Proyecto"
-              }
-            />
-            <DetailField
-              label="Asignado a"
-              value={request.assignedTo ?? "Sin asignar"}
-            />
-          </div>
-
-          {request.projectId && (
-            <p className="text-sm">
-              <span className="font-medium">Proyecto:</span> {request.projectId}
-            </p>
-          )}
-
-          <p className="text-sm">
-            <span className="font-medium">Comentarios:</span>{' '}
-            {request.description || 'N/A'}
-          </p>
-        </div>
-        {/* Card de Productos */}
-
-        <RequestedItemsTable items={items} />
-
-        {/* Card de Productos */}
-
-
-        <div className="pt-2 flex gap-2 flex-wrap">
-          {request.assignedTo ? (
-            <Button size="sm" variant="outline" onClick={onReassign}>
-              Reasignar
-            </Button>
-          ) : (
-            <Button size="sm" variant="primary" onClick={onAssign}>
-              Asignar
-            </Button>
-          )}
-          <Button size="sm" variant="secondary" onClick={onFollowUp}>
-            Dar seguimiento
-          </Button>
-        </div>
-      </ComponentCard>
-    </div>
-  );
+  sku: string;
+  paisOrigen?: Pais;
+  medioTransporte: MedioTransporte;
+  diasCotizadoADescuento?: number;
+  diasDescuentoAComprado?: number;
+  diasCompradoAPagado?: number;
+  diasPagadoASeguimiento1?: number;
+  diasSeguimiento1AFob?: number;
+  diasFobABl?: number;
+  diasBlASeguimiento2?: number;
+  diasSeguimiento2ACif?: number;
+  diasCifARecibido?: number;
+  diasTotalesEstimados: number;
+  notas?: string;
 };
 
+type Stats = {
+  total: number;
+  porMedioTransporte: Record<string, number>;
+  promedios: {
+    diasTotales: number;
+    porEtapa: Record<string, number>;
+  };
+};
 
+// ============================================================================
+// API SERVICE
+// ============================================================================
 
-const useSupervisors = (enabled: boolean) => {
-  const [data, setData] = useState<Supervisor[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const token = getToken();
 
-  useEffect(() => {
-    if (!enabled) return;
-    let mounted = true;
-    (async () => {
-      setLoading(true);
-      try {
-        const res = await api<Supervisor[]>('/api/v1/users/supervisors');
-        if (mounted) setData(res || []);
-      } catch (e) {
-        if (mounted) setError('No se pudieron cargar supervisores');
-      } finally {
-        if (mounted) setLoading(false);
+const api = {
+  // TimelineSKU
+  async getTimelinesSKU(filters?: { sku?: string; medioTransporte?: string }) {
+    const params = new URLSearchParams();
+    if (filters?.sku) params.append("sku", filters.sku);
+    if (filters?.medioTransporte) params.append("medioTransporte", filters.medioTransporte);
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/timeline-sku?${params}`,
+      {
+        credentials: "include",
+        headers: { Authorization: `Bearer ${token}` },
       }
-    })();
-    return () => { mounted = false; };
-  }, [enabled]);
+    );
+    if (!response.ok) throw new Error("Error al cargar timelines");
+    return response.json();
+  },
 
-  return { data, loading, error };
+  async getTimelineStats() {
+    const response = await fetch(`${API_BASE_URL}/api/v1/timeline-sku/stats`, {
+      credentials: "include",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error("Error al cargar estadísticas");
+    return response.json();
+  },
+
+  async createTimelineSKU(data: any) {
+    const response = await fetch(`${API_BASE_URL}/api/v1/timeline-sku`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error("Error al crear timeline");
+    return response.json();
+  },
+
+  async updateTimelineSKU(sku: string, data: any) {
+    const response = await fetch(`${API_BASE_URL}/api/v1/timeline-sku/${sku}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error("Error al actualizar timeline");
+    return response.json();
+  },
+
+  async deleteTimelineSKU(sku: string) {
+    const response = await fetch(`${API_BASE_URL}/api/v1/timeline-sku/${sku}`, {
+      method: "DELETE",
+      credentials: "include",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error("Error al eliminar timeline");
+    return response.json();
+  },
+
+  // Sincronización
+  async sincronizarCotizacionesAprobadas() {
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/sync/estado-productos/cotizaciones-aprobadas`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+    if (!response.ok) throw new Error("Error al sincronizar");
+    return response.json();
+  },
+
+  // Países
+  async getPaises() {
+    const response = await fetch(`${API_BASE_URL}/api/v1/paises`, {
+      credentials: "include",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error("Error al cargar países");
+    return response.json();
+  },
 };
 
-type SupervisorAssignModalProps = {
-  open: boolean;
-  defaultAssigneeId?: string | null;
-  onClose: () => void;
-  onSubmit: (assigneeId: string) => void;
-  mode: 'assign' | 'reassign';
-};
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
 
-const SupervisorAssignModal = ({
-  open, defaultAssigneeId, onClose, onSubmit, mode
-}: SupervisorAssignModalProps) => {
-  const { data: supervisors, loading, error } = useSupervisors(open);
-  const [assigneeId, setAssigneeId] = useState<string>("");
-
-  useEffect(() => {
-    setAssigneeId(defaultAssigneeId ?? "");
-  }, [defaultAssigneeId, open]);
-
-  if (!open) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-      <div className="w-full max-w-md rounded-xl bg-white p-4 dark:bg-[#101828] dark:text-gray-100">
-        <h3 className="text-base font-semibold mb-3">
-          {mode === 'assign' ? 'Asignar solicitud' : 'Reasignar solicitud'}
-        </h3>
-
-        {loading && <p className="text-sm">Cargando supervisores…</p>}
-        {error && <p className="text-sm text-rose-500">{error}</p>}
-
-        {!loading && !error && (
-          <select
-            className="w-full rounded-lg border border-gray-300 bg-white p-2 text-sm dark:border-white/10 dark:bg-[#101828]"
-            value={assigneeId}
-            onChange={e => setAssigneeId(e.target.value)}
-          >
-            <option value="">Selecciona un supervisor…</option>
-            {supervisors.map(u => (
-              <option key={u.id} value={u.id}>
-                {u.fullName}
-              </option>
-            ))}
-          </select>
-        )}
-
-        <div className="mt-4 flex justify-end gap-2">
-          <button className="px-3 py-2 text-sm rounded-lg border" onClick={onClose}>Cancelar</button>
-          <button
-            className="px-3 py-2 text-sm rounded-lg bg-blue-600 text-white disabled:opacity-50"
-            disabled={!assigneeId}
-            onClick={() => onSubmit(assigneeId)}
-          >
-            {mode === 'assign' ? 'Asignar' : 'Reasignar'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+const MEDIO_TRANSPORTE_LABELS: Record<MedioTransporte, string> = {
+  MARITIMO: "🚢 Marítimo",
+  TERRESTRE: "🚛 Terrestre",
+  AEREO: "✈️ Aéreo",
 };
 
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
-export default function QuotesAssignment() {
-  const navigate = useNavigate();
-  const { user } = useAuth();
+export default function Assignment() {
+  const { addNotification } = useNotifications();
 
-  const [filters, setFilters] = useState<QuoteFilters>({
-    preset: "30d",
-    estado: "todas",
-    tipoSolicitud: "todas",
-    tipoCompra: "todas",
-    proyectoId: "todos",
-    asignadoA: "todos",
-    origen: "todos",
-    ordenar: "recientes",
-    q: "",
+  // Estados principales
+  const [timelines, setTimelines] = useState<TimelineSKU[]>([]);
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [paises, setPaises] = useState<Pais[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingSincronizacion, setLoadingSincronizacion] = useState(false);
+
+  // Estados de formulario
+  const [showModal, setShowModal] = useState(false);
+  const [timelineEditando, setTimelineEditando] = useState<TimelineSKU | null>(null);
+  const [formData, setFormData] = useState<any>({
+    sku: "",
+    paisOrigenId: "",
+    medioTransporte: "MARITIMO",
+    diasCotizadoADescuento: "",
+    diasDescuentoAComprado: "",
+    diasCompradoAPagado: "",
+    diasPagadoASeguimiento1: "",
+    diasSeguimiento1AFob: "",
+    diasFobABl: "",
+    diasBlASeguimiento2: "",
+    diasSeguimiento2ACif: "",
+    diasCifARecibido: "",
+    notas: "",
   });
 
-  let Supervisores: usuarios[] = [];
-  const Usuarios = cargarSupervisores();
+  // Filtros
+  const [skuFiltro, setSkuFiltro] = useState("");
+  const [medioFiltro, setMedioFiltro] = useState<string>("");
 
-  Usuarios.then((data) => {
-    Supervisores = data;
-  });
-
-  const [data, setData] = useState<AssignmentRequest[]>([]);
-  const [, setLoading] = useState(true);
-  const [, setError] = useState<string | null>(null);
+  // ============================================================================
+  // EFFECTS
+  // ============================================================================
 
   useEffect(() => {
-    let isMounted = true; // Prevenir memory leaks
+    cargarDatos();
+  }, [skuFiltro, medioFiltro]);
 
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const result = await ObtenerCotizaciones();
-        if (isMounted) setData(result);
-      } catch (err) {
-        if (isMounted) setError(err instanceof Error ? err.message : 'Error');
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
+  // ============================================================================
+  // FUNCTIONS
+  // ============================================================================
 
-    fetchData();
-
-    return () => {
-      isMounted = false; // Cleanup si se desmonta
-    };
-  }, []);
-
-
-
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  // Processing pipeline
-  const allFiltered = useFilteredRequests(data, filters);
-  const { pending, assigned } = usePartitionedRequests(allFiltered);
-
-
-
-  const selectedRequest = useMemo(
-    () => allFiltered.find((r) => r.id === selectedId) ?? null,
-    [allFiltered, selectedId] // Cambio de sortedRequests a allFiltered
-  );
-
-  //despues de click de seleccionar request, ir al inicio de la pagina
-  useEffect(() => {
-    if (selectedId) {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  }, [selectedId]);
-
-  // Event handlers
-
-  const [assignOpen, setAssignOpen] = useState(false);
-  const [assignMode, setAssignMode] = useState<'assign' | 'reassign'>('assign');
-  const [selectedAssigneeId, setSelectedAssigneeId] = useState<string | null>(null);
-
-  const openAssign = () => {
-    setAssignMode('assign');
-    setSelectedAssigneeId(null);
-    setAssignOpen(true);
-  };
-  const openReassign = () => {
-    setAssignMode('reassign');
-    setSelectedAssigneeId(selectedRequest?.assignedToId ?? null);
-    setAssignOpen(true);
-  };
-
-  // enviar
-  const submitAssign = async (assigneeId: string) => {
-    if (!selectedRequest) return;
-    let nuevaFecha = new Date();
-    //hacemos el casteo de la fecha limite original
-    const fechaLimiteOriginal = new Date(selectedRequest.quoteDeadlineISO);
-    //le sumamos 3 dias
-    nuevaFecha.setTime(fechaLimiteOriginal.getTime() + 3 * 24 * 60 * 60 * 1000);
-    //convertimos a ISO
-    const nuevaFechaISO = nuevaFecha.toISOString();
+  const cargarDatos = async () => {
     try {
-      await api('/api/v1/assignments', {
-        method: 'POST',
-        body: JSON.stringify({
-          entityType: 'PURCHASE_REQUEST',
-          entityId: selectedRequest.id,
-          assignedToId: assigneeId,
-          requesterId: user?.id,
-          //a eta le ponemos la fecha limite, mas 3 dias para dar tiempo a cotizar
-          eta: nuevaFechaISO,
-          role: 'SUPERVISOR',
+      setLoading(true);
+      const [timelinesData, statsData, paisesData] = await Promise.all([
+        api.getTimelinesSKU({
+          sku: skuFiltro || undefined,
+          medioTransporte: medioFiltro || undefined,
         }),
-      });
-
-      // 3) Notificar y refrescar
-      alert("Solicitud asignada correctamente.");
-
-      setAssignOpen(false);
-
-      window.location.reload();
-
-    } catch (err) {
-      console.error("Error asignando:", err);
-      const msg = err instanceof Error ? err.message : "Error desconocido";
-      alert(`No se pudo asignar: ${msg}`);
+        api.getTimelineStats(),
+        api.getPaises(),
+      ]);
+      setTimelines(timelinesData.items || []);
+      setStats(statsData);
+      setPaises(paisesData || []);
+    } catch (error) {
+      console.error("Error al cargar datos:", error);
+      addNotification("danger", "Error", "Error al cargar configuración");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleFollowUp = () => {
-    navigate("/quotes/follow-ups", {
-      state: { fromAssignment: true, selected: selectedRequest },
-    });
+  const abrirModal = (timeline?: TimelineSKU) => {
+    if (timeline) {
+      setTimelineEditando(timeline);
+      setFormData({
+        sku: timeline.sku,
+        paisOrigenId: timeline.paisOrigen?.id || "",
+        medioTransporte: timeline.medioTransporte,
+        diasCotizadoADescuento: timeline.diasCotizadoADescuento?.toString() || "",
+        diasDescuentoAComprado: timeline.diasDescuentoAComprado?.toString() || "",
+        diasCompradoAPagado: timeline.diasCompradoAPagado?.toString() || "",
+        diasPagadoASeguimiento1: timeline.diasPagadoASeguimiento1?.toString() || "",
+        diasSeguimiento1AFob: timeline.diasSeguimiento1AFob?.toString() || "",
+        diasFobABl: timeline.diasFobABl?.toString() || "",
+        diasBlASeguimiento2: timeline.diasBlASeguimiento2?.toString() || "",
+        diasSeguimiento2ACif: timeline.diasSeguimiento2ACif?.toString() || "",
+        diasCifARecibido: timeline.diasCifARecibido?.toString() || "",
+        notas: timeline.notas || "",
+      });
+    } else {
+      setTimelineEditando(null);
+      setFormData({
+        sku: "",
+        paisOrigenId: "",
+        medioTransporte: "MARITIMO",
+        diasCotizadoADescuento: "",
+        diasDescuentoAComprado: "",
+        diasCompradoAPagado: "",
+        diasPagadoASeguimiento1: "",
+        diasSeguimiento1AFob: "",
+        diasFobABl: "",
+        diasBlASeguimiento2: "",
+        diasSeguimiento2ACif: "",
+        diasCifARecibido: "",
+        notas: "",
+      });
+    }
+    setShowModal(true);
   };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!formData.sku) {
+      addNotification("warn", "Advertencia", "El SKU es requerido");
+      return;
+    }
+
+    try {
+      const data = {
+        sku: formData.sku,
+        paisOrigenId: formData.paisOrigenId || null,
+        medioTransporte: formData.medioTransporte,
+        diasCotizadoADescuento: formData.diasCotizadoADescuento
+          ? parseInt(formData.diasCotizadoADescuento)
+          : null,
+        diasDescuentoAComprado: formData.diasDescuentoAComprado
+          ? parseInt(formData.diasDescuentoAComprado)
+          : null,
+        diasCompradoAPagado: formData.diasCompradoAPagado
+          ? parseInt(formData.diasCompradoAPagado)
+          : null,
+        diasPagadoASeguimiento1: formData.diasPagadoASeguimiento1
+          ? parseInt(formData.diasPagadoASeguimiento1)
+          : null,
+        diasSeguimiento1AFob: formData.diasSeguimiento1AFob
+          ? parseInt(formData.diasSeguimiento1AFob)
+          : null,
+        diasFobABl: formData.diasFobABl ? parseInt(formData.diasFobABl) : null,
+        diasBlASeguimiento2: formData.diasBlASeguimiento2
+          ? parseInt(formData.diasBlASeguimiento2)
+          : null,
+        diasSeguimiento2ACif: formData.diasSeguimiento2ACif
+          ? parseInt(formData.diasSeguimiento2ACif)
+          : null,
+        diasCifARecibido: formData.diasCifARecibido
+          ? parseInt(formData.diasCifARecibido)
+          : null,
+        notas: formData.notas || null,
+      };
+
+      if (timelineEditando) {
+        await api.updateTimelineSKU(timelineEditando.sku, data);
+        addNotification("success", "Éxito", "Timeline actualizado correctamente");
+      } else {
+        await api.createTimelineSKU(data);
+        addNotification("success", "Éxito", "Timeline creado correctamente");
+      }
+
+      setShowModal(false);
+      await cargarDatos();
+    } catch (error) {
+      console.error("Error al guardar timeline:", error);
+      addNotification("danger", "Error", "Error al guardar timeline");
+    }
+  };
+
+  const handleDelete = async (sku: string) => {
+    if (!confirm(`¿Estás seguro de eliminar el timeline del SKU ${sku}?`)) return;
+
+    try {
+      await api.deleteTimelineSKU(sku);
+      addNotification("success", "Éxito", "Timeline eliminado");
+      await cargarDatos();
+    } catch (error) {
+      console.error("Error al eliminar timeline:", error);
+      addNotification("danger", "Error", "Error al eliminar timeline");
+    }
+  };
+
+  const ejecutarSincronizacion = async () => {
+    if (
+      !confirm(
+        "¿Estás seguro de ejecutar la sincronización? Esto creará EstadoProducto para todas las cotizaciones aprobadas sin registro."
+      )
+    )
+      return;
+
+    try {
+      setLoadingSincronizacion(true);
+      const resultado = await api.sincronizarCotizacionesAprobadas();
+      addNotification(
+        "success",
+        "Sincronización Completada",
+        `Creados: ${resultado.creados} | Omitidos: ${resultado.omitidos} | Errores: ${resultado.errores || 0}`
+      );
+    } catch (error) {
+      console.error("Error al sincronizar:", error);
+      addNotification("danger", "Error", "Error al ejecutar sincronización");
+    } finally {
+      setLoadingSincronizacion(false);
+    }
+  };
+
+  const calcularTotalDias = () => {
+    let total = 0;
+    Object.keys(formData).forEach((key) => {
+      if (key.startsWith("dias") && formData[key]) {
+        total += parseInt(formData[key]);
+      }
+    });
+    return total;
+  };
+
+  // ============================================================================
+  // RENDER
+  // ============================================================================
+
+  if (loading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+      </div>
+    );
+  }
 
   return (
     <>
       <PageMeta
-        title="Asignación de solicitudes"
-        description="Gestiona solicitudes pendientes y asignadas según prioridad y vencimiento"
+        description="Configuración de tiempos y sincronización"
+        title="Shopping Assignment"
       />
 
-      <div className="pb-6">
-        <h1 className="text-title-sm sm:text-title-md font-semibold text-gray-800 dark:text-white/90">
-          Asignación de solicitudes
-        </h1>
-      </div>
-
-      <div className="mb-6">
-        <Filters
-          value={filters}
-          onChange={setFilters}
-          proyectos={MOCK_PROJECTS}
-          usuarios={Supervisores as usuarios[]}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        <div className={`${selectedRequest ? 'lg:col-span-2' : 'lg:col-span-5'} space-y-6`}>
-
-          <RequestList
-            title="Pendientes"
-            requests={pending}
-            onSelectRequest={setSelectedId}
-            emptyMessage="Sin pendientes."
-          />
-
-          <RequestList
-            title="Asignadas"
-            requests={assigned}
-            onSelectRequest={setSelectedId}
-            emptyMessage="Sin asignadas."
-          />
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
+          <h2 className="text-2xl font-semibold text-gray-800 dark:text-white/90">
+            Configuración del Sistema
+          </h2>
+          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+            Gestión de timelines por SKU y sincronización de datos
+          </p>
         </div>
 
-        <div className={`${selectedRequest ? 'lg:col-span-3' : 'lg:col-span-5'}`}>
-          <RequestDetail
-            request={selectedRequest}
-            onAssign={openAssign}
-            onReassign={openReassign}
-            onFollowUp={handleFollowUp}
-          />
+        {/* Acciones Rápidas */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <button
+            onClick={() => abrirModal()}
+            className="flex items-center justify-center gap-2 rounded-xl border border-blue-600 bg-blue-600 p-6 font-medium text-white transition-all hover:bg-blue-700"
+          >
+            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+              />
+            </svg>
+            Crear Nuevo Timeline SKU
+          </button>
 
-          <SupervisorAssignModal
-            open={assignOpen}
-            defaultAssigneeId={selectedAssigneeId}
-            mode={assignMode}
-            onClose={() => setAssignOpen(false)}
-            onSubmit={submitAssign}
-          />
-
+          <button
+            onClick={ejecutarSincronizacion}
+            disabled={loadingSincronizacion}
+            className="flex items-center justify-center gap-2 rounded-xl border border-green-600 bg-green-600 p-6 font-medium text-white transition-all hover:bg-green-700 disabled:opacity-50"
+          >
+            {loadingSincronizacion ? (
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+            ) : (
+              <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+            )}
+            {loadingSincronizacion ? "Sincronizando..." : "Sincronizar Cotizaciones"}
+          </button>
         </div>
+
+        {/* Estadísticas */}
+        {stats && (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
+              <div className="flex items-center gap-3">
+                <div className="rounded-lg bg-blue-100 p-3 dark:bg-blue-900/20">
+                  <svg
+                    className="h-6 w-6 text-blue-600 dark:text-blue-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Total Timelines
+                  </p>
+                  <p className="text-2xl font-semibold text-gray-900 dark:text-white">
+                    {stats.total}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {Object.entries(stats.porMedioTransporte).map(([medio, cantidad]) => (
+              <div
+                key={medio}
+                className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="rounded-lg bg-purple-100 p-3 dark:bg-purple-900/20">
+                    <span className="text-2xl">
+                      {medio === "MARITIMO" && "🚢"}
+                      {medio === "TERRESTRE" && "🚛"}
+                      {medio === "AEREO" && "✈️"}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{medio}</p>
+                    <p className="text-2xl font-semibold text-gray-900 dark:text-white">
+                      {cantidad}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Lista de Timelines */}
+        <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
+          <div className="mb-6 flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
+              Timelines Configurados
+            </h3>
+
+            {/* Filtros */}
+            <div className="flex gap-3">
+              <input
+                type="text"
+                placeholder="Buscar SKU..."
+                value={skuFiltro}
+                onChange={(e) => setSkuFiltro(e.target.value)}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+              />
+
+              <select
+                value={medioFiltro}
+                onChange={(e) => setMedioFiltro(e.target.value)}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+              >
+                <option value="">Todos los medios</option>
+                <option value="MARITIMO">🚢 Marítimo</option>
+                <option value="TERRESTRE">🚛 Terrestre</option>
+                <option value="AEREO">✈️ Aéreo</option>
+              </select>
+            </div>
+          </div>
+
+          {timelines.length === 0 ? (
+            <div className="py-12 text-center">
+              <svg
+                className="mx-auto h-16 w-16 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                />
+              </svg>
+              <p className="mt-4 text-gray-600 dark:text-gray-400">
+                No hay timelines configurados
+              </p>
+              <button
+                onClick={() => abrirModal()}
+                className="mt-4 rounded-lg bg-blue-600 px-6 py-2 font-medium text-white hover:bg-blue-700"
+              >
+                Crear el primero
+              </button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="border-b border-gray-200 dark:border-gray-700">
+                  <tr>
+                    <th className="pb-3 text-left text-sm font-medium text-gray-700 dark:text-gray-300">
+                      SKU
+                    </th>
+                    <th className="pb-3 text-left text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Medio
+                    </th>
+                    <th className="pb-3 text-left text-sm font-medium text-gray-700 dark:text-gray-300">
+                      País Origen
+                    </th>
+                    <th className="pb-3 text-center text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Días Totales
+                    </th>
+                    <th className="pb-3 text-right text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Acciones
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {timelines.map((timeline) => (
+                    <tr
+                      key={timeline.id}
+                      className="transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                    >
+                      <td className="py-4 text-sm font-mono font-medium text-gray-900 dark:text-white">
+                        {timeline.sku}
+                      </td>
+                      <td className="py-4 text-sm text-gray-700 dark:text-gray-300">
+                        {MEDIO_TRANSPORTE_LABELS[timeline.medioTransporte]}
+                      </td>
+                      <td className="py-4 text-sm text-gray-700 dark:text-gray-300">
+                        {timeline.paisOrigen?.nombre || "-"}
+                      </td>
+                      <td className="py-4 text-center text-sm font-semibold text-blue-600 dark:text-blue-400">
+                        {timeline.diasTotalesEstimados} días
+                      </td>
+                      <td className="py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => abrirModal(timeline)}
+                            className="rounded-lg bg-blue-100 p-2 text-blue-600 hover:bg-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/40"
+                          >
+                            <svg
+                              className="h-5 w-5"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                              />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => handleDelete(timeline.sku)}
+                            className="rounded-lg bg-red-100 p-2 text-red-600 hover:bg-red-200 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40"
+                          >
+                            <svg
+                              className="h-5 w-5"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                              />
+                            </svg>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Modal de Formulario */}
+        {showModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
+              <div className="mb-6 flex items-center justify-between">
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  {timelineEditando ? "Editar Timeline" : "Crear Timeline SKU"}
+                </h3>
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-800"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Información Básica */}
+                <div className="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+                  <h4 className="mb-4 font-medium text-gray-900 dark:text-white">
+                    Información Básica
+                  </h4>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        SKU *
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.sku}
+                        onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                        disabled={!!timelineEditando}
+                        className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                        placeholder="Ej: SKU-12345"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Medio de Transporte
+                      </label>
+                      <select
+                        value={formData.medioTransporte}
+                        onChange={(e) =>
+                          setFormData({ ...formData, medioTransporte: e.target.value })
+                        }
+                        className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                      >
+                        <option value="MARITIMO">🚢 Marítimo</option>
+                        <option value="TERRESTRE">🚛 Terrestre</option>
+                        <option value="AEREO">✈️ Aéreo</option>
+                      </select>
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        País de Origen
+                      </label>
+                      <select
+                        value={formData.paisOrigenId}
+                        onChange={(e) =>
+                          setFormData({ ...formData, paisOrigenId: e.target.value })
+                        }
+                        className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                      >
+                        <option value="">Seleccionar país...</option>
+                        {paises.map((pais) => (
+                          <option key={pais.id} value={pais.id}>
+                            {pais.nombre}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Días por Etapa */}
+                <div className="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+                  <h4 className="mb-4 font-medium text-gray-900 dark:text-white">
+                    Días por Etapa (opcional)
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+                    {[
+                      { key: "diasCotizadoADescuento", label: "Cotizado → Descuento" },
+                      { key: "diasDescuentoAComprado", label: "Descuento → Comprado" },
+                      { key: "diasCompradoAPagado", label: "Comprado → Pagado" },
+                      { key: "diasPagadoASeguimiento1", label: "Pagado → 1er Seguimiento" },
+                      { key: "diasSeguimiento1AFob", label: "1er Seg → FOB" },
+                      { key: "diasFobABl", label: "FOB → BL" },
+                      { key: "diasBlASeguimiento2", label: "BL → 2do Seguimiento" },
+                      { key: "diasSeguimiento2ACif", label: "2do Seg → CIF" },
+                      { key: "diasCifARecibido", label: "CIF → Recibido" },
+                    ].map((campo) => (
+                      <div key={campo.key}>
+                        <label className="mb-1 block text-xs text-gray-600 dark:text-gray-400">
+                          {campo.label}
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={formData[campo.key]}
+                          onChange={(e) =>
+                            setFormData({ ...formData, [campo.key]: e.target.value })
+                          }
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                          placeholder="días"
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Total */}
+                  <div className="mt-4 rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-blue-900 dark:text-blue-300">
+                        Total Estimado:
+                      </span>
+                      <span className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                        {calcularTotalDias()} días
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Notas */}
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Notas / Observaciones
+                  </label>
+                  <textarea
+                    value={formData.notas}
+                    onChange={(e) => setFormData({ ...formData, notas: e.target.value })}
+                    rows={3}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                    placeholder="Información adicional sobre este timeline..."
+                  />
+                </div>
+
+                {/* Botones */}
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowModal(false)}
+                    className="flex-1 rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700"
+                  >
+                    {timelineEditando ? "Actualizar" : "Crear"} Timeline
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );
-}
-////////////////////
-/*
-  FUNCIONES PARA CONECTAR CON BACKEND
-  - fetchAssignments(filters): Promise<AssignmentRequest[]>
-  - assignRequest(requestId, userId): Promise<void>
-  - reassignRequest(requestId, newUserId): Promise<void>
-  - followUpRequest(requestId): void (navega a la página de seguimiento)
-*/
-async function ObtenerCotizaciones(): Promise<AssignmentRequest[]> {
-  try {
-    const raw = await api<ApiPurchaseRequest[]>('/api/v1/assignments');
-    console.log("Cotizaciones obtenidas:", raw);
-
-    const toScope = (p: string): Scope =>
-      p === 'INTERNATIONAL' ? 'internacional' : 'nacional';
-
-    const toDeliveryPlace = (d: string): DeliveryPlace =>
-      d === 'PROJECT' ? 'proyecto' : 'almacen';
-
-    return raw.map((r) => {
-      const first = r.assignments?.[0] ?? null;
-
-
-
-      const flattenItems = (nested: ApiPurchaseRequest["items"]): RequestItem[] => {
-        if (!nested) return [];
-        // Aplanar cualquier nivel de anidación
-        const flat = (Array.isArray(nested) && (nested as any).flat)
-          ? (nested as any).flat(Infinity)
-          : ([] as any[]).concat(...(nested as any));
-        return flat
-          .filter(Boolean)
-          .map((it: any): RequestItem => ({
-            id: String(it.id),
-            sku: it.sku ?? undefined,
-            description: String(it.description ?? ''),
-            quantity: Number(it.quantity ?? 0),
-            unit: String(it.unit ?? ''),
-            extraSpecs: it.extraSpecs ?? undefined,
-          }));
-      };
-
-      const items: RequestItem[] = flattenItems(r.items);
-
-      const finalClientName =
-        r.finalClient ??
-        'Cliente no especificado';
-
-      const createdAt = FormatDateApi(r.createdAt) || r.createdAt;
-      const quoteDeadlineISO = r.quoteDeadline;
-      const quoteDeadline = FormatDateApi(r.quoteDeadline) || r.quoteDeadline;
-
-      return {
-        id: r.id,
-        reference: r.reference,
-        finalClient: finalClientName,
-        createdAt,
-        quoteDeadlineISO,
-        quoteDeadline,
-        deadlline: r.quoteDeadline,
-        requesterName: r.requester?.fullName ?? 'Solicitante no especificado',
-        requestCategory: r.requestCategory as unknown as requestCategory,
-        procuremet: toScope(r.procurement),
-        deliveryPlace: toDeliveryPlace(r.deliveryType),
-        description: r.description ?? '',
-        assignedTo: first?.assignedTo?.fullName ?? undefined,
-        assignedToId: first?.assignedToId ?? undefined,
-        progress: first?.progress ?? 0,
-        followStatus: first?.followStatus ?? 'UNASSIGNED',
-        items,
-      };
-    });
-  } catch (error) {
-    console.error("Error al obtener cotizaciones:", error);
-    return [];
-  }
-}
-
-async function cargarSupervisores(): Promise<usuarios[]> {
-  try {
-    const raw = await api<usuarios[]>('/api/v1/users/supervisors');
-    console.log("Usuarios cargados:", raw);
-    return raw || [];
-
-  } catch (error) {
-    console.error("Error al cargar Usuarios:", error);
-    return [];
-  }
 }

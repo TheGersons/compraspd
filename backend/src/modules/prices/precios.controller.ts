@@ -1,11 +1,11 @@
-import { 
-  Body, 
-  Controller, 
-  Delete, 
-  Get, 
-  Param, 
-  Patch, 
-  Post, 
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
   UseGuards,
   ParseUUIDPipe
 } from '@nestjs/common';
@@ -15,6 +15,7 @@ import { PreciosService } from './precios.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreatePrecioDto } from './dto/create-precio.dto';
 import { UpdatePrecioDto } from './dto/update-precio.dto';
+import { EstadoProductoSyncService } from '../estado-producto/estado-producto-sync.service';
 
 type UserJwt = { sub: string; role?: string };
 
@@ -27,7 +28,7 @@ type UserJwt = { sub: string; role?: string };
 @UseGuards(AuthGuard('jwt'))
 @Controller('api/v1/precios')
 export class PreciosController {
-  constructor(private readonly preciosService: PreciosService) {}
+  constructor(private readonly preciosService: PreciosService, private readonly estadoProductoSyncService: EstadoProductoSyncService,) { }
 
   /**
    * POST /api/v1/precios
@@ -108,11 +109,15 @@ export class PreciosController {
   @Post(':id/select')
   @ApiOperation({ summary: 'Seleccionar oferta ganadora' })
   @ApiResponse({ status: 200, description: 'Oferta seleccionada' })
-  selectOffer(
+  async selectOffer(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: UserJwt
   ) {
-    return this.preciosService.selectOffer(id, user);
+    const resultado = this.preciosService.selectOffer(id, user);
+
+
+    return resultado;
+
   }
 
   /**

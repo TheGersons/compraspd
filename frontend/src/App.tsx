@@ -48,7 +48,7 @@ import NotificationPanel from "./pages/Notifications/components/notifications/No
 import Projects from "./pages/projects/Projects";
 import NewProject from "./pages/projects/NewProject";
 
-const SHOPPING_MANAGER_ROLES = ["ADMIN"];
+const SHOPPING_MANAGER_ROLES = ["ADMIN", "SUPERVISOR"];
 const QUOTES_SUPERVISOR_ROLES = ["SUPERVISOR", "ADMIN"];
 
 export default function App() {
@@ -149,7 +149,6 @@ export default function App() {
               {/* SHOPPING */}
               <Route path="/shopping" element={<ShoppingLayout />}>
                 <Route index element={<Shopping />} />
-                <Route path="new" element={<ShoppingNew />} />
                 <Route path="follow-ups" element={<ShoppingFollowUps />} />
                 <Route path="history" element={<ShoppingHistory />} />
                 <Route

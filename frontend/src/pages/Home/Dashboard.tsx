@@ -87,12 +87,7 @@ function KpiCarousel({
     const visibleItems = getVisibleItems();
 
     return (
-        <div
-            ref={containerRef}
-            className="relative"
-            onMouseEnter={() => setIsPaused(true)}
-            onMouseLeave={() => setIsPaused(false)}
-        >
+        <><div className="flex flex-col items-center gap-2">
             <div className="flex items-center gap-3">
                 {/* Botón Anterior */}
                 <button
@@ -122,12 +117,12 @@ function KpiCarousel({
 
                 {/* Cards Container */}
                 <div className="flex-1">
-                    <div 
+                    <div
                         className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 transition-all duration-400 ease-out"
                         style={{
-                            transform: isAnimating 
-                                ? direction === 'right' 
-                                    ? 'translateX(-20px)' 
+                            transform: isAnimating
+                                ? direction === 'right'
+                                    ? 'translateX(-20px)'
                                     : 'translateX(20px)'
                                 : 'translateX(0)',
                             opacity: isAnimating ? 0.7 : 1
@@ -145,8 +140,7 @@ function KpiCarousel({
                                         hint={item.hint}
                                         tone={item.tone}
                                         type={item.type}
-                                        columns={item.columns}
-                                    />
+                                        columns={item.columns} />
                                 </div>
                             );
                         })}
@@ -186,19 +180,16 @@ function KpiCarousel({
                     {items.map((_, idx) => (
                         <div
                             key={idx}
-                            className={`h-1.5 rounded-full transition-all duration-300 ${
-                                idx === currentIndex
+                            className={`h-1.5 rounded-full transition-all duration-300 ${idx === currentIndex
                                     ? "w-6 bg-blue-600 dark:bg-blue-500"
-                                    : "w-1.5 bg-gray-300 dark:bg-gray-600"
-                            }`}
-                        />
+                                    : "w-1.5 bg-gray-300 dark:bg-gray-600"}`} />
                     ))}
                 </div>
                 <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
                     {currentIndex + 1} / {items.length}
                 </span>
             </div>
-        </div>
+        </div></>
     );
 }
 

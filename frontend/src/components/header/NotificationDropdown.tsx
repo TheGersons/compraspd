@@ -77,7 +77,7 @@ export default function NotificationDropdown() {
           </button>
         </div>
         <ul className="flex flex-col h-auto overflow-y-auto custom-scrollbar">
-          {/* Example notification items */}
+          {/* Example notification items 
           <li>
             <DropdownItem
               onItemClick={closeDropdown}
