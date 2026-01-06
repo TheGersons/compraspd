@@ -4,7 +4,7 @@ import PageMeta from "../../components/common/PageMeta";
 import Button from "../../components/ui/button/Button";
 import { useNotifications } from "../Notifications/context/NotificationContext";
 import { getToken } from "../../lib/api";
-import { LoadingScreen } from "../../components/common/LoadingScreen"; // ← AGREGAR
+import { LoadingScreen } from "../../components/common/LoadingScreen";
 import { error } from "console";
 
 
@@ -17,7 +17,7 @@ type LugarEntrega = "ALMACEN" | "OFICINA" | "PROYECTO" | "OTRO";
 type TipoUnidad = "UNIDAD" | "CAJA" | "PAQUETE" | "METRO" | "KILOGRAMO" | "LITRO" | "OTRO";
 
 interface ItemCotizacion {
-  sku: string;
+  // sku eliminado - será autoasignado por backend
   descripcionProducto: string;
   cantidad: number;
   tipoUnidad: TipoUnidad;
@@ -146,7 +146,7 @@ export default function New() {
   const navigate = useNavigate();
   const { addNotification } = useNotifications();
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null); // ← AGREGAR
+  const [error, setError] = useState<string | null>(null);
 
   // Estado del formulario
   const [nombreCotizacion, setNombreCotizacion] = useState("");
@@ -159,7 +159,7 @@ export default function New() {
   const [searchSolicitante, setSearchSolicitante] = useState("");
   const [proyectoId, setProyectoId] = useState("");
   const [items, setItems] = useState<ItemCotizacion[]>([
-    { sku: "", descripcionProducto: "", cantidad: 1, tipoUnidad: "UNIDAD", notas: "" },
+    { descripcionProducto: "", cantidad: 1, tipoUnidad: "UNIDAD", notas: "" },
   ]);
 
   // Catálogos
@@ -181,7 +181,7 @@ export default function New() {
     try {
       setIsLoading(true);
       setLoadingCatalogos(true);
-      setError(null); // ← AGREGAR
+      setError(null);
       const [tiposData, usuariosData, proyectosData] = await Promise.all([
         api.getTipos(),
         api.getUsuarios(),
@@ -234,7 +234,7 @@ export default function New() {
   const agregarItem = () => {
     setItems([
       ...items,
-      { sku: "", descripcionProducto: "", cantidad: 1, tipoUnidad: "UNIDAD", notas: "" },
+      { descripcionProducto: "", cantidad: 1, tipoUnidad: "UNIDAD", notas: "" },
     ]);
   };
 
@@ -267,10 +267,9 @@ export default function New() {
 
     if (limite < hoy) return "La fecha límite no puede ser en el pasado";
 
-    // Validar items
+    // Validar items (SKU eliminado de validación)
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
-      if (!item.sku.trim()) return `El SKU del item ${i + 1} es obligatorio`;
       if (!item.descripcionProducto.trim()) return `La descripción del item ${i + 1} es obligatoria`;
       if (item.cantidad <= 0) return `La cantidad del item ${i + 1} debe ser mayor a 0`;
     }
@@ -294,7 +293,7 @@ export default function New() {
 
       const fechaEstimadaDefault = new Date();
       fechaEstimadaDefault.setDate(fechaEstimadaDefault.getDate() + 30); // +30 días
-      // Preparar datos
+      // Preparar datos (SKU eliminado del payload)
       const payload = {
         nombreCotizacion: nombreCotizacion.trim(),
         tipoCompra,
@@ -306,7 +305,7 @@ export default function New() {
         solicitanteId,
         proyectoId,
         items: items.map(item => ({
-          sku: item.sku.trim(),
+          // sku eliminado - backend lo asignará automáticamente
           descripcionProducto: item.descripcionProducto.trim(),
           cantidad: item.cantidad,
           tipoUnidad: item.tipoUnidad,
@@ -344,7 +343,7 @@ export default function New() {
     }
   };
 
-  // 🔧 AGREGAR ESTO ANTES DEL return (
+  // Loading y error states
 if (loadingCatalogos) {
   return <LoadingScreen message="Cargando formulario de cotización..." />;
 }
@@ -365,7 +364,6 @@ if (error) {
   );
 }
 
-// Tu return ( original aquí...
 return (
     <>
       <PageMeta title="Nueva Cotización" description="Crear una nueva cotización" />
@@ -553,19 +551,16 @@ return (
               <select
                 value={lugarEntrega}
                 onChange={(e) => setLugarEntrega(e.target.value as LugarEntrega)}
-                className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-2.5 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+                className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-2.5 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
                 required
               >
                 <option value="ALMACEN">Almacén</option>
+                <option value="OFICINA">Oficina</option>
                 <option value="PROYECTO" disabled={!proyectoId}>
-                  Proyecto {!proyectoId && '(Seleccione un proyecto primero)'}
+                  Proyecto {!proyectoId && "(seleccione proyecto primero)"}
                 </option>
+                <option value="OTRO">Otro</option>
               </select>
-              {lugarEntrega === "PROYECTO" && !proyectoId && (
-                <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-                  ⚠️ Debe seleccionar un proyecto para usar esta opción
-                </p>
-              )}
             </div>
 
             {/* Fecha Límite */}
@@ -586,20 +581,20 @@ return (
             {/* Comentarios */}
             <div className="md:col-span-2">
               <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Comentarios/Observaciones
+                Comentarios o Instrucciones Especiales
               </label>
               <textarea
                 value={comentarios}
                 onChange={(e) => setComentarios(e.target.value)}
                 rows={3}
                 className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-2.5 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
-                placeholder="Información adicional sobre la cotización..."
+                placeholder="Añade cualquier comentario relevante..."
               />
             </div>
           </div>
         </div>
 
-        {/* Items */}
+        {/* Items de la Cotización */}
         <div className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -641,24 +636,10 @@ return (
                   )}
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                  {/* SKU */}
-                  <div>
-                    <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
-                      SKU <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={item.sku}
-                      onChange={(e) => actualizarItem(index, "sku", e.target.value)}
-                      className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
-                      placeholder="LAP-001"
-                      required
-                    />
-                  </div>
-
-                  {/* Descripción */}
-                  <div className="md:col-span-2">
+                {/* Grid cambiado de 4 a 3 columnas, SKU eliminado */}
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {/* Descripción - ahora ocupa más espacio */}
+                  <div className="md:col-span-2 lg:col-span-3">
                     <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
                       Descripción del Producto <span className="text-rose-500">*</span>
                     </label>

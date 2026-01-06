@@ -272,7 +272,7 @@ const useFilteredRequests = (
           r.reference.toLowerCase().includes(qLower) ||
           r.finalClient.toLowerCase().includes(qLower) ||
           r.description.toLowerCase().includes(qLower) ||
-          r.items?.some(i => i.sku?.toLowerCase().includes(qLower) || i.description.toLowerCase().includes(qLower))
+          r.items?.some(i =>  i.description.toLowerCase().includes(qLower))
       );
     }
 

@@ -9,7 +9,6 @@ import { useNotifications } from "../Notifications/context/NotificationContext";
 
 type Producto = {
     id: string;
-    sku: string;
     descripcionProducto: string;
     cantidad: number;
     tipoUnidad: string;
@@ -634,9 +633,6 @@ export default function MyQuotes() {
                                                         {cotizacionSeleccionada.detalles.map((prod) => (
                                                             <tr key={prod.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
                                                                 <td className="py-3">
-                                                                    <div className="font-medium text-gray-900 dark:text-white">
-                                                                        {prod.sku}
-                                                                    </div>
                                                                     <div className="text-xs text-gray-600 dark:text-gray-400">
                                                                         {prod.descripcionProducto}
                                                                     </div>

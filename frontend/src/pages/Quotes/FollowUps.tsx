@@ -785,7 +785,7 @@ export default function FollowUps() {
                 Agregar Precio
               </h3>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                {productoParaPrecio.sku} - {productoParaPrecio.descripcionProducto}
+                {productoParaPrecio.descripcionProducto}
               </p>
             </div>
             <button
@@ -1218,11 +1218,9 @@ export default function FollowUps() {
                                         {/* Producto */}
                                         <td className="py-4">
                                           <div className="font-medium text-gray-900 dark:text-white">
-                                            {producto.sku}
-                                          </div>
-                                          <div className="text-sm text-gray-600 dark:text-gray-400">
                                             {producto.descripcionProducto}
                                           </div>
+                                          
                                         </td>
 
                                         {/* Cantidad */}
@@ -1647,7 +1645,7 @@ export default function FollowUps() {
                     Configurar Timeline
                   </h3>
                   <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                    {productoConfigurando.sku} - {productoConfigurando.descripcionProducto}
+                    {productoConfigurando.descripcionProducto}
                   </p>
                 </div>
                 <button

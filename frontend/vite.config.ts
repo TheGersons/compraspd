@@ -13,9 +13,12 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://192.168.3.38:3001',  // o 'http://backend:3001' si usas nombre de contenedor
+        target: 'http://192.168.114.18:3001',  // o 'http://backend:3001' si usas nombre de contenedor
         changeOrigin: true,
       },
     },
   },
 });
+
+//target: 'http://192.168.114.18:3001',  // IP del servidor backend en la red local
+//target: 'http://192.168.3.38:3001',  // o 'http://backend:3001' si usas nombre de contenedor
