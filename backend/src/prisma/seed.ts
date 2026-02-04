@@ -1,7 +1,7 @@
 // ============================================================================
 // SEED - DATOS ESENCIALES PARA PRODUCCIÓN
 // ============================================================================
-// Ubicación: backend/prisma/seed.ts
+// Ubicación: backend/src/prisma/seed.ts
 // Ejecutar: npx prisma db seed
 // ============================================================================
 
@@ -193,10 +193,8 @@ async function main() {
 
   const deptCreados: {id: string; nombre: string}[] = [];
   for (const nombre of departamentos) {
-    const dept = await prisma.departamento.upsert({
-      where: { id: 'temp-' + nombre }, // Temporal, se sobrescribirá
-      update: {},
-      create: { nombre },
+    const dept = await prisma.departamento.create({
+      data: { nombre }
     });
     deptCreados.push(dept);
   }
