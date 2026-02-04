@@ -11,9 +11,21 @@ COPY package.json pnpm-lock.yaml* ./
 # INSTALAR DEPENDENCIAS + FORZAR @nestjs/schedule
 RUN pnpm install --frozen-lockfile && \
     pnpm add @nestjs/schedule --save-prod
+ 
+# ============================
+#  2️⃣ Etapa de Desarrollo (NUEVA)
+# ============================
+FROM node:22-alpine AS development
+RUN corepack enable && corepack prepare pnpm@9.12.3 --activate
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN pnpm db:generate
+# No hacemos build aquí, el código se servirá vía volúmenes
+CMD ["pnpm", "start:dev"]    
 
 # ============================
-#  2️⃣ Etapa de build
+# 3️⃣ Etapa de build
 # ============================
 FROM node:22-alpine AS build
 RUN corepack enable && corepack prepare pnpm@9.12.3 --activate
@@ -31,7 +43,7 @@ RUN pnpm db:generate && pnpm build
 
 
 # ============================
-#  3️⃣ Etapa final (runtime)
+#  4 Etapa final (runtime)
 # ============================
 FROM node:22-alpine AS runner
 RUN corepack enable && corepack prepare pnpm@9.12.3 --activate
