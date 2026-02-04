@@ -102,8 +102,8 @@ async sign(usuario: UsuarioWithRoleName, metadata?: LoginMetadata) {
   const refreshJti = randomUUID();
 
   // Configuración de expiración
-  const accessTokenExpiry = process.env.JWT_EXPIRES || '15m';
-  const refreshTokenExpiry = process.env.JWT_REFRESH_EXPIRES || '7d';
+  const accessTokenExpiry = process.env.JWT_EXPIRES as any || '15m';
+  const refreshTokenExpiry = process.env.JWT_REFRESH_EXPIRES as any || '7d';
 
   // Payload del access token
   const accessPayload = {
@@ -288,7 +288,7 @@ async deleteOldSessions() {
 
       // Generar nuevo access token
       const newJti = randomUUID();
-      const accessTokenExpiry = process.env.JWT_EXPIRES || '15m';
+      const accessTokenExpiry = process.env.JWT_EXPIRES as any || '15m';
 
       const accessPayload = {
         sub: sesion.usuario.id,
