@@ -2,7 +2,7 @@
 
 import { api } from '../../../lib/api';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://89.167.20.163:3001';
 
 type User = {
   id: string;

@@ -4,6 +4,28 @@
 // MANEJO DE TOKENS
 // ============================================================================
 
+let showAccessDenied: ((message: string) => void) | null = null;
+async function apiCall(url: string, options: RequestInit) {
+  const response = await fetch(url, options);
+
+  if (response.status === 403 || response.status === 401) {
+    const error = await response.json();
+
+    // Mostrar dialog
+    if (window.showAccessDenied) {
+      window.showAccessDenied(error.message || 'No tienes permisos');
+    }
+
+    throw new Error('Forbidden');
+  }
+
+  return response;
+}
+
+export function setAccessDeniedHandler(handler: (message: string) => void) {
+  showAccessDenied = handler;
+}
+
 export function getToken(): string | null {
   return localStorage.getItem("access_token");
 }
@@ -65,7 +87,7 @@ async function refreshAccessToken(): Promise<string | null> {
   }
 
   const refreshToken = getRefreshToken();
-  
+
   if (!refreshToken) {
     console.error("No hay refresh token disponible");
     return null;
@@ -77,7 +99,7 @@ async function refreshAccessToken(): Promise<string | null> {
   refreshPromise = (async () => {
     try {
       console.log("Refrescando access token...");
-      
+
       const response = await fetch("/api/v1/auth/refresh", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -89,18 +111,18 @@ async function refreshAccessToken(): Promise<string | null> {
       }
 
       const data = await response.json();
-      
+
       // Guardar nuevo access token
       localStorage.setItem("access_token", data.access_token);
-      
+
       console.log("Access token refrescado exitosamente");
-      
+
       return data.access_token;
     } catch (error) {
       console.error("Error al refrescar token:", error);
       // Si falla el refresh, limpiar todo
       removeTokens();
-      
+
       // NO redirigir automáticamente aquí
       // Dejar que el componente de rutas protegidas lo maneje
       return null;
@@ -146,13 +168,13 @@ export async function api<T>(
   // Si es 401 (no autorizado) Y tenemos refresh token, intentar refrescar
   if (response.status === 401) {
     const hasRefreshToken = !!getRefreshToken();
-    
+
     if (hasRefreshToken && token) {
       console.log("Token expirado, intentando refrescar...");
 
       try {
         const newToken = await refreshAccessToken();
-        
+
         if (newToken) {
           // Reintentar la petición original con el nuevo token
           response = await makeRequest(newToken);

@@ -76,9 +76,8 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
  * Helper para hacer fetch con autenticación
  */
 async function fetchWithAuth<T>(url: string, options?: RequestInit): Promise<T> {
-  
   const token = getToken();
-  
+
   const response = await fetch(url, {
     ...options,
     headers: {
@@ -87,6 +86,19 @@ async function fetchWithAuth<T>(url: string, options?: RequestInit): Promise<T> 
       ...options?.headers,
     },
   });
+
+  // ✅ MANEJAR 401/403 AQUÍ
+  if (response.status === 401 || response.status === 403) {
+    const error = await response.json().catch(() => ({ message: response.statusText }));
+
+    // Mostrar dialog sin lanzar error que React Query capture
+    if (window.showAccessDenied) {
+      window.showAccessDenied(error.message || 'No tienes permisos');
+    }
+
+    // Lanzar error silencioso (React Query lo captura pero no muestra nada)
+    throw new Error('AUTH_ERROR');
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: response.statusText }));
@@ -105,7 +117,7 @@ async function fetchWithAuth<T>(url: string, options?: RequestInit): Promise<T> 
  */
 function mapEstadoFilter(estado?: string): string | undefined {
   if (!estado || estado === "todas") return undefined;
-  
+
   const estadoMap: Record<string, string> = {
     abiertas: "ENVIADA",
     en_revision: "EN_REVISION",
@@ -113,7 +125,7 @@ function mapEstadoFilter(estado?: string): string | undefined {
     cerradas: "APROBADA",
     vencidas: "ENVIADA", // Filtrar por fecha en frontend
   };
-  
+
   return estadoMap[estado] || estado.toUpperCase();
 }
 
@@ -122,17 +134,17 @@ function mapEstadoFilter(estado?: string): string | undefined {
  */
 function mapTipoCompraFilter(tipoCompra?: string): string | undefined {
   if (!tipoCompra || tipoCompra === "todas") return undefined;
-  
+
   // Ya viene en formato correcto desde el filtro
   if (tipoCompra === "NATIONAL" || tipoCompra === "INTERNATIONAL") {
     return tipoCompra === "NATIONAL" ? "NACIONAL" : "INTERNACIONAL";
   }
-  
+
   const tipoCompraMap: Record<string, string> = {
     nacional: "NACIONAL",
     internacional: "INTERNACIONAL",
   };
-  
+
   return tipoCompraMap[tipoCompra] || tipoCompra.toUpperCase();
 }
 
@@ -144,7 +156,7 @@ async function fetchQuotations(
   isAdmin: boolean = false
 ): Promise<DashboardResponse> {
   console.log('📊 [API] Fetching quotations with filters:', filters);
-  
+
   // Construir query params
   const params = new URLSearchParams();
 
@@ -181,7 +193,7 @@ async function fetchQuotations(
 
 
   const data = await fetchWithAuth<{ items: QuotationFromAPI[]; total: number; page: number; pageSize: number }>(endpoint);
-  
+
   console.log('✅ [API] Quotations received:', data);
 
   return {
@@ -198,15 +210,15 @@ async function fetchQuotations(
  */
 async function fetchQuotationsStats(preset: string): Promise<StatsResponse> {
   console.log('📈 [API] Fetching stats for period:', preset);
-  
+
   // TODO: Crear endpoint /api/v1/quotations/stats en el backend
   // Por ahora retornamos datos mock
-  
+
   // Endpoint temporal - descomentar cuando exista
   // const data = await fetchWithAuth<StatsResponse>(
   //   `${API_BASE_URL}/api/v1/quotations/stats?period=${preset}`
   // );
-  
+
   // Mock data mientras tanto
   const mockData: StatsResponse = {
     monthlyStats: [],
@@ -217,7 +229,7 @@ async function fetchQuotationsStats(preset: string): Promise<StatsResponse> {
       rejected: 0,
     },
   };
-  
+
   console.log('✅ [API] Stats received (mock):', mockData);
   return mockData;
 }

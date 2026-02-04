@@ -3,6 +3,8 @@ import ProtectedRoute from "./router/ProtectedRoute";
 import PublicOnlyRoute from "./router/PublicOnlyRoute";
 import { ScrollToTop } from "./components/common/ScrollToTop";
 import { Toaster } from 'react-hot-toast';
+import AccessDeniedDialog from './components/common/AccessDeniedDialog';
+import { setAccessDeniedHandler } from './lib/api';
 
 // Layouts
 import AppLayout from "./layout/AppLayout";
@@ -47,11 +49,19 @@ import NotificationContainer from "./pages/Notifications/components/notification
 import NotificationPanel from "./pages/Notifications/components/notifications/NotificationPanel";
 import Projects from "./pages/projects/Projects";
 import NewProject from "./pages/projects/NewProject";
+import { useState, useEffect } from "react";
 
 const SHOPPING_MANAGER_ROLES = ["ADMIN", "SUPERVISOR"];
 const QUOTES_SUPERVISOR_ROLES = ["SUPERVISOR", "ADMIN"];
 
 export default function App() {
+  const [accessDenied, setAccessDenied] = useState({ open: false, message: '' });
+
+  useEffect(() => {
+    setAccessDeniedHandler((message) => {
+      setAccessDenied({ open: true, message });
+    });
+  }, []);
   return (
     <NotificationProvider>
       <>
@@ -188,9 +198,15 @@ export default function App() {
           {/* 404 */}
           <Route path="*" element={<NotFound />} />
         </Routes>
+        {/* Dialog de acceso denegado */}
+      <AccessDeniedDialog
+        isOpen={accessDenied.open}
+        onClose={() => setAccessDenied({ open: false, message: '' })}
+        message={accessDenied.message}
+      />
       </>
       <NotificationContainer />
-      <NotificationPanel />
+      {/*<NotificationPanel />*/}
     </NotificationProvider>
   );
 }

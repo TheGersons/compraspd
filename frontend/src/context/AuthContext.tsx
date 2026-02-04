@@ -3,10 +3,10 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { usersApi } from "../pages/users/service/userApi";
-import { 
-  getToken, 
+import {
+  getToken,
   getRefreshToken,
-  removeTokens, 
+  removeTokens,
   setTokens,
   setUser as saveUser,
   getUser as getSavedUser
@@ -45,7 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refresh = async () => {
     const accessToken = getToken();
     const refreshToken = getRefreshToken();
-    
+
     // Si no hay tokens, no hay sesión
     if (!accessToken && !refreshToken) {
       setUser(null);
@@ -68,13 +68,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       saveUser(me);
     } catch (error: any) {
       console.error("Error al obtener usuario:", error);
-      
+
       // Si el error es de autenticación, limpiar sesión
       if (error?.message?.includes("401") || error?.message?.includes("Sesión")) {
         console.log("Sesión inválida, limpiando tokens...");
         setUser(null);
         removeTokens();
-        
+
         // Solo redirigir si NO estamos ya en la página de login
         if (location.pathname !== "/signin") {
           navigate("/signin", { replace: true });
@@ -113,25 +113,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * Login: guarda tokens y obtiene información del usuario
    */
   const login = async (
-    accessToken: string, 
+    accessToken: string,
     refreshToken: string,
     userData?: any
   ) => {
     console.log("Guardando tokens de nueva sesión...");
-    
-    // Guardar tokens
+
     setTokens(accessToken, refreshToken);
-    
-    // Si ya tenemos la info del usuario, usarla
+
     if (userData) {
       setUser(userData);
       saveUser(userData);
       setIsLoading(false);
-      setTimeout(() => void refresh(), 100); // Refrescar en segundo plano
+
+      // ✅ AGREGAR ESTO:
+      const rolNombre = userData.rol.nombre.toUpperCase();
+      if (rolNombre === 'USUARIO') {
+        navigate('/quotes/my-quotes');
+      } else {
+        navigate('/quotes');
+      }
+
+      setTimeout(() => void refresh(), 100);
     } else {
-      // Si no, obtenerla del backend
       setIsLoading(true);
       await refresh();
+
+      // ✅ AGREGAR ESTO TAMBIÉN:
+      const me = await usersApi.me();
+      const rolNombre = me.rol.nombre.toUpperCase();
+      if (rolNombre === 'USUARIO') {
+        navigate('/quotes/my-quotes');
+      } else {
+        navigate('/quotes');
+      }
     }
   };
 
@@ -141,9 +156,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    */
   const logout = async () => {
     console.log("Cerrando sesión...");
-    
+
     const token = getToken();
-    
+
     // Intentar cerrar sesión en backend
     if (token) {
       try {
@@ -160,13 +175,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Ignorar errores del backend
       }
     }
-    
+
     // SIEMPRE limpiar tokens locales
     removeTokens();
     setUser(null);
-    
+
     console.log("Tokens locales limpiados");
-    
+
     // Redirigir a login
     navigate("/signin", { replace: true });
   };

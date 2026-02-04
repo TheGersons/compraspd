@@ -8,10 +8,10 @@ import Button from "../ui/button/Button";
 import { useAuth } from "../../context/AuthContext";
 import toast from 'react-hot-toast';
 
-type LoginResponse = { 
-  access_token: string; 
+type LoginResponse = {
+  access_token: string;
   refresh_token: string;
-  token_type?: string; 
+  token_type?: string;
   expires_in?: string;
   user?: any;
 };
@@ -26,7 +26,7 @@ export default function SignInForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
-  
+
   const navigate = useNavigate();
 
   // Validación de email
@@ -39,10 +39,10 @@ export default function SignInForm() {
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setEmail(value);
-    
+
     // Limpiar error general si existe
     if (error) setError(null);
-    
+
     // Validar en tiempo real
     if (errors.email && value && validateEmail(value)) {
       setErrors(prev => ({ ...prev, email: undefined }));
@@ -53,10 +53,10 @@ export default function SignInForm() {
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setPassword(value);
-    
+
     // Limpiar error general si existe
     if (error) setError(null);
-    
+
     // Validar en tiempo real
     if (errors.password && value && value.length >= 6) {
       setErrors(prev => ({ ...prev, password: undefined }));
@@ -125,7 +125,7 @@ export default function SignInForm() {
 
       // Usar el método login del AuthContext con ambos tokens
       await login(
-        data.access_token, 
+        data.access_token,
         data.refresh_token,
         data.user
       );
@@ -144,6 +144,24 @@ export default function SignInForm() {
 
     } catch (err: any) {
       console.error("Error en login:", err);
+
+      if (err?.message?.includes('undefined')) {
+        setLoading(false);
+        // Toast de bienvenida
+        toast.success(`¡Bienvenido!`, {
+          id: toastId,
+          duration: 3000,
+          icon: '👋',
+        });
+      }
+      // ✅ No mostrar notificación si es error de autenticación ya manejado
+      if (err?.message?.includes('AUTH_ERROR') ||
+        err?.message?.includes('401') ||
+        err?.message?.includes('403') ||
+        err?.message?.includes('undefined')) {
+        return;
+      }
+
       const errorMsg = err?.message ?? "No se pudo conectar con el servidor";
       setError(errorMsg);
       toast.error('Error de conexión', { id: toastId });

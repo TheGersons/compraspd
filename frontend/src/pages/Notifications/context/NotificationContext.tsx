@@ -33,7 +33,7 @@ const defaultConfig: NotificationConfig = {
     info: 5000,
     success: 4000,
     warn: 7000,
-    danger: 0 
+    danger: 7000 
   },
   playSound: false,
   maxVisible: 4

@@ -17,8 +17,18 @@ export default function QuotesLayout() {
   // 🛑 Paso 1: Obtener el rol del usuario
   const { user } = useAuth(); // Asegúrate de que este hook exista y devuelva { user: { role } }
 
+  if (!user) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent mx-auto"></div>
+          <p className="mt-2 text-gray-600">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
   // 🛑 Paso 2: Verificar si el usuario tiene permiso de Supervisor
-const isSupervisor = user?.rol.nombre?.toUpperCase() !== undefined
+const isSupervisor = user?.rol.nombre?.toUpperCase() !== 'Usuario'
   ? ['SUPERVISOR', 'ADMIN'].includes(user.rol.nombre.toUpperCase())
   : false;
   // 🛑 Paso 3: Filtrar las pestañas basado en el rol
