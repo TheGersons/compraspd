@@ -81,7 +81,7 @@ export class QuotationsService {
         // Crear detalles en la misma transacción
         detalles: {
           create: items.map(item => ({
-            sku: item.sku || null,
+            // sku eliminado - el trigger SQL lo asignará automáticamente
             descripcionProducto: item.descripcionProducto,
             cantidad: item.cantidad,
             tipoUnidad: item.tipoUnidad,
