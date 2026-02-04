@@ -9,6 +9,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=http://89.167.20.163:3001/api/v1
     container_name: compras-frontend
     ports:
       - "8080:80"
