@@ -2,7 +2,7 @@ FROM node:20-alpine AS build
 WORKDIR /app
 RUN corepack enable
 COPY package.json pnpm-lock.yaml* ./
-RUN pnpm i --frozen-lockfile
+RUN pnpm i --no-frozen-lockfile
 COPY . .
 RUN pnpm build
 

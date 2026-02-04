@@ -22,7 +22,7 @@ services:
     build:
       context: ./
       dockerfile: Dockerfile.dev
-      target: development
+      #target: development
     command: pnpm start:dev  
     env_file:
       - ./.env.docker
