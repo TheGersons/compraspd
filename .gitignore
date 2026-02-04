@@ -35,5 +35,8 @@ dist-ssr
 /backend/.pnpm-store
 /frontend/vite.config.ts
 /frontend/vite.config
+/vite.config.ts
+vite.config.ts
+
 .vite
 /vite.config
