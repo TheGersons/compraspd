@@ -1,6 +1,7 @@
 // src/components/common/AccessDeniedDialog.tsx
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useNavigateWithRole } from '../../hooks/useNavigateWithRole';
 
 interface Props {
   isOpen: boolean;
@@ -10,6 +11,7 @@ interface Props {
 
 export default function AccessDeniedDialog({ isOpen, onClose, message }: Props) {
   const navigate = useNavigate();
+  const { navigateSafe, canAccess, getHomeRoute } = useNavigateWithRole();
 
   useEffect(() => {
     if (isOpen) {
@@ -44,7 +46,7 @@ export default function AccessDeniedDialog({ isOpen, onClose, message }: Props) 
           <button
             onClick={() => {
               onClose();
-              navigate('/quotes');
+              navigateSafe('/quotes');
             }}
             className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
           >

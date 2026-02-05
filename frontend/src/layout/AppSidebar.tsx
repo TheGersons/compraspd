@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { ShoppingCart, /*, User*/ 
 User,
 UtilityPole} from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 
 // Assume these icons are imported from an icon library
 import {
@@ -24,7 +25,14 @@ type NavItem = {
   name: string;
   icon: React.ReactNode;
   path?: string;
-  subItems?: { name: string; path: string; pro?: boolean; new?: boolean }[];
+  roles?: string[]; // NUEVO - roles permitidos para este item
+  subItems?: { 
+    name: string; 
+    path: string; 
+    pro?: boolean; 
+    new?: boolean;
+    roles?: string[]; // NUEVO - roles permitidos para este subitem
+  }[];
 };
 
 const navItems: NavItem[] = [
@@ -32,84 +40,50 @@ const navItems: NavItem[] = [
     icon: <PieChartIcon />,
     name: "Inicio",
     path: "/dashboard",
-
+    roles: ["ADMIN", "SUPERVISOR"], // USUARIO no ve esto
   },
   {
-    //icono generico para cotizaciones si 
     icon: <DocsIcon />,
     name: "Cotizaciones",
     subItems: [
-      { name: "Resumen", path: "/quotes", pro: false },
-      { name: "Nueva Cotización", path: "/quotes/new", pro: false },
-      { name: "Mis cotizaciónes", path: "/quotes/my-quotes", pro: false},
-      { name: "Seguimiento", path: "/quotes/follow-ups", pro: false },
-      { name: "Historial", path: "/quotes/history", pro: false },
+      { name: "Resumen", path: "/quotes", pro: false, roles: ["ADMIN", "SUPERVISOR"] },
+      { name: "Nueva Cotización", path: "/quotes/new", pro: false }, // TODOS
+      { name: "Mis cotizaciónes", path: "/quotes/my-quotes", pro: false }, // TODOS
+      { name: "Seguimiento", path: "/quotes/follow-ups", pro: false, roles: ["ADMIN", "SUPERVISOR"] },
+      { name: "Historial", path: "/quotes/history", pro: false }, // TODOS
+      { name: "Asignación", path: "/quotes/assignment", pro: false, roles: ["SUPERVISOR", "ADMIN"] },
     ],
   },
   {
-    //sales / compras
     icon: <ShoppingCart />,
     name: "Compras",
+    roles: ["ADMIN", "SUPERVISOR"], // USUARIO no ve este menú
     subItems: [
       { name: "Resumen", path: "/shopping", pro: false },
       { name: "Seguimiento", path: "/shopping/follow-ups", pro: false },
-      { name: "Asignación", path: "/shopping/assignment", pro: false },
+      { name: "Asignación", path: "/shopping/assignment", pro: false, roles: ["SUPERVISOR", "ADMIN"] },
       { name: "Historial", path: "/shopping/history", pro: false },
     ],
-  },{
-    //icono generico para cotizaciones si 
+  },
+  {
     icon: <UtilityPole />,
     name: "Proyectos",
+    roles: ["ADMIN", "SUPERVISOR"], // USUARIO no ve esto
     subItems: [
       { name: "ver Proyectos", path: "/projects", pro: false },
       { name: "Nuevo Proyecto", path: "/projects/new", pro: false },
     ],
   },
-  /*
-  {
-    icon: <GridIcon />,
-    name: "Dashboard",
-    subItems: [
-      { name: "Cotizaciones", path: "/home", pro: false },
-      { name: "Compras", path: "/compras", pro: true },
-      { name: "import/export", path: "/import-export", pro: true, new: true },
-    ],
-  },
-  {
-    icon: <CalenderIcon />,
-    name: "Calendar",
-    path: "/calendar",
-  },
-  */
   {
     icon: <User />,
     name: "Usuarios",
+    roles: ["ADMIN"], // Solo ADMIN
     subItems: [
       { name: "Gestión de Usuarios", path: "/profiles", pro: false },
       { name: "Configuración", path: "/settings", pro: false },
       { name: "Roles", path: "/roles", pro: false },
     ],
   },
-  /*
-  {
-    name: "Forms",
-    icon: <ListIcon />,
-    subItems: [{ name: "Form Elements", path: "/form-elements", pro: false }],
-  },
-  {
-    name: "Tables",
-    icon: <TableIcon />,
-    subItems: [{ name: "Basic Tables", path: "/basic-tables", pro: false }],
-  },
-  {
-    name: "Pages",
-    icon: <PageIcon />,
-    subItems: [
-      { name: "Blank Page", path: "/blank", pro: false },
-      { name: "404 Error", path: "/error-404", pro: false },
-    ],
-  },
-  */
 ];
 
 const othersItems: NavItem[] = [
@@ -121,7 +95,6 @@ const othersItems: NavItem[] = [
       { name: "Bar Chart", path: "/bar-chart", pro: false },
     ],
   },
-  */
   {
     icon: <BoxCubeIcon />,
     name: "UI Elements",
@@ -134,7 +107,6 @@ const othersItems: NavItem[] = [
       { name: "Videos", path: "/videos", pro: false },
     ],
   },
-  /*
   {
     icon: <PlugInIcon />,
     name: "Authentication",
@@ -149,6 +121,28 @@ const othersItems: NavItem[] = [
 const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const location = useLocation();
+  const { user } = useAuth(); // NUEVO
+
+  // NUEVO - Función para verificar si tiene permiso
+  const hasPermission = (roles?: string[]) => {
+    if (!roles || roles.length === 0) return true; // Sin restricción
+    const userRole = user?.rol?.nombre;
+    return userRole ? roles.includes(userRole) : false;
+  };
+
+  // NUEVO - Filtrar items según permisos
+  const filterItemsByRole = (items: NavItem[]): NavItem[] => {
+    return items
+      .filter(item => hasPermission(item.roles)) // Filtrar items principales
+      .map(item => ({
+        ...item,
+        subItems: item.subItems?.filter(sub => hasPermission(sub.roles)) // Filtrar subitems
+      }))
+      .filter(item => !item.subItems || item.subItems.length > 0); // Quitar menús vacíos
+  };
+
+  const filteredNavItems = filterItemsByRole(navItems); // NUEVO
+  const filteredOthersItems = filterItemsByRole(othersItems); // NUEVO
 
   const [openSubmenu, setOpenSubmenu] = useState<{
     type: "main" | "others";
@@ -390,7 +384,7 @@ const AppSidebar: React.FC = () => {
                   <HorizontaLDots className="size-6" />
                 )}
               </h2>
-              {renderMenuItems(navItems, "main")}
+              {renderMenuItems(filteredNavItems, "main")}
             </div>
             <div className="">
               <h2
@@ -405,7 +399,7 @@ const AppSidebar: React.FC = () => {
                   <HorizontaLDots />
                 )}
               </h2>
-              {renderMenuItems(othersItems, "others")}
+              {renderMenuItems(filteredOthersItems, "others")}
             </div>
           </div>
         </nav>

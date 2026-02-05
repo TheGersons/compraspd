@@ -7,6 +7,7 @@ import Checkbox from "../form/input/Checkbox";
 import Button from "../ui/button/Button";
 import { useAuth } from "../../context/AuthContext";
 import toast from 'react-hot-toast';
+import { useNavigateWithRole } from '../../hooks/useNavigateWithRole';
 
 type LoginResponse = {
   access_token: string;
@@ -28,6 +29,7 @@ export default function SignInForm() {
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
 
   const navigate = useNavigate();
+  const { navigateSafe, canAccess, getHomeRoute } = useNavigateWithRole();
 
   // Validación de email
   const validateEmail = (email: string) => {
@@ -139,7 +141,7 @@ export default function SignInForm() {
 
       // Redirigir después de un breve delay para que se vea el toast
       setTimeout(() => {
-        navigate("/quotes");
+        navigateSafe('/quotes/assignment');
       }, 500);
 
     } catch (err: any) {

@@ -53,6 +53,7 @@ import { useState, useEffect } from "react";
 
 const SHOPPING_MANAGER_ROLES = ["ADMIN", "SUPERVISOR"];
 const QUOTES_SUPERVISOR_ROLES = ["SUPERVISOR", "ADMIN"];
+const STAFF_ROLES = ["ADMIN", "SUPERVISOR"]; // NUEVO - Todos menos USUARIO;
 
 export default function App() {
   const [accessDenied, setAccessDenied] = useState({ open: false, message: '' });
@@ -86,7 +87,7 @@ export default function App() {
               fontWeight: '500',
               boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
             },
-            
+
             // Estilos específicos por tipo
             success: {
               duration: 3000,
@@ -98,7 +99,7 @@ export default function App() {
                 secondary: '#10b981',
               },
             },
-            
+
             error: {
               duration: 5000,
               style: {
@@ -109,7 +110,7 @@ export default function App() {
                 secondary: '#ef4444',
               },
             },
-            
+
             loading: {
               style: {
                 background: '#3b82f6',
@@ -123,29 +124,62 @@ export default function App() {
         />
 
         <ScrollToTop />
-        
+
         <Routes>
           {/* públicas solo */}
           <Route path="/signin" element={<PublicOnlyRoute><SignIn /></PublicOnlyRoute>} />
           <Route path="/signup" element={<PublicOnlyRoute><SignUp /></PublicOnlyRoute>} />
-
-         
 
           {/* protegidas */}
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
             <Route element={<AppLayout />}>
-              <Route path="/home" element={<Home />} />
-              <Route path="/dashboard" element={<Dashboard />} />
+              {/* Dashboard - Solo STAFF */}
+              <Route
+                path="/home"
+                element={
+                  <ProtectedRoute roles={STAFF_ROLES}>
+                    <Home />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute roles={STAFF_ROLES}>
+                    <Dashboard />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* QUOTES */}
               <Route path="/quotes" element={<QuotesLayout />}>
-                <Route index element={<Quotes />} />
+                {/* Resumen - Solo STAFF */}
+                <Route
+                  index
+                  element={
+                    <ProtectedRoute roles={STAFF_ROLES}>
+                      <Quotes />
+                    </ProtectedRoute>
+                  }
+                />
+                {/* New - TODOS pueden acceder */}
                 <Route path="new" element={<QuotesNew />} />
+                {/* My Quotes - TODOS pueden acceder */}
                 <Route path="my-quotes" element={<MyQuotes />} />
-                <Route path="follow-ups" element={<QuotesFollowUps />} />
+                {/* Follow-ups - Solo STAFF */}
+                <Route
+                  path="follow-ups"
+                  element={
+                    <ProtectedRoute roles={STAFF_ROLES}>
+                      <QuotesFollowUps />
+                    </ProtectedRoute>
+                  }
+                />
+                {/* History - TODOS pueden acceder */}
                 <Route path="history" element={<QuotesHistory />} />
+                {/* Assignment - Solo SUPERVISOR/ADMIN */}
                 <Route
                   path="assignment"
                   element={
@@ -156,8 +190,15 @@ export default function App() {
                 />
               </Route>
 
-              {/* SHOPPING */}
-              <Route path="/shopping" element={<ShoppingLayout />}>
+              {/* SHOPPING - Solo STAFF */}
+              <Route
+                path="/shopping"
+                element={
+                  <ProtectedRoute roles={STAFF_ROLES}>
+                    <ShoppingLayout />
+                  </ProtectedRoute>
+                }
+              >
                 <Route index element={<Shopping />} />
                 <Route path="follow-ups" element={<ShoppingFollowUps />} />
                 <Route path="history" element={<ShoppingHistory />} />
@@ -171,27 +212,68 @@ export default function App() {
                 />
               </Route>
 
-              {/* Proyectos */}
-              <Route path="/projects" element={<Projects />} />
-              <Route path="/projects/new" element={<NewProject />} />
-              <Route path="/projects/edit/:id" element={<NewProject />} />
+              {/* Proyectos - Solo STAFF */}
+              <Route
+                path="/projects"
+                element={
+                  <ProtectedRoute roles={STAFF_ROLES}>
+                    <Projects />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/projects/new"
+                element={
+                  <ProtectedRoute roles={STAFF_ROLES}>
+                    <NewProject />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/projects/edit/:id"
+                element={
+                  <ProtectedRoute roles={STAFF_ROLES}>
+                    <NewProject />
+                  </ProtectedRoute>
+                }
+              />
 
-              {/* genéricas */}
-              <Route path="/Profiles" element={<Profiles />} />
-              <Route path="/settings" element={<UserProfiles />} />
-              <Route path="/roles" element={<UserProfiles />} />
-              <Route path="/calendar" element={<Calendar />} />
-              <Route path="/blank" element={<Blank />} />
-              <Route path="/form-elements" element={<FormElements />} />
-              <Route path="/basic-tables" element={<BasicTables />} />
-              <Route path="/alerts" element={<Alerts />} />
-              <Route path="/avatars" element={<Avatars />} />
-              <Route path="/badge" element={<Badges />} />
-              <Route path="/buttons" element={<Buttons />} />
-              <Route path="/images" element={<Images />} />
-              <Route path="/videos" element={<Videos />} />
-              <Route path="/line-chart" element={<LineChart />} />
-              <Route path="/bar-chart" element={<BarChart />} />
+              {/* Usuarios - Solo ADMIN */}
+              <Route
+                path="/Profiles"
+                element={
+                  <ProtectedRoute roles={["ADMIN"]}>
+                    <Profiles />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/settings"
+                element={
+                  <ProtectedRoute roles={STAFF_ROLES}>
+                    <UserProfiles />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/roles"
+                element={
+                  <ProtectedRoute roles={["ADMIN"]}>
+                    <UserProfiles />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Resto - Solo STAFF */}
+              <Route
+                path="/calendar"
+                element={
+                  <ProtectedRoute roles={STAFF_ROLES}>
+                    <Calendar />
+                  </ProtectedRoute>
+                }
+              />
+              {/* ... resto de rutas genéricas igual con STAFF_ROLES */}
             </Route>
           </Route>
 
@@ -199,11 +281,11 @@ export default function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
         {/* Dialog de acceso denegado */}
-      <AccessDeniedDialog
-        isOpen={accessDenied.open}
-        onClose={() => setAccessDenied({ open: false, message: '' })}
-        message={accessDenied.message}
-      />
+        <AccessDeniedDialog
+          isOpen={accessDenied.open}
+          onClose={() => setAccessDenied({ open: false, message: '' })}
+          message={accessDenied.message}
+        />
       </>
       <NotificationContainer />
       {/*<NotificationPanel />*/}

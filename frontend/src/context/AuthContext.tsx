@@ -11,6 +11,7 @@ import {
   setUser as saveUser,
   getUser as getSavedUser
 } from "../lib/api";
+import { useNavigateWithRole } from "../hooks/useNavigateWithRole";
 
 type User = {
   id: string;
@@ -37,6 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const { navigateSafe, canAccess, getHomeRoute } = useNavigateWithRole();
 
   /**
    * Refresca la información del usuario desde el backend
@@ -126,27 +128,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       saveUser(userData);
       setIsLoading(false);
 
-      // ✅ AGREGAR ESTO:
-      const rolNombre = userData.rol.nombre.toUpperCase();
-      if (rolNombre === 'USUARIO') {
-        navigate('/quotes/my-quotes');
-      } else {
-        navigate('/quotes');
-      }
+
+      navigateSafe('/quotes');
 
       setTimeout(() => void refresh(), 100);
     } else {
       setIsLoading(true);
       await refresh();
 
-      // ✅ AGREGAR ESTO TAMBIÉN:
-      const me = await usersApi.me();
-      const rolNombre = me.rol.nombre.toUpperCase();
-      if (rolNombre === 'USUARIO') {
-        navigate('/quotes/my-quotes');
-      } else {
-        navigate('/quotes');
-      }
+      navigateSafe('/quotes');
     }
   };
 
