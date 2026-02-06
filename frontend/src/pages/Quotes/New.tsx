@@ -169,7 +169,7 @@ export default function New() {
   }
   const [solicitanteId, setSolicitanteId] = useState("");
   const [searchSolicitante, setSearchSolicitante] = useState("");
-  const [proyectoId, setProyectoId] = useState("");
+  const [proyectoId, setProyectoId] = useState(null);
   const [items, setItems] = useState<ItemCotizacion[]>([
     { descripcionProducto: "", cantidad: 1, tipoUnidad: "UNIDAD", notas: "" },
   ]);
@@ -301,10 +301,10 @@ export default function New() {
       addNotification("warn", "Validación", error, { priority: "medium" });
       return;
     }
-
+    
     try {
       setLoading(true);
-
+      
       const fechaEstimadaDefault = new Date();
       fechaEstimadaDefault.setDate(fechaEstimadaDefault.getDate() + 30); // +30 días
       // Preparar datos (SKU eliminado del payload)
@@ -317,7 +317,7 @@ export default function New() {
         comentarios: comentarios.trim() || undefined,
         tipoId,
         solicitanteId,
-        proyectoId,
+        proyectoId ,
         items: items.map(item => ({
           // sku eliminado - backend lo asignará automáticamente
           descripcionProducto: item.descripcionProducto.trim(),
@@ -457,7 +457,7 @@ export default function New() {
               </label>
               <select
                 value={proyectoId}
-                onChange={(e) => setProyectoId(e.target.value)}
+                onChange={(e) => setProyectoId(e.target.value.length < 5 ? null : e.target.value)}
                 className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-2.5 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
               >
                 <option value="">Seleccione un proyecto</option>

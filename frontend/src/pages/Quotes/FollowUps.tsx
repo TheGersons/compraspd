@@ -62,6 +62,7 @@ type Producto = {
 type Cotizacion = {
   id: string;
   nombreCotizacion: string;
+  tipoCompra: 'NACIONAL' | 'INTERNACIONAL';
   estado: string;
   fechaSolicitud: string;
   fechaLimite: string;
@@ -162,7 +163,7 @@ const api = {
     });
     if (!response.ok) {
       return 0
-    }else{
+    } else {
       return response.json();
     }
   },
@@ -273,7 +274,7 @@ const api = {
     });
     if (!response.ok) {
       return 0;
-    }else{
+    } else {
       return response.json();
     }
   },
@@ -455,9 +456,9 @@ export default function FollowUps() {
       }
 
       const data = await api.getCotizacionesPendientes(filters);
-      if(data === 0){
+      if (data === 0) {
         navigate('/quotes/new');
-                return;
+        return;
       }
       setCotizaciones(data.items || []);
     } catch (error) {
@@ -537,9 +538,25 @@ export default function FollowUps() {
 
   const guardarConfiguracion = async (config: any) => {
     if (!cotizacionSeleccionada || !productoConfigurando) return;
+     
 
     try {
-      await api.configurarTimeline(cotizacionSeleccionada.id, [
+      if (cotizacionSeleccionada.tipoCompra === 'NACIONAL')
+      {
+        
+        await api.configurarTimeline(cotizacionSeleccionada.id, [
+        {
+          sku: productoConfigurando.sku,
+          paisOrigenId: '53b360e4-f5fe-4f27-beba-90bc79390f07',
+          medioTransporte: config.medioTransporte,
+          timeline: config.timeline,
+          notas: config.notas,
+        },
+      ]);
+
+      } else  {
+
+        await api.configurarTimeline(cotizacionSeleccionada.id, [
         {
           sku: productoConfigurando.sku,
           paisOrigenId: config.paisOrigenId,
@@ -548,6 +565,8 @@ export default function FollowUps() {
           notas: config.notas,
         },
       ]);
+      }
+      
 
       addNotification("success", "Timeline configurado exitosamente", "Timeline configurado exitosamente");
       setShowTimelineModal(false);
@@ -643,10 +662,10 @@ export default function FollowUps() {
   const cargarProveedores = async () => {
     try {
       const data = await api.getProveedores();
-      if (data === 0){
+      if (data === 0) {
         navigate('/quotes/new');
-                toast.error('No cuentas con los permisos necesarios');
-                return;
+        toast.error('No cuentas con los permisos necesarios');
+        return;
       }
       setProveedores(data || []);
     } catch (error) {
@@ -1384,7 +1403,7 @@ export default function FollowUps() {
                       )}
                       {/* TAB 2: CHAT */}
                       {vistaActiva === "chat" && (
-                        <div className="flex h-[600px] flex-col">
+                        <div className="flex h-[350px] flex-col">
                           {/* Mensajes */}
                           <div className="flex-1 overflow-y-auto space-y-4 mb-4">
                             {loadingChat ? (
@@ -1704,6 +1723,7 @@ export default function FollowUps() {
             <TimelineModalContent
               producto={productoConfigurando}
               paises={paises}
+              tipoCompra={cotizacionSeleccionada?.tipoCompra || 'NACIONAL'}  // ← AGREGAR
               onSave={guardarConfiguracion}
               onCancel={() => {
                 setShowTimelineModal(false);
@@ -1724,51 +1744,94 @@ export default function FollowUps() {
 function TimelineModalContent({
   producto,
   paises,
+  tipoCompra,
   onSave,
   onCancel,
 }: {
   producto: Producto;
   paises: Pais[];
+  tipoCompra: 'NACIONAL' | 'INTERNACIONAL';
   onSave: (config: any) => void;
   onCancel: () => void;
 }) {
+  const esNacional = tipoCompra === 'NACIONAL';
+
   const [paisOrigenId, setPaisOrigenId] = useState(
-    producto.estadoProducto?.paisOrigen?.id || paises[0]?.id || ""
+    producto.estadoProducto?.paisOrigen?.id || (esNacional ? '' : paises[0]?.id) || ""
   );
   const [medioTransporte, setMedioTransporte] = useState<MedioTransporte>(
-    producto.estadoProducto?.medioTransporte || "MARITIMO"
+    producto.estadoProducto?.medioTransporte || "TERRESTRE"
   );
+
+  // Timeline config - valores por defecto según tipo
   const [timeline, setTimeline] = useState<TimelineConfig>({
     diasCotizadoADescuento: producto.timelineSugerido?.diasCotizadoADescuento || 2,
     diasDescuentoAComprado: producto.timelineSugerido?.diasDescuentoAComprado || 3,
     diasCompradoAPagado: producto.timelineSugerido?.diasCompradoAPagado || 5,
-    diasPagadoASeguimiento1: producto.timelineSugerido?.diasPagadoASeguimiento1,
-    diasSeguimiento1AFob: producto.timelineSugerido?.diasSeguimiento1AFob,
-    diasFobABl: producto.timelineSugerido?.diasFobABl,
-    diasBlASeguimiento2: producto.timelineSugerido?.diasBlASeguimiento2,
-    diasSeguimiento2ACif: producto.timelineSugerido?.diasSeguimiento2ACif,
-    diasCifARecibido: producto.timelineSugerido?.diasCifARecibido || 5,
+    // Solo para internacional
+    diasPagadoASeguimiento1: esNacional ? undefined : producto.timelineSugerido?.diasPagadoASeguimiento1,
+    diasSeguimiento1AFob: esNacional ? undefined : producto.timelineSugerido?.diasSeguimiento1AFob,
+    diasFobABl: esNacional ? undefined : producto.timelineSugerido?.diasFobABl,
+    diasBlASeguimiento2: esNacional ? undefined : producto.timelineSugerido?.diasBlASeguimiento2,
+    diasSeguimiento2ACif: esNacional ? undefined : producto.timelineSugerido?.diasSeguimiento2ACif,
+    diasCifARecibido: esNacional
+      ? (producto.timelineSugerido?.diasCifARecibido || 3) // Para nacional: Pagado → Recibido
+      : (producto.timelineSugerido?.diasCifARecibido || 5),
   });
   const [notas, setNotas] = useState(producto.timelineSugerido?.notas || "");
 
   const diasTotales = Object.values(timeline).reduce((sum, dias) => sum + (dias || 0), 0);
 
+  // Procesos según tipo de compra
+  const procesosNacional = [
+    { key: "diasCotizadoADescuento", label: "Cotizado → Con Descuento" },
+    { key: "diasDescuentoAComprado", label: "Con Descuento → Comprado" },
+    { key: "diasCompradoAPagado", label: "Comprado → Pagado" },
+    { key: "diasCifARecibido", label: "Pagado → Recibido" },
+  ];
+
+  const procesosInternacional = [
+    { key: "diasCotizadoADescuento", label: "Cotizado → Con Descuento" },
+    { key: "diasDescuentoAComprado", label: "Con Descuento → Comprado" },
+    { key: "diasCompradoAPagado", label: "Comprado → Pagado" },
+    { key: "diasPagadoASeguimiento1", label: "Pagado → 1er Seguimiento" },
+    { key: "diasSeguimiento1AFob", label: "1er Seg. → En FOB" },
+    { key: "diasFobABl", label: "FOB → Con BL" },
+    { key: "diasBlASeguimiento2", label: "BL → 2do Seguimiento" },
+    { key: "diasSeguimiento2ACif", label: "2do Seg. → En CIF" },
+    { key: "diasCifARecibido", label: "CIF → Recibido" },
+  ];
+
+  const procesos = esNacional ? procesosNacional : procesosInternacional;
+
   const handleSave = () => {
-    if (!paisOrigenId) {
+    // Para internacional, validar país de origen
+    if (!esNacional && !paisOrigenId) {
       alert("Selecciona un país de origen");
       return;
     }
 
     onSave({
-      paisOrigenId,
+      paisOrigenId: esNacional ? null : paisOrigenId,
       medioTransporte,
       timeline,
       notas,
+      esNacional,
     });
   };
 
   return (
     <div className="p-6">
+      {/* Badge de tipo de compra */}
+      <div className="mb-4">
+        <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium ${esNacional
+            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+            : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
+          }`}>
+          {esNacional ? '🏠 Compra Nacional' : '🌍 Compra Internacional'}
+        </span>
+      </div>
+
       {/* Timeline sugerido */}
       {producto.timelineSugerido && (
         <div className="mb-6 rounded-lg bg-blue-50 p-4 dark:bg-blue-900/20">
@@ -1789,24 +1852,27 @@ function TimelineModalContent({
       )}
 
       <div className="space-y-6">
-        {/* País y Transporte */}
-        <div className="grid gap-4 md:grid-cols-2">
-          <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              País de Origen <span className="text-rose-500">*</span>
-            </label>
-            <select
-              value={paisOrigenId}
-              onChange={(e) => setPaisOrigenId(e.target.value)}
-              className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-            >
-              {paises.map((pais) => (
-                <option key={pais.id} value={pais.id}>
-                  {pais.codigo} - {pais.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
+        {/* País y Transporte - Solo mostrar país para INTERNACIONAL */}
+        <div className={`grid gap-4 ${esNacional ? 'md:grid-cols-1' : 'md:grid-cols-2'}`}>
+          {!esNacional && (
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                País de Origen <span className="text-rose-500">*</span>
+              </label>
+              <select
+                value={paisOrigenId}
+                onChange={(e) => setPaisOrigenId(e.target.value)}
+                className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              >
+                <option value="">Seleccionar país...</option>
+                {paises.map((pais) => (
+                  <option key={pais.id} value={pais.id}>
+                    {pais.codigo} - {pais.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div>
             <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -1817,9 +1883,15 @@ function TimelineModalContent({
               onChange={(e) => setMedioTransporte(e.target.value as MedioTransporte)}
               className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
             >
-              <option value="MARITIMO">🚢 Marítimo</option>
-              <option value="TERRESTRE">🚚 Terrestre</option>
-              <option value="AEREO">✈️ Aéreo</option>
+              {esNacional ? (
+                <option value="TERRESTRE">🚚 Terrestre</option>
+              ) : (
+                <>
+                  <option value="MARITIMO">🚢 Marítimo</option>
+                  <option value="TERRESTRE">🚚 Terrestre</option>
+                  <option value="AEREO">✈️ Aéreo</option>
+                </>
+              )}
             </select>
           </div>
         </div>
@@ -1827,20 +1899,10 @@ function TimelineModalContent({
         {/* Timeline de días */}
         <div>
           <h4 className="mb-3 font-semibold text-gray-900 dark:text-white">
-            Días por Proceso
+            Días por Proceso {esNacional && <span className="text-sm font-normal text-gray-500">(Simplificado)</span>}
           </h4>
-          <div className="grid gap-3 md:grid-cols-2">
-            {[
-              { key: "diasCotizadoADescuento", label: "Cotizado → Con Descuento" },
-              { key: "diasDescuentoAComprado", label: "Con Descuento → Comprado" },
-              { key: "diasCompradoAPagado", label: "Comprado → Pagado" },
-              { key: "diasPagadoASeguimiento1", label: "Pagado → 1er Seguimiento" },
-              { key: "diasSeguimiento1AFob", label: "1er Seg. → En FOB" },
-              { key: "diasFobABl", label: "FOB → Con BL" },
-              { key: "diasBlASeguimiento2", label: "BL → 2do Seguimiento" },
-              { key: "diasSeguimiento2ACif", label: "2do Seg. → En CIF" },
-              { key: "diasCifARecibido", label: "CIF → Recibido" },
-            ].map((proceso) => (
+          <div className={`grid gap-3 ${esNacional ? 'md:grid-cols-2' : 'md:grid-cols-3'}`}>
+            {procesos.map((proceso) => (
               <div key={proceso.key}>
                 <label className="mb-1 block text-xs text-gray-600 dark:text-gray-400">
                   {proceso.label}
@@ -1855,7 +1917,7 @@ function TimelineModalContent({
                       [proceso.key]: e.target.value ? parseInt(e.target.value) : undefined,
                     })
                   }
-                  placeholder="N/A"
+                  placeholder="Días"
                   className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                 />
               </div>
@@ -1864,12 +1926,16 @@ function TimelineModalContent({
         </div>
 
         {/* Total de días */}
-        <div className="rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 p-4 dark:from-blue-900/20 dark:to-indigo-900/20">
+        <div className={`rounded-lg p-4 ${esNacional
+            ? 'bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20'
+            : 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20'
+          }`}>
           <div className="flex items-center justify-between">
             <span className="font-medium text-gray-900 dark:text-white">
               Total de días estimados:
             </span>
-            <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+            <span className={`text-2xl font-bold ${esNacional ? 'text-green-600 dark:text-green-400' : 'text-blue-600 dark:text-blue-400'
+              }`}>
               {diasTotales} días
             </span>
           </div>
@@ -1899,7 +1965,10 @@ function TimelineModalContent({
           </button>
           <button
             onClick={handleSave}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+            className={`rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors ${esNacional
+                ? 'bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600'
+                : 'bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600'
+              }`}
           >
             Guardar Configuración
           </button>

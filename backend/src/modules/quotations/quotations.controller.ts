@@ -86,11 +86,11 @@ export class QuotationsController {
     });
   }
 
-   /**
- * GET /api/v1/quotations/my-quotations
- * Obtener mis cotizaciones con estadísticas de aprobación
- * Para vista del solicitante (MyQuotes)
- */
+  /**
+* GET /api/v1/quotations/my-quotations
+* Obtener mis cotizaciones con estadísticas de aprobación
+* Para vista del solicitante (MyQuotes)
+*/
   @Get('my-quotations')
   getMyCotizaciones(@CurrentUser() user: UserJwt) {
     return this.service.getMyCotizaciones(user);
@@ -136,5 +136,17 @@ export class QuotationsController {
     return this.service.changeStatus(id, dto.estado, user);
   }
 
- 
+  /**
+ * POST /api/v1/quotations/:id/ensure-chat
+ * Crea un chat para la cotización si no existe
+ * Retorna el chat existente si ya tiene uno
+ */
+  @Post(':id/ensure-chat')
+  ensureChat(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: UserJwt
+  ) {
+    return this.service.ensureChat(id, user);
+  }
+
 }

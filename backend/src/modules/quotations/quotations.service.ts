@@ -1,8 +1,8 @@
-import { 
-  BadRequestException, 
-  ForbiddenException, 
-  Injectable, 
-  NotFoundException 
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateQuotationDto } from './dto/create-quotation.dto';
@@ -28,7 +28,7 @@ const ALLOWED_TRANSITIONS: Record<QuotationStatus, QuotationStatus[]> = {
  */
 @Injectable()
 export class QuotationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   /**
    * Crea una cotización nueva con sus items
@@ -37,6 +37,10 @@ export class QuotationsService {
    * - tipoId debe existir en la tabla Tipo
    * - proyectoId debe existir (si se proporciona)
    */
+  /**
+  * Crea una cotización nueva con sus items
+  * Ahora también crea el chat automáticamente
+  */
   async create(dto: CreateQuotationDto, user: UserJwt) {
     const { items, ...quotationData } = dto;
 
@@ -64,48 +68,65 @@ export class QuotationsService {
       }
     }
 
-    // Crear cotización con items
-    return this.prisma.cotizacion.create({
-      data: {
-        nombreCotizacion: quotationData.nombreCotizacion,
-        tipoCompra: quotationData.tipoCompra,
-        lugarEntrega: quotationData.lugarEntrega,
-        fechaLimite: new Date(quotationData.fechaLimite),
-        fechaEstimada: new Date(quotationData.fechaEstimada),
-        comentarios: quotationData.comentarios,
-        estado: 'ENVIADA', // Estado inicial
-        solicitanteId: quotationData.solicitanteId,
-        tipoId: dto.tipoId,
-        proyectoId: dto.proyectoId || null,
-        
-        // Crear detalles en la misma transacción
-        detalles: {
-          create: items.map(item => ({
-            // sku eliminado - el trigger SQL lo asignará automáticamente
-            descripcionProducto: item.descripcionProducto,
-            cantidad: item.cantidad,
-            tipoUnidad: item.tipoUnidad,
-            notas: item.notas || null,
-          }))
-        }
-      },
-      include: {
-        detalles: true,
-        solicitante: {
-          select: {
-            id: true,
-            nombre: true,
-            email: true,
-            departamento: {
-              select: { nombre: true }
+    // Crear cotización con chat en una transacción
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Crear el chat primero
+      const chat = await tx.chat.create({
+        data: {
+          participantes: {
+            create: {
+              userId: quotationData.solicitanteId,
+              ultimoLeido: new Date(),
             }
           }
+        }
+      });
+
+      // 2. Crear cotización con el chatId
+      const cotizacion = await tx.cotizacion.create({
+        data: {
+          nombreCotizacion: quotationData.nombreCotizacion,
+          tipoCompra: quotationData.tipoCompra,
+          lugarEntrega: quotationData.lugarEntrega,
+          fechaLimite: new Date(quotationData.fechaLimite),
+          fechaEstimada: new Date(quotationData.fechaEstimada),
+          comentarios: quotationData.comentarios,
+          estado: 'ENVIADA',
+          solicitanteId: quotationData.solicitanteId,
+          tipoId: dto.tipoId,
+          proyectoId: dto.proyectoId || null,
+          chatId: chat.id, // ← Asociar el chat
+
+          detalles: {
+            create: items.map(item => ({
+              descripcionProducto: item.descripcionProducto,
+              cantidad: item.cantidad,
+              tipoUnidad: item.tipoUnidad,
+              notas: item.notas || null,
+            }))
+          }
         },
-        tipo: {
-          include: { area: true }
-        },
-        proyecto: true,
-      }
+        include: {
+          detalles: true,
+          solicitante: {
+            select: {
+              id: true,
+              nombre: true,
+              email: true,
+              departamento: {
+                select: { nombre: true }
+              }
+            }
+          },
+          tipo: {
+            include: { area: true }
+          },
+          proyecto: true,
+          chat: true, // ← Incluir chat en respuesta
+        }
+      });
+
+      return cotizacion;
     });
   }
 
@@ -118,8 +139,8 @@ export class QuotationsService {
     const take = Math.min(100, Math.max(1, pageSize));
 
     const [total, items] = await this.prisma.$transaction([
-      this.prisma.cotizacion.count({ 
-        where: { solicitanteId: user.sub } 
+      this.prisma.cotizacion.count({
+        where: { solicitanteId: user.sub }
       }),
       this.prisma.cotizacion.findMany({
         where: { solicitanteId: user.sub },
@@ -137,11 +158,11 @@ export class QuotationsService {
       }),
     ]);
 
-    return { 
-      page, 
-      pageSize, 
-      total, 
-      items 
+    return {
+      page,
+      pageSize,
+      total,
+      items
     };
   }
 
@@ -149,43 +170,77 @@ export class QuotationsService {
    * Obtiene una cotización por ID
    * Valida permisos: solo el solicitante o supervisores pueden verla
    */
-  async getById(id: string, user: UserJwt) {
-    const cotizacion = await this.prisma.cotizacion.findUnique({
-      where: { id },
-      include: {
-        detalles: {
-          include: {
-            precios: {
-              include: {
-                proveedor: true
-              }
+  /**
+ * Obtiene una cotización por ID
+ * Si es supervisor/admin y no está en el chat, lo agrega automáticamente
+ */
+async getById(id: string, user: UserJwt) {
+  const cotizacion = await this.prisma.cotizacion.findUnique({
+    where: { id },
+    include: {
+      detalles: {
+        include: {
+          precios: {
+            include: {
+              proveedor: true
             }
           }
-        },
-        solicitante: {
-          select: {
-            id: true,
-            nombre: true,
-            email: true,
-            departamento: { select: { nombre: true } }
+        }
+      },
+      solicitante: {
+        select: {
+          id: true,
+          nombre: true,
+          email: true,
+          departamento: { select: { nombre: true } }
+        }
+      },
+      tipo: { include: { area: true } },
+      proyecto: true,
+      chat: {
+        include: {
+          participantes: {
+            select: { userId: true }
           }
-        },
-        tipo: { include: { area: true } },
-        proyecto: true,
+        }
       }
-    });
-
-    if (!cotizacion) {
-      throw new NotFoundException('Cotización no encontrada');
     }
+  });
 
-    // Validar permisos
-    if (cotizacion.solicitanteId !== user.sub && !this.isSupervisorOrAdmin(user)) {
-      throw new ForbiddenException('No tienes permiso para ver esta cotización');
-    }
-
-    return cotizacion;
+  if (!cotizacion) {
+    throw new NotFoundException('Cotización no encontrada');
   }
+
+  // Validar permisos
+  const isOwner = cotizacion.solicitanteId === user.sub;
+  const isSupervisor = this.isSupervisorOrAdmin(user);
+
+  if (!isOwner && !isSupervisor) {
+    throw new ForbiddenException('No tienes permiso para ver esta cotización');
+  }
+
+  // Si es supervisor y hay chat, verificar si está como participante
+  if (isSupervisor && cotizacion.chatId) {
+    const yaEsParticipante = cotizacion.chat?.participantes.some(
+      p => p.userId === user.sub
+    );
+
+    if (!yaEsParticipante) {
+      // Agregar supervisor al chat
+      await this.prisma.participantesChat.create({
+        data: {
+          chatId: cotizacion.chatId,
+          userId: user.sub,
+          ultimoLeido: new Date(),
+        }
+      }).catch(() => {
+        // Ignorar si ya existe (por race condition)
+      });
+    }
+  }
+
+  return cotizacion;
+}
 
   /**
    * Actualiza una cotización existente
@@ -194,8 +249,8 @@ export class QuotationsService {
    * - Es supervisor/admin Y estado = ENVIADA o EN_REVISION
    */
   async update(id: string, dto: UpdateQuotationDto, user: UserJwt) {
-    const current = await this.prisma.cotizacion.findUnique({ 
-      where: { id } 
+    const current = await this.prisma.cotizacion.findUnique({
+      where: { id }
     });
 
     if (!current) {
@@ -206,7 +261,7 @@ export class QuotationsService {
     const isOwner = current.solicitanteId === user.sub;
     const isSupervisor = this.isSupervisorOrAdmin(user);
 
-    const canEdit = 
+    const canEdit =
       (isOwner && current.estado === 'ENVIADA') ||
       (isSupervisor && ['ENVIADA', 'EN_REVISION'].includes(current.estado));
 
@@ -218,8 +273,8 @@ export class QuotationsService {
 
     // Validar tipoId si se proporciona
     if (dto.tipoId && dto.tipoId !== current.tipoId) {
-      const tipo = await this.prisma.tipo.findUnique({ 
-        where: { id: dto.tipoId } 
+      const tipo = await this.prisma.tipo.findUnique({
+        where: { id: dto.tipoId }
       });
       if (!tipo) {
         throw new NotFoundException('Tipo no encontrado');
@@ -228,8 +283,8 @@ export class QuotationsService {
 
     // Validar proyectoId si se proporciona
     if (dto.proyectoId && dto.proyectoId !== current.proyectoId) {
-      const proyecto = await this.prisma.proyecto.findUnique({ 
-        where: { id: dto.proyectoId } 
+      const proyecto = await this.prisma.proyecto.findUnique({
+        where: { id: dto.proyectoId }
       });
       if (!proyecto || !proyecto.estado) {
         throw new NotFoundException('Proyecto no encontrado o inactivo');
@@ -262,8 +317,8 @@ export class QuotationsService {
    * Valida transiciones permitidas y permisos
    */
   async changeStatus(id: string, nuevoEstado: QuotationStatus, user: UserJwt) {
-    const current = await this.prisma.cotizacion.findUnique({ 
-      where: { id } 
+    const current = await this.prisma.cotizacion.findUnique({
+      where: { id }
     });
 
     if (!current) {
@@ -372,123 +427,197 @@ export class QuotationsService {
   }
 
   // ============================================================================
-// AGREGAR ESTE MÉTODO EN quotations.service.ts
-// ============================================================================
+  // AGREGAR ESTE MÉTODO EN quotations.service.ts
+  // ============================================================================
 
-/**
- * Obtiene todas las cotizaciones del usuario actual (como solicitante)
- * Con estadísticas de aprobación y progreso
- * Para vista MyQuotes del frontend
+  /**
+   * Obtiene todas las cotizaciones del usuario actual (como solicitante)
+   * Con estadísticas de aprobación y progreso
+   * Para vista MyQuotes del frontend
+   */
+  async getMyCotizaciones(user: UserJwt) {
+    const cotizaciones = await this.prisma.cotizacion.findMany({
+      where: {
+        solicitanteId: user.sub
+      },
+      include: {
+        solicitante: {
+          select: {
+            id: true,
+            nombre: true,
+            email: true,
+            departamento: {
+              select: { nombre: true }
+            }
+          }
+        },
+        supervisorResponsable: {
+          select: {
+            id: true,
+            nombre: true,
+            email: true
+          }
+        },
+        proyecto: {
+          select: {
+            id: true,
+            nombre: true,
+            criticidad: true
+          }
+        },
+        tipo: {
+          select: {
+            id: true,
+            nombre: true,
+            area: {
+              select: {
+                id: true,
+                nombreArea: true
+              }
+            }
+          }
+        },
+        detalles: {
+          select: {
+            id: true,
+            sku: true,
+            descripcionProducto: true,
+            cantidad: true,
+            tipoUnidad: true
+          }
+        },
+        estadosProductos: {
+          select: {
+            id: true,
+            sku: true,
+            aprobadoPorSupervisor: true,
+            criticidad: true,
+            nivelCriticidad: true,
+            diasRetrasoActual: true,
+            paisOrigen: {
+              select: { nombre: true }
+            },
+            medioTransporte: true
+          }
+        }
+      },
+      orderBy: { fechaSolicitud: 'desc' }
+    });
+
+    // Calcular estadísticas de aprobación por cotización
+    return cotizaciones.map(cot => {
+      const totalProductos = cot.detalles.length;
+      const productosAprobados = cot.estadosProductos.filter(
+        ep => ep.aprobadoPorSupervisor
+      ).length;
+      const productosPendientes = totalProductos - productosAprobados;
+      const porcentajeAprobado = totalProductos > 0
+        ? Math.round((productosAprobados / totalProductos) * 100)
+        : 0;
+
+      return {
+        id: cot.id,
+        nombreCotizacion: cot.nombreCotizacion,
+        estado: cot.estado,
+        fechaSolicitud: cot.fechaSolicitud,
+        fechaLimite: cot.fechaLimite,
+        fechaEstimada: cot.fechaEstimada,
+        aprobadaParcialmente: cot.aprobadaParcialmente,
+        todosProductosAprobados: cot.todosProductosAprobados,
+        comentarios: cot.comentarios,
+        tipoCompra: cot.tipoCompra,
+        lugarEntrega: cot.lugarEntrega,
+        chatId: cot.chatId,
+
+        // Relaciones
+        solicitante: cot.solicitante,
+        supervisorResponsable: cot.supervisorResponsable,
+        proyecto: cot.proyecto,
+        tipo: cot.tipo,
+
+        // Estadísticas calculadas
+        totalProductos,
+        productosAprobados,
+        productosPendientes,
+        porcentajeAprobado,
+
+        // NO incluir detalles completos aquí para reducir payload
+        // El frontend pedirá los detalles con getById si es necesario
+      };
+    });
+  }
+  /**
+ * Crea un chat para una cotización existente que no tiene uno
+ * Evita duplicados verificando si ya existe
  */
-async getMyCotizaciones(user: UserJwt) {
-  const cotizaciones = await this.prisma.cotizacion.findMany({
-    where: { 
-      solicitanteId: user.sub 
-    },
-    include: {
-      solicitante: {
-        select: { 
-          id: true, 
-          nombre: true, 
-          email: true,
-          departamento: {
-            select: { nombre: true }
-          }
-        }
-      },
-      supervisorResponsable: {
-        select: { 
-          id: true, 
-          nombre: true, 
-          email: true 
-        }
-      },
-      proyecto: {
-        select: { 
-          id: true, 
-          nombre: true,
-          criticidad: true
-        }
-      },
-      tipo: {
-        select: {
-          id: true,
-          nombre: true,
-          area: { 
-            select: { 
-              id: true,
-              nombreArea: true 
-            } 
-          }
-        }
-      },
-      detalles: {
-        select: { 
-          id: true,
-          sku: true,
-          descripcionProducto: true,
-          cantidad: true,
-          tipoUnidad: true
-        }
-      },
-      estadosProductos: {
-        select: { 
-          id: true,
-          sku: true,
-          aprobadoPorSupervisor: true,
-          criticidad: true,
-          nivelCriticidad: true,
-          diasRetrasoActual: true,
-          paisOrigen: {
-            select: { nombre: true }
-          },
-          medioTransporte: true
-        }
+  async ensureChat(cotizacionId: string, user: UserJwt) {
+    const cotizacion = await this.prisma.cotizacion.findUnique({
+      where: { id: cotizacionId },
+      select: {
+        id: true,
+        chatId: true,
+        solicitanteId: true,
+        supervisorResponsableId: true,
       }
-    },
-    orderBy: { fechaSolicitud: 'desc' }
-  });
+    });
 
-  // Calcular estadísticas de aprobación por cotización
-  return cotizaciones.map(cot => {
-    const totalProductos = cot.detalles.length;
-    const productosAprobados = cot.estadosProductos.filter(
-      ep => ep.aprobadoPorSupervisor
-    ).length;
-    const productosPendientes = totalProductos - productosAprobados;
-    const porcentajeAprobado = totalProductos > 0 
-      ? Math.round((productosAprobados / totalProductos) * 100) 
-      : 0;
+    if (!cotizacion) {
+      throw new NotFoundException('Cotización no encontrada');
+    }
 
-    return {
-      id: cot.id,
-      nombreCotizacion: cot.nombreCotizacion,
-      estado: cot.estado,
-      fechaSolicitud: cot.fechaSolicitud,
-      fechaLimite: cot.fechaLimite,
-      fechaEstimada: cot.fechaEstimada,
-      aprobadaParcialmente: cot.aprobadaParcialmente,
-      todosProductosAprobados: cot.todosProductosAprobados,
-      comentarios: cot.comentarios,
-      tipoCompra: cot.tipoCompra,
-      lugarEntrega: cot.lugarEntrega,
-      chatId: cot.chatId,
-      
-      // Relaciones
-      solicitante: cot.solicitante,
-      supervisorResponsable: cot.supervisorResponsable,
-      proyecto: cot.proyecto,
-      tipo: cot.tipo,
-      
-      // Estadísticas calculadas
-      totalProductos,
-      productosAprobados,
-      productosPendientes,
-      porcentajeAprobado,
-      
-      // NO incluir detalles completos aquí para reducir payload
-      // El frontend pedirá los detalles con getById si es necesario
-    };
-  });
-}
+    // Si ya tiene chat, retornarlo
+    if (cotizacion.chatId) {
+      return this.prisma.chat.findUnique({
+        where: { id: cotizacion.chatId },
+        include: {
+          participantes: {
+            include: {
+              usuario: {
+                select: { id: true, nombre: true, email: true }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // Crear chat con participantes (solicitante + supervisor si existe)
+    const participantes = [cotizacion.solicitanteId];
+    if (cotizacion.supervisorResponsableId) {
+      participantes.push(cotizacion.supervisorResponsableId);
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // Crear chat
+      const chat = await tx.chat.create({
+        data: {
+          participantes: {
+            create: participantes.map(userId => ({
+              userId,
+              ultimoLeido: new Date(),
+            }))
+          }
+        }
+      });
+
+      // Asociar a cotización
+      await tx.cotizacion.update({
+        where: { id: cotizacionId },
+        data: { chatId: chat.id }
+      });
+
+      return tx.chat.findUnique({
+        where: { id: chat.id },
+        include: {
+          participantes: {
+            include: {
+              usuario: {
+                select: { id: true, nombre: true, email: true }
+              }
+            }
+          }
+        }
+      });
+    });
+  }
 }
