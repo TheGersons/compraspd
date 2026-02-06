@@ -23,16 +23,16 @@ export class CreateQuotationItemDto {
 
   @IsNotEmpty()
   @IsString()
-  descripcionProducto: string | undefined; // description → descripcionProducto
+  descripcionProducto: string ; // description → descripcionProducto
 
   @IsNotEmpty()
   @IsInt()
   @Min(1)
-  cantidad: number | undefined; // quantity → cantidad
+  cantidad: number ; // quantity → cantidad
 
   @IsNotEmpty()
   @IsString()
-  tipoUnidad: string | undefined; // unit → tipoUnidad (ej: "UNIDAD", "CAJA", "METRO")
+  tipoUnidad: string; // unit → tipoUnidad (ej: "UNIDAD", "CAJA", "METRO")
 
   @IsOptional()
   @IsString()
@@ -46,11 +46,11 @@ export class CreateQuotationItemDto {
 export class CreateQuotationDto {
   @IsNotEmpty()
   @IsString()
-  nombreCotizacion: string | undefined; // title → nombreCotizacion
+  nombreCotizacion: string ; // title → nombreCotizacion
 
   @IsNotEmpty()
   @IsUUID()
-  tipoId: string | undefined; // requestCategory → tipoId (UUID de tabla Tipo)
+  tipoId: string ; // requestCategory → tipoId (UUID de tabla Tipo)
 
   @IsOptional()
   @IsUUID()
@@ -58,19 +58,19 @@ export class CreateQuotationDto {
 
   @IsNotEmpty()
   @IsIn(['NACIONAL', 'INTERNACIONAL'])
-  tipoCompra: 'NACIONAL' | 'INTERNACIONAL' | undefined; // procurement → tipoCompra
+  tipoCompra: 'NACIONAL' | 'INTERNACIONAL' ; // procurement → tipoCompra
 
   @IsNotEmpty()
   @IsIn(['ALMACEN', 'PROYECTO', 'OFICINA'])
-  lugarEntrega: 'ALMACEN' | 'PROYECTO' | 'OFICINA' | undefined; // deliveryType → lugarEntrega
+  lugarEntrega: 'ALMACEN' | 'PROYECTO' | 'OFICINA' ; // deliveryType → lugarEntrega
 
   @IsNotEmpty()
   @IsDateString()
-  fechaLimite: string | undefined; // quoteDeadline → fechaLimite
+  fechaLimite: string ; // quoteDeadline → fechaLimite
 
   @IsNotEmpty()
   @IsDateString()
-  fechaEstimada: string | undefined; // dueDate → fechaEstimada (NUEVO OBLIGATORIO)
+  fechaEstimada: string ; // dueDate → fechaEstimada (NUEVO OBLIGATORIO)
 
   @IsOptional()
   @IsString()
@@ -79,5 +79,5 @@ export class CreateQuotationDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateQuotationItemDto)
-  items: CreateQuotationItemDto[] | undefined; // Detalles de la cotización
+  items: CreateQuotationItemDto[] ; // Detalles de la cotización
 }
