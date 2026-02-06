@@ -20,7 +20,7 @@ import { RequestedItemsTable } from './components/RequestedItemsTable';
 
 type requestCategory = "licitaciones" | "proyectos" | "suministros" | "inventarios";
 type Scope = "nacional" | "internacional" | "NACIONAL" | "INTERNACIONAL";
-type DeliveryPlace = "almacen" | "proyecto";
+type DeliveryPlace = "almacen" | "proyecto" | "oficina";
 type Urgency = "critical" | "high" | "medium" | "low" | "normal";
 type AlertVariant = "success" | "error" | "warning" | "info";
 
@@ -272,7 +272,7 @@ const useFilteredRequests = (
           r.reference.toLowerCase().includes(qLower) ||
           r.finalClient.toLowerCase().includes(qLower) ||
           r.description.toLowerCase().includes(qLower) ||
-          r.items?.some(i =>  i.description.toLowerCase().includes(qLower))
+          r.items?.some(i => i.description.toLowerCase().includes(qLower))
       );
     }
 
@@ -550,7 +550,11 @@ const RequestDetail = ({
             <DetailField
               label="Entrega"
               value={
-                request.deliveryPlace === "almacen" ? "Almacén" : "Proyecto"
+                request.deliveryPlace === "almacen"
+                  ? "Almacén"
+                  : request.deliveryPlace === "proyecto"
+                    ? "Proyecto"
+                    : "Oficina"
               }
             />
             <DetailField
@@ -689,7 +693,20 @@ const SupervisorAssignModal = ({
 
 export default function QuotesAssignment() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+      </div>
+    );
+  }
+
+  // 2. SIN USUARIO (ProtectedRoute redirigirá)
+  if (!user) {
+    return null;
+  }
 
   const [filters, setFilters] = useState<QuoteFilters>({
     preset: "30d",
@@ -896,7 +913,11 @@ async function ObtenerCotizaciones(): Promise<AssignmentRequest[]> {
       p === 'INTERNATIONAL' ? 'internacional' : 'nacional';
 
     const toDeliveryPlace = (d: string): DeliveryPlace =>
-      d === 'PROJECT' ? 'proyecto' : 'almacen';
+  d === 'PROJECT' 
+    ? 'proyecto' 
+    : d === 'WAREHOUSE' 
+    ? 'almacen' // Asumo que 'almacen' es el valor que espera tu tipo DeliveryPlace
+    : 'oficina';
 
     return raw.map((r) => {
       const first = r.assignments?.[0] ?? null;

@@ -23,16 +23,16 @@ export class CreateQuotationItemDto {
 
   @IsNotEmpty()
   @IsString()
-  descripcionProducto: string; // description → descripcionProducto
+  descripcionProducto: string | undefined; // description → descripcionProducto
 
   @IsNotEmpty()
   @IsInt()
   @Min(1)
-  cantidad: number; // quantity → cantidad
+  cantidad: number | undefined; // quantity → cantidad
 
   @IsNotEmpty()
   @IsString()
-  tipoUnidad: string; // unit → tipoUnidad (ej: "UNIDAD", "CAJA", "METRO")
+  tipoUnidad: string | undefined; // unit → tipoUnidad (ej: "UNIDAD", "CAJA", "METRO")
 
   @IsOptional()
   @IsString()
@@ -46,15 +46,15 @@ export class CreateQuotationItemDto {
 export class CreateQuotationDto {
   @IsNotEmpty()
   @IsString()
-  nombreCotizacion: string; // title → nombreCotizacion
+  nombreCotizacion: string | undefined; // title → nombreCotizacion
 
   @IsNotEmpty()
   @IsUUID()
-  tipoId: string; // requestCategory → tipoId (UUID de tabla Tipo)
+  tipoId: string | undefined; // requestCategory → tipoId (UUID de tabla Tipo)
 
   @IsNotEmpty()
   @IsUUID()
-  solicitanteId: string; // requesterId → solicitanteId (UUID de usuario)
+  solicitanteId: string | undefined; // requesterId → solicitanteId (UUID de usuario)
 
   @IsOptional()
   @IsUUID()
@@ -62,19 +62,19 @@ export class CreateQuotationDto {
 
   @IsNotEmpty()
   @IsIn(['NACIONAL', 'INTERNACIONAL'])
-  tipoCompra: 'NACIONAL' | 'INTERNACIONAL'; // procurement → tipoCompra
+  tipoCompra: 'NACIONAL' | 'INTERNACIONAL' | undefined; // procurement → tipoCompra
 
   @IsNotEmpty()
-  @IsIn(['ALMACEN', 'PROYECTO'])
-  lugarEntrega: 'ALMACEN' | 'PROYECTO'; // deliveryType → lugarEntrega
-
-  @IsNotEmpty()
-  @IsDateString()
-  fechaLimite: string; // quoteDeadline → fechaLimite
+  @IsIn(['ALMACEN', 'PROYECTO', 'OFICINA'])
+  lugarEntrega: 'ALMACEN' | 'PROYECTO' | 'OFICINA' | undefined; // deliveryType → lugarEntrega
 
   @IsNotEmpty()
   @IsDateString()
-  fechaEstimada: string; // dueDate → fechaEstimada (NUEVO OBLIGATORIO)
+  fechaLimite: string | undefined; // quoteDeadline → fechaLimite
+
+  @IsNotEmpty()
+  @IsDateString()
+  fechaEstimada: string | undefined; // dueDate → fechaEstimada (NUEVO OBLIGATORIO)
 
   @IsOptional()
   @IsString()
@@ -83,5 +83,5 @@ export class CreateQuotationDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateQuotationItemDto)
-  items: CreateQuotationItemDto[]; // Detalles de la cotización
+  items: CreateQuotationItemDto[] | undefined; // Detalles de la cotización
 }

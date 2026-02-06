@@ -8,8 +8,11 @@ export function mapProcurement(v: string) {
 
 export function mapDeliveryType(v: string) {
   const t = v.trim().toLowerCase();
+  
   if (t === 'almacen' || t === 'almacén') return 'WAREHOUSE';
   if (t === 'proyecto') return 'PROJECT';
+  if (t === 'oficina') return 'OFFICE'; // <-- Agregado aquí
+
   return String(v).toUpperCase();
 }
 

@@ -23,7 +23,7 @@ import UserComboBox from "../Quotes/components/ComboBoxUsers";
 
 type Scope = "nacional" | "internacional";
 type RequestType = "licitaciones" | "proyectos" | "suministros" | "inventarios";
-type DeliveryPlace = "almacen" | "proyecto";
+type DeliveryPlace = "almacen" | "proyecto" | "oficina";
 type Unit = "und" | "caja" | "kg" | "M" | "Lb";
 
 type ProductLine = {
@@ -485,7 +485,7 @@ export default function QuotesNew() {
       ...prev,
       deliveryPlace: place,
       projectId: place === "almacen" ? undefined : prev.projectId,
-      warehouseId: place === "proyecto" ? undefined : prev.warehouseId
+      warehouseId: place === "proyecto" ? undefined : prev.warehouseId,
     }));
   }, []);
 
@@ -653,6 +653,7 @@ export default function QuotesNew() {
               >
                 <option value="almacen">Almacén</option>
                 <option value="proyecto">Proyecto</option>
+                <option value="oficina">Oficina</option>
               </select>
             </div>
 
@@ -681,6 +682,17 @@ export default function QuotesNew() {
               <div>
                 <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">
                   Almacén
+                </label>
+                <p className="w-full rounded-lg border border-gray-300 bg-gray-100 p-2 text-sm dark:border-white/10 dark:bg-[#101828] dark:text-gray-100">
+                  {warehouses[0]?.name || "Cargando..."}
+                </p>
+              </div>
+            )}
+
+            {form.deliveryPlace === "oficina" && warehouses.length > 0 && (
+              <div>
+                <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">
+                  Oficina
                 </label>
                 <p className="w-full rounded-lg border border-gray-300 bg-gray-100 p-2 text-sm dark:border-white/10 dark:bg-[#101828] dark:text-gray-100">
                   {warehouses[0]?.name || "Cargando..."}

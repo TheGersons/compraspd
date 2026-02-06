@@ -16,6 +16,7 @@ export enum ProcurementType {
 export enum DeliveryType {
     WAREHOUSE = 'WAREHOUSE', // Almacen
     PROJECT = 'PROJECT',     // Proyecto
+    OFFICE = 'OFFICE'
 }
 
 // Opcional: Tipo base para una línea de ítem de PR

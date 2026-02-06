@@ -17,7 +17,7 @@ async function main() {
   // 1. ROLES
   // ==========================================================================
   console.log('📋 Creando roles...');
-  
+
   const rolAdmin = await prisma.rol.upsert({
     where: { nombre: 'ADMIN' },
     update: {},
@@ -62,23 +62,23 @@ async function main() {
     { modulo: 'cotizaciones', accion: 'editar', descripcion: 'Editar cotizaciones' },
     { modulo: 'cotizaciones', accion: 'eliminar', descripcion: 'Eliminar cotizaciones' },
     { modulo: 'cotizaciones', accion: 'aprobar', descripcion: 'Aprobar cotizaciones' },
-    
+
     // Compras
     { modulo: 'compras', accion: 'crear', descripcion: 'Crear órdenes de compra' },
     { modulo: 'compras', accion: 'ver', descripcion: 'Ver órdenes de compra' },
     { modulo: 'compras', accion: 'editar', descripcion: 'Editar órdenes de compra' },
-    
+
     // Usuarios
     { modulo: 'usuarios', accion: 'crear', descripcion: 'Crear usuarios' },
     { modulo: 'usuarios', accion: 'ver', descripcion: 'Ver usuarios' },
     { modulo: 'usuarios', accion: 'editar', descripcion: 'Editar usuarios' },
     { modulo: 'usuarios', accion: 'eliminar', descripcion: 'Eliminar usuarios' },
-    
+
     // Catálogos
     { modulo: 'catalogos', accion: 'crear', descripcion: 'Crear catálogos' },
     { modulo: 'catalogos', accion: 'ver', descripcion: 'Ver catálogos' },
     { modulo: 'catalogos', accion: 'editar', descripcion: 'Editar catálogos' },
-    
+
     // Reportes
     { modulo: 'reportes', accion: 'ver', descripcion: 'Ver reportes' },
     { modulo: 'reportes', accion: 'exportar', descripcion: 'Exportar reportes' },
@@ -191,12 +191,21 @@ async function main() {
     'Proyectos',
   ];
 
-  const deptCreados: {id: string; nombre: string}[] = [];
+  const deptCreados: { id: string; nombre: string }[] = [];
+
   for (const nombre of departamentos) {
-    const dept = await prisma.departamento.create({
-      data: { nombre }
+    const existente = await prisma.departamento.findFirst({
+      where: { nombre }
     });
-    deptCreados.push(dept);
+
+    if (existente) {
+      deptCreados.push(existente);
+    } else {
+      const dept = await prisma.departamento.create({
+        data: { nombre }
+      });
+      deptCreados.push(dept);
+    }
   }
 
   console.log('✅ Departamentos creados\n');
@@ -259,17 +268,35 @@ async function main() {
 
   for (const areaData of areas) {
     const { tipos, ...areaInfo } = areaData;
-    const area = await prisma.area.create({
-      data: areaInfo,
+
+    // Buscar si el área ya existe
+    let area = await prisma.area.findFirst({
+      where: { nombreArea: areaInfo.nombreArea }
     });
 
-    for (const tipoNombre of tipos) {
-      await prisma.tipo.create({
-        data: {
-          nombre: tipoNombre,
-          areaId: area.id,
-        },
+    if (!area) {
+      area = await prisma.area.create({
+        data: areaInfo,
       });
+    }
+
+    // Crear tipos para esta área
+    for (const tipoNombre of tipos) {
+      const tipoExistente = await prisma.tipo.findFirst({
+        where: {
+          areaId: area.id,
+          nombre: tipoNombre
+        }
+      });
+
+      if (!tipoExistente) {
+        await prisma.tipo.create({
+          data: {
+            nombre: tipoNombre,
+            areaId: area.id,
+          },
+        });
+      }
     }
   }
 
@@ -294,11 +321,15 @@ async function main() {
   ];
 
   for (const pais of paises) {
-    await prisma.pais.upsert({
-      where: { codigo: pais.codigo },
-      update: {},
-      create: pais,
+    const existente = await prisma.pais.findFirst({
+      where: { codigo: pais.codigo }
     });
+
+    if (!existente) {
+      await prisma.pais.create({
+        data: pais,
+      });
+    }
   }
 
   console.log('✅ Países creados\n');
@@ -336,9 +367,15 @@ async function main() {
   ];
 
   for (const proveedor of proveedores) {
-    await prisma.proveedor.create({
-      data: proveedor,
+    const existente = await prisma.proveedor.findFirst({
+      where: { nombre: proveedor.nombre }
     });
+
+    if (!existente) {
+      await prisma.proveedor.create({
+        data: proveedor,
+      });
+    }
   }
 
   console.log('✅ Proveedores creados\n');
@@ -348,14 +385,20 @@ async function main() {
   // ==========================================================================
   console.log('📁 Creando proyecto inicial...');
 
-  await prisma.proyecto.create({
-    data: {
-      nombre: 'Proyecto General',
-      descripcion: 'Proyecto por defecto para cotizaciones generales',
-      criticidad: 5,
-      estado: true,
-    },
+  const proyectoExistente = await prisma.proyecto.findFirst({
+    where: { nombre: 'Proyecto General' }
   });
+
+  if (!proyectoExistente) {
+    await prisma.proyecto.create({
+      data: {
+        nombre: 'Proyecto General',
+        descripcion: 'Proyecto por defecto para cotizaciones generales',
+        criticidad: 5,
+        estado: true,
+      },
+    });
+  }
 
   console.log('✅ Proyecto inicial creado\n');
 

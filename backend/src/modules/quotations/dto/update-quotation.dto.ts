@@ -28,8 +28,8 @@ export class UpdateQuotationDto {
   tipoCompra?: 'NACIONAL' | 'INTERNACIONAL';
 
   @IsOptional()
-  @IsIn(['ALMACEN', 'PROYECTO'])
-  lugarEntrega?: 'ALMACEN' | 'PROYECTO';
+  @IsIn(['ALMACEN', 'PROYECTO', 'OFICINA'])
+  lugarEntrega?: 'ALMACEN' | 'PROYECTO' | 'OFICINA';
 
   @IsOptional()
   @IsDateString()

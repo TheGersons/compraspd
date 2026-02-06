@@ -119,6 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refreshToken: string,
     userData?: any
   ) => {
+    setIsLoading(true);
     console.log("Guardando tokens de nueva sesión...");
 
     setTokens(accessToken, refreshToken);
@@ -126,12 +127,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (userData) {
       setUser(userData);
       saveUser(userData);
-      setIsLoading(false);
 
 
       navigateSafe('/quotes');
 
-      setTimeout(() => void refresh(), 100);
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      setIsLoading(false);
     } else {
       setIsLoading(true);
       await refresh();

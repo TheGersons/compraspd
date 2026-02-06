@@ -9,6 +9,29 @@ import BarMonthly from "../../components/quotes/charts/BarMonthly";
 import LineTrend from "../../components/quotes/charts/LineTrend";
 import Filters, { QuoteFilters } from "../../components/quotes/filters";
 import { useQuotesDashboard, useQuotesStats } from "./hooks/useQuotesDashboard";
+import { getToken } from "../../lib/api";
+import { useAuth } from "../../context/AuthContext";
+
+
+// ============================================================================
+// API SERVICE
+// ============================================================================
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
+
+const api = {
+    async getMe() {
+      const token = getToken();
+        const response = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
+            credentials: "include",
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) throw new Error("Error al cargar usuario");
+        return response.json();
+    },
+  }
+
+
 
 // ============================================================================
 // TYPES
@@ -137,6 +160,9 @@ const translateProcurement = (tipoCompra: string): string => {
 // ============================================================================
 
 export default function Quotes() {
+  const user = api.getMe();
+  
+  console.log(user);
   const [filters, setFilters] = useState<QuoteFilters>({
     preset: "30d",
     estado: "todas",

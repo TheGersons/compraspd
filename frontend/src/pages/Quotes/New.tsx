@@ -5,7 +5,7 @@ import Button from "../../components/ui/button/Button";
 import { useNotifications } from "../Notifications/context/NotificationContext";
 import { getToken } from "../../lib/api";
 import { LoadingScreen } from "../../components/common/LoadingScreen";
-import { error } from "console";
+import { useAuth } from "../../context/AuthContext";
 
 
 // ============================================================================
@@ -13,7 +13,7 @@ import { error } from "console";
 // ============================================================================
 
 type TipoCompra = "NACIONAL" | "INTERNACIONAL";
-type LugarEntrega = "ALMACEN" | "OFICINA" | "PROYECTO" | "OTRO";
+type LugarEntrega = "ALMACEN" | "OFICINA" | "PROYECTO";
 type TipoUnidad = "UNIDAD" | "CAJA" | "PAQUETE" | "METRO" | "KILOGRAMO" | "LITRO" | "OTRO";
 
 interface ItemCotizacion {
@@ -64,21 +64,21 @@ const api = {
 
   async getCurrentUser(): Promise<Usuario> {
     try {
-    const token = await getToken();
-    const response = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
-      credentials: "include",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    if (!response.ok) throw new Error("Error al obtener usuario actual");
-    return response.json();
-    }catch (error) {
+      const token = await getToken();
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
+        credentials: "include",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) throw new Error("Error al obtener usuario actual");
+      return response.json();
+    } catch (error) {
       throw error;
-    }finally {
-      
+    } finally {
+
     }
-    
+
   },
 
   async getTipos(): Promise<Tipo[]> {
@@ -145,7 +145,7 @@ const api = {
 export default function New() {
   const navigate = useNavigate();
   const { addNotification } = useNotifications();
-  const [isLoading, setIsLoading] = useState(false);
+  const [_isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Estado del formulario
@@ -155,6 +155,18 @@ export default function New() {
   const [fechaLimite, setFechaLimite] = useState("");
   const [comentarios, setComentarios] = useState("");
   const [tipoId, setTipoId] = useState("");
+  const { user, isLoading } = useAuth();
+  // 1. LOADING
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+      </div>
+    );
+  }
+  if (!user) {
+    return null;
+  }
   const [solicitanteId, setSolicitanteId] = useState("");
   const [searchSolicitante, setSearchSolicitante] = useState("");
   const [proyectoId, setProyectoId] = useState("");
@@ -177,7 +189,7 @@ export default function New() {
   }, []);
 
   const cargarCatalogos = async () => {
-    
+
     try {
       setIsLoading(true);
       setLoadingCatalogos(true);
@@ -193,12 +205,7 @@ export default function New() {
 
       // Obtener usuario actual del endpoint /auth/me
       try {
-        const currentUser = await api.getCurrentUser();
-        const usuarioActual = usuariosData.find(u => u.id === currentUser.id);
-        if (usuarioActual) {
-          setSolicitanteId(usuarioActual.id);
-          console.log('✅ Solicitante auto-completado:', usuarioActual.nombre);
-        }
+        setSolicitanteId(user.id);
       } catch (error) {
         console.log('⚠️ No se pudo obtener usuario actual:', error);
       }
@@ -220,6 +227,7 @@ export default function New() {
 
   useEffect(() => {
     if (!proyectoId && lugarEntrega === "PROYECTO") {
+
       setLugarEntrega("ALMACEN");
       addNotification(
         "info",
@@ -227,6 +235,8 @@ export default function New() {
         "Se cambió a Almacén porque no hay proyecto seleccionado.",
         { priority: "low" }
       );
+
+
     }
   }, [proyectoId]);
 
@@ -257,7 +267,11 @@ export default function New() {
     if (!nombreCotizacion.trim()) return "El nombre de la cotización es obligatorio";
     if (!tipoId) return "Debe seleccionar un tipo de cotización";
     if (!solicitanteId) return "Debe seleccionar un solicitante";
-    if (!proyectoId) return "Debe seleccionar un proyecto";
+    // ESTO ES LO CORRECTO
+    // Solo pide proyecto si el lugar de entrega es explícitamente 'PROYECTO'
+    if (!proyectoId && lugarEntrega === 'PROYECTO') {
+      return "Debe seleccionar un proyecto cuando el lugar de entrega es 'Proyecto'";
+    }
     if (!fechaLimite) return "La fecha límite es obligatoria";
 
     // Validar fecha
@@ -344,27 +358,27 @@ export default function New() {
   };
 
   // Loading y error states
-if (loadingCatalogos) {
-  return <LoadingScreen message="Cargando formulario de cotización..." />;
-}
+  if (loadingCatalogos) {
+    return <LoadingScreen message="Cargando formulario de cotización..." />;
+  }
 
-if (error) {
-  return (
-    <div className="flex items-center justify-center min-h-[400px]">
-      <div className="text-center">
-        <p className="text-red-600 mb-4">{error}</p>
-        <button
-          onClick={cargarCatalogos}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg"
-        >
-          Reintentar
-        </button>
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">{error}</p>
+          <button
+            onClick={cargarCatalogos}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg"
+          >
+            Reintentar
+          </button>
+        </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
-return (
+  return (
     <>
       <PageMeta title="Nueva Cotización" description="Crear una nueva cotización" />
 
@@ -445,7 +459,6 @@ return (
                 value={proyectoId}
                 onChange={(e) => setProyectoId(e.target.value)}
                 className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-2.5 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
-                required
               >
                 <option value="">Seleccione un proyecto</option>
                 {proyectos.map((proyecto) => (
@@ -559,7 +572,6 @@ return (
                 <option value="PROYECTO" disabled={!proyectoId}>
                   Proyecto {!proyectoId && "(seleccione proyecto primero)"}
                 </option>
-                <option value="OTRO">Otro</option>
               </select>
             </div>
 

@@ -139,6 +139,9 @@ export default function SignInForm() {
         icon: '👋',
       });
 
+      // Después del login exitoso
+      window.location.href = '/quotes';  // En lugar de navigate()
+
       // Redirigir después de un breve delay para que se vea el toast
       setTimeout(() => {
         navigateSafe('/quotes/assignment');

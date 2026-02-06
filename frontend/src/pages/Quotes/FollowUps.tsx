@@ -3,6 +3,9 @@ import PageMeta from "../../components/common/PageMeta";
 import { getToken } from "../../lib/api";
 import { useNotifications } from "../Notifications/context/NotificationContext";
 import Historial from "./components/Historial";
+import { useAuth } from "../../context/AuthContext";
+import toast from "react-hot-toast";
+import { useNavigate } from "react-router";
 
 // ============================================================================
 // TYPES
@@ -142,11 +145,12 @@ type Precio = {
 // ============================================================================
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
-const token = getToken();
+
 
 const api = {
   // Cotizaciones
   async getCotizacionesPendientes(filters?: { estado?: string; search?: string; page?: number }) {
+    const token = getToken();
     const params = new URLSearchParams();
     if (filters?.estado) params.append("estado", filters.estado);
     if (filters?.search) params.append("search", filters.search);
@@ -156,11 +160,15 @@ const api = {
       credentials: "include",
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!response.ok) throw new Error("Error al cargar cotizaciones");
-    return response.json();
+    if (!response.ok) {
+      return 0
+    }else{
+      return response.json();
+    }
   },
 
   async getCotizacionDetalle(id: string) {
+    const token = getToken();
     const response = await fetch(`${API_BASE_URL}/api/v1/followups/${id}`, {
       credentials: "include",
       headers: { Authorization: `Bearer ${token}` },
@@ -170,6 +178,7 @@ const api = {
   },
 
   async configurarTimeline(cotizacionId: string, productos: any[]) {
+    const token = getToken();
     const response = await fetch(`${API_BASE_URL}/api/v1/followups/${cotizacionId}/configurar`, {
       method: "POST",
       credentials: "include",
@@ -184,6 +193,7 @@ const api = {
   },
 
   async aprobarProductos(cotizacionId: string, productos: any[]) {
+    const token = getToken();
     const response = await fetch(`${API_BASE_URL}/api/v1/followups/${cotizacionId}/aprobar`, {
       method: "POST",
       credentials: "include",
@@ -198,6 +208,7 @@ const api = {
   },
 
   async getHistorial(cotizacionId: string) {
+    const token = getToken();
     const response = await fetch(`${API_BASE_URL}/api/v1/followups/${cotizacionId}/historial`, {
       credentials: "include",
       headers: { Authorization: `Bearer ${token}` },
@@ -208,6 +219,7 @@ const api = {
 
   // Chat
   async getChatMessages(chatId: string) {
+    const token = getToken();
     const response = await fetch(`${API_BASE_URL}/api/v1/messages/${chatId}/messages`, {
       credentials: "include",
       headers: { Authorization: `Bearer ${token}` },
@@ -217,6 +229,7 @@ const api = {
   },
 
   async sendMessage(chatId: string, contenido: string) {
+    const token = getToken();
     const response = await fetch(`${API_BASE_URL}/api/v1/messages/${chatId}/messages`, {
       method: "POST",
       credentials: "include",
@@ -232,6 +245,7 @@ const api = {
 
   // Países y Timeline
   async getPaises() {
+    const token = getToken();
     const response = await fetch(`${API_BASE_URL}/api/v1/paises`, {
       credentials: "include",
       headers: { Authorization: `Bearer ${token}` },
@@ -241,6 +255,7 @@ const api = {
   },
 
   async getTimelineSugerido(sku: string) {
+    const token = getToken();
     const response = await fetch(`${API_BASE_URL}/api/v1/timeline/${sku}/sugerencia`, {
       credentials: "include",
       headers: { Authorization: `Bearer ${token}` },
@@ -251,16 +266,21 @@ const api = {
 
   // Obtener proveedores activos
   async getProveedores() {
+    const token = getToken();
     const response = await fetch(`${API_BASE_URL}/api/v1/proveedores`, {
       credentials: "include",
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!response.ok) throw new Error("Error al cargar proveedores");
-    return response.json();
+    if (!response.ok) {
+      return 0;
+    }else{
+      return response.json();
+    }
   },
 
   // Obtener precios de un detalle de cotización
   async getPreciosByDetalle(detalleId: string) {
+    const token = getToken();
     const response = await fetch(`${API_BASE_URL}/api/v1/precios/detalle/${detalleId}`, {
       credentials: "include",
       headers: { Authorization: `Bearer ${token}` },
@@ -277,6 +297,7 @@ const api = {
     precioDescuento?: number;
     comprobanteDescuento?: string;
   }) {
+    const token = getToken();
     const response = await fetch(`${API_BASE_URL}/api/v1/precios`, {
       method: "POST",
       credentials: "include",
@@ -292,6 +313,7 @@ const api = {
 
   // Marcar precio como seleccionado (cambio de método POST)
   async selectPrecio(precioId: string) {
+    const token = getToken();
     const response = await fetch(`${API_BASE_URL}/api/v1/precios/${precioId}/select`, {
       method: "POST",  // ← Tu backend usa POST, no PATCH
       credentials: "include",
@@ -303,6 +325,7 @@ const api = {
 
   // Eliminar precio
   async deletePrecio(precioId: string) {
+    const token = getToken();
     const response = await fetch(`${API_BASE_URL}/api/v1/precios/${precioId}`, {
       method: "DELETE",
       credentials: "include",
@@ -337,7 +360,23 @@ export default function FollowUps() {
   const [loadingChat, setLoadingChat] = useState(false);
   const [sendingMessage, setSendingMessage] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const { user, isLoading } = useAuth();
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+      </div>
+    );
+  }
+
+
   const [currentUserId, setCurrentUserId] = useState<string>("");
+  // 2. SIN USUARIO (ProtectedRoute redirigirá)
+  if (!user) {
+    return null;
+  } else {
+    useEffect
+  }
 
 
   // Estados de configuración
@@ -358,7 +397,7 @@ export default function FollowUps() {
   const [showPrecioModal, setShowPrecioModal] = useState(false);
   const [productoParaPrecio, setProductoParaPrecio] = useState<Producto | null>(null);
   const [loadingPrecios, setLoadingPrecios] = useState(false);
-
+  const navigate = useNavigate();
 
   // ============================================================================
   // EFFECTS
@@ -368,7 +407,7 @@ export default function FollowUps() {
   useEffect(() => {
     cargarCotizaciones();
     cargarPaises();
-    obtenerUsuarioActual();
+    asignarUsuario();
   }, [estadoFiltro]);
 
   // Cargar mensajes cuando cambia la cotización seleccionada
@@ -399,6 +438,9 @@ export default function FollowUps() {
   // FUNCTIONS
   // ============================================================================
 
+  const asignarUsuario = async () => {
+    setCurrentUserId(user.id);
+  }
   const cargarCotizaciones = async () => {
     try {
       setLoading(true);
@@ -413,6 +455,10 @@ export default function FollowUps() {
       }
 
       const data = await api.getCotizacionesPendientes(filters);
+      if(data === 0){
+        navigate('/quotes/new');
+                return;
+      }
       setCotizaciones(data.items || []);
     } catch (error) {
       console.error("Error al cargar cotizaciones:", error);
@@ -421,20 +467,7 @@ export default function FollowUps() {
       setLoading(false);
     }
   };
-  const obtenerUsuarioActual = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
-        credentials: "include",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (response.ok) {
-        const user = await response.json();
-        setCurrentUserId(user.id || user.sub || "");
-      }
-    } catch (error) {
-      console.error("Error al obtener usuario actual:", error);
-    }
-  };
+
 
   const cargarPaises = async () => {
     try {
@@ -610,6 +643,11 @@ export default function FollowUps() {
   const cargarProveedores = async () => {
     try {
       const data = await api.getProveedores();
+      if (data === 0){
+        navigate('/quotes/new');
+                toast.error('No cuentas con los permisos necesarios');
+                return;
+      }
       setProveedores(data || []);
     } catch (error) {
       console.error("Error al cargar proveedores:", error);
@@ -1220,7 +1258,7 @@ export default function FollowUps() {
                                           <div className="font-medium text-gray-900 dark:text-white">
                                             {producto.descripcionProducto}
                                           </div>
-                                          
+
                                         </td>
 
                                         {/* Cantidad */}

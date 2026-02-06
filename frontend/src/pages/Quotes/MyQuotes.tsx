@@ -2,6 +2,9 @@ import { useState, useEffect, useRef } from "react";
 import PageMeta from "../../components/common/PageMeta";
 import { getToken } from "../../lib/api";
 import { useNotifications } from "../Notifications/context/NotificationContext";
+import { useAuth } from "../../context/AuthContext";
+import { useNavigate } from "react-router";
+import toast from "react-hot-toast";
 
 // ============================================================================
 // TYPES
@@ -78,6 +81,7 @@ type ChatMessage = {
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 const token = getToken();
 
+
 const api = {
     // Obtener mis cotizaciones (como solicitante)
     async getMisCotizaciones() {
@@ -85,8 +89,12 @@ const api = {
             credentials: "include",
             headers: { Authorization: `Bearer ${token}` },
         });
-        if (!response.ok) throw new Error("Error al cargar mis cotizaciones");
-        return response.json();
+        if (!response.ok){
+            return 0;
+        } else{
+            return response.json();
+        }
+        
     },
 
     async getMe() {
@@ -242,10 +250,23 @@ export default function MyQuotes() {
     const [nuevoMensaje, setNuevoMensaje] = useState("");
     const [loadingChat, setLoadingChat] = useState(false);
     const [sendingMessage, setSendingMessage] = useState(false);
-
+    const navigate = useNavigate();
     // Estados de UI
     const [showProductos, setShowProductos] = useState(false);
+
+    const { user, isLoading } = useAuth()
+    if (isLoading) {
+        return (
+            <div className="flex h-screen items-center justify-center">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+            </div>
+        );
+    }
     const [currentUserId, setCurrentUserId] = useState<string>("");
+    // 2. SIN USUARIO (ProtectedRoute redirigirá)
+    if (!user) {
+        return null;
+    }
 
     // ============================================================================
     // EFFECTS
@@ -273,24 +294,20 @@ export default function MyQuotes() {
     // En MyQuotes - Parte 2
 
     const obtenerUsuarioActual = async () => {
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
-                credentials: "include",
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            if (response.ok) {
-                const user = await response.json();
-                setCurrentUserId(user.id || user.sub || "");
-            }
-        } catch (error) {
-            console.error("Error al obtener usuario actual:", error);
-        }
+        setCurrentUserId(user.id);
     };
 
     const cargarMisCotizaciones = async () => {
         try {
             setLoading(true);
             const data = await api.getMisCotizaciones();
+            if(data === 0 )
+            {
+                
+                navigate('/quotes/new');
+                toast.error('No cuentas con los permisos necesarios');
+                return;
+            }
             setCotizaciones(data || []);
         } catch (error) {
             console.error("Error al cargar cotizaciones:", error);
@@ -301,36 +318,36 @@ export default function MyQuotes() {
     };
 
     const seleccionarCotizacion = async (cotizacion: Cotizacion) => {
-    try {
-      setLoadingDetalle(true);
-      const detalle = await api.getCotizacionDetalle(cotizacion.id);
-      setCotizacionSeleccionada(detalle);
-      setShowProductos(false);
-    } catch (error) {
-      console.error("Error al cargar detalle:", error);
-      addNotification("danger", "Error", "Error al cargar detalle de cotización");
-    } finally {
-      setLoadingDetalle(false);
-    }
-  };
+        try {
+            setLoadingDetalle(true);
+            const detalle = await api.getCotizacionDetalle(cotizacion.id);
+            setCotizacionSeleccionada(detalle);
+            setShowProductos(false);
+        } catch (error) {
+            console.error("Error al cargar detalle:", error);
+            addNotification("danger", "Error", "Error al cargar detalle de cotización");
+        } finally {
+            setLoadingDetalle(false);
+        }
+    };
 
     const cargarMensajes = async (chatId: string) => {
-    try {
-      setLoadingChat(true);
-      const data = await api.getChatMessages(chatId);
-      
-      // CORRECCIÓN: Ordenar por fecha ascendente (más antiguos primero)
-      const mensajesOrdenados = (data.items || data || []).sort((a: ChatMessage, b: ChatMessage) => {
-        return new Date(a.creado).getTime() - new Date(b.creado).getTime();
-      });
-      
-      setMensajes(mensajesOrdenados);
-    } catch (error) {
-      console.error("Error al cargar mensajes:", error);
-    } finally {
-      setLoadingChat(false);
-    }
-  };
+        try {
+            setLoadingChat(true);
+            const data = await api.getChatMessages(chatId);
+
+            // CORRECCIÓN: Ordenar por fecha ascendente (más antiguos primero)
+            const mensajesOrdenados = (data.items || data || []).sort((a: ChatMessage, b: ChatMessage) => {
+                return new Date(a.creado).getTime() - new Date(b.creado).getTime();
+            });
+
+            setMensajes(mensajesOrdenados);
+        } catch (error) {
+            console.error("Error al cargar mensajes:", error);
+        } finally {
+            setLoadingChat(false);
+        }
+    };
 
     const enviarMensaje = async () => {
         if (!nuevoMensaje.trim() || !cotizacionSeleccionada?.chatId) {
@@ -560,7 +577,7 @@ export default function MyQuotes() {
                                         <div className="rounded-lg p-3 ring-1 ring-gray-200 dark:ring-gray-800">
                                             <div className="text-xs text-gray-500 dark:text-gray-400">Lugar de Entrega</div>
                                             <div className="font-semibold text-gray-800 dark:text-white/90">
-                                                {cotizacionSeleccionada.lugarEntrega === "ALMACEN" ? "Almacén" : "Proyecto"}
+                                                {cotizacionSeleccionada.lugarEntrega === "ALMACEN" ? "Almacén" : cotizacionSeleccionada.lugarEntrega === "PROYECTO" ? "Proyecto" : "Oficina"}
                                             </div>
                                         </div>
                                         <div className="rounded-lg p-3 ring-1 ring-gray-200 dark:ring-gray-800">

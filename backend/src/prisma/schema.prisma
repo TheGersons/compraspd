@@ -20,7 +20,7 @@ datasource db {
 
 model Area {
   id         String   @id @default(uuid()) @db.Uuid
-  nombreArea String   @map("nombre_area")
+  nombreArea String   @unique @map("nombre_area")
   tipo       String   // "proyectos" | "comercial" | "tecnica" | "operativa"
   icono      String?
   creado     DateTime @default(now())
@@ -34,19 +34,20 @@ model Area {
 model Tipo {
   id     String   @id @default(uuid()) @db.Uuid
   areaId String   @map("area_id") @db.Uuid
-  nombre String
+  nombre String   
   creado DateTime @default(now())
   
   area         Area          @relation(fields: [areaId], references: [id], onDelete: Restrict)
   cotizaciones Cotizacion[]
   
+  @@unique([areaId, nombre])
   @@index([areaId])
   @@map("tipo")
 }
 
 model Departamento {
   id     String   @id @default(uuid()) @db.Uuid
-  nombre String
+  nombre String   @unique
   creado DateTime @default(now())
   
   usuarios Usuario[]
@@ -56,7 +57,7 @@ model Departamento {
 
 model Proyecto {
   id           String   @id @default(uuid()) @db.Uuid
-  nombre       String
+  nombre       String   @unique
   descripcion  String?
   criticidad   Int      @default(5) // 1-10, donde 10 es más crítico
   estado       Boolean  @default(true)
@@ -73,7 +74,7 @@ model Proyecto {
 
 model Proveedor {
   id        String    @id @default(uuid()) @db.Uuid
-  nombre    String
+  nombre    String    @unique
   rtn       String?
   email     String?
   telefono  String?
