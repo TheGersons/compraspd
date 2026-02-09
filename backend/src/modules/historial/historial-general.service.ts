@@ -15,13 +15,14 @@ type EtapaContador = {
   segundoSeguimiento: number;
   enCIF: number;
   recibido: number;
+  rechazado: number;
 };
 
 type CriticidadNivel = 'alta' | 'media' | 'baja';
 
 @Injectable()
 export class HistorialGeneralService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   /**
    * Obtiene el resumen de todas las cotizaciones a las que el usuario tiene acceso
@@ -143,6 +144,7 @@ export class HistorialGeneralService {
     const etapas = this.contarProductosPorEtapa(estadosProductos);
     const productosCompletados = this.contarProductosCompletados(estadosProductos);
     const productosAtrasados = this.contarProductosAtrasados(estadosProductos);
+    const productosRechazados = this.contarProductosRechazados(estadosProductos);  // NUEVO
     const criticidad = this.calcularCriticidad(estadosProductos);
 
     return {
@@ -154,14 +156,15 @@ export class HistorialGeneralService {
       },
       proyecto: cotizacion.proyecto
         ? {
-            nombre: cotizacion.proyecto.nombre,
-          }
+          nombre: cotizacion.proyecto.nombre,
+        }
         : null,
       totalProductos: cotizacion.detalles.length,
       productosCompletados,
       productosAtrasados,
+      productosRechazados,  // NUEVO
       fechaCreacion: cotizacion.fechaSolicitud,
-      fechaActualizacion: cotizacion.fechaSolicitud, // Usar fecha solicitud si no hay updatedAt
+      fechaActualizacion: cotizacion.fechaSolicitud,
       criticidad,
       etapas,
     };
@@ -183,6 +186,7 @@ export class HistorialGeneralService {
       segundoSeguimiento: 0,
       enCIF: 0,
       recibido: 0,
+      rechazado: 0,
     };
 
     for (const estado of estadosProductos) {
@@ -197,9 +201,19 @@ export class HistorialGeneralService {
       if (estado.segundoSeguimiento) etapas.segundoSeguimiento++;
       if (estado.enCIF) etapas.enCIF++;
       if (estado.recibido) etapas.recibido++;
+      if (estado.rechazado) etapas.rechazado++;
     }
 
     return etapas;
+  }
+
+  /**
+ * Cuenta cuántos productos han sido rechazados
+ */
+  private contarProductosRechazados(estadosProductos: any[]): number {
+    return estadosProductos.filter((estado) => {
+      return estado.rechazado === true;
+    }).length;
   }
 
   /**

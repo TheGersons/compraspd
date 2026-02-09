@@ -23,6 +23,9 @@ type Producto = {
         diasRetrasoActual: number;
         paisOrigen?: { nombre: string };
         medioTransporte?: string;
+        rechazado?: boolean;
+        fechaRechazo?: string;
+        motivoRechazo?: string;
     };
 };
 
@@ -59,6 +62,7 @@ type Cotizacion = {
     totalProductos: number;
     productosAprobados: number;
     productosPendientes: number;
+    productosRechazados?: number;
     porcentajeAprobado?: number;
     detalles?: Producto[];
 };
@@ -89,12 +93,12 @@ const api = {
             credentials: "include",
             headers: { Authorization: `Bearer ${token}` },
         });
-        if (!response.ok){
+        if (!response.ok) {
             return 0;
-        } else{
+        } else {
             return response.json();
         }
-        
+
     },
 
     async getMe() {
@@ -301,9 +305,8 @@ export default function MyQuotes() {
         try {
             setLoading(true);
             const data = await api.getMisCotizaciones();
-            if(data === 0 )
-            {
-                
+            if (data === 0) {
+
                 navigate('/quotes/new');
                 toast.error('No cuentas con los permisos necesarios');
                 return;
@@ -657,13 +660,18 @@ export default function MyQuotes() {
                                                                 <td className="py-3 text-gray-700 dark:text-gray-300">
                                                                     {prod.cantidad} {prod.tipoUnidad.toLowerCase()}
                                                                 </td>
-                                                                <td className="py-3">
-                                                                    {prod.estadoProducto?.aprobadoPorSupervisor ? (
-                                                                        <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                                                {/* En la celda de estado/aprobación */}
+                                                                <td className="py-3 text-center">
+                                                                    {prod.estadoProducto?.rechazado ? (
+                                                                        <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                                                                            ❌ Rechazado
+                                                                        </span>
+                                                                    ) : prod.estadoProducto?.aprobadoPorSupervisor ? (
+                                                                        <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
                                                                             ✓ Aprobado
                                                                         </span>
                                                                     ) : (
-                                                                        <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
+                                                                        <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
                                                                             ⏳ Pendiente
                                                                         </span>
                                                                     )}
@@ -712,6 +720,41 @@ export default function MyQuotes() {
                                 </div>
                             )}
                         </div>
+
+                        {/* Alerta de productos rechazados */}
+                        {cotizacionSeleccionada.detalles?.some(p => p.estadoProducto?.rechazado) && (
+                            <div className="mb-4 rounded-lg border-2 border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
+                                <div className="flex items-start gap-3">
+                                    <svg className="h-6 w-6 flex-shrink-0 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    <div className="flex-1">
+                                        <h4 className="font-semibold text-red-900 dark:text-red-300">
+                                            ⚠️ Productos Rechazados
+                                        </h4>
+                                        <p className="mt-1 text-sm text-red-700 dark:text-red-400">
+                                            Algunos productos de esta cotización han sido rechazados por el supervisor.
+                                            Revisa los motivos y crea una nueva solicitud con las correcciones necesarias.
+                                        </p>
+                                        <div className="mt-3 space-y-2">
+                                            {cotizacionSeleccionada.detalles
+                                                ?.filter(p => p.estadoProducto?.rechazado)
+                                                .map(prod => (
+                                                    <div key={prod.id} className="rounded-lg bg-white p-3 dark:bg-gray-800">
+                                                        <p className="font-medium text-gray-900 dark:text-white">
+                                                            {prod.descripcionProducto}
+                                                        </p>
+                                                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                                                            <strong>Motivo:</strong> {prod.estadoProducto?.motivoRechazo}
+                                                        </p>
+                                                    </div>
+                                                ))
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* CARD DE CHAT */}
                         <div className="my-8 rounded-lg border border-gray-200 bg-white p-4 shadow-xl dark:border-gray-700 dark:bg-gray-800">

@@ -33,10 +33,12 @@ type CotizacionHistorial = {
     segundoSeguimiento: number;
     enCIF: number;
     recibido: number;
+    rechazado: number;
   };
   // Estado crítico general
   criticidad: 'alta' | 'media' | 'baja';
   productosAtrasados: number;
+  productosRechazados: number;
 };
 
 // ============================================================================
@@ -182,7 +184,7 @@ function TarjetaCotizacion({
       </div>
 
       {/* Estadísticas principales */}
-      <div className="mb-3 grid grid-cols-3 gap-3">
+      <div className="mb-3 grid grid-cols-4 gap-3">  {/* Cambiar a grid-cols-4 */}
         <div className="rounded-lg bg-gray-50 p-2 text-center dark:bg-gray-700/50">
           <p className="text-xs text-gray-600 dark:text-gray-400">Total</p>
           <p className="text-lg font-bold text-gray-900 dark:text-white">
@@ -199,6 +201,13 @@ function TarjetaCotizacion({
           <p className="text-xs text-rose-600 dark:text-rose-400">Atrasados</p>
           <p className="text-lg font-bold text-rose-700 dark:text-rose-300">
             {cotizacion.productosAtrasados}
+          </p>
+        </div>
+        {/* NUEVO */}
+        <div className="rounded-lg bg-red-50 p-2 text-center dark:bg-red-900/20">
+          <p className="text-xs text-red-600 dark:text-red-400">Rechazados</p>
+          <p className="text-lg font-bold text-red-700 dark:text-red-300">
+            {cotizacion.productosRechazados || 0}
           </p>
         </div>
       </div>
@@ -220,10 +229,10 @@ function TarjetaCotizacion({
       {/* Etapas críticas (miniatura) */}
       <div className="mb-3 flex items-center gap-1">
         {Object.entries(cotizacion.etapas).map(([etapa, cantidad]) => {
-          const porcentaje = cotizacion.totalProductos > 0 
-            ? (cantidad / cotizacion.totalProductos) * 100 
+          const porcentaje = cotizacion.totalProductos > 0
+            ? (cantidad / cotizacion.totalProductos) * 100
             : 0;
-          
+
           return (
             <div
               key={etapa}
@@ -376,7 +385,8 @@ function ModalDetalle({
                       conBL: '7. Con BL',
                       segundoSeguimiento: '8. Segundo Seguimiento',
                       enCIF: '9. En CIF',
-                      recibido: '10. Recibido'
+                      recibido: '10. Recibido',
+                      rechazado: '❌ Rechazados'
                     };
 
                     const porcentaje = cotizacion.totalProductos > 0

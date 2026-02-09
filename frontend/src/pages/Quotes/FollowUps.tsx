@@ -1762,6 +1762,7 @@ export default function FollowUps() {
 
                   // Recargar detalle
                   await seleccionarCotizacion(cotizacionSeleccionada);
+                  await cargarCotizaciones();
                 } catch (error) {
                   console.error("Error al rechazar producto:", error);
                   addNotification("danger", "Error al rechazar producto", "Intenta de nuevo");
