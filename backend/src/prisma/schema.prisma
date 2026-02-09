@@ -469,10 +469,17 @@ model EstadoProducto {
   cantidad       Int?
   observaciones  String?  @db.Text
   estadoGeneral  String   @default("warn") @db.VarChar(20) // "success", "warn", "danger"
+
+  
   
   // Metadata
   creado      DateTime @default(now())
   actualizado DateTime @default(now()) @updatedAt
+
+  // NUEVOS CAMPOS - Rechazo de productos
+  rechazado             Boolean   @default(false)
+  fechaRechazo          DateTime? @map("fecha_rechazo")
+  motivoRechazo         String?   @map("motivo_rechazo") @db.Text
   
   // Relaciones
   proyecto          Proyecto?          @relation(fields: [proyectoId], references: [id], onDelete: Cascade)

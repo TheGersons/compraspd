@@ -54,6 +54,9 @@ type Producto = {
     fechaAprobacion?: string;
     paisOrigen?: Pais;
     medioTransporte?: MedioTransporte;
+    rechazado?: boolean;
+    fechaRechazo?: string;
+    motivoRechazo?: string;
   };
   timelineSugerido?: TimelineSKU;
   precios?: Precio[];
@@ -336,6 +339,21 @@ const api = {
     return response.json();
   },
 
+  async rechazarProducto(cotizacionId: string, estadoProductoId: string, motivoRechazo: string) {
+    const token = getToken();
+    const response = await fetch(`${API_BASE_URL}/api/v1/followups/${cotizacionId}/rechazar`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ estadoProductoId, motivoRechazo }),
+    });
+    if (!response.ok) throw new Error("Error al rechazar producto");
+    return response.json();
+  },
+
 };
 
 // ============================================================================
@@ -538,35 +556,34 @@ export default function FollowUps() {
 
   const guardarConfiguracion = async (config: any) => {
     if (!cotizacionSeleccionada || !productoConfigurando) return;
-     
+
 
     try {
-      if (cotizacionSeleccionada.tipoCompra === 'NACIONAL')
-      {
-        
-        await api.configurarTimeline(cotizacionSeleccionada.id, [
-        {
-          sku: productoConfigurando.sku,
-          paisOrigenId: '53b360e4-f5fe-4f27-beba-90bc79390f07',
-          medioTransporte: config.medioTransporte,
-          timeline: config.timeline,
-          notas: config.notas,
-        },
-      ]);
-
-      } else  {
+      if (cotizacionSeleccionada.tipoCompra === 'NACIONAL') {
 
         await api.configurarTimeline(cotizacionSeleccionada.id, [
-        {
-          sku: productoConfigurando.sku,
-          paisOrigenId: config.paisOrigenId,
-          medioTransporte: config.medioTransporte,
-          timeline: config.timeline,
-          notas: config.notas,
-        },
-      ]);
+          {
+            sku: productoConfigurando.sku,
+            paisOrigenId: '53b360e4-f5fe-4f27-beba-90bc79390f07',
+            medioTransporte: config.medioTransporte,
+            timeline: config.timeline,
+            notas: config.notas,
+          },
+        ]);
+
+      } else {
+
+        await api.configurarTimeline(cotizacionSeleccionada.id, [
+          {
+            sku: productoConfigurando.sku,
+            paisOrigenId: config.paisOrigenId,
+            medioTransporte: config.medioTransporte,
+            timeline: config.timeline,
+            notas: config.notas,
+          },
+        ]);
       }
-      
+
 
       addNotification("success", "Timeline configurado exitosamente", "Timeline configurado exitosamente");
       setShowTimelineModal(false);
@@ -1723,11 +1740,32 @@ export default function FollowUps() {
             <TimelineModalContent
               producto={productoConfigurando}
               paises={paises}
-              tipoCompra={cotizacionSeleccionada?.tipoCompra || 'NACIONAL'}  // ← AGREGAR
+              tipoCompra={cotizacionSeleccionada?.tipoCompra || 'NACIONAL'}
               onSave={guardarConfiguracion}
               onCancel={() => {
                 setShowTimelineModal(false);
                 setProductoConfigurando(null);
+              }}
+              onReject={async (motivoRechazo) => {
+                if (!cotizacionSeleccionada || !productoConfigurando?.estadoProducto?.id) return;
+
+                try {
+                  await api.rechazarProducto(
+                    cotizacionSeleccionada.id,
+                    productoConfigurando.estadoProducto.id,
+                    motivoRechazo
+                  );
+
+                  addNotification("success", "Producto rechazado", "El solicitante será notificado");
+                  setShowTimelineModal(false);
+                  setProductoConfigurando(null);
+
+                  // Recargar detalle
+                  await seleccionarCotizacion(cotizacionSeleccionada);
+                } catch (error) {
+                  console.error("Error al rechazar producto:", error);
+                  addNotification("danger", "Error al rechazar producto", "Intenta de nuevo");
+                }
               }}
             />
           </div>
@@ -1747,42 +1785,45 @@ function TimelineModalContent({
   tipoCompra,
   onSave,
   onCancel,
+  onReject,
 }: {
   producto: Producto;
   paises: Pais[];
   tipoCompra: 'NACIONAL' | 'INTERNACIONAL';
   onSave: (config: any) => void;
   onCancel: () => void;
+  onReject: (motivoRechazo: string) => void;
 }) {
   const esNacional = tipoCompra === 'NACIONAL';
 
+  // Estados existentes
   const [paisOrigenId, setPaisOrigenId] = useState(
     producto.estadoProducto?.paisOrigen?.id || (esNacional ? '' : paises[0]?.id) || ""
   );
   const [medioTransporte, setMedioTransporte] = useState<MedioTransporte>(
     producto.estadoProducto?.medioTransporte || "TERRESTRE"
   );
-
-  // Timeline config - valores por defecto según tipo
   const [timeline, setTimeline] = useState<TimelineConfig>({
     diasCotizadoADescuento: producto.timelineSugerido?.diasCotizadoADescuento || 2,
     diasDescuentoAComprado: producto.timelineSugerido?.diasDescuentoAComprado || 3,
     diasCompradoAPagado: producto.timelineSugerido?.diasCompradoAPagado || 5,
-    // Solo para internacional
     diasPagadoASeguimiento1: esNacional ? undefined : producto.timelineSugerido?.diasPagadoASeguimiento1,
     diasSeguimiento1AFob: esNacional ? undefined : producto.timelineSugerido?.diasSeguimiento1AFob,
     diasFobABl: esNacional ? undefined : producto.timelineSugerido?.diasFobABl,
     diasBlASeguimiento2: esNacional ? undefined : producto.timelineSugerido?.diasBlASeguimiento2,
     diasSeguimiento2ACif: esNacional ? undefined : producto.timelineSugerido?.diasSeguimiento2ACif,
     diasCifARecibido: esNacional
-      ? (producto.timelineSugerido?.diasCifARecibido || 3) // Para nacional: Pagado → Recibido
+      ? (producto.timelineSugerido?.diasCifARecibido || 3)
       : (producto.timelineSugerido?.diasCifARecibido || 5),
   });
   const [notas, setNotas] = useState(producto.timelineSugerido?.notas || "");
 
+  // NUEVOS ESTADOS para rechazo
+  const [mostrarRechazo, setMostrarRechazo] = useState(false);
+  const [motivoRechazo, setMotivoRechazo] = useState("");
+
   const diasTotales = Object.values(timeline).reduce((sum, dias) => sum + (dias || 0), 0);
 
-  // Procesos según tipo de compra
   const procesosNacional = [
     { key: "diasCotizadoADescuento", label: "Cotizado → Con Descuento" },
     { key: "diasDescuentoAComprado", label: "Con Descuento → Comprado" },
@@ -1805,12 +1846,10 @@ function TimelineModalContent({
   const procesos = esNacional ? procesosNacional : procesosInternacional;
 
   const handleSave = () => {
-    // Para internacional, validar país de origen
     if (!esNacional && !paisOrigenId) {
       alert("Selecciona un país de origen");
       return;
     }
-
     onSave({
       paisOrigenId: esNacional ? null : paisOrigenId,
       medioTransporte,
@@ -1820,17 +1859,120 @@ function TimelineModalContent({
     });
   };
 
+  const handleReject = () => {
+    if (motivoRechazo.trim().length < 10) {
+      alert("El motivo debe tener al menos 10 caracteres");
+      return;
+    }
+    onReject(motivoRechazo.trim());
+  };
+
+  // Si está en modo rechazo, mostrar formulario de rechazo
+  if (mostrarRechazo) {
+    return (
+      <div className="p-6">
+        <div className="mb-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
+              <svg className="h-6 w-6 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Rechazar Producto
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {producto.sku} - {producto.descripcionProducto}
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-lg bg-red-50 p-4 dark:bg-red-900/20 mb-4">
+            <p className="text-sm text-red-700 dark:text-red-400">
+              Al rechazar este producto, el solicitante será notificado y deberá corregir o justificar la solicitud antes de que pueda ser aprobada.
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Motivo del rechazo <span className="text-rose-500">*</span>
+            </label>
+            <textarea
+              value={motivoRechazo}
+              onChange={(e) => setMotivoRechazo(e.target.value)}
+              rows={4}
+              placeholder="Explica el motivo del rechazo (mínimo 10 caracteres)..."
+              className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-red-500 focus:outline-none focus:ring-4 focus:ring-red-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            />
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {motivoRechazo.length}/10 caracteres mínimos
+            </p>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 border-t border-gray-200 pt-4 dark:border-gray-700">
+            <button
+              onClick={() => {
+                setMostrarRechazo(false);
+                setMotivoRechazo("");
+              }}
+              className="rounded-lg border-2 border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              Volver
+            </button>
+            <button
+              onClick={handleReject}
+              disabled={motivoRechazo.trim().length < 10}
+              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-red-500 dark:hover:bg-red-600"
+            >
+              Confirmar Rechazo
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Vista normal de configuración
   return (
     <div className="p-6">
       {/* Badge de tipo de compra */}
-      <div className="mb-4">
+      <div className="mb-4 flex items-center justify-between">
         <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium ${esNacional
-            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-            : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
+          ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+          : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
           }`}>
           {esNacional ? '🏠 Compra Nacional' : '🌍 Compra Internacional'}
         </span>
+
+        {/* Mostrar si está rechazado */}
+        {producto.estadoProducto?.rechazado && (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-800 dark:bg-red-900/30 dark:text-red-400">
+            ⚠️ Rechazado
+          </span>
+        )}
       </div>
+
+      {/* Mostrar motivo de rechazo previo si existe */}
+      {producto.estadoProducto?.rechazado && producto.estadoProducto?.motivoRechazo && (
+        <div className="mb-6 rounded-lg bg-red-50 p-4 dark:bg-red-900/20">
+          <div className="flex items-start gap-2">
+            <svg className="h-5 w-5 flex-shrink-0 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <div className="flex-1">
+              <h4 className="font-medium text-red-900 dark:text-red-300">
+                Producto rechazado anteriormente
+              </h4>
+              <p className="mt-1 text-sm text-red-700 dark:text-red-400">
+                {producto.estadoProducto.motivoRechazo}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Timeline sugerido */}
       {producto.timelineSugerido && (
@@ -1852,7 +1994,7 @@ function TimelineModalContent({
       )}
 
       <div className="space-y-6">
-        {/* País y Transporte - Solo mostrar país para INTERNACIONAL */}
+        {/* País y Transporte */}
         <div className={`grid gap-4 ${esNacional ? 'md:grid-cols-1' : 'md:grid-cols-2'}`}>
           {!esNacional && (
             <div>
@@ -1927,8 +2069,8 @@ function TimelineModalContent({
 
         {/* Total de días */}
         <div className={`rounded-lg p-4 ${esNacional
-            ? 'bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20'
-            : 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20'
+          ? 'bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20'
+          : 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20'
           }`}>
           <div className="flex items-center justify-between">
             <span className="font-medium text-gray-900 dark:text-white">
@@ -1956,22 +2098,36 @@ function TimelineModalContent({
         </div>
 
         {/* Botones */}
-        <div className="flex items-center justify-end gap-3 border-t border-gray-200 pt-4 dark:border-gray-700">
+        <div className="flex items-center justify-between border-t border-gray-200 pt-4 dark:border-gray-700">
+          {/* Botón Rechazar a la izquierda */}
           <button
-            onClick={onCancel}
-            className="rounded-lg border-2 border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+            onClick={() => setMostrarRechazo(true)}
+            className="inline-flex items-center gap-2 rounded-lg border-2 border-red-300 px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 dark:border-red-600 dark:text-red-400 dark:hover:bg-red-900/20"
           >
-            Cancelar
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            Rechazar
           </button>
-          <button
-            onClick={handleSave}
-            className={`rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors ${esNacional
+
+          {/* Botones Cancelar y Guardar a la derecha */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onCancel}
+              className="rounded-lg border-2 border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleSave}
+              className={`rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors ${esNacional
                 ? 'bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600'
                 : 'bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600'
-              }`}
-          >
-            Guardar Configuración
-          </button>
+                }`}
+            >
+              Guardar Configuración
+            </button>
+          </div>
         </div>
       </div>
     </div>

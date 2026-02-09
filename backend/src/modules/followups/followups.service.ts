@@ -58,7 +58,7 @@ export class FollowUpsService {
     // Construir filtros
     const where: any = {
       estado: {
-        in: ['ENVIADA' ,'PENDIENTE', 'EN_CONFIGURACION', 'APROBADA_PARCIAL']
+        in: ['ENVIADA', 'PENDIENTE', 'EN_CONFIGURACION', 'APROBADA_PARCIAL']
       }
     };
 
@@ -164,17 +164,21 @@ export class FollowUpsService {
   }
 
   /**
-   * Obtiene detalle completo de una cotización
-   * Incluye productos con timeline sugerido si existe
-   */
+ * Obtiene detalle completo de una cotización
+ * Incluye productos con timeline sugerido si existe
+ * NUEVO: Agrega automáticamente al supervisor como participante del chat
+ */
   async getCotizacionDetalle(cotizacionId: string, user: UserJwt) {
-    // Verificar que es supervisor
+    // Verificar que es supervisor o admin
     const usuario = await this.prisma.usuario.findUnique({
       where: { id: user.sub },
       include: { rol: true }
     });
 
-    if (!usuario?.rol.nombre.toLowerCase().includes('supervisor')) {
+    const rolNombre = usuario?.rol.nombre.toLowerCase() || '';
+    const esSupervisorOAdmin = rolNombre.includes('supervisor') || rolNombre.includes('admin');
+
+    if (!esSupervisorOAdmin) {
       throw new ForbiddenException('Solo supervisores pueden acceder a esta función');
     }
 
@@ -234,6 +238,15 @@ export class FollowUpsService {
           include: {
             paisOrigen: true
           }
+        },
+        // Incluir chat con participantes para verificar
+        chat: {
+          select: {
+            id: true,
+            participantes: {
+              select: { userId: true }
+            }
+          }
         }
       }
     });
@@ -241,6 +254,31 @@ export class FollowUpsService {
     if (!cotizacion) {
       throw new NotFoundException('Cotización no encontrada');
     }
+
+    // =====================================================
+    // NUEVO: Agregar supervisor al chat si no es participante
+    // =====================================================
+    if (cotizacion.chatId && cotizacion.chat) {
+      const yaEsParticipante = cotizacion.chat.participantes.some(
+        p => p.userId === user.sub
+      );
+
+      if (!yaEsParticipante) {
+        try {
+          await this.prisma.participantesChat.create({
+            data: {
+              chatId: cotizacion.chatId,
+              userId: user.sub,
+              ultimoLeido: new Date(),
+            }
+          });
+        } catch (error) {
+          // Ignorar error si ya existe (race condition)
+          // El unique constraint evitará duplicados
+        }
+      }
+    }
+    // =====================================================
 
     // Obtener timeline sugerido para cada SKU
     const productosConTimeline = await Promise.all(
@@ -269,8 +307,11 @@ export class FollowUpsService {
       })
     );
 
+    // Retornar sin el objeto chat interno (solo chatId)
+    const { chat, ...cotizacionSinChat } = cotizacion;
+
     return {
-      ...cotizacion,
+      ...cotizacionSinChat,
       detalles: productosConTimeline
     };
   }
@@ -591,81 +632,81 @@ export class FollowUpsService {
     // VALIDACIONES ANTES DE APROBAR
     // ============================================================================
     for (const aprobacion of dto.productos) {
-    if (aprobacion.aprobado) {
-      // Encontrar el estado producto
-      const estadoProducto = cotizacion.estadosProductos.find(
-        ep => ep.id === aprobacion.estadoProductoId
-      );
-
-      if (!estadoProducto) {
-        throw new BadRequestException(
-          `Producto ${aprobacion.estadoProductoId} no encontrado`
+      if (aprobacion.aprobado) {
+        // Encontrar el estado producto
+        const estadoProducto = cotizacion.estadosProductos.find(
+          ep => ep.id === aprobacion.estadoProductoId
         );
-      }
 
-      // Buscar el detalle correspondiente por SKU
-      const detalle = await this.prisma.cotizacionDetalle.findFirst({
-        where: {
-          cotizacionId: cotizacionId,
-          sku: estadoProducto.sku
-        },
-        include: {
-          precios: {
-            select: {
-              id: true,
-              precio: true,
-              precioDescuento: true,
-              ComprobanteDescuento: true
+        if (!estadoProducto) {
+          throw new BadRequestException(
+            `Producto ${aprobacion.estadoProductoId} no encontrado`
+          );
+        }
+
+        // Buscar el detalle correspondiente por SKU
+        const detalle = await this.prisma.cotizacionDetalle.findFirst({
+          where: {
+            cotizacionId: cotizacionId,
+            sku: estadoProducto.sku
+          },
+          include: {
+            precios: {
+              select: {
+                id: true,
+                precio: true,
+                precioDescuento: true,
+                ComprobanteDescuento: true
+              }
             }
           }
+        });
+
+        if (!detalle) {
+          throw new BadRequestException(
+            `No se encontró el detalle para el producto ${estadoProducto.sku}`
+          );
         }
-      });
 
-      if (!detalle) {
-        throw new BadRequestException(
-          `No se encontró el detalle para el producto ${estadoProducto.sku}`
-        );
-      }
+        // VALIDACIÓN 1: Debe tener precio seleccionado
+        if (!detalle.preciosId) {
+          throw new BadRequestException(
+            `El producto "${estadoProducto.sku}" debe tener un precio seleccionado antes de aprobarlo`
+          );
+        }
 
-      // VALIDACIÓN 1: Debe tener precio seleccionado
-      if (!detalle.preciosId) {
-        throw new BadRequestException(
-          `El producto "${estadoProducto.sku}" debe tener un precio seleccionado antes de aprobarlo`
-        );
-      }
+        // Obtener el precio seleccionado
+        const precioSeleccionado = await this.prisma.precios.findUnique({
+          where: { id: detalle.preciosId }
+        });
 
-      // Obtener el precio seleccionado
-      const precioSeleccionado = await this.prisma.precios.findUnique({
-        where: { id: detalle.preciosId }
-      });
+        if (!precioSeleccionado) {
+          throw new BadRequestException(
+            `No se encontró el precio seleccionado para "${estadoProducto.sku}"`
+          );
+        }
 
-      if (!precioSeleccionado) {
-        throw new BadRequestException(
-          `No se encontró el precio seleccionado para "${estadoProducto.sku}"`
-        );
-      }
+        // VALIDACIÓN 2: Debe tener comprobante de descuento solicitado
+        if (!precioSeleccionado.ComprobanteDescuento) {
+          throw new BadRequestException(
+            `El producto "${estadoProducto.sku}" debe tener una solicitud de descuento con comprobante antes de aprobarlo. ` +
+            `Por favor, solicite el descuento primero.`
+          );
+        }
 
-      // VALIDACIÓN 2: Debe tener comprobante de descuento solicitado
-      if (!precioSeleccionado.ComprobanteDescuento) {
-        throw new BadRequestException(
-          `El producto "${estadoProducto.sku}" debe tener una solicitud de descuento con comprobante antes de aprobarlo. ` +
-          `Por favor, solicite el descuento primero.`
-        );
-      }
-
-      // VALIDACIÓN 3: Debe tener resultado de descuento (aprobado o denegado)
-      if (precioSeleccionado.precioDescuento === null) {
-        throw new BadRequestException(
-          `El producto "${estadoProducto.sku}" debe tener el resultado del descuento (aprobado o denegado) antes de aprobarlo. ` +
-          `Por favor, agregue el resultado del descuento.`
-        );
+        // VALIDACIÓN 3: Debe tener resultado de descuento (aprobado o denegado)
+        if (precioSeleccionado.precioDescuento === null) {
+          throw new BadRequestException(
+            `El producto "${estadoProducto.sku}" debe tener el resultado del descuento (aprobado o denegado) antes de aprobarlo. ` +
+            `Por favor, agregue el resultado del descuento.`
+          );
+        }
       }
     }
-  }
 
-  // ============================================================================
-  // SI TODAS LAS VALIDACIONES PASARON, PROCEDER CON LA APROBACIÓN
-  // ============================================================================
+    // ============================================================================
+    // SI TODAS LAS VALIDACIONES PASARON, PROCEDER CON LA APROBACIÓN
+    // ============================================================================
 
     type CambioAprobacion = {
       estadoProductoId: string;
@@ -739,8 +780,7 @@ export class FollowUpsService {
           ? 'APROBADA_PARCIAL'
           : cotizacion.estado;
 
-      if (CambioAprobacion === 'PRODUCTO_DESAPROBADO')
-      {
+      if (CambioAprobacion === 'PRODUCTO_DESAPROBADO') {
         nuevoEstado = 'EN_CONFIGURACION';
       }
 
@@ -972,5 +1012,129 @@ export class FollowUpsService {
       ...s,
       cotizacionesActivas: s._count.cotizacionesSupervisadas
     }));
+  }
+
+  /**
+ * Rechaza un producto individual con motivo
+ * El producto queda marcado como rechazado y no puede ser aprobado hasta que se corrija
+ */
+  async rechazarProducto(
+    cotizacionId: string,
+    dto: { estadoProductoId: string; motivoRechazo: string },
+    user: UserJwt
+  ) {
+    // Verificar que es supervisor
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id: user.sub },
+      include: { rol: true }
+    });
+
+    const rolNombre = usuario?.rol.nombre.toLowerCase() || '';
+    const esSupervisorOAdmin = rolNombre.includes('supervisor') || rolNombre.includes('admin');
+
+    if (!esSupervisorOAdmin) {
+      throw new ForbiddenException('Solo supervisores pueden rechazar productos');
+    }
+
+    // Verificar que el producto pertenece a la cotización
+    const estadoProducto = await this.prisma.estadoProducto.findFirst({
+      where: {
+        id: dto.estadoProductoId,
+        cotizacionId: cotizacionId
+      },
+      select: {
+        id: true,
+        sku: true,
+        descripcion: true
+      }
+    });
+
+    if (!estadoProducto) {
+      throw new BadRequestException('Producto no encontrado en esta cotización');
+    }
+
+    // Validar motivo
+    if (!dto.motivoRechazo || dto.motivoRechazo.trim().length < 10) {
+      throw new BadRequestException('El motivo de rechazo debe tener al menos 10 caracteres');
+    }
+
+    // Ejecutar en transacción
+    const resultado = await this.prisma.$transaction(async (tx) => {
+      // 1. Actualizar estado del producto
+      await tx.estadoProducto.update({
+        where: { id: dto.estadoProductoId },
+        data: {
+          rechazado: true,
+          fechaRechazo: new Date(),
+          motivoRechazo: dto.motivoRechazo.trim(),
+          aprobadoPorSupervisor: false,
+          fechaAprobacion: null
+        }
+      });
+
+      // 2. Registrar en historial
+      await tx.historialCotizacion.create({
+        data: {
+          cotizacionId: cotizacionId,
+          usuarioId: user.sub,
+          accion: 'PRODUCTO_RECHAZADO',
+          detalles: {
+            productoId: dto.estadoProductoId,
+            sku: estadoProducto.sku,
+            descripcion: estadoProducto.descripcion,
+            motivoRechazo: dto.motivoRechazo.trim()
+          }
+        }
+      });
+
+      // 3. Actualizar estado de la cotización
+      const todosProductos = await tx.estadoProducto.findMany({
+        where: { cotizacionId: cotizacionId },
+        select: {
+          aprobadoPorSupervisor: true,
+          rechazado: true
+        }
+      });
+
+      const totalProductos = todosProductos.length;
+      const productosAprobados = todosProductos.filter(p => p.aprobadoPorSupervisor).length;
+      const productosRechazados = todosProductos.filter(p => p.rechazado).length;
+      const aprobadaParcialmente = productosAprobados > 0 && productosAprobados < totalProductos;
+
+      // Si hay productos rechazados, el estado vuelve a EN_CONFIGURACION
+      let nuevoEstado = 'EN_CONFIGURACION';
+      if (productosRechazados === 0 && productosAprobados === totalProductos) {
+        nuevoEstado = 'APROBADA_COMPLETA';
+      } else if (aprobadaParcialmente) {
+        nuevoEstado = 'APROBADA_PARCIAL';
+      }
+
+      await tx.cotizacion.update({
+        where: { id: cotizacionId },
+        data: {
+          supervisorResponsableId: user.sub,
+          aprobadaParcialmente,
+          todosProductosAprobados: false,
+          estado: nuevoEstado
+        }
+      });
+
+      return {
+        totalProductos,
+        productosAprobados,
+        productosRechazados,
+        nuevoEstado
+      };
+    });
+
+    return {
+      message: 'Producto rechazado exitosamente',
+      producto: {
+        id: estadoProducto.id,
+        sku: estadoProducto.sku,
+        motivoRechazo: dto.motivoRechazo.trim()
+      },
+      ...resultado
+    };
   }
 }

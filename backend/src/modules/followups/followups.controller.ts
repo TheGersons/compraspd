@@ -35,14 +35,14 @@ type UserJwt = { sub: string; role?: string };
 @UseGuards(JwtAuthGuard)
 @Controller('api/v1/followups')
 export class FollowUpsController {
-  constructor(private readonly followupsService: FollowUpsService) {}
+  constructor(private readonly followupsService: FollowUpsService) { }
 
   /**
    * GET /api/v1/followups
    * Lista cotizaciones pendientes de configuración/aprobación
    */
   @Get()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Listar cotizaciones pendientes',
     description: 'Obtiene lista de cotizaciones que requieren configuración o aprobación. Solo para supervisores.'
   })
@@ -75,7 +75,7 @@ export class FollowUpsController {
    * Obtiene estadísticas del dashboard de supervisores
    */
   @Get('estadisticas')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Estadísticas de supervisor',
     description: 'Obtiene contadores y estadísticas para el dashboard'
   })
@@ -89,7 +89,7 @@ export class FollowUpsController {
    * Lista supervisores disponibles
    */
   @Get('supervisores')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Listar supervisores',
     description: 'Obtiene lista de supervisores activos con su carga de trabajo'
   })
@@ -103,7 +103,7 @@ export class FollowUpsController {
    * Obtiene detalle completo de una cotización
    */
   @Get(':id')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Detalle de cotización',
     description: 'Obtiene cotización completa con productos, timeline sugerido y chat'
   })
@@ -121,7 +121,7 @@ export class FollowUpsController {
    * Obtiene historial de cambios de una cotización
    */
   @Get(':id/historial')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Historial de cambios',
     description: 'Obtiene log completo de cambios realizados en la cotización'
   })
@@ -139,7 +139,7 @@ export class FollowUpsController {
    * Configura timeline para productos de la cotización
    */
   @Post(':id/configurar')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Configurar timeline',
     description: 'Configura días de timeline, país y transporte para cada producto'
   })
@@ -160,7 +160,7 @@ export class FollowUpsController {
    * Aprueba o desaprueba productos individualmente
    */
   @Post(':id/aprobar')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Aprobar productos',
     description: 'Aprueba o desaprueba productos de forma individual o masiva'
   })
@@ -180,7 +180,7 @@ export class FollowUpsController {
    * Reasigna supervisor responsable
    */
   @Patch(':id/supervisor')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Reasignar supervisor',
     description: 'Cambia el supervisor responsable de la cotización'
   })
@@ -193,5 +193,25 @@ export class FollowUpsController {
     @Body('supervisorId', ParseUUIDPipe) supervisorId: string
   ) {
     return this.followupsService.reasignarSupervisor(id, supervisorId, user);
+  }
+
+  /**
+ * POST /api/v1/followups/:id/rechazar
+ * Rechaza un producto individual con motivo
+ */
+  @Post(':id/rechazar')
+  @ApiOperation({
+    summary: 'Rechazar producto',
+    description: 'Rechaza un producto individual con un motivo obligatorio'
+  })
+  @ApiResponse({ status: 200, description: 'Producto rechazado exitosamente' })
+  @ApiResponse({ status: 400, description: 'Motivo inválido o producto no encontrado' })
+  @ApiResponse({ status: 403, description: 'Solo supervisores pueden rechazar' })
+  rechazarProducto(
+    @CurrentUser() user: UserJwt,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: { estadoProductoId: string; motivoRechazo: string }
+  ) {
+    return this.followupsService.rechazarProducto(id, dto, user);
   }
 }
