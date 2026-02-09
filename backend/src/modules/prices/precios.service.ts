@@ -1,8 +1,8 @@
-import { 
-  BadRequestException, 
-  ForbiddenException, 
-  Injectable, 
-  NotFoundException 
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreatePrecioDto } from './dto/create-precio.dto';
@@ -16,7 +16,7 @@ type UserJwt = { sub: string; role?: string };
  */
 @Injectable()
 export class PreciosService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   /**
    * Crear oferta de proveedor para un item de cotización
@@ -124,7 +124,7 @@ export class PreciosService {
       throw new ForbiddenException('No tienes permiso para ver estas ofertas');
     }
 
-    return this.prisma.precios.findMany({
+    const precios = await this.prisma.precios.findMany({
       where: { cotizacionDetalleId },
       include: {
         proveedor: {
@@ -141,6 +141,12 @@ export class PreciosService {
         { precio: 'asc' }
       ]
     });
+
+    // Agregar campo "seleccionado" a cada precio
+    return precios.map(precio => ({
+      ...precio,
+      seleccionado: detalle.preciosId === precio.id
+    }));
   }
 
   /**
@@ -206,7 +212,7 @@ export class PreciosService {
     }
 
     // Solo permitir edición si cotización está EN_REVISION o ENVIADA
-    if (!['ENVIADA', 'EN_REVISION','EN_CONFIGURACION'].includes(current.cotizacionDetalle.cotizacion.estado)) {
+    if (!['ENVIADA', 'EN_REVISION', 'EN_CONFIGURACION'].includes(current.cotizacionDetalle.cotizacion.estado)) {
       throw new BadRequestException(
         'No se pueden modificar ofertas de una cotización ya procesada'
       );
@@ -303,7 +309,7 @@ export class PreciosService {
       throw new BadRequestException(
         `Solo se pueden seleccionar ofertas cuando la cotización está EN_REVISION` +
         ` o EN_CONFIGURACION. Estado actual: ${precio.cotizacionDetalle.cotizacion.estado}`
-         
+
       );
     }
 
@@ -520,5 +526,5 @@ export class PreciosService {
       aprobado: fueAprobado,
     };
   }
-  
+
 }
