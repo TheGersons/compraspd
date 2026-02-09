@@ -1749,6 +1749,7 @@ export default function FollowUps() {
               onReject={async (motivoRechazo) => {
                 if (!cotizacionSeleccionada || !productoConfigurando) return;
 
+
                 try {
                   const idParaRechazar = productoConfigurando.estadoProducto?.id || productoConfigurando.id;
                   await api.rechazarProducto(
@@ -1792,12 +1793,12 @@ function TimelineModalContent({
   producto: Producto;
   paises: Pais[];
   tipoCompra: 'NACIONAL' | 'INTERNACIONAL';
-  onSave: (config: any) => void;
+  onSave: (config: any) => Promise<void> | void;
   onCancel: () => void;
-  onReject: (motivoRechazo: string) => void;
+  onReject: (motivoRechazo: string) => Promise<void> | void;
 }) {
 
- 
+  const [loading, setLoading] = useState(false);
   const esNacional = tipoCompra === 'NACIONAL';
 
   // Estados existentes
@@ -1854,13 +1855,20 @@ function TimelineModalContent({
       alert("Selecciona un país de origen");
       return;
     }
-    onSave({
-      paisOrigenId: esNacional ? null : paisOrigenId,
-      medioTransporte,
-      timeline,
-      notas,
-      esNacional,
-    });
+
+    try {
+      setLoading(true);
+      onSave({
+        paisOrigenId: esNacional ? null : paisOrigenId,
+        medioTransporte,
+        timeline,
+        notas,
+        esNacional,
+      });
+    } catch (error) {
+      console.error(error);
+      setLoading(false);
+    }
   };
 
   const handleReject = () => {
@@ -2116,22 +2124,26 @@ function TimelineModalContent({
             Rechazar
           </button>
 
-          {/* Botones Cancelar y Guardar a la derecha */}
+          {/* Botones Cancelar y Guardar */}
           <div className="flex items-center gap-3">
             <button
               onClick={onCancel}
-              className="rounded-lg border-2 border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+              disabled={loading} // Deshabilitar al cargar
+              className="rounded-lg border-2 border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
             >
               Cancelar
             </button>
+
             <button
               onClick={handleSave}
-              className={`rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors ${esNacional
-                ? 'bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600'
-                : 'bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600'
+              disabled={loading} // Deshabilitar al cargar
+              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors ${loading ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
                 }`}
             >
-              Guardar Configuración
+              {loading && (
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+              )}
+              {loading ? "Guardando..." : "Guardar Configuración"}
             </button>
           </div>
         </div>
