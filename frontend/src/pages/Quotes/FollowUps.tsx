@@ -5,7 +5,7 @@ import { useNotifications } from "../Notifications/context/NotificationContext";
 import Historial from "./components/Historial";
 import { useAuth } from "../../context/AuthContext";
 import toast from "react-hot-toast";
-import { useNavigate } from "react-router";
+import { useNavigate } from "react-router-dom";
 
 // ============================================================================
 // TYPES
