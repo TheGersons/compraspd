@@ -174,73 +174,73 @@ export class QuotationsService {
  * Obtiene una cotización por ID
  * Si es supervisor/admin y no está en el chat, lo agrega automáticamente
  */
-async getById(id: string, user: UserJwt) {
-  const cotizacion = await this.prisma.cotizacion.findUnique({
-    where: { id },
-    include: {
-      detalles: {
-        include: {
-          precios: {
-            include: {
-              proveedor: true
+  async getById(id: string, user: UserJwt) {
+    const cotizacion = await this.prisma.cotizacion.findUnique({
+      where: { id },
+      include: {
+        detalles: {
+          include: {
+            precios: {
+              include: {
+                proveedor: true
+              }
+            }
+          }
+        },
+        solicitante: {
+          select: {
+            id: true,
+            nombre: true,
+            email: true,
+            departamento: { select: { nombre: true } }
+          }
+        },
+        tipo: { include: { area: true } },
+        proyecto: true,
+        chat: {
+          include: {
+            participantes: {
+              select: { userId: true }
             }
           }
         }
-      },
-      solicitante: {
-        select: {
-          id: true,
-          nombre: true,
-          email: true,
-          departamento: { select: { nombre: true } }
-        }
-      },
-      tipo: { include: { area: true } },
-      proyecto: true,
-      chat: {
-        include: {
-          participantes: {
-            select: { userId: true }
+      }
+    });
+
+    if (!cotizacion) {
+      throw new NotFoundException('Cotización no encontrada');
+    }
+
+    // Validar permisos
+    const isOwner = cotizacion.solicitanteId === user.sub;
+    const isSupervisor = this.isSupervisorOrAdmin(user);
+
+    if (!isOwner && !isSupervisor) {
+      throw new ForbiddenException('No tienes permiso para ver esta cotización');
+    }
+
+    // Si es supervisor y hay chat, verificar si está como participante
+    if (isSupervisor && cotizacion.chatId) {
+      const yaEsParticipante = cotizacion.chat?.participantes.some(
+        p => p.userId === user.sub
+      );
+
+      if (!yaEsParticipante) {
+        // Agregar supervisor al chat
+        await this.prisma.participantesChat.create({
+          data: {
+            chatId: cotizacion.chatId,
+            userId: user.sub,
+            ultimoLeido: new Date(),
           }
-        }
+        }).catch(() => {
+          // Ignorar si ya existe (por race condition)
+        });
       }
     }
-  });
 
-  if (!cotizacion) {
-    throw new NotFoundException('Cotización no encontrada');
+    return cotizacion;
   }
-
-  // Validar permisos
-  const isOwner = cotizacion.solicitanteId === user.sub;
-  const isSupervisor = this.isSupervisorOrAdmin(user);
-
-  if (!isOwner && !isSupervisor) {
-    throw new ForbiddenException('No tienes permiso para ver esta cotización');
-  }
-
-  // Si es supervisor y hay chat, verificar si está como participante
-  if (isSupervisor && cotizacion.chatId) {
-    const yaEsParticipante = cotizacion.chat?.participantes.some(
-      p => p.userId === user.sub
-    );
-
-    if (!yaEsParticipante) {
-      // Agregar supervisor al chat
-      await this.prisma.participantesChat.create({
-        data: {
-          chatId: cotizacion.chatId,
-          userId: user.sub,
-          ultimoLeido: new Date(),
-        }
-      }).catch(() => {
-        // Ignorar si ya existe (por race condition)
-      });
-    }
-  }
-
-  return cotizacion;
-}
 
   /**
    * Actualiza una cotización existente
@@ -618,6 +618,39 @@ async getById(id: string, user: UserJwt) {
           }
         }
       });
+    });
+  }
+
+  /**
+    * Elimina una cotización y limpia sus datos asociados
+    */
+  async delete(id: string, user: UserJwt) {
+    // 1. Obtener datos para limpieza (Chat ID)
+    const cotizacion = await this.prisma.cotizacion.findUnique({
+      where: { id },
+      select: { chatId: true }
+    });
+
+    if (!cotizacion) {
+      throw new NotFoundException('Cotización no encontrada');
+    }
+
+    // 2. Transacción de borrado
+    return this.prisma.$transaction(async (tx) => {
+      // PASO A: Borrar la cotización
+      // Esto borrará en cascada: Detalles, Estados, Historial, Notificaciones
+      await tx.cotizacion.delete({
+        where: { id }
+      });
+
+      // PASO B: Borrar el Chat huérfano manualmente (si existe)
+      if (cotizacion.chatId) {
+        await tx.chat.delete({
+          where: { id: cotizacion.chatId }
+        }).catch(e => console.warn('Chat no encontrado o ya borrado', e));
+      }
+
+      return { message: 'Cotización eliminada correctamente' };
     });
   }
 }

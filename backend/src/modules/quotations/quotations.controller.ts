@@ -7,7 +7,8 @@ import {
   Post,
   Query,
   UseGuards,
-  ParseUUIDPipe
+  ParseUUIDPipe,
+  Delete
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { QuotationsService } from './quotations.service';
@@ -147,6 +148,18 @@ export class QuotationsController {
     @CurrentUser() user: UserJwt
   ) {
     return this.service.ensureChat(id, user);
+  }
+
+  /**
+   * DELETE /api/v1/quotations/:id
+   * Elimina una cotización por ID
+   */
+  @Delete(':id')
+  delete(
+    @CurrentUser() user: UserJwt,
+    @Param('id', ParseUUIDPipe) id: string
+  ) {
+    return this.service.delete(id, user);
   }
 
 }

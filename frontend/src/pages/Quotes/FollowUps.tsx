@@ -353,6 +353,16 @@ const api = {
     if (!response.ok) throw new Error("Error al rechazar producto");
     return response.json();
   },
+  async deleteCotizacion(id: string) {
+    const token = getToken();
+    const response = await fetch(`${API_BASE_URL}/api/v1/followups/${id}`, {
+      method: "DELETE",
+      credentials: "include",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error("Error al eliminar cotización");
+    return response.json();
+  },
 
 };
 
@@ -460,6 +470,31 @@ export default function FollowUps() {
   const asignarUsuario = async () => {
     setCurrentUserId(user.id);
   }
+  const eliminarCotizacionActual = async () => {
+    if (!cotizacionSeleccionada) return;
+
+    // Confirmación de seguridad
+    if (!confirm("⚠️ ¿Estás seguro de que deseas ELIMINAR esta cotización?\n\nEsta acción borrará todos los productos, mensajes y configuraciones asociados. No se puede deshacer.")) {
+      return;
+    }
+
+    try {
+      setLoading(true); // Bloqueamos la UI
+      await api.deleteCotizacion(cotizacionSeleccionada.id);
+      
+      addNotification("success", "Cotización eliminada", "La cotización ha sido eliminada correctamente");
+      
+      // Limpiamos la selección y recargamos la lista
+      setCotizacionSeleccionada(null);
+      await cargarCotizaciones();
+      
+    } catch (error) {
+      console.error("Error al eliminar:", error);
+      addNotification("danger", "Error", "No se pudo eliminar la cotización");
+    } finally {
+      setLoading(false);
+    }
+  };
   const cargarCotizaciones = async () => {
     try {
       setLoading(true);
@@ -593,6 +628,7 @@ export default function FollowUps() {
     } catch (error) {
       console.error("Error al configurar timeline:", error);
       addNotification("danger", "Error al configurar timeline", "Error al configurar timeline");
+      throw error; // Re-lanzar para que el modal lo capture
     }
   };
 
@@ -817,7 +853,6 @@ export default function FollowUps() {
     // Llamar a la función original
     await toggleAprobarProducto(estadoProductoId, aprobar);
   };
-
   // ============================================================================
   // COMPONENTE: Modal para Agregar Precio
   // AGREGAR ANTES DEL RETURN PRINCIPAL DEL COMPONENTE
@@ -1202,6 +1237,17 @@ export default function FollowUps() {
                     {cotizacionSeleccionada.porcentajeAprobado || 0}%
                   </span>
                 </div>
+                {/* 🗑️ BOTÓN DE ELIMINAR COTIZACIÓN */}
+        <button
+            onClick={eliminarCotizacionActual}
+            className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
+            title="Eliminar cotización permanentemente"
+        >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            Eliminar
+        </button>
               </div>
 
               {/* Tabs */}
@@ -1287,91 +1333,94 @@ export default function FollowUps() {
                                     </tr>
                                   </thead>
                                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                    {cotizacionSeleccionada.detalles.map((producto) => (
-                                      <tr key={producto.id} className="group hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                                        {/* Producto */}
-                                        <td className="py-4">
-                                          <div className="font-medium text-gray-900 dark:text-white">
-                                            {producto.descripcionProducto}
-                                          </div>
-
-                                        </td>
-
-                                        {/* Cantidad */}
-                                        <td className="py-4 text-sm text-gray-700 dark:text-gray-300">
-                                          {producto.cantidad} {producto.tipoUnidad.toLowerCase()}
-                                        </td>
-
-                                        {/* País / Transporte */}
-                                        <td className="py-4">
-                                          {producto.estadoProducto?.paisOrigen ? (
-                                            <div className="text-sm">
-                                              <div className="font-medium text-gray-900 dark:text-white">
-                                                {producto.estadoProducto.paisOrigen.nombre}
-                                              </div>
-                                              <div className="text-gray-600 dark:text-gray-400">
-                                                {producto.estadoProducto.medioTransporte === "MARITIMO" && "🚢 Marítimo"}
-                                                {producto.estadoProducto.medioTransporte === "TERRESTRE" && "🚚 Terrestre"}
-                                                {producto.estadoProducto.medioTransporte === "AEREO" && "✈️ Aéreo"}
-                                              </div>
+                                    {cotizacionSeleccionada.detalles
+                                      // 🔴 FILTRO: Ocultar rechazados
+                                      .filter(p => !p.estadoProducto?.rechazado)
+                                      .map((producto) => (
+                                        <tr key={producto.id} className="group hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                                          {/* Producto */}
+                                          <td className="py-4">
+                                            <div className="font-medium text-gray-900 dark:text-white">
+                                              {producto.descripcionProducto}
                                             </div>
-                                          ) : (
-                                            <span className="text-sm text-gray-400 dark:text-gray-500">
-                                              No configurado
-                                            </span>
-                                          )}
-                                        </td>
 
-                                        {/* Timeline */}
-                                        <td className="py-4 text-sm">
-                                          {producto.timelineSugerido ? (
-                                            <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                                              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                          </td>
+
+                                          {/* Cantidad */}
+                                          <td className="py-4 text-sm text-gray-700 dark:text-gray-300">
+                                            {producto.cantidad} {producto.tipoUnidad.toLowerCase()}
+                                          </td>
+
+                                          {/* País / Transporte */}
+                                          <td className="py-4">
+                                            {producto.estadoProducto?.paisOrigen ? (
+                                              <div className="text-sm">
+                                                <div className="font-medium text-gray-900 dark:text-white">
+                                                  {producto.estadoProducto.paisOrigen.nombre}
+                                                </div>
+                                                <div className="text-gray-600 dark:text-gray-400">
+                                                  {producto.estadoProducto.medioTransporte === "MARITIMO" && "🚢 Marítimo"}
+                                                  {producto.estadoProducto.medioTransporte === "TERRESTRE" && "🚚 Terrestre"}
+                                                  {producto.estadoProducto.medioTransporte === "AEREO" && "✈️ Aéreo"}
+                                                </div>
+                                              </div>
+                                            ) : (
+                                              <span className="text-sm text-gray-400 dark:text-gray-500">
+                                                No configurado
+                                              </span>
+                                            )}
+                                          </td>
+
+                                          {/* Timeline */}
+                                          <td className="py-4 text-sm">
+                                            {producto.timelineSugerido ? (
+                                              <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                                                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                                {producto.timelineSugerido.diasTotalesEstimados} días
+                                              </span>
+                                            ) : (
+                                              <span className="text-gray-400 dark:text-gray-500">
+                                                Sin timeline
+                                              </span>
+                                            )}
+                                          </td>
+
+                                          {/* Aprobado */}
+                                          <td className="py-4 text-center">
+                                            {producto.estadoProducto ? (
+                                              <input
+                                                type="checkbox"
+                                                checked={producto.estadoProducto.aprobadoPorSupervisor}
+                                                onChange={(e) =>
+                                                  toggleAprobarProductoConValidacion(
+                                                    producto.estadoProducto!.id,
+                                                    e.target.checked
+                                                  )
+                                                }
+                                                className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                                              />
+                                            ) : (
+                                              <span className="text-gray-400">N/A</span>
+                                            )}
+                                          </td>
+
+                                          {/* Acciones */}
+                                          <td className="py-4 text-right">
+                                            <button
+                                              onClick={() => configurarProducto(producto)}
+                                              className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                                            >
+                                              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                               </svg>
-                                              {producto.timelineSugerido.diasTotalesEstimados} días
-                                            </span>
-                                          ) : (
-                                            <span className="text-gray-400 dark:text-gray-500">
-                                              Sin timeline
-                                            </span>
-                                          )}
-                                        </td>
-
-                                        {/* Aprobado */}
-                                        <td className="py-4 text-center">
-                                          {producto.estadoProducto ? (
-                                            <input
-                                              type="checkbox"
-                                              checked={producto.estadoProducto.aprobadoPorSupervisor}
-                                              onChange={(e) =>
-                                                toggleAprobarProductoConValidacion(
-                                                  producto.estadoProducto!.id,
-                                                  e.target.checked
-                                                )
-                                              }
-                                              className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                                            />
-                                          ) : (
-                                            <span className="text-gray-400">N/A</span>
-                                          )}
-                                        </td>
-
-                                        {/* Acciones */}
-                                        <td className="py-4 text-right">
-                                          <button
-                                            onClick={() => configurarProducto(producto)}
-                                            className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
-                                          >
-                                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                            </svg>
-                                            Configurar
-                                          </button>
-                                        </td>
-                                      </tr>
-                                    ))}
+                                              Configurar
+                                            </button>
+                                          </td>
+                                        </tr>
+                                      ))}
                                   </tbody>
                                 </table>
                               </div>
@@ -1381,9 +1430,13 @@ export default function FollowUps() {
                                 <div className="flex justify-end">
                                   <button
                                     onClick={() => {
-                                      // Aprobar todos los productos pendientes
+                                      // 🔴 CORRECCIÓN: Filtrar rechazados para no aprobarlos
                                       const pendientes = cotizacionSeleccionada.detalles!
-                                        .filter(p => p.estadoProducto && !p.estadoProducto.aprobadoPorSupervisor)
+                                        .filter(p =>
+                                          p.estadoProducto &&
+                                          !p.estadoProducto.aprobadoPorSupervisor &&
+                                          !p.estadoProducto.rechazado // <-- Validación crítica
+                                        )
                                         .map(p => ({ estadoProductoId: p.estadoProducto!.id, aprobado: true }));
 
                                       if (pendientes.length > 0) {
@@ -1533,137 +1586,140 @@ export default function FollowUps() {
                             </div>
                           ) : (
                             <div className="space-y-6">
-                              {cotizacionSeleccionada.detalles.map((producto) => {
-                                const precios = preciosPorProducto[producto.id] || [];
-                                const tienePrecio = precios.length > 0;
-                                const precioSeleccionado = precios.find(p => p.seleccionado);
+                              {cotizacionSeleccionada.detalles
+                                // 🔴 FILTRO: Ocultar rechazados en lista de precios
+                                .filter(p => !p.estadoProducto?.rechazado)
+                                .map((producto) => {
+                                  const precios = preciosPorProducto[producto.id] || [];
+                                  const tienePrecio = precios.length > 0;
+                                  const precioSeleccionado = precios.find(p => p.seleccionado);
 
-                                return (
-                                  <div
-                                    key={producto.id}
-                                    className="rounded-lg border border-gray-200 p-4 dark:border-gray-700"
-                                  >
-                                    {/* Header del producto */}
-                                    <div className="mb-4 flex items-start justify-between">
-                                      <div className="flex-1">
-                                        <div className="flex items-center gap-2">
-                                          <h4 className="font-semibold text-gray-900 dark:text-white">
-                                            {producto.sku}
-                                          </h4>
-                                          {!tienePrecio && (
-                                            <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
-                                              Sin precio
-                                            </span>
-                                          )}
-                                          {tienePrecio && !precioSeleccionado && (
-                                            <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
-                                              Sin seleccionar
-                                            </span>
-                                          )}
-                                          {precioSeleccionado && (
-                                            <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                                              ✓ Precio seleccionado
-                                            </span>
-                                          )}
-                                        </div>
-                                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                                          {producto.descripcionProducto}
-                                        </p>
-                                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">
-                                          Cantidad: {producto.cantidad} {producto.tipoUnidad.toLowerCase()}
-                                        </p>
-                                      </div>
-                                      <button
-                                        onClick={() => abrirModalPrecio(producto)}
-                                        className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
-                                      >
-                                        + Agregar Precio
-                                      </button>
-                                    </div>
-
-                                    {/* Lista de precios */}
-                                    {precios.length > 0 ? (
-                                      <div className="space-y-2">
-                                        {precios.map((precio) => (
-                                          <div
-                                            key={precio.id}
-                                            className={`rounded-lg border p-3 transition-colors ${precio.seleccionado
-                                              ? "border-green-500 bg-green-50 dark:border-green-600 dark:bg-green-900/20"
-                                              : "border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
-                                              }`}
-                                          >
-                                            <div className="flex items-start justify-between">
-                                              <div className="flex items-start gap-3 flex-1">
-                                                {/* Radio button */}
-                                                <input
-                                                  type="radio"
-                                                  name={`precio-${producto.id}`}
-                                                  checked={precio.seleccionado}
-                                                  onChange={() => seleccionarPrecio(precio.id, producto.id)}
-                                                  className="mt-1 h-4 w-4 text-blue-600"
-                                                />
-
-                                                {/* Info del precio */}
-                                                <div className="flex-1">
-                                                  <div className="flex items-center gap-2">
-                                                    <span className="font-semibold text-gray-900 dark:text-white">
-                                                      {precio.proveedor.nombre}
-                                                    </span>
-                                                    {precio.proveedor.rtn && (
-                                                      <span className="text-xs text-gray-500">
-                                                        RTN: {precio.proveedor.rtn}
-                                                      </span>
-                                                    )}
-                                                  </div>
-
-                                                  <div className="mt-1 flex flex-wrap items-center gap-4 text-sm">
-                                                    {/* Mostrar precio con descuento si existe, sino el precio normal */}
-                                                    <span className="font-medium text-gray-900 dark:text-white">
-                                                      L. {Number(precio.precioDescuento || precio.precio).toFixed(2)}
-                                                    </span>
-
-                                                    {/* Si hay descuento, mostrar el precio original tachado */}
-                                                    {precio.precioDescuento && (
-                                                      <span className="text-gray-500 line-through">
-                                                        L. {Number(precio.precio).toFixed(2)}
-                                                      </span>
-                                                    )}
-                                                  </div>
-
-                                                  {precio.ComprobanteDescuento && (
-                                                    <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
-                                                      📄 Comprobante: {precio.ComprobanteDescuento}
-                                                    </p>
-                                                  )}
-
-                                                  <p className="mt-1 text-xs text-gray-400 dark:text-gray-600">
-                                                    Agregado: {new Date(precio.creado).toLocaleDateString("es-HN")}
-                                                  </p>
-                                                </div>
-                                              </div>
-
-                                              {/* Botón eliminar */}
-                                              <button
-                                                onClick={() => eliminarPrecio(precio.id, producto.id)}
-                                                className="ml-2 rounded-lg p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                                title="Eliminar precio"
-                                              >
-                                                X
-                                              </button>
-                                            </div>
+                                  return (
+                                    <div
+                                      key={producto.id}
+                                      className="rounded-lg border border-gray-200 p-4 dark:border-gray-700"
+                                    >
+                                      {/* Header del producto */}
+                                      <div className="mb-4 flex items-start justify-between">
+                                        <div className="flex-1">
+                                          <div className="flex items-center gap-2">
+                                            <h4 className="font-semibold text-gray-900 dark:text-white">
+                                              {producto.sku}
+                                            </h4>
+                                            {!tienePrecio && (
+                                              <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
+                                                Sin precio
+                                              </span>
+                                            )}
+                                            {tienePrecio && !precioSeleccionado && (
+                                              <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                                                Sin seleccionar
+                                              </span>
+                                            )}
+                                            {precioSeleccionado && (
+                                              <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                                ✓ Precio seleccionado
+                                              </span>
+                                            )}
                                           </div>
-                                        ))}
+                                          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                                            {producto.descripcionProducto}
+                                          </p>
+                                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">
+                                            Cantidad: {producto.cantidad} {producto.tipoUnidad.toLowerCase()}
+                                          </p>
+                                        </div>
+                                        <button
+                                          onClick={() => abrirModalPrecio(producto)}
+                                          className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+                                        >
+                                          + Agregar Precio
+                                        </button>
                                       </div>
-                                    ) : (
-                                      <div className="rounded-lg border-2 border-dashed border-gray-300 p-4 text-center dark:border-gray-700">
-                                        <p className="text-sm text-gray-500 dark:text-gray-500">
-                                          No hay precios agregados. Agrega al menos uno para poder aprobar este producto.
-                                        </p>
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
+
+                                      {/* Lista de precios */}
+                                      {precios.length > 0 ? (
+                                        <div className="space-y-2">
+                                          {precios.map((precio) => (
+                                            <div
+                                              key={precio.id}
+                                              className={`rounded-lg border p-3 transition-colors ${precio.seleccionado
+                                                ? "border-green-500 bg-green-50 dark:border-green-600 dark:bg-green-900/20"
+                                                : "border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+                                                }`}
+                                            >
+                                              <div className="flex items-start justify-between">
+                                                <div className="flex items-start gap-3 flex-1">
+                                                  {/* Radio button */}
+                                                  <input
+                                                    type="radio"
+                                                    name={`precio-${producto.id}`}
+                                                    checked={precio.seleccionado}
+                                                    onChange={() => seleccionarPrecio(precio.id, producto.id)}
+                                                    className="mt-1 h-4 w-4 text-blue-600"
+                                                  />
+
+                                                  {/* Info del precio */}
+                                                  <div className="flex-1">
+                                                    <div className="flex items-center gap-2">
+                                                      <span className="font-semibold text-gray-900 dark:text-white">
+                                                        {precio.proveedor.nombre}
+                                                      </span>
+                                                      {precio.proveedor.rtn && (
+                                                        <span className="text-xs text-gray-500">
+                                                          RTN: {precio.proveedor.rtn}
+                                                        </span>
+                                                      )}
+                                                    </div>
+
+                                                    <div className="mt-1 flex flex-wrap items-center gap-4 text-sm">
+                                                      {/* Mostrar precio con descuento si existe, sino el precio normal */}
+                                                      <span className="font-medium text-gray-900 dark:text-white">
+                                                        L. {Number(precio.precioDescuento || precio.precio).toFixed(2)}
+                                                      </span>
+
+                                                      {/* Si hay descuento, mostrar el precio original tachado */}
+                                                      {precio.precioDescuento && (
+                                                        <span className="text-gray-500 line-through">
+                                                          L. {Number(precio.precio).toFixed(2)}
+                                                        </span>
+                                                      )}
+                                                    </div>
+
+                                                    {precio.ComprobanteDescuento && (
+                                                      <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                                                        📄 Comprobante: {precio.ComprobanteDescuento}
+                                                      </p>
+                                                    )}
+
+                                                    <p className="mt-1 text-xs text-gray-400 dark:text-gray-600">
+                                                      Agregado: {new Date(precio.creado).toLocaleDateString("es-HN")}
+                                                    </p>
+                                                  </div>
+                                                </div>
+
+                                                {/* Botón eliminar */}
+                                                <button
+                                                  onClick={() => eliminarPrecio(precio.id, producto.id)}
+                                                  className="ml-2 rounded-lg p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                                  title="Eliminar precio"
+                                                >
+                                                  X
+                                                </button>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <div className="rounded-lg border-2 border-dashed border-gray-300 p-4 text-center dark:border-gray-700">
+                                          <p className="text-sm text-gray-500 dark:text-gray-500">
+                                            No hay precios agregados. Agrega al menos uno para poder aprobar este producto.
+                                          </p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
                             </div>
                           )}
                         </div>
@@ -1747,11 +1803,13 @@ export default function FollowUps() {
                 setProductoConfigurando(null);
               }}
               onReject={async (motivoRechazo) => {
+                // 🟢 CORRECCIÓN: Permitir rechazar si es productoConfigurando válido
                 if (!cotizacionSeleccionada || !productoConfigurando) return;
 
-
                 try {
+                  // ID híbrido: Si tiene estado, usa estado.id; si no, usa producto.id
                   const idParaRechazar = productoConfigurando.estadoProducto?.id || productoConfigurando.id;
+
                   await api.rechazarProducto(
                     cotizacionSeleccionada.id,
                     idParaRechazar,
@@ -1777,7 +1835,6 @@ export default function FollowUps() {
     </>
   );
 }
-
 // ============================================================================
 // COMPONENTE AUXILIAR: MODAL CONTENT
 // ============================================================================
@@ -1793,12 +1850,14 @@ function TimelineModalContent({
   producto: Producto;
   paises: Pais[];
   tipoCompra: 'NACIONAL' | 'INTERNACIONAL';
-  onSave: (config: any) => Promise<void> | void;
+  onSave: (config: any) => Promise<void> | void; // 🟢 Promise support
   onCancel: () => void;
-  onReject: (motivoRechazo: string) => Promise<void> | void;
+  onReject: (motivoRechazo: string) => Promise<void> | void; // 🟢 Promise support
 }) {
 
+  // 🟢 ESTADO DE CARGA
   const [loading, setLoading] = useState(false);
+
   const esNacional = tipoCompra === 'NACIONAL';
 
   // Estados existentes
@@ -1850,98 +1909,84 @@ function TimelineModalContent({
 
   const procesos = esNacional ? procesosNacional : procesosInternacional;
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!esNacional && !paisOrigenId) {
       alert("Selecciona un país de origen");
       return;
     }
 
     try {
-      setLoading(true);
-      onSave({
-        paisOrigenId: esNacional ? null : paisOrigenId,
+      setLoading(true); // 🔒 Bloqueo
+      await onSave({
+        paisOrigenId,
         medioTransporte,
         timeline,
         notas,
-        esNacional,
       });
+      // No desbloqueamos porque el modal se cierra
     } catch (error) {
       console.error(error);
-      setLoading(false);
+      setLoading(false); // 🔓 Desbloqueo error
     }
   };
 
-  const handleReject = () => {
-    console.log('llega aca');
-    if (motivoRechazo.trim().length < 10) {
-      alert("El motivo debe tener al menos 10 caracteres");
-      return;
+  const handleReject = async () => {
+    if (motivoRechazo.trim().length < 10) return;
+
+    try {
+      setLoading(true); // 🔒 Bloqueo
+      await onReject(motivoRechazo.trim());
+    } catch (error) {
+      setLoading(false); // 🔓 Desbloqueo error
     }
-    console.log('paso el primer if');
-    onReject(motivoRechazo.trim());
   };
 
-  // Si está en modo rechazo, mostrar formulario de rechazo
   if (mostrarRechazo) {
     return (
       <div className="p-6">
-        <div className="mb-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
-              <svg className="h-6 w-6 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Rechazar Producto
-              </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                {producto.sku} - {producto.descripcionProducto}
-              </p>
-            </div>
+        <h4 className="mb-2 text-lg font-semibold text-red-600 dark:text-red-400">
+          Rechazar Producto
+        </h4>
+        <div className="rounded-lg bg-red-50 p-4 dark:bg-red-900/20">
+          <p className="mb-4 text-sm text-red-800 dark:text-red-200">
+            Al rechazar este producto, el solicitante será notificado y deberá corregir o justificar la solicitud antes de que pueda ser aprobada.
+          </p>
+
+          <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Motivo del rechazo <span className="text-red-500">*</span>
+          </label>
+          <textarea
+            className="w-full rounded-lg border-2 border-red-200 bg-white p-3 text-sm focus:border-red-500 focus:outline-none dark:border-red-800 dark:bg-gray-800 dark:text-white"
+            rows={4}
+            placeholder="Explica por qué se rechaza este producto..."
+            value={motivoRechazo}
+            onChange={(e) => setMotivoRechazo(e.target.value)}
+            disabled={loading} // Deshabilitar
+          />
+          <div className="mt-1 text-right text-xs text-gray-500 dark:text-gray-400">
+            {motivoRechazo.length}/10 caracteres mínimos
           </div>
 
-          <div className="rounded-lg bg-red-50 p-4 dark:bg-red-900/20 mb-4">
-            <p className="text-sm text-red-700 dark:text-red-400">
-              Al rechazar este producto, el solicitante será notificado y deberá corregir o justificar la solicitud antes de que pueda ser aprobada.
-            </p>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Motivo del rechazo <span className="text-rose-500">*</span>
-            </label>
-            <textarea
-              value={motivoRechazo}
-              onChange={(e) => setMotivoRechazo(e.target.value)}
-              rows={4}
-              placeholder="Explica el motivo del rechazo (mínimo 10 caracteres)..."
-              className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-red-500 focus:outline-none focus:ring-4 focus:ring-red-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-            />
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {motivoRechazo.length}/10 caracteres mínimos
-            </p>
-          </div>
-
-          <div className="flex items-center justify-end gap-3 border-t border-gray-200 pt-4 dark:border-gray-700">
+          <div className="mt-4 flex justify-end gap-3">
             <button
               onClick={() => {
                 setMostrarRechazo(false);
                 setMotivoRechazo("");
               }}
-              className="rounded-lg border-2 border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+              disabled={loading}
+              className="rounded-lg border-2 border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300"
             >
-              Volver
+              Cancelar
             </button>
             <button
               onClick={handleReject}
-              disabled={motivoRechazo.trim().length < 10}
-              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-red-500 dark:hover:bg-red-600"
+              disabled={motivoRechazo.trim().length < 10 || loading}
+              className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Confirmar Rechazo
+              {loading && (
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+              )}
+              {loading ? "Rechazando..." : "Confirmar Rechazo"}
             </button>
           </div>
         </div>
@@ -1949,203 +1994,167 @@ function TimelineModalContent({
     );
   }
 
-  // Vista normal de configuración
   return (
     <div className="p-6">
-      {/* Badge de tipo de compra */}
-      <div className="mb-4 flex items-center justify-between">
-        <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium ${esNacional
-          ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-          : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
-          }`}>
-          {esNacional ? '🏠 Compra Nacional' : '🌍 Compra Internacional'}
-        </span>
-
-        {/* Mostrar si está rechazado */}
-        {producto.estadoProducto?.rechazado && (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-800 dark:bg-red-900/30 dark:text-red-400">
-            ⚠️ Rechazado
-          </span>
-        )}
-      </div>
-
-      {/* Mostrar motivo de rechazo previo si existe */}
+      {/* Aviso si ya fue rechazado antes */}
       {producto.estadoProducto?.rechazado && producto.estadoProducto?.motivoRechazo && (
         <div className="mb-6 rounded-lg bg-red-50 p-4 dark:bg-red-900/20">
-          <div className="flex items-start gap-2">
-            <svg className="h-5 w-5 flex-shrink-0 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="flex gap-3">
+            <svg className="h-6 w-6 flex-shrink-0 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
-            <div className="flex-1">
-              <h4 className="font-medium text-red-900 dark:text-red-300">
-                Producto rechazado anteriormente
-              </h4>
-              <p className="mt-1 text-sm text-red-700 dark:text-red-400">
-                {producto.estadoProducto.motivoRechazo}
+            <div>
+              <h4 className="font-semibold text-red-800 dark:text-red-200">Producto Previamente Rechazado</h4>
+              <p className="mt-1 text-sm text-red-700 dark:text-red-300">
+                Motivo: {producto.estadoProducto.motivoRechazo}
               </p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Timeline sugerido */}
-      {producto.timelineSugerido && (
-        <div className="mb-6 rounded-lg bg-blue-50 p-4 dark:bg-blue-900/20">
-          <div className="flex items-start gap-2">
-            <svg className="h-5 w-5 flex-shrink-0 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <div className="flex-1">
-              <h4 className="font-medium text-blue-900 dark:text-blue-300">
-                Timeline sugerido encontrado
-              </h4>
-              <p className="mt-1 text-sm text-blue-700 dark:text-blue-400">
-                Este producto ya tiene una configuración previa. Los valores se han cargado automáticamente.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Columna Izquierda: Configuración Básica */}
+        <div className="space-y-4">
+          <h4 className="border-b border-gray-200 pb-2 font-semibold text-gray-800 dark:border-gray-700 dark:text-white">
+            Datos Logísticos
+          </h4>
 
-      <div className="space-y-6">
-        {/* País y Transporte */}
-        <div className={`grid gap-4 ${esNacional ? 'md:grid-cols-1' : 'md:grid-cols-2'}`}>
+          {/* País de Origen */}
           {!esNacional && (
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                País de Origen <span className="text-rose-500">*</span>
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                País de Origen
               </label>
               <select
                 value={paisOrigenId}
                 onChange={(e) => setPaisOrigenId(e.target.value)}
-                className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                disabled={loading}
+                className="w-full rounded-lg border-2 border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               >
                 <option value="">Seleccionar país...</option>
-                {paises.map((pais) => (
-                  <option key={pais.id} value={pais.id}>
-                    {pais.codigo} - {pais.nombre}
+                {paises.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nombre} ({p.codigo})
                   </option>
                 ))}
               </select>
             </div>
           )}
 
+          {/* Medio de Transporte */}
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Medio de Transporte <span className="text-rose-500">*</span>
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Medio de Transporte
             </label>
-            <select
-              value={medioTransporte}
-              onChange={(e) => setMedioTransporte(e.target.value as MedioTransporte)}
-              className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-            >
-              {esNacional ? (
-                <option value="TERRESTRE">🚚 Terrestre</option>
-              ) : (
-                <>
-                  <option value="MARITIMO">🚢 Marítimo</option>
-                  <option value="TERRESTRE">🚚 Terrestre</option>
-                  <option value="AEREO">✈️ Aéreo</option>
-                </>
-              )}
-            </select>
+            <div className="flex gap-2">
+              {(["MARITIMO", "AEREO", "TERRESTRE"] as MedioTransporte[]).map((tipo) => (
+                <button
+                  key={tipo}
+                  onClick={() => setMedioTransporte(tipo)}
+                  disabled={loading}
+                  className={`flex-1 rounded-lg border-2 px-2 py-2 text-xs font-medium transition-colors ${medioTransporte === tipo
+                    ? "border-blue-600 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                    : "border-gray-200 hover:border-blue-300 dark:border-gray-600 dark:text-gray-300"
+                    }`}
+                >
+                  {tipo === "MARITIMO" && "🚢 Marítimo"}
+                  {tipo === "AEREO" && "✈️ Aéreo"}
+                  {tipo === "TERRESTRE" && "🚚 Terrestre"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Notas */}
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Notas Adicionales
+            </label>
+            <textarea
+              value={notas}
+              onChange={(e) => setNotas(e.target.value)}
+              disabled={loading}
+              className="w-full rounded-lg border-2 border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              rows={3}
+              placeholder="Notas sobre el proveedor, ruta, etc..."
+            />
           </div>
         </div>
 
-        {/* Timeline de días */}
-        <div>
-          <h4 className="mb-3 font-semibold text-gray-900 dark:text-white">
-            Días por Proceso {esNacional && <span className="text-sm font-normal text-gray-500">(Simplificado)</span>}
-          </h4>
-          <div className={`grid gap-3 ${esNacional ? 'md:grid-cols-2' : 'md:grid-cols-3'}`}>
-            {procesos.map((proceso) => (
-              <div key={proceso.key}>
-                <label className="mb-1 block text-xs text-gray-600 dark:text-gray-400">
-                  {proceso.label}
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={timeline[proceso.key as keyof TimelineConfig] || ""}
-                  onChange={(e) =>
-                    setTimeline({
-                      ...timeline,
-                      [proceso.key]: e.target.value ? parseInt(e.target.value) : undefined,
-                    })
-                  }
-                  placeholder="Días"
-                  className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                />
+        {/* Columna Derecha: Timeline */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between border-b border-gray-200 pb-2 dark:border-gray-700">
+            <h4 className="font-semibold text-gray-800 dark:text-white">
+              Tiempos Estimados
+            </h4>
+            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+              Total: {diasTotales} días
+            </span>
+          </div>
+
+          <div className="max-h-[300px] space-y-3 overflow-y-auto pr-2">
+            {procesos.map((proc) => (
+              <div key={proc.key} className="flex items-center justify-between gap-4">
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  {proc.label}
+                </span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    value={(timeline as any)[proc.key] || 0}
+                    onChange={(e) =>
+                      setTimeline({
+                        ...timeline,
+                        [proc.key]: parseInt(e.target.value) || 0,
+                      })
+                    }
+                    disabled={loading}
+                    className="w-16 rounded-lg border-2 border-gray-200 px-2 py-1 text-center text-sm focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  />
+                  <span className="text-xs text-gray-400">días</span>
+                </div>
               </div>
             ))}
           </div>
         </div>
+      </div>
 
-        {/* Total de días */}
-        <div className={`rounded-lg p-4 ${esNacional
-          ? 'bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20'
-          : 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20'
-          }`}>
-          <div className="flex items-center justify-between">
-            <span className="font-medium text-gray-900 dark:text-white">
-              Total de días estimados:
-            </span>
-            <span className={`text-2xl font-bold ${esNacional ? 'text-green-600 dark:text-green-400' : 'text-blue-600 dark:text-blue-400'
-              }`}>
-              {diasTotales} días
-            </span>
-          </div>
-        </div>
+      {/* Footer con acciones */}
+      <div className="mt-8 flex items-center justify-between border-t border-gray-200 pt-4 dark:border-gray-700">
+        <button
+          onClick={() => setMostrarRechazo(true)}
+          disabled={loading}
+          className="inline-flex items-center gap-2 rounded-lg border-2 border-red-300 px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-600 dark:text-red-400 dark:hover:bg-red-900/20"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+          Rechazar
+        </button>
 
-        {/* Notas */}
-        <div>
-          <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Notas / Observaciones
-          </label>
-          <textarea
-            value={notas}
-            onChange={(e) => setNotas(e.target.value)}
-            rows={3}
-            placeholder="Información adicional sobre este producto..."
-            className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-          />
-        </div>
-
-        {/* Botones */}
-        <div className="flex items-center justify-between border-t border-gray-200 pt-4 dark:border-gray-700">
-          {/* Botón Rechazar a la izquierda */}
+        {/* Botones Cancelar y Guardar */}
+        <div className="flex items-center gap-3">
           <button
-            onClick={() => setMostrarRechazo(true)}
-            className="inline-flex items-center gap-2 rounded-lg border-2 border-red-300 px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 dark:border-red-600 dark:text-red-400 dark:hover:bg-red-900/20"
+            onClick={onCancel}
+            disabled={loading}
+            className="rounded-lg border-2 border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
           >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-            Rechazar
+            Cancelar
           </button>
 
-          {/* Botones Cancelar y Guardar */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={onCancel}
-              disabled={loading} // Deshabilitar al cargar
-              className="rounded-lg border-2 border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-            >
-              Cancelar
-            </button>
-
-            <button
-              onClick={handleSave}
-              disabled={loading} // Deshabilitar al cargar
-              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors ${loading ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
-                }`}
-            >
-              {loading && (
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-              )}
-              {loading ? "Guardando..." : "Guardar Configuración"}
-            </button>
-          </div>
+          <button
+            onClick={handleSave}
+            disabled={loading}
+            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors ${loading ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
+              }`}
+          >
+            {loading && (
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+            )}
+            {loading ? "Guardando..." : "Guardar Configuración"}
+          </button>
         </div>
       </div>
     </div>
