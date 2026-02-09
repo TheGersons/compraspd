@@ -527,4 +527,47 @@ export class PreciosService {
     };
   }
 
+  /**
+ * Deseleccionar una oferta
+ * Quita la referencia preciosId del CotizacionDetalle
+ */
+  async deselectOffer(id: string, user: UserJwt) {
+    if (!this.isSupervisorOrAdmin(user)) {
+      throw new ForbiddenException('Solo supervisores pueden deseleccionar ofertas');
+    }
+
+    const precio = await this.prisma.precios.findUnique({
+      where: { id },
+      include: {
+        cotizacionDetalle: {
+          select: {
+            id: true,
+            preciosId: true
+          }
+        }
+      }
+    });
+
+    if (!precio) {
+      throw new NotFoundException('Oferta no encontrada');
+    }
+
+    // Verificar que esté seleccionada
+    if (precio.cotizacionDetalle.preciosId !== id) {
+      throw new BadRequestException('Esta oferta no está seleccionada');
+    }
+
+    // Quitar selección
+    await this.prisma.cotizacionDetalle.update({
+      where: { id: precio.cotizacionDetalleId },
+      data: {
+        preciosId: null
+      }
+    });
+
+    return {
+      ok: true,
+      message: 'Oferta deseleccionada exitosamente'
+    };
+  }
 }

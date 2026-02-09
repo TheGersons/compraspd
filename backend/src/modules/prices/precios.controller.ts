@@ -163,4 +163,18 @@ export class PreciosController {
   ) {
     return this.preciosService.resultadoDescuento(id, dto.precioDescuento, user);
   }
+
+  /**
+ * POST /api/v1/precios/:id/deselect
+ * Deseleccionar una oferta
+ */
+  @Post(':id/deselect')
+  @ApiOperation({ summary: 'Deseleccionar oferta' })
+  @ApiResponse({ status: 200, description: 'Oferta deseleccionada' })
+  deselectOffer(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: UserJwt
+  ) {
+    return this.preciosService.deselectOffer(id, user);
+  }
 }

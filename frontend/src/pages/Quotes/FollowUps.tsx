@@ -366,6 +366,16 @@ const api = {
     if (!response.ok) throw new Error("Error al rechazar producto");
     return response.json();
   },
+  async deselectPrecio(precioId: string) {
+    const token = getToken();
+    const response = await fetch(`${API_BASE_URL}/api/v1/precios/${precioId}/deselect`, {
+      method: "POST",
+      credentials: "include",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error("Error al deseleccionar precio");
+    return response.json();
+  },
 
 };
 
@@ -500,7 +510,16 @@ export default function FollowUps() {
     }
   };
 
-
+  const deseleccionarPrecio = async (precioId: string, detalleId: string) => {
+    try {
+      await api.deselectPrecio(precioId);
+      addNotification("success", "Éxito", "Precio deseleccionado");
+      await cargarPreciosProducto(detalleId);
+    } catch (error) {
+      console.error("Error al deseleccionar precio:", error);
+      addNotification("danger", "Error", "Error al deseleccionar precio");
+    }
+  };
   const cargarPaises = async () => {
     try {
       const data = await api.getPaises();
@@ -535,11 +554,11 @@ export default function FollowUps() {
     try {
       setLoadingDetalle(true);
       await api.deleteCotizacion(cotizacionSeleccionada.id);
-      
+
       addNotification("success", "Cotización eliminada", "La cotización ha sido eliminada correctamente");
       setCotizacionSeleccionada(null);
       await cargarCotizaciones();
-      
+
     } catch (error) {
       console.error("Error al eliminar:", error);
       addNotification("danger", "Error", "No se pudo eliminar la cotización");
@@ -629,7 +648,7 @@ export default function FollowUps() {
     } catch (error) {
       console.error("Error al configurar timeline:", error);
       addNotification("danger", "Error al configurar timeline", "Error al configurar timeline");
-      throw error; 
+      throw error;
     }
   };
 
@@ -1212,23 +1231,23 @@ export default function FollowUps() {
                       </span>
                     </div>
                   </div>
-                  
+
                   {/* ACCIONES DEL HEADER: Estado y Botón Eliminar */}
                   <div className="flex flex-col items-end gap-2">
                     <span className={`rounded-full px-3 py-1.5 text-sm font-medium ${getEstadoBadgeColor(cotizacionSeleccionada.estado)}`}>
-                        {getEstadoLabel(cotizacionSeleccionada.estado)}
+                      {getEstadoLabel(cotizacionSeleccionada.estado)}
                     </span>
-                    
+
                     {/* Botón de eliminar cotización */}
                     <button
-                        onClick={eliminarCotizacionActual}
-                        className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
-                        title="Eliminar cotización permanentemente"
+                      onClick={eliminarCotizacionActual}
+                      className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
+                      title="Eliminar cotización permanentemente"
                     >
-                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                        Eliminar
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      Eliminar
                     </button>
                   </div>
                 </div>
@@ -1344,90 +1363,90 @@ export default function FollowUps() {
                                       // 🔴 FILTRO: Ocultar rechazados
                                       .filter(p => !p.estadoProducto?.rechazado)
                                       .map((producto) => (
-                                      <tr key={producto.id} className="group hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                                        {/* Producto */}
-                                        <td className="py-4">
-                                          <div className="font-medium text-gray-900 dark:text-white">
-                                            {producto.descripcionProducto}
-                                          </div>
-
-                                        </td>
-
-                                        {/* Cantidad */}
-                                        <td className="py-4 text-sm text-gray-700 dark:text-gray-300">
-                                          {producto.cantidad} {producto.tipoUnidad.toLowerCase()}
-                                        </td>
-
-                                        {/* País / Transporte */}
-                                        <td className="py-4">
-                                          {producto.estadoProducto?.paisOrigen ? (
-                                            <div className="text-sm">
-                                              <div className="font-medium text-gray-900 dark:text-white">
-                                                {producto.estadoProducto.paisOrigen.nombre}
-                                              </div>
-                                              <div className="text-gray-600 dark:text-gray-400">
-                                                {producto.estadoProducto.medioTransporte === "MARITIMO" && "🚢 Marítimo"}
-                                                {producto.estadoProducto.medioTransporte === "TERRESTRE" && "🚚 Terrestre"}
-                                                {producto.estadoProducto.medioTransporte === "AEREO" && "✈️ Aéreo"}
-                                              </div>
+                                        <tr key={producto.id} className="group hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                                          {/* Producto */}
+                                          <td className="py-4">
+                                            <div className="font-medium text-gray-900 dark:text-white">
+                                              {producto.descripcionProducto}
                                             </div>
-                                          ) : (
-                                            <span className="text-sm text-gray-400 dark:text-gray-500">
-                                              No configurado
-                                            </span>
-                                          )}
-                                        </td>
 
-                                        {/* Timeline */}
-                                        <td className="py-4 text-sm">
-                                          {producto.timelineSugerido ? (
-                                            <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                                              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                          </td>
+
+                                          {/* Cantidad */}
+                                          <td className="py-4 text-sm text-gray-700 dark:text-gray-300">
+                                            {producto.cantidad} {producto.tipoUnidad.toLowerCase()}
+                                          </td>
+
+                                          {/* País / Transporte */}
+                                          <td className="py-4">
+                                            {producto.estadoProducto?.paisOrigen ? (
+                                              <div className="text-sm">
+                                                <div className="font-medium text-gray-900 dark:text-white">
+                                                  {producto.estadoProducto.paisOrigen.nombre}
+                                                </div>
+                                                <div className="text-gray-600 dark:text-gray-400">
+                                                  {producto.estadoProducto.medioTransporte === "MARITIMO" && "🚢 Marítimo"}
+                                                  {producto.estadoProducto.medioTransporte === "TERRESTRE" && "🚚 Terrestre"}
+                                                  {producto.estadoProducto.medioTransporte === "AEREO" && "✈️ Aéreo"}
+                                                </div>
+                                              </div>
+                                            ) : (
+                                              <span className="text-sm text-gray-400 dark:text-gray-500">
+                                                No configurado
+                                              </span>
+                                            )}
+                                          </td>
+
+                                          {/* Timeline */}
+                                          <td className="py-4 text-sm">
+                                            {producto.timelineSugerido ? (
+                                              <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                                                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                                {producto.timelineSugerido.diasTotalesEstimados} días
+                                              </span>
+                                            ) : (
+                                              <span className="text-gray-400 dark:text-gray-500">
+                                                Sin timeline
+                                              </span>
+                                            )}
+                                          </td>
+
+                                          {/* Aprobado */}
+                                          <td className="py-4 text-center">
+                                            {producto.estadoProducto ? (
+                                              <input
+                                                type="checkbox"
+                                                checked={producto.estadoProducto.aprobadoPorSupervisor}
+                                                onChange={(e) =>
+                                                  toggleAprobarProductoConValidacion(
+                                                    producto.estadoProducto!.id,
+                                                    e.target.checked
+                                                  )
+                                                }
+                                                className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                                              />
+                                            ) : (
+                                              <span className="text-gray-400">N/A</span>
+                                            )}
+                                          </td>
+
+                                          {/* Acciones */}
+                                          <td className="py-4 text-right">
+                                            <button
+                                              onClick={() => configurarProducto(producto)}
+                                              className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                                            >
+                                              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                               </svg>
-                                              {producto.timelineSugerido.diasTotalesEstimados} días
-                                            </span>
-                                          ) : (
-                                            <span className="text-gray-400 dark:text-gray-500">
-                                              Sin timeline
-                                            </span>
-                                          )}
-                                        </td>
-
-                                        {/* Aprobado */}
-                                        <td className="py-4 text-center">
-                                          {producto.estadoProducto ? (
-                                            <input
-                                              type="checkbox"
-                                              checked={producto.estadoProducto.aprobadoPorSupervisor}
-                                              onChange={(e) =>
-                                                toggleAprobarProductoConValidacion(
-                                                  producto.estadoProducto!.id,
-                                                  e.target.checked
-                                                )
-                                              }
-                                              className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                                            />
-                                          ) : (
-                                            <span className="text-gray-400">N/A</span>
-                                          )}
-                                        </td>
-
-                                        {/* Acciones */}
-                                        <td className="py-4 text-right">
-                                          <button
-                                            onClick={() => configurarProducto(producto)}
-                                            className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
-                                          >
-                                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                            </svg>
-                                            Configurar
-                                          </button>
-                                        </td>
-                                      </tr>
-                                    ))}
+                                              Configurar
+                                            </button>
+                                          </td>
+                                        </tr>
+                                      ))}
                                   </tbody>
                                 </table>
                               </div>
@@ -1439,8 +1458,8 @@ export default function FollowUps() {
                                     onClick={() => {
                                       // 🔴 CORRECCIÓN: Filtrar rechazados para no aprobarlos
                                       const pendientes = cotizacionSeleccionada.detalles!
-                                        .filter(p => 
-                                          p.estadoProducto && 
+                                        .filter(p =>
+                                          p.estadoProducto &&
                                           !p.estadoProducto.aprobadoPorSupervisor &&
                                           !p.estadoProducto.rechazado // <-- Validación crítica
                                         )
@@ -1597,136 +1616,150 @@ export default function FollowUps() {
                                 // 🔴 FILTRO: Ocultar rechazados en lista de precios
                                 .filter(p => !p.estadoProducto?.rechazado)
                                 .map((producto) => {
-                                const precios = preciosPorProducto[producto.id] || [];
-                                const tienePrecio = precios.length > 0;
-                                const precioSeleccionado = precios.find(p => p.seleccionado);
+                                  const precios = preciosPorProducto[producto.id] || [];
+                                  const tienePrecio = precios.length > 0;
+                                  const precioSeleccionado = precios.find(p => p.seleccionado);
 
-                                return (
-                                  <div
-                                    key={producto.id}
-                                    className="rounded-lg border border-gray-200 p-4 dark:border-gray-700"
-                                  >
-                                    {/* Header del producto */}
-                                    <div className="mb-4 flex items-start justify-between">
-                                      <div className="flex-1">
-                                        <div className="flex items-center gap-2">
-                                          <h4 className="font-semibold text-gray-900 dark:text-white">
-                                            {producto.sku}
-                                          </h4>
-                                          {!tienePrecio && (
-                                            <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
-                                              Sin precio
-                                            </span>
-                                          )}
-                                          {tienePrecio && !precioSeleccionado && (
-                                            <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
-                                              Sin seleccionar
-                                            </span>
-                                          )}
-                                          {precioSeleccionado && (
-                                            <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                                              ✓ Precio seleccionado
-                                            </span>
-                                          )}
+                                  return (
+                                    <div
+                                      key={producto.id}
+                                      className="rounded-lg border border-gray-200 p-4 dark:border-gray-700"
+                                    >
+                                      {/* Header del producto */}
+                                      <div className="mb-4 flex items-start justify-between">
+                                        <div className="flex-1">
+                                          <div className="flex items-center gap-2">
+                                            <h4 className="font-semibold text-gray-900 dark:text-white">
+                                              {producto.sku}
+                                            </h4>
+                                            {!tienePrecio && (
+                                              <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
+                                                Sin precio
+                                              </span>
+                                            )}
+                                            {tienePrecio && !precioSeleccionado && (
+                                              <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                                                Sin seleccionar
+                                              </span>
+                                            )}
+                                            {precioSeleccionado && (
+                                              <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                                ✓ Precio seleccionado
+                                              </span>
+                                            )}
+                                          </div>
+                                          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                                            {producto.descripcionProducto}
+                                          </p>
+                                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">
+                                            Cantidad: {producto.cantidad} {producto.tipoUnidad.toLowerCase()}
+                                          </p>
                                         </div>
-                                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                                          {producto.descripcionProducto}
-                                        </p>
-                                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">
-                                          Cantidad: {producto.cantidad} {producto.tipoUnidad.toLowerCase()}
-                                        </p>
+                                        <button
+                                          onClick={() => abrirModalPrecio(producto)}
+                                          className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+                                        >
+                                          + Agregar Precio
+                                        </button>
                                       </div>
-                                      <button
-                                        onClick={() => abrirModalPrecio(producto)}
-                                        className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
-                                      >
-                                        + Agregar Precio
-                                      </button>
-                                    </div>
 
-                                    {/* Lista de precios */}
-                                    {precios.length > 0 ? (
-                                      <div className="space-y-2">
-                                        {precios.map((precio) => (
-                                          <div
-                                            key={precio.id}
-                                            className={`rounded-lg border p-3 transition-colors ${precio.seleccionado
-                                              ? "border-green-500 bg-green-50 dark:border-green-600 dark:bg-green-900/20"
-                                              : "border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
-                                              }`}
-                                          >
-                                            <div className="flex items-start justify-between">
-                                              <div className="flex items-start gap-3 flex-1">
-                                                {/* Radio button */}
-                                                <input
-                                                  type="radio"
-                                                  name={`precio-${producto.id}`}
-                                                  checked={precio.seleccionado}
-                                                  onChange={() => seleccionarPrecio(precio.id, producto.id)}
-                                                  className="mt-1 h-4 w-4 text-blue-600"
-                                                />
+                                      {/* Lista de precios */}
+                                      {precios.length > 0 ? (
+                                        <div className="space-y-2">
+                                          {precios.map((precio) => (
+                                            <div
+                                              key={precio.id}
+                                              className={`rounded-lg border p-3 transition-colors ${precio.seleccionado
+                                                ? "border-green-500 bg-green-50 dark:border-green-600 dark:bg-green-900/20"
+                                                : "border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+                                                }`}
+                                            >
+                                              <div className="flex items-start justify-between">
+                                                <div className="flex items-start gap-3 flex-1">
+                                                  {/* Radio button */}
+                                                  <input
+                                                    type="radio"
+                                                    name={`precio-${producto.id}`}
+                                                    checked={precio.seleccionado}
+                                                    onChange={() => seleccionarPrecio(precio.id, producto.id)}
+                                                    className="mt-1 h-4 w-4 text-blue-600"
+                                                  />
 
-                                                {/* Info del precio */}
-                                                <div className="flex-1">
-                                                  <div className="flex items-center gap-2">
-                                                    <span className="font-semibold text-gray-900 dark:text-white">
-                                                      {precio.proveedor.nombre}
-                                                    </span>
-                                                    {precio.proveedor.rtn && (
-                                                      <span className="text-xs text-gray-500">
-                                                        RTN: {precio.proveedor.rtn}
+                                                  {/* Info del precio */}
+                                                  <div className="flex-1">
+                                                    <div className="flex items-center gap-2">
+                                                      <span className="font-semibold text-gray-900 dark:text-white">
+                                                        {precio.proveedor.nombre}
                                                       </span>
-                                                    )}
-                                                  </div>
+                                                      {precio.proveedor.rtn && (
+                                                        <span className="text-xs text-gray-500">
+                                                          RTN: {precio.proveedor.rtn}
+                                                        </span>
+                                                      )}
+                                                    </div>
 
-                                                  <div className="mt-1 flex flex-wrap items-center gap-4 text-sm">
-                                                    {/* Mostrar precio con descuento si existe, sino el precio normal */}
-                                                    <span className="font-medium text-gray-900 dark:text-white">
-                                                      L. {Number(precio.precioDescuento || precio.precio).toFixed(2)}
-                                                    </span>
-
-                                                    {/* Si hay descuento, mostrar el precio original tachado */}
-                                                    {precio.precioDescuento && (
-                                                      <span className="text-gray-500 line-through">
-                                                        L. {Number(precio.precio).toFixed(2)}
+                                                    <div className="mt-1 flex flex-wrap items-center gap-4 text-sm">
+                                                      {/* Mostrar precio con descuento si existe, sino el precio normal */}
+                                                      <span className="font-medium text-gray-900 dark:text-white">
+                                                        L. {Number(precio.precioDescuento || precio.precio).toFixed(2)}
                                                       </span>
-                                                    )}
-                                                  </div>
 
-                                                  {precio.ComprobanteDescuento && (
-                                                    <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
-                                                      📄 Comprobante: {precio.ComprobanteDescuento}
+                                                      {/* Si hay descuento, mostrar el precio original tachado */}
+                                                      {precio.precioDescuento && (
+                                                        <span className="text-gray-500 line-through">
+                                                          L. {Number(precio.precio).toFixed(2)}
+                                                        </span>
+                                                      )}
+                                                    </div>
+
+                                                    {precio.ComprobanteDescuento && (
+                                                      <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                                                        📄 Comprobante: {precio.ComprobanteDescuento}
+                                                      </p>
+                                                    )}
+
+                                                    <p className="mt-1 text-xs text-gray-400 dark:text-gray-600">
+                                                      Agregado: {new Date(precio.creado).toLocaleDateString("es-HN")}
                                                     </p>
-                                                  )}
+                                                  </div>
+                                                </div>
 
-                                                  <p className="mt-1 text-xs text-gray-400 dark:text-gray-600">
-                                                    Agregado: {new Date(precio.creado).toLocaleDateString("es-HN")}
-                                                  </p>
+                                                {/* Botones de acción */}
+                                                <div className="ml-2 flex gap-1">
+                                                  {precio.seleccionado ? (
+                                                    <button
+                                                      onClick={() => deseleccionarPrecio(precio.id, producto.id)}
+                                                      className="rounded-lg px-2 py-1 text-xs font-medium text-orange-600 hover:bg-orange-50 dark:text-orange-400 dark:hover:bg-orange-900/20"
+                                                      title="Deseleccionar precio"
+                                                    >
+                                                      Deseleccionar
+                                                    </button>
+                                                  ) : (
+                                                    <button
+                                                      onClick={() => eliminarPrecio(precio.id, producto.id)}
+                                                      className="rounded-lg p-1.5 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                                                      title="Eliminar precio"
+                                                    >
+                                                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                      </svg>
+                                                    </button>
+                                                  )}
                                                 </div>
                                               </div>
-
-                                              {/* Botón eliminar */}
-                                              <button
-                                                onClick={() => eliminarPrecio(precio.id, producto.id)}
-                                                className="ml-2 rounded-lg p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                                title="Eliminar precio"
-                                              >
-                                                X
-                                              </button>
                                             </div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    ) : (
-                                      <div className="rounded-lg border-2 border-dashed border-gray-300 p-4 text-center dark:border-gray-700">
-                                        <p className="text-sm text-gray-500 dark:text-gray-500">
-                                          No hay precios agregados. Agrega al menos uno para poder aprobar este producto.
-                                        </p>
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <div className="rounded-lg border-2 border-dashed border-gray-300 p-4 text-center dark:border-gray-700">
+                                          <p className="text-sm text-gray-500 dark:text-gray-500">
+                                            No hay precios agregados. Agrega al menos uno para poder aprobar este producto.
+                                          </p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
                             </div>
                           )}
                         </div>
@@ -1819,7 +1852,7 @@ export default function FollowUps() {
 
                   await api.rechazarProducto(
                     cotizacionSeleccionada.id,
-                    idParaRechazar, 
+                    idParaRechazar,
                     motivoRechazo
                   );
 
@@ -1940,7 +1973,7 @@ function TimelineModalContent({
 
   const handleReject = async () => {
     if (motivoRechazo.trim().length < 10) return;
-    
+
     try {
       setLoading(true); // 🔒 Bloqueo
       await onReject(motivoRechazo.trim());
@@ -1992,7 +2025,7 @@ function TimelineModalContent({
               className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading && (
-                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
               )}
               {loading ? "Rechazando..." : "Confirmar Rechazo"}
             </button>
@@ -2151,16 +2184,15 @@ function TimelineModalContent({
           >
             Cancelar
           </button>
-          
+
           <button
             onClick={handleSave}
             disabled={loading}
-            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors ${
-              loading ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
-            }`}
+            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors ${loading ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
+              }`}
           >
             {loading && (
-               <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
             )}
             {loading ? "Guardando..." : "Guardar Configuración"}
           </button>
