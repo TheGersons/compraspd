@@ -301,7 +301,7 @@ export default function MyQuotes() {
         setCurrentUserId(user.id);
     };
 
-    const cargarMisCotizaciones = async () => {
+    const  cargarMisCotizaciones = async () => {
         try {
             setLoading(true);
             const data = await api.getMisCotizaciones();

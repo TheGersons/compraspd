@@ -156,20 +156,10 @@ export default function New() {
   const [comentarios, setComentarios] = useState("");
   const [tipoId, setTipoId] = useState("");
   const { user, isLoading } = useAuth();
-  // 1. LOADING
-  if (isLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
-      </div>
-    );
-  }
-  if (!user) {
-    return null;
-  }
+  
   const [solicitanteId, setSolicitanteId] = useState("");
   const [searchSolicitante, setSearchSolicitante] = useState("");
-  const [proyectoId, setProyectoId] = useState(null);
+  const [proyectoId, setProyectoId] = useState("");
   const [items, setItems] = useState<ItemCotizacion[]>([
     { descripcionProducto: "", cantidad: 1, tipoUnidad: "UNIDAD", notas: "" },
   ]);
@@ -182,6 +172,17 @@ export default function New() {
   // Estados de carga y errores
   const [loading, setLoading] = useState(false);
   const [loadingCatalogos, setLoadingCatalogos] = useState(true);
+  // 1. LOADING
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+      </div>
+    );
+  }
+  if (!user) {
+    return null;
+  }
 
   // Cargar catálogos al montar
   useEffect(() => {
@@ -194,14 +195,40 @@ export default function New() {
       setIsLoading(true);
       setLoadingCatalogos(true);
       setError(null);
-      const [tiposData, usuariosData, proyectosData] = await Promise.all([
+      const [tiposResult, usuariosResult, proyectosResult] = await Promise.allSettled([
         api.getTipos(),
         api.getUsuarios(),
         api.getProyectos(),
       ]);
-      setTipos(tiposData);
-      setUsuarios(usuariosData.filter(u => u.activo));
-      setProyectos(proyectosData.filter(p => p.estado));
+      // 1. Manejar Tipos (CON VALIDACIÓN DE NULOS EXTRA)
+      if (tiposResult.status === 'fulfilled') {
+        // Si tiposResult.value es null o undefined, usamos [] para evitar pantallas blancas
+        const datosSeguros = tiposResult.value || []; 
+        setTipos(datosSeguros);
+      } else {
+        console.warn("⚠️ Error cargando Tipos:", tiposResult.reason);
+        setTipos([]); 
+      }
+
+      // 2. Manejar Usuarios
+      if (usuariosResult.status === 'fulfilled') {
+        // Validamos también aquí por seguridad básica
+        const usuariosSeguros = usuariosResult.value || [];
+        setUsuarios(usuariosSeguros.filter((u: any) => u.activo));
+      } else {
+        // Aquí suele caer el 401, lo manejamos silenciosamente
+        console.warn("⚠️ Error cargando Usuarios (posible 401):", usuariosResult.reason);
+        setUsuarios([]);
+      }
+
+      // 3. Manejar Proyectos
+      if (proyectosResult.status === 'fulfilled') {
+        const proyectosSeguros = proyectosResult.value || [];
+        setProyectos(proyectosSeguros.filter((p: any) => p.estado));
+      } else {
+        console.warn("⚠️ Error cargando Proyectos:", proyectosResult.reason);
+        setProyectos([]);
+      }
 
       // Obtener usuario actual del endpoint /auth/me
       try {
@@ -301,10 +328,10 @@ export default function New() {
       addNotification("warn", "Validación", error, { priority: "medium" });
       return;
     }
-    
+
     try {
       setLoading(true);
-      
+
       const fechaEstimadaDefault = new Date();
       fechaEstimadaDefault.setDate(fechaEstimadaDefault.getDate() + 30); // +30 días
       // Preparar datos (SKU eliminado del payload)
@@ -317,7 +344,7 @@ export default function New() {
         comentarios: comentarios.trim() || undefined,
         tipoId,
         solicitanteId,
-        proyectoId ,
+        proyectoId,
         items: items.map(item => ({
           // sku eliminado - backend lo asignará automáticamente
           descripcionProducto: item.descripcionProducto.trim(),
