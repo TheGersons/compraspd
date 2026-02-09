@@ -62,7 +62,7 @@ export class PreciosService {
     }
 
     // Validar que precio con descuento sea menor que precio normal
-    if (dto.precioDescuento && dto.precioDescuento >= dto.precio) {
+    if (dto.precioDescuento && dto.precioDescuento > dto.precio) {
       throw new BadRequestException('El precio con descuento debe ser menor al precio normal');
     }
 
