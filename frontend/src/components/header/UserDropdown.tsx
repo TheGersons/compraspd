@@ -3,6 +3,7 @@ import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { useAuth } from "../../context/AuthContext";
 import toast from 'react-hot-toast';
+import { Icon, UserIcon } from "lucide-react";
 
 export default function UserDropdown() {
   const [isOpen, setIsOpen] = useState(false);
@@ -34,12 +35,12 @@ export default function UserDropdown() {
 
   async function confirmLogout() {
     setIsLoggingOut(true);
-    
+
     const toastId = toast.loading('Cerrando sesión...');
-    
+
     try {
       await logout();
-      
+
       toast.success('Sesión cerrada correctamente', {
         id: toastId,
         duration: 2000,
@@ -64,17 +65,17 @@ export default function UserDropdown() {
           onClick={toggleDropdown}
           className="flex items-center text-gray-700 dropdown-toggle dark:text-gray-400"
         >
-          <span className="mr-3 overflow-hidden rounded-full h-11 w-11">
-            <img src="/images/user/owner.jpg" alt="User" />
+          <span className="mr-3 flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-blue-100 dark:bg-blue-900/30">
+            {/* Icono de user con fondo azul */}
+            <UserIcon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
           </span>
 
           <span className="block mr-1 font-medium text-theme-sm">
             {user?.nombre?.substring(0, spaceBlank(user?.nombre))}
           </span>
           <svg
-            className={`stroke-gray-500 dark:stroke-gray-400 transition-transform duration-200 ${
-              isOpen ? "rotate-180" : ""
-            }`}
+            className={`stroke-gray-500 dark:stroke-gray-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""
+              }`}
             width="18"
             height="20"
             viewBox="0 0 18 20"

@@ -1019,48 +1019,104 @@ export class FollowUpsService {
  * El producto queda marcado como rechazado y no puede ser aprobado hasta que se corrija
  */
   async rechazarProducto(
-    cotizacionId: string,
-    dto: { estadoProductoId: string; motivoRechazo: string },
-    user: UserJwt
-  ) {
-    // Verificar que es supervisor
-    const usuario = await this.prisma.usuario.findUnique({
-      where: { id: user.sub },
-      include: { rol: true }
-    });
+  cotizacionId: string,
+  dto: { estadoProductoId: string; motivoRechazo: string },
+  user: UserJwt
+) {
+  // 1. Validaciones de Rol (IGUAL QUE ANTES)
+  const usuario = await this.prisma.usuario.findUnique({
+    where: { id: user.sub },
+    include: { rol: true }
+  });
 
-    const rolNombre = usuario?.rol.nombre.toLowerCase() || '';
-    const esSupervisorOAdmin = rolNombre.includes('supervisor') || rolNombre.includes('admin');
+  const rolNombre = usuario?.rol.nombre.toLowerCase() || '';
+  const esSupervisorOAdmin = rolNombre.includes('supervisor') || rolNombre.includes('admin');
 
-    if (!esSupervisorOAdmin) {
-      throw new ForbiddenException('Solo supervisores pueden rechazar productos');
+  if (!esSupervisorOAdmin) {
+    throw new ForbiddenException('Solo supervisores pueden rechazar productos');
+  }
+
+  // 2. Validar motivo (IGUAL QUE ANTES)
+  if (!dto.motivoRechazo || dto.motivoRechazo.trim().length < 10) {
+    throw new BadRequestException('El motivo de rechazo debe tener al menos 10 caracteres');
+  }
+
+  // ===========================================================================
+  // 3. LOGICA NUEVA: Determinar si es un Estado existente o un Detalle virgen
+  // ===========================================================================
+  
+  // Intentamos buscarlo como EstadoProducto (el caso normal)
+  let estadoProducto = await this.prisma.estadoProducto.findFirst({
+    where: {
+      id: dto.estadoProductoId,
+      cotizacionId: cotizacionId
     }
+  });
 
-    // Verificar que el producto pertenece a la cotización
-    const estadoProducto = await this.prisma.estadoProducto.findFirst({
+  // Si no existe como estado, buscamos si es un Detalle de la cotización
+  // (Esto pasa cuando rechazas algo que aún no ha sido configurado)
+  let esNuevoEstado = false;
+  
+  if (!estadoProducto) {
+    const detalleProducto = await this.prisma.cotizacionDetalle.findFirst({
       where: {
-        id: dto.estadoProductoId,
+        id: dto.estadoProductoId, // Aquí usamos el ID que mandó el front
         cotizacionId: cotizacionId
-      },
-      select: {
-        id: true,
-        sku: true,
-        descripcion: true
       }
     });
 
-    if (!estadoProducto) {
+    if (!detalleProducto) {
       throw new BadRequestException('Producto no encontrado en esta cotización');
     }
 
-    // Validar motivo
-    if (!dto.motivoRechazo || dto.motivoRechazo.trim().length < 10) {
-      throw new BadRequestException('El motivo de rechazo debe tener al menos 10 caracteres');
-    }
+    // Si encontramos el detalle, significa que debemos CREAR el estadoProducto ahora mismo
+    esNuevoEstado = true;
+    
+    // Preparamos los datos básicos, pero lo guardaremos dentro de la transacción
+    // para asegurar integridad
+    estadoProducto = {
+      id: undefined, // Se generará al crear
+      cotizacionId: cotizacionId,
+      sku: detalleProducto.sku, // Asumiendo que el detalle tiene SKU
+      descripcion: detalleProducto.descripcionProducto,
+      // ... otros campos necesarios para tu tipo
+    } as any;
+  }
 
-    // Ejecutar en transacción
-    const resultado = await this.prisma.$transaction(async (tx) => {
-      // 1. Actualizar estado del producto
+  // ===========================================================================
+  // 4. TRANSACCIÓN
+  // ===========================================================================
+  const resultado = await this.prisma.$transaction(async (tx) => {
+    let estadoIdFinal = dto.estadoProductoId;
+
+    if (esNuevoEstado) {
+      // CASO B: Crear el estado desde cero marcado como rechazado
+      const nuevoEstado = await tx.estadoProducto.create({
+        data: {
+          cotizacionId: cotizacionId,
+          sku: estadoProducto!.sku || 'SIN-SKU', // Fallback por seguridad
+          descripcion: estadoProducto?.descripcion ?? '',
+          rechazado: true,
+          fechaRechazo: new Date(),
+          motivoRechazo: dto.motivoRechazo.trim(),
+          aprobadoPorSupervisor: false,
+          fechaAprobacion: null,
+          // Asegúrate de llenar otros campos obligatorios de tu schema si los hay
+          // Ej: criticidad: 1, nivelCriticidad: 'BAJA' (defaults)
+        }
+      });
+      estadoIdFinal = nuevoEstado.id;
+      
+      // IMPORTANTE: Si tu modelo de datos requiere vincular el Detalle con el Estado, hazlo aquí.
+      // Por ejemplo, si CotizacionDetalle tiene un campo 'estadoProductoId':
+      /* await tx.cotizacionDetalle.update({
+         where: { id: dto.estadoProductoId }, // el ID original que envió el front
+         data: { estadoProductoId: nuevoEstado.id }
+      });
+      */
+      
+    } else {
+      // CASO A: Actualizar estado existente
       await tx.estadoProducto.update({
         where: { id: dto.estadoProductoId },
         data: {
@@ -1071,70 +1127,66 @@ export class FollowUpsService {
           fechaAprobacion: null
         }
       });
+    }
 
-      // 2. Registrar en historial
-      await tx.historialCotizacion.create({
-        data: {
-          cotizacionId: cotizacionId,
-          usuarioId: user.sub,
-          accion: 'PRODUCTO_RECHAZADO',
-          detalles: {
-            productoId: dto.estadoProductoId,
-            sku: estadoProducto.sku,
-            descripcion: estadoProducto.descripcion,
-            motivoRechazo: dto.motivoRechazo.trim()
-          }
+    // 5. Registrar en historial (Usando el ID correcto)
+    await tx.historialCotizacion.create({
+      data: {
+        cotizacionId: cotizacionId,
+        usuarioId: user.sub,
+        accion: 'PRODUCTO_RECHAZADO',
+        detalles: {
+          productoId: estadoIdFinal,
+          sku: estadoProducto!.sku,
+          descripcion: estadoProducto?.descripcion ?? '',
+          motivoRechazo: dto.motivoRechazo.trim()
         }
-      });
-
-      // 3. Actualizar estado de la cotización
-      const todosProductos = await tx.estadoProducto.findMany({
-        where: { cotizacionId: cotizacionId },
-        select: {
-          aprobadoPorSupervisor: true,
-          rechazado: true
-        }
-      });
-
-      const totalProductos = todosProductos.length;
-      const productosAprobados = todosProductos.filter(p => p.aprobadoPorSupervisor).length;
-      const productosRechazados = todosProductos.filter(p => p.rechazado).length;
-      const aprobadaParcialmente = productosAprobados > 0 && productosAprobados < totalProductos;
-
-      // Si hay productos rechazados, el estado vuelve a EN_CONFIGURACION
-      let nuevoEstado = 'EN_CONFIGURACION';
-      if (productosRechazados === 0 && productosAprobados === totalProductos) {
-        nuevoEstado = 'APROBADA_COMPLETA';
-      } else if (aprobadaParcialmente) {
-        nuevoEstado = 'APROBADA_PARCIAL';
       }
+    });
 
-      await tx.cotizacion.update({
-        where: { id: cotizacionId },
-        data: {
-          supervisorResponsableId: user.sub,
-          aprobadaParcialmente,
-          todosProductosAprobados: false,
-          estado: nuevoEstado
-        }
-      });
+    // 6. Recalcular estado de la cotización (IGUAL QUE ANTES)
+    const todosProductos = await tx.estadoProducto.findMany({
+      where: { cotizacionId: cotizacionId },
+      select: {
+        aprobadoPorSupervisor: true,
+        rechazado: true
+      }
+    });
 
-      return {
-        totalProductos,
-        productosAprobados,
-        productosRechazados,
-        nuevoEstado
-      };
+    const totalProductos = todosProductos.length;
+    const productosAprobados = todosProductos.filter(p => p.aprobadoPorSupervisor).length;
+    const productosRechazados = todosProductos.filter(p => p.rechazado).length;
+    const aprobadaParcialmente = productosAprobados > 0 && productosAprobados < totalProductos;
+
+    let nuevoEstado = 'EN_CONFIGURACION';
+    if (productosRechazados === 0 && productosAprobados === totalProductos) {
+      nuevoEstado = 'APROBADA_COMPLETA';
+    } else if (aprobadaParcialmente) {
+      nuevoEstado = 'APROBADA_PARCIAL';
+    }
+
+    await tx.cotizacion.update({
+      where: { id: cotizacionId },
+      data: {
+        supervisorResponsableId: user.sub,
+        aprobadaParcialmente,
+        todosProductosAprobados: false,
+        estado: nuevoEstado
+      }
     });
 
     return {
-      message: 'Producto rechazado exitosamente',
-      producto: {
-        id: estadoProducto.id,
-        sku: estadoProducto.sku,
-        motivoRechazo: dto.motivoRechazo.trim()
-      },
-      ...resultado
+      totalProductos,
+      productosAprobados,
+      productosRechazados,
+      nuevoEstado,
+      idRechazado: estadoIdFinal
     };
-  }
+  });
+
+  return {
+    message: 'Producto rechazado exitosamente',
+    ...resultado
+  };
+}
 }

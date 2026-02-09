@@ -1747,12 +1747,13 @@ export default function FollowUps() {
                 setProductoConfigurando(null);
               }}
               onReject={async (motivoRechazo) => {
-                if (!cotizacionSeleccionada || !productoConfigurando?.estadoProducto?.id) return;
+                if (!cotizacionSeleccionada || !productoConfigurando) return;
 
                 try {
+                  const idParaRechazar = productoConfigurando.estadoProducto?.id || productoConfigurando.id;
                   await api.rechazarProducto(
                     cotizacionSeleccionada.id,
-                    productoConfigurando.estadoProducto.id,
+                    idParaRechazar,
                     motivoRechazo
                   );
 
@@ -1795,6 +1796,8 @@ function TimelineModalContent({
   onCancel: () => void;
   onReject: (motivoRechazo: string) => void;
 }) {
+
+ 
   const esNacional = tipoCompra === 'NACIONAL';
 
   // Estados existentes
@@ -1861,10 +1864,12 @@ function TimelineModalContent({
   };
 
   const handleReject = () => {
+    console.log('llega aca');
     if (motivoRechazo.trim().length < 10) {
       alert("El motivo debe tener al menos 10 caracteres");
       return;
     }
+    console.log('paso el primer if');
     onReject(motivoRechazo.trim());
   };
 

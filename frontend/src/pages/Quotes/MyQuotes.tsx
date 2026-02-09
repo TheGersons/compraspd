@@ -722,7 +722,8 @@ export default function MyQuotes() {
                         </div>
 
                         {/* Alerta de productos rechazados */}
-                        {cotizacionSeleccionada.detalles?.some(p => p.estadoProducto?.rechazado) && (
+                        {/* 1. Asegúrate de que cotizacionSeleccionada no sea null antes de evaluar detalles */}
+                        {cotizacionSeleccionada && cotizacionSeleccionada.detalles?.some(p => p.estadoProducto?.rechazado) && (
                             <div className="mb-4 rounded-lg border-2 border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
                                 <div className="flex items-start gap-3">
                                     <svg className="h-6 w-6 flex-shrink-0 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -734,9 +735,9 @@ export default function MyQuotes() {
                                         </h4>
                                         <p className="mt-1 text-sm text-red-700 dark:text-red-400">
                                             Algunos productos de esta cotización han sido rechazados por el supervisor.
-                                            Revisa los motivos y crea una nueva solicitud con las correcciones necesarias.
                                         </p>
                                         <div className="mt-3 space-y-2">
+                                            {/* Aquí ya es seguro mapear porque entramos solo si cotizacionSeleccionada existe */}
                                             {cotizacionSeleccionada.detalles
                                                 ?.filter(p => p.estadoProducto?.rechazado)
                                                 .map(prod => (
