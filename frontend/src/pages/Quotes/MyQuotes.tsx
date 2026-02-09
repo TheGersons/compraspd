@@ -3,7 +3,7 @@ import PageMeta from "../../components/common/PageMeta";
 import { getToken } from "../../lib/api";
 import { useNotifications } from "../Notifications/context/NotificationContext";
 import { useAuth } from "../../context/AuthContext";
-import { useNavigate } from "react-router";
+import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 
 // ============================================================================
