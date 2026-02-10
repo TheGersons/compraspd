@@ -28,6 +28,7 @@ export class StorageService {
      * Crea una carpeta en Nextcloud (recursivamente si es necesario)
      */
     private async createFolder(folderPath: string): Promise<void> {
+        // Construir URL completa
         const url = `${this.webdavUrl}/${folderPath}`;
 
         try {
@@ -39,10 +40,10 @@ export class StorageService {
             });
 
             // 201 = creado, 405 = ya existe (ambos son OK)
-            if (!response.ok && response.status !== 405) {
+            if (!response.ok && response.status !== 405 && response.status !== 409) {
                 // Si falla, intentar crear carpetas padre
                 const parentPath = folderPath.split('/').slice(0, -1).join('/');
-                if (parentPath) {
+                if (parentPath && parentPath.length > 0) {
                     await this.createFolder(parentPath);
                     // Reintentar crear la carpeta actual
                     await fetch(url, {

@@ -135,36 +135,6 @@ export class PreciosController {
   }
 
   /**
-   * PATCH /api/v1/precios/:id/solicitar-descuento
-   * Solicita descuento para un precio
-   */
-  @Patch(':id/solicitar-descuento')
-  @ApiOperation({ summary: 'Solicitar descuento para un precio' })
-  @ApiResponse({ status: 200, description: 'Descuento solicitado' })
-  solicitarDescuento(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: { comprobanteDescuento: string },
-    @CurrentUser() user: UserJwt
-  ) {
-    return this.preciosService.solicitarDescuento(id, dto.comprobanteDescuento, user);
-  }
-
-  /**
-   * PATCH /api/v1/precios/:id/resultado-descuento
-   * Agrega resultado de solicitud de descuento
-   */
-  @Patch(':id/resultado-descuento')
-  @ApiOperation({ summary: 'Agregar resultado de descuento' })
-  @ApiResponse({ status: 200, description: 'Resultado agregado' })
-  resultadoDescuento(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: { precioDescuento: number },
-    @CurrentUser() user: UserJwt
-  ) {
-    return this.preciosService.resultadoDescuento(id, dto.precioDescuento, user);
-  }
-
-  /**
  * POST /api/v1/precios/:id/deselect
  * Deseleccionar una oferta
  */
@@ -176,5 +146,33 @@ export class PreciosController {
     @CurrentUser() user: UserJwt
   ) {
     return this.preciosService.deselectOffer(id, user);
+  }
+
+  /**
+ * POST /api/v1/precios/:id/solicitar-descuento
+ * Solicitar descuento con comprobante
+ */
+  @Post(':id/solicitar-descuento')
+  @ApiOperation({ summary: 'Solicitar descuento' })
+  solicitarDescuento(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { comprobanteDescuento: string },
+    @CurrentUser() user: UserJwt
+  ) {
+    return this.preciosService.solicitarDescuento(id, body.comprobanteDescuento, user);
+  }
+
+  /**
+   * POST /api/v1/precios/:id/resultado-descuento
+   * Registrar resultado del descuento
+   */
+  @Post(':id/resultado-descuento')
+  @ApiOperation({ summary: 'Registrar resultado de descuento' })
+  resultadoDescuento(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { precioDescuento: number },
+    @CurrentUser() user: UserJwt
+  ) {
+    return this.preciosService.resultadoDescuento(id, body.precioDescuento, user);
   }
 }
