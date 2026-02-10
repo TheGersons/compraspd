@@ -30,7 +30,7 @@ import {
   ActualizarFechasLimiteDto,
   ListEstadoProductoQueryDto,
   AprobarProductoDto,
-  TimelineCompletoResponseDto
+  TimelineCompletoResponseDto,
 } from './dto/estado-producto.dto';
 
 type UserJwt = { sub: string; role?: string };

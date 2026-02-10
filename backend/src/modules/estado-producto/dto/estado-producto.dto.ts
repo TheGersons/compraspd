@@ -319,3 +319,65 @@ export class RegistrarEvidenciaDto {
   @IsString()
   observacion?: string;
 }
+
+// ============================================================================
+// DTOs DE RESPUESTA PARA TIMELINE
+// ============================================================================
+
+export class TimelineItemResponseDto {
+  @ApiProperty()
+  estado!: string;
+
+  @ApiProperty()
+  label!: string;
+
+  @ApiProperty()
+  completado!: boolean;
+
+  @ApiPropertyOptional()
+  fecha?: Date | string | null;
+
+  @ApiPropertyOptional()
+  fechaLimite?: Date | string | null;
+
+  @ApiProperty()
+  diasRetraso!: number;
+
+  @ApiProperty()
+  enTiempo!: boolean;
+
+  @ApiPropertyOptional()
+  evidencia?: string;
+
+  @ApiProperty()
+  tieneEvidencia!: boolean;
+
+  @ApiProperty()
+  esNoAplica!: boolean;
+}
+
+export class TimelineCompletoResponseDto {
+  @ApiProperty()
+  estadoActual!: string;
+
+  @ApiProperty()
+  progreso!: number;
+
+  @ApiProperty({ type: [TimelineItemResponseDto] })
+  timeline!: TimelineItemResponseDto[];
+
+  @ApiProperty()
+  criticidad!: number;
+
+  @ApiProperty()
+  nivelCriticidad!: string;
+
+  @ApiProperty()
+  diasRetrasoTotal!: number;
+
+  @ApiPropertyOptional()
+  tipoCompra?: string;
+
+  @ApiPropertyOptional()
+  siguienteEstado?: string | null;
+}
