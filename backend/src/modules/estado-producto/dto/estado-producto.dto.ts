@@ -1,5 +1,6 @@
 import { IsBoolean, IsEnum, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer'
 
 /**
  * Estados del proceso de compra (10 etapas)
@@ -273,12 +274,14 @@ export class ListEstadoProductoQueryDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  @Type(()=>Number)
   @IsNumber()
   @Min(1)
   page?: number;
 
   @ApiPropertyOptional()
   @IsOptional()
+  @Type(()=>Number)
   @IsNumber()
   @Min(1)
   pageSize?: number;
