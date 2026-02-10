@@ -261,4 +261,49 @@ export class StorageService {
         const timestamp = Date.now();
         return `NO_APLICA_${timestamp}`;
     }
+
+    /**
+     * Descarga un archivo desde Nextcloud y retorna el Buffer y el MimeType
+     */
+    async getFile(cotizacionId: string, sku: string, proveedor: string, tipo: string, filename: string) {
+        // Reconstruimos la ruta exacta igual que en el upload
+        const cleanProveedor = proveedor.replace(/[^a-zA-Z0-9]/g, '_');
+        const folderPath = `${this.basePath}/${cotizacionId}/${sku}/${cleanProveedor}/${tipo}`;
+        const filePath = `${folderPath}/${filename}`;
+
+        const url = `${this.webdavUrl}/${filePath}`;
+
+        try {
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.getAuthHeader(),
+                },
+            });
+
+            if (!response.ok) {
+                if (response.status === 404) {
+                    throw new BadRequestException('El archivo no existe en el servidor de almacenamiento');
+                }
+                throw new Error(`Error WebDAV: ${response.statusText}`);
+            }
+
+            // Convertimos el stream a Buffer
+            const arrayBuffer = await response.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+
+            // Intentamos obtener el tipo de archivo, o usamos genérico
+            const contentType = response.headers.get('content-type') || 'application/octet-stream';
+
+            return {
+                buffer,
+                contentType,
+                filename
+            };
+
+        } catch (error) {
+            console.error('Error al descargar archivo:', error);
+            throw error;
+        }
+    }
 }

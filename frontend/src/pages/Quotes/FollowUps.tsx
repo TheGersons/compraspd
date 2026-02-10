@@ -377,7 +377,35 @@ const api = {
     if (!response.ok) throw new Error("Error al deseleccionar precio");
     return response.json();
   },
+  async downloadFile(params: {
+    cotizacionId: string;
+    sku: string;
+    proveedor: string;
+    filename: string;
+    mode: 'inline' | 'attachment'
+  }) {
+    const token = getToken();
+    // Construimos los Query Params para el GET
+    const query = new URLSearchParams({
+      cotizacionId: params.cotizacionId,
+      sku: params.sku,
+      proveedor: params.proveedor,
+      tipo: 'comprobantes_descuento', // Ajusta si manejas otros tipos
+      filename: params.filename,
+      mode: params.mode
+    });
 
+    const response = await fetch(`${API_BASE_URL}/api/v1/storage/download?${query.toString()}`, {
+      method: 'GET',
+      credentials: "include",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!response.ok) throw new Error("Error al descargar archivo");
+
+    // Retornamos el Blob para que el frontend cree la URL temporal
+    return response.blob();
+  },
 };
 
 // ============================================================================
@@ -873,6 +901,46 @@ export default function FollowUps() {
 
     // Llamar a la función original
     await toggleAprobarProducto(estadoProductoId, aprobar);
+  };
+
+  const manejarArchivo = async (precio: Precio, sku: string, mode: 'inline' | 'attachment') => {
+    if (!precio.ComprobanteDescuento || !cotizacionSeleccionada) return;
+
+    const toastId = toast.loading(mode === 'inline' ? "Abriendo archivo..." : "Descargando...");
+
+    try {
+      const blob = await api.downloadFile({
+        cotizacionId: cotizacionSeleccionada.id,
+        sku: sku,
+        proveedor: precio.proveedor.nombre,
+        filename: precio.ComprobanteDescuento,
+        mode: mode
+      });
+
+      // Crear URL temporal en el navegador
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+
+      if (mode === 'attachment') {
+        // Forzar descarga
+        link.download = precio.ComprobanteDescuento;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        // Abrir en nueva pestaña (Visualizar)
+        window.open(url, '_blank');
+      }
+
+      // Limpiar memoria después de un momento
+      setTimeout(() => window.URL.revokeObjectURL(url), 100);
+      toast.dismiss(toastId);
+
+    } catch (error) {
+      console.error(error);
+      toast.error("No se pudo obtener el archivo", { id: toastId });
+    }
   };
 
   // ============================================================================
@@ -1731,7 +1799,37 @@ export default function FollowUps() {
                                                 </div>
 
                                                 {/* Botones de acción */}
-                                                <div className="ml-2 flex gap-1">
+                                                <div className="ml-2 flex items-center gap-1">
+                                                  {/* Botones de Archivo (Solo si hay comprobante) */}
+                                                  {precio.ComprobanteDescuento && (
+                                                    <>
+                                                      <button
+                                                        onClick={() => manejarArchivo(precio, producto.sku, 'inline')}
+                                                        className="rounded-lg p-1.5 text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
+                                                        title="Ver comprobante"
+                                                      >
+                                                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                        </svg>
+                                                      </button>
+
+                                                      <button
+                                                        onClick={() => manejarArchivo(precio, producto.sku, 'attachment')}
+                                                        className="rounded-lg p-1.5 text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+                                                        title="Descargar comprobante"
+                                                      >
+                                                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                                        </svg>
+                                                      </button>
+
+                                                      {/* Separador vertical pequeño */}
+                                                      <div className="mx-1 h-4 w-px bg-gray-300 dark:bg-gray-600"></div>
+                                                    </>
+                                                  )}
+
+                                                  {/* Botones de Acción (Seleccionar/Eliminar) */}
                                                   {precio.seleccionado ? (
                                                     <button
                                                       onClick={() => deseleccionarPrecio(precio.id, producto.id)}
