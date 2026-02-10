@@ -480,6 +480,17 @@ model EstadoProducto {
   rechazado             Boolean   @default(false)
   fechaRechazo          DateTime? @map("fecha_rechazo")
   motivoRechazo         String?   @map("motivo_rechazo") @db.Text
+
+  evidenciaCotizado           String?  @db.Text
+  evidenciaConDescuento       String?  @db.Text
+  evidenciaComprado           String?  @db.Text
+  evidenciaPagado             String?  @db.Text
+  evidenciaPrimerSeguimiento  String?  @db.Text
+  evidenciaEnFOB              String?  @db.Text
+  evidenciaConBL              String?  @db.Text
+  evidenciaSegundoSeguimiento String?  @db.Text
+  evidenciaEnCIF              String?  @db.Text
+  evidenciaRecibido           String?  @db.Text
   
   // Relaciones
   proyecto          Proyecto?          @relation(fields: [proyectoId], references: [id], onDelete: Cascade)

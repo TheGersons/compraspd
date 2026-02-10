@@ -1,26 +1,8 @@
-// ============================================
-// DTOs para módulo de ESTADO-PRODUCTO
-// Sistema de tracking de las 10 etapas
-// ============================================
-
+import { IsBoolean, IsEnum, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { 
-  IsString, 
-  IsEnum, 
-  IsOptional, 
-  IsBoolean, 
-  IsInt, 
-  IsUUID,
-  Min, 
-  Max,
-  IsISO8601,
-  IsNotEmpty 
-} from 'class-validator';
-import { Type } from 'class-transformer';
-import { MedioTransporte } from '@prisma/client';
 
 /**
- * Enum para los 10 estados del proceso
+ * Estados del proceso de compra (10 etapas)
  */
 export enum EstadoProceso {
   COTIZADO = 'cotizado',
@@ -36,305 +18,304 @@ export enum EstadoProceso {
 }
 
 /**
- * DTO para crear EstadoProducto al aprobar cotización
- * Se crea automáticamente desde el service de quotations
+ * Estados para compras NACIONALES (5 etapas)
  */
+export const ESTADOS_NACIONAL: EstadoProceso[] = [
+  EstadoProceso.COTIZADO,
+  EstadoProceso.CON_DESCUENTO,
+  EstadoProceso.COMPRADO,
+  EstadoProceso.PAGADO,
+  EstadoProceso.RECIBIDO
+];
+
+/**
+ * Estados para compras INTERNACIONALES (10 etapas)
+ */
+export const ESTADOS_INTERNACIONAL: EstadoProceso[] = [
+  EstadoProceso.COTIZADO,
+  EstadoProceso.CON_DESCUENTO,
+  EstadoProceso.COMPRADO,
+  EstadoProceso.PAGADO,
+  EstadoProceso.PRIMER_SEGUIMIENTO,
+  EstadoProceso.EN_FOB,
+  EstadoProceso.CON_BL,
+  EstadoProceso.SEGUNDO_SEGUIMIENTO,
+  EstadoProceso.EN_CIF,
+  EstadoProceso.RECIBIDO
+];
+
+/**
+ * Etiquetas legibles para cada estado
+ */
+export const ESTADO_LABELS: Record<EstadoProceso, string> = {
+  [EstadoProceso.COTIZADO]: 'Cotizado',
+  [EstadoProceso.CON_DESCUENTO]: 'Con Descuento',
+  [EstadoProceso.COMPRADO]: 'Comprado',
+  [EstadoProceso.PAGADO]: 'Pagado',
+  [EstadoProceso.PRIMER_SEGUIMIENTO]: '1er Seguimiento',
+  [EstadoProceso.EN_FOB]: 'En FOB',
+  [EstadoProceso.CON_BL]: 'Con BL',
+  [EstadoProceso.SEGUNDO_SEGUIMIENTO]: '2do Seguimiento',
+  [EstadoProceso.EN_CIF]: 'En CIF',
+  [EstadoProceso.RECIBIDO]: 'Recibido'
+};
+
+// ============================================================================
+// DTOs EXISTENTES (mantener compatibilidad)
+// ============================================================================
+
 export class CreateEstadoProductoDto {
-  @ApiProperty({ description: 'ID del proyecto' })
+  @ApiPropertyOptional()
   @IsOptional()
   @IsUUID()
   proyectoId?: string;
 
-  @ApiProperty({ description: 'ID de la cotización' })
+  @ApiProperty()
   @IsUUID()
-  cotizacionId: string;
+  cotizacionId!: string;
 
-  @ApiProperty({ description: 'ID del detalle de cotización' })
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsUUID()
-  cotizacionDetalleId: string;
+  cotizacionDetalleId?: string;
 
-  @ApiProperty({ description: 'SKU del producto' })
+  @ApiProperty()
   @IsString()
-  sku: string;
+  sku!: string;
 
-  @ApiProperty({ description: 'Descripción del producto' })
+  @ApiProperty()
   @IsString()
-  descripcion: string;
+  descripcion!: string;
 
-  @ApiPropertyOptional({ description: 'ID del país de origen' })
+  @ApiPropertyOptional()
   @IsOptional()
   @IsUUID()
   paisOrigenId?: string;
 
-  @ApiPropertyOptional({ 
-    description: 'Medio de transporte',
-    enum: MedioTransporte
-  })
+  @ApiPropertyOptional()
   @IsOptional()
-  @IsEnum(MedioTransporte)
-  medioTransporte?: MedioTransporte;
+  @IsString()
+  medioTransporte?: string;
 
-  @ApiPropertyOptional({ description: 'Nombre del proveedor' })
+  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   proveedor?: string;
 
-  @ApiPropertyOptional({ description: 'Responsable del producto' })
+  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   responsable?: string;
 
-  @ApiPropertyOptional({ description: 'Precio unitario' })
+  @ApiPropertyOptional()
   @IsOptional()
+  @IsNumber()
   precioUnitario?: number;
 
-  @ApiPropertyOptional({ description: 'Precio total' })
+  @ApiPropertyOptional()
   @IsOptional()
+  @IsNumber()
   precioTotal?: number;
 
-  @ApiPropertyOptional({ description: 'Cantidad' })
+  @ApiPropertyOptional()
   @IsOptional()
-  @IsInt()
+  @IsNumber()
   cantidad?: number;
 }
 
-/**
- * DTO para avanzar al siguiente estado
- */
 export class AvanzarEstadoDto {
   @ApiPropertyOptional({ description: 'Observación del cambio de estado' })
   @IsOptional()
   @IsString()
   observacion?: string;
+
+  @ApiPropertyOptional({ description: 'URL o referencia del archivo de evidencia' })
+  @IsOptional()
+  @IsString()
+  evidenciaUrl?: string;
+
+  @ApiPropertyOptional({ description: 'Marcar como "No aplica evidencia"' })
+  @IsOptional()
+  @IsBoolean()
+  noAplicaEvidencia?: boolean;
 }
 
-/**
- * DTO para cambiar a un estado específico
- */
 export class CambiarEstadoDto {
-  @ApiProperty({ 
-    description: 'Estado al que se quiere cambiar',
-    enum: EstadoProceso
-  })
-  @IsNotEmpty()
+  @ApiProperty({ enum: EstadoProceso })
   @IsEnum(EstadoProceso)
-  estado: EstadoProceso;
+  estado!: EstadoProceso;
 
-  @ApiPropertyOptional({ description: 'Observación del cambio' })
+  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   observacion?: string;
+
+  @ApiPropertyOptional({ description: 'URL o referencia del archivo de evidencia' })
+  @IsOptional()
+  @IsString()
+  evidenciaUrl?: string;
+
+  @ApiPropertyOptional({ description: 'Marcar como "No aplica evidencia"' })
+  @IsOptional()
+  @IsBoolean()
+  noAplicaEvidencia?: boolean;
 }
 
-/**
- * DTO para actualizar fechas manualmente
- */
 export class ActualizarFechasDto {
-  @ApiPropertyOptional({ description: 'Fecha cotizado' })
+  @ApiPropertyOptional()
   @IsOptional()
-  @IsISO8601()
-  fechaCotizado?: string;
+  fechaCotizado?: Date;
 
-  @ApiPropertyOptional({ description: 'Fecha con descuento' })
+  @ApiPropertyOptional()
   @IsOptional()
-  @IsISO8601()
-  fechaConDescuento?: string;
+  fechaConDescuento?: Date;
 
-  @ApiPropertyOptional({ description: 'Fecha comprado' })
+  @ApiPropertyOptional()
   @IsOptional()
-  @IsISO8601()
-  fechaComprado?: string;
+  fechaComprado?: Date;
 
-  @ApiPropertyOptional({ description: 'Fecha pagado' })
+  @ApiPropertyOptional()
   @IsOptional()
-  @IsISO8601()
-  fechaPagado?: string;
+  fechaPagado?: Date;
 
-  @ApiPropertyOptional({ description: 'Fecha primer seguimiento' })
+  @ApiPropertyOptional()
   @IsOptional()
-  @IsISO8601()
-  fechaPrimerSeguimiento?: string;
+  fechaPrimerSeguimiento?: Date;
 
-  @ApiPropertyOptional({ description: 'Fecha en FOB' })
+  @ApiPropertyOptional()
   @IsOptional()
-  @IsISO8601()
-  fechaEnFOB?: string;
+  fechaEnFOB?: Date;
 
-  @ApiPropertyOptional({ description: 'Fecha con BL' })
+  @ApiPropertyOptional()
   @IsOptional()
-  @IsISO8601()
-  fechaConBL?: string;
+  fechaConBL?: Date;
 
-  @ApiPropertyOptional({ description: 'Fecha segundo seguimiento' })
+  @ApiPropertyOptional()
   @IsOptional()
-  @IsISO8601()
-  fechaSegundoSeguimiento?: string;
+  fechaSegundoSeguimiento?: Date;
 
-  @ApiPropertyOptional({ description: 'Fecha en CIF' })
+  @ApiPropertyOptional()
   @IsOptional()
-  @IsISO8601()
-  fechaEnCIF?: string;
+  fechaEnCIF?: Date;
 
-  @ApiPropertyOptional({ description: 'Fecha recibido' })
+  @ApiPropertyOptional()
   @IsOptional()
-  @IsISO8601()
-  fechaRecibido?: string;
+  fechaRecibido?: Date;
 }
 
-/**
- * DTO para actualizar fechas límite manualmente
- */
 export class ActualizarFechasLimiteDto {
   @ApiPropertyOptional()
   @IsOptional()
-  @IsISO8601()
-  fechaLimiteCotizado?: string;
+  fechaLimiteCotizado?: Date;
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsISO8601()
-  fechaLimiteConDescuento?: string;
+  fechaLimiteConDescuento?: Date;
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsISO8601()
-  fechaLimiteComprado?: string;
+  fechaLimiteComprado?: Date;
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsISO8601()
-  fechaLimitePagado?: string;
+  fechaLimitePagado?: Date;
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsISO8601()
-  fechaLimitePrimerSeguimiento?: string;
+  fechaLimitePrimerSeguimiento?: Date;
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsISO8601()
-  fechaLimiteEnFOB?: string;
+  fechaLimiteEnFOB?: Date;
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsISO8601()
-  fechaLimiteConBL?: string;
+  fechaLimiteConBL?: Date;
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsISO8601()
-  fechaLimiteSegundoSeguimiento?: string;
+  fechaLimiteSegundoSeguimiento?: Date;
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsISO8601()
-  fechaLimiteEnCIF?: string;
+  fechaLimiteEnCIF?: Date;
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsISO8601()
-  fechaLimiteRecibido?: string;
+  fechaLimiteRecibido?: Date;
 }
 
-/**
- * DTO para filtros de listado
- */
 export class ListEstadoProductoQueryDto {
-  @ApiPropertyOptional({ description: 'Filtrar por proyecto' })
+  @ApiPropertyOptional()
   @IsOptional()
   @IsUUID()
   proyectoId?: string;
 
-  @ApiPropertyOptional({ description: 'Filtrar por cotización' })
+  @ApiPropertyOptional()
   @IsOptional()
   @IsUUID()
   cotizacionId?: string;
 
-  @ApiPropertyOptional({ description: 'Filtrar por SKU' })
+  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   sku?: string;
 
-  @ApiPropertyOptional({ 
-    description: 'Filtrar por nivel de criticidad',
-    enum: ['BAJO', 'MEDIO', 'ALTO']
-  })
+  @ApiPropertyOptional()
   @IsOptional()
-  @IsEnum(['BAJO', 'MEDIO', 'ALTO'])
+  @IsString()
   nivelCriticidad?: string;
 
-  @ApiPropertyOptional({ description: 'Página' })
+  @ApiPropertyOptional({ description: 'Filtrar por tipo de compra' })
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
+  @IsString()
+  tipoCompra?: 'NACIONAL' | 'INTERNACIONAL';
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
   @Min(1)
   page?: number;
 
-  @ApiPropertyOptional({ description: 'Tamaño de página' })
+  @ApiPropertyOptional()
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
+  @IsNumber()
   @Min(1)
-  @Max(100)
   pageSize?: number;
 }
 
-/**
- * DTO para aprobar producto por supervisor
- */
 export class AprobarProductoDto {
-  @ApiProperty({ description: 'Aprobar o rechazar' })
+  @ApiProperty()
   @IsBoolean()
-  aprobado: boolean;
+  aprobado!: boolean;
 
-  @ApiPropertyOptional({ description: 'Observaciones' })
+  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   observaciones?: string;
 }
 
-/**
- * DTO de respuesta con timeline item
- */
-export class TimelineItemResponseDto {
-  @ApiProperty()
-  estado: string;
+// ============================================================================
+// NUEVOS DTOs PARA EVIDENCIAS
+// ============================================================================
 
-  @ApiProperty()
-  completado: boolean;
+export class RegistrarEvidenciaDto {
+  @ApiProperty({ enum: EstadoProceso, description: 'Estado al que pertenece la evidencia' })
+  @IsEnum(EstadoProceso)
+  estado!: EstadoProceso;
 
-  @ApiPropertyOptional()
-  fecha?: Date;
+  @ApiPropertyOptional({ description: 'URL del archivo de evidencia' })
+  @IsOptional()
+  @IsString()
+  evidenciaUrl?: string;
 
-  @ApiPropertyOptional()
-  fechaLimite?: Date;
+  @ApiPropertyOptional({ description: 'Marcar como "No aplica"' })
+  @IsOptional()
+  @IsBoolean()
+  noAplica?: boolean;
 
-  @ApiProperty()
-  diasRetraso: number;
-
-  @ApiProperty()
-  enTiempo: boolean;
-}
-
-/**
- * DTO de respuesta de timeline completo
- */
-export class TimelineCompletoResponseDto {
-  @ApiProperty()
-  estadoActual: string;
-
-  @ApiProperty()
-  progreso: number; // 0-100
-
-  @ApiProperty({ type: [TimelineItemResponseDto] })
-  timeline: TimelineItemResponseDto[];
-
-  @ApiProperty()
-  criticidad: number;
-
-  @ApiProperty()
-  nivelCriticidad: string;
-
-  @ApiProperty()
-  diasRetrasoTotal: number;
+  @ApiPropertyOptional({ description: 'Observaciones adicionales' })
+  @IsOptional()
+  @IsString()
+  observacion?: string;
 }

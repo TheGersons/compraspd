@@ -13,26 +13,19 @@ import {
   ActualizarFechasLimiteDto,
   ListEstadoProductoQueryDto,
   AprobarProductoDto,
-  EstadoProceso
+  EstadoProceso,
+  ESTADOS_NACIONAL,
+  ESTADOS_INTERNACIONAL,
+  ESTADO_LABELS,
+  RegistrarEvidenciaDto
 } from './dto/estado-producto.dto';
 
 type UserJwt = { sub: string; role?: string };
 
 /**
- * Orden secuencial de los 10 estados
+ * Orden secuencial de los 10 estados (internacional)
  */
-const ORDEN_ESTADOS: EstadoProceso[] = [
-  EstadoProceso.COTIZADO,
-  EstadoProceso.CON_DESCUENTO,
-  EstadoProceso.COMPRADO,
-  EstadoProceso.PAGADO,
-  EstadoProceso.PRIMER_SEGUIMIENTO,
-  EstadoProceso.EN_FOB,
-  EstadoProceso.CON_BL,
-  EstadoProceso.SEGUNDO_SEGUIMIENTO,
-  EstadoProceso.EN_CIF,
-  EstadoProceso.RECIBIDO
-];
+const ORDEN_ESTADOS: EstadoProceso[] = ESTADOS_INTERNACIONAL;
 
 /**
  * Mapeo de estados a nombres de campos de fecha
@@ -51,8 +44,24 @@ const ESTADO_A_CAMPO_FECHA: Record<EstadoProceso, string> = {
 };
 
 /**
+ * Mapeo de estados a campos de evidencia
+ */
+const ESTADO_A_CAMPO_EVIDENCIA: Record<EstadoProceso, string> = {
+  [EstadoProceso.COTIZADO]: 'evidenciaCotizado',
+  [EstadoProceso.CON_DESCUENTO]: 'evidenciaConDescuento',
+  [EstadoProceso.COMPRADO]: 'evidenciaComprado',
+  [EstadoProceso.PAGADO]: 'evidenciaPagado',
+  [EstadoProceso.PRIMER_SEGUIMIENTO]: 'evidenciaPrimerSeguimiento',
+  [EstadoProceso.EN_FOB]: 'evidenciaEnFOB',
+  [EstadoProceso.CON_BL]: 'evidenciaConBL',
+  [EstadoProceso.SEGUNDO_SEGUIMIENTO]: 'evidenciaSegundoSeguimiento',
+  [EstadoProceso.EN_CIF]: 'evidenciaEnCIF',
+  [EstadoProceso.RECIBIDO]: 'evidenciaRecibido'
+};
+
+/**
  * Service para gestión de Estado Producto
- * Sistema completo de tracking de las 10 etapas
+ * Sistema completo de tracking con soporte para Nacional e Internacional
  */
 @Injectable()
 export class EstadoProductoService {
@@ -91,7 +100,7 @@ export class EstadoProductoService {
         sku: dto.sku,
         descripcion: dto.descripcion,
         paisOrigenId: dto.paisOrigenId,
-        medioTransporte: dto.medioTransporte,
+        medioTransporte: dto.medioTransporte as any,
         proveedor: dto.proveedor,
         responsable: dto.responsable,
         precioUnitario: dto.precioUnitario,
@@ -114,7 +123,7 @@ export class EstadoProductoService {
       include: {
         proyecto: true,
         cotizacion: {
-          select: { nombreCotizacion: true }
+          select: { nombreCotizacion: true, tipoCompra: true }
         },
         paisOrigen: true
       }
@@ -123,17 +132,29 @@ export class EstadoProductoService {
 
   /**
    * Listar estados de productos con filtros
+   * Ahora incluye filtro por tipo de compra
    */
   async list(filters: ListEstadoProductoQueryDto, user: UserJwt) {
     const page = filters.page || 1;
     const pageSize = Math.min(filters.pageSize || 20, 100);
     const skip = (page - 1) * pageSize;
 
-    const where: any = {};
+    const where: any = {
+      // Solo mostrar productos aprobados por supervisor
+      aprobadoPorSupervisor: true
+    };
+    
     if (filters.proyectoId) where.proyectoId = filters.proyectoId;
     if (filters.cotizacionId) where.cotizacionId = filters.cotizacionId;
     if (filters.sku) where.sku = { contains: filters.sku, mode: 'insensitive' };
     if (filters.nivelCriticidad) where.nivelCriticidad = filters.nivelCriticidad;
+    
+    // Filtrar por tipo de compra
+    if (filters.tipoCompra) {
+      where.cotizacion = {
+        tipoCompra: filters.tipoCompra
+      };
+    }
 
     const [total, items] = await this.prisma.$transaction([
       this.prisma.estadoProducto.count({ where }),
@@ -141,7 +162,7 @@ export class EstadoProductoService {
         where,
         include: {
           proyecto: { select: { nombre: true } },
-          cotizacion: { select: { nombreCotizacion: true } },
+          cotizacion: { select: { nombreCotizacion: true, tipoCompra: true } },
           paisOrigen: { select: { nombre: true } }
         },
         orderBy: [
@@ -160,7 +181,9 @@ export class EstadoProductoService {
       items: items.map(item => ({
         ...item,
         estadoActual: this.obtenerEstadoActual(item),
-        progreso: this.calcularProgreso(item)
+        progreso: this.calcularProgreso(item, item.cotizacion?.tipoCompra),
+        tipoCompra: item.cotizacion?.tipoCompra || 'INTERNACIONAL',
+        estadosAplicables: this.getEstadosAplicables(item.cotizacion?.tipoCompra)
       }))
     };
   }
@@ -191,16 +214,56 @@ export class EstadoProductoService {
       throw new NotFoundException('Estado de producto no encontrado');
     }
 
+    const tipoCompra = estado.cotizacion?.tipoCompra || 'INTERNACIONAL';
+    const estadosAplicables = this.getEstadosAplicables(tipoCompra);
+
     return {
       ...estado,
+      tipoCompra,
+      estadosAplicables,
       estadoActual: this.obtenerEstadoActual(estado),
-      progreso: this.calcularProgreso(estado),
-      timeline: this.generarTimeline(estado)
+      progreso: this.calcularProgreso(estado, tipoCompra),
+      timeline: this.generarTimeline(estado, tipoCompra),
+      siguienteEstado: this.obtenerSiguienteEstado(estado, tipoCompra)
+    };
+  }
+
+  /**
+   * Obtener el timeline de un producto
+   */
+  async getTimeline(id: string, user: UserJwt) {
+    const estado = await this.prisma.estadoProducto.findUnique({
+      where: { id },
+      include: {
+        cotizacion: {
+          select: { tipoCompra: true }
+        }
+      }
+    });
+
+    if (!estado) {
+      throw new NotFoundException('Estado de producto no encontrado');
+    }
+
+    const tipoCompra = estado.cotizacion?.tipoCompra || 'INTERNACIONAL';
+    const estadoActual = this.obtenerEstadoActual(estado);
+    const timeline = this.generarTimeline(estado, tipoCompra);
+
+    return {
+      estadoActual,
+      progreso: this.calcularProgreso(estado, tipoCompra),
+      timeline,
+      criticidad: estado.criticidad,
+      nivelCriticidad: estado.nivelCriticidad,
+      diasRetrasoTotal: estado.diasRetrasoActual,
+      tipoCompra,
+      siguienteEstado: this.obtenerSiguienteEstado(estado, tipoCompra)
     };
   }
 
   /**
    * Avanzar al siguiente estado
+   * Requiere evidencia o marcar como "No aplica"
    */
   async avanzarEstado(id: string, dto: AvanzarEstadoDto, user: UserJwt) {
     if (!this.isSupervisorOrAdmin(user)) {
@@ -208,30 +271,47 @@ export class EstadoProductoService {
     }
 
     const estado = await this.prisma.estadoProducto.findUnique({
-      where: { id }
+      where: { id },
+      include: {
+        cotizacion: { select: { tipoCompra: true } }
+      }
     });
 
     if (!estado) {
       throw new NotFoundException('Estado de producto no encontrado');
     }
 
+    const tipoCompra = estado.cotizacion?.tipoCompra || 'INTERNACIONAL';
+    const estadosAplicables = this.getEstadosAplicables(tipoCompra);
     const estadoActual = this.obtenerEstadoActual(estado);
-    const indexActual = ORDEN_ESTADOS.indexOf(estadoActual as EstadoProceso);
+    const indexActual = estadosAplicables.indexOf(estadoActual as EstadoProceso);
 
-    if (indexActual === -1 || indexActual >= ORDEN_ESTADOS.length - 1) {
+    if (indexActual === -1 || indexActual >= estadosAplicables.length - 1) {
       throw new BadRequestException('El producto ya está en el último estado');
     }
 
-    const siguienteEstado = ORDEN_ESTADOS[indexActual + 1];
+    const siguienteEstado = estadosAplicables[indexActual + 1];
+
+    // Validar que tenga evidencia o "No aplica" (excepto para cotizado y conDescuento que ya se manejaron)
+    if (siguienteEstado !== EstadoProceso.COTIZADO && siguienteEstado !== EstadoProceso.CON_DESCUENTO) {
+      if (!dto.evidenciaUrl && !dto.noAplicaEvidencia) {
+        throw new BadRequestException(
+          `Debe proporcionar evidencia o marcar "No aplica" para avanzar al estado "${ESTADO_LABELS[siguienteEstado]}"`
+        );
+      }
+    }
 
     return this.cambiarEstado(id, {
       estado: siguienteEstado,
-      observacion: dto.observacion
+      observacion: dto.observacion,
+      evidenciaUrl: dto.evidenciaUrl,
+      noAplicaEvidencia: dto.noAplicaEvidencia
     }, user);
   }
 
   /**
    * Cambiar a un estado específico
+   * Valida que sea un estado aplicable según el tipo de compra
    */
   async cambiarEstado(id: string, dto: CambiarEstadoDto, user: UserJwt) {
     if (!this.isSupervisorOrAdmin(user)) {
@@ -239,11 +319,25 @@ export class EstadoProductoService {
     }
 
     const estado = await this.prisma.estadoProducto.findUnique({
-      where: { id }
+      where: { id },
+      include: {
+        cotizacion: { select: { tipoCompra: true } }
+      }
     });
 
     if (!estado) {
       throw new NotFoundException('Estado de producto no encontrado');
+    }
+
+    const tipoCompra = estado.cotizacion?.tipoCompra || 'INTERNACIONAL';
+    const estadosAplicables = this.getEstadosAplicables(tipoCompra);
+
+    // Validar que el estado sea aplicable para este tipo de compra
+    if (!estadosAplicables.includes(dto.estado)) {
+      throw new BadRequestException(
+        `El estado "${ESTADO_LABELS[dto.estado]}" no aplica para compras ${tipoCompra}. ` +
+        `Estados válidos: ${estadosAplicables.map(e => ESTADO_LABELS[e]).join(', ')}`
+      );
     }
 
     const campoFecha = ESTADO_A_CAMPO_FECHA[dto.estado];
@@ -255,9 +349,21 @@ export class EstadoProductoService {
       [campoFecha]: fechaActual
     };
 
+    // Guardar evidencia si se proporcionó
+    if (dto.evidenciaUrl) {
+      updateData[`evidencia${dto.estado.charAt(0).toUpperCase() + dto.estado.slice(1)}`] = dto.evidenciaUrl;
+    } else if (dto.noAplicaEvidencia) {
+      updateData[`evidencia${dto.estado.charAt(0).toUpperCase() + dto.estado.slice(1)}`] = `NO_APLICA_${Date.now()}`;
+    }
+
     // Si hay observaciones, actualizar
     if (dto.observacion) {
       updateData.observaciones = dto.observacion;
+    }
+
+    // Para compras NACIONALES, al llegar a PAGADO, también marcar los estados intermedios como completados
+    if (tipoCompra === 'NACIONAL' && dto.estado === EstadoProceso.PAGADO) {
+      // No se marcan los estados internacionales, se quedan en null
     }
 
     // Recalcular criticidad y retraso
@@ -272,19 +378,26 @@ export class EstadoProductoService {
     updateData.diasRetrasoActual = diasRetraso;
     updateData.estadoGeneral = this.determinarEstadoGeneral(nivelCriticidad);
 
-    return this.prisma.estadoProducto.update({
+    const updated = await this.prisma.estadoProducto.update({
       where: { id },
       data: updateData,
       include: {
-        proyecto: true,
-        cotizacion: true,
-        paisOrigen: true
+        proyecto: { select: { nombre: true } },
+        cotizacion: { select: { nombreCotizacion: true, tipoCompra: true } },
+        paisOrigen: { select: { nombre: true } }
       }
     });
+
+    return {
+      ...updated,
+      estadoActual: this.obtenerEstadoActual(updated),
+      progreso: this.calcularProgreso(updated, tipoCompra),
+      siguienteEstado: this.obtenerSiguienteEstado(updated, tipoCompra)
+    };
   }
 
   /**
-   * Actualizar fechas manualmente
+   * Actualizar fechas reales de un producto
    */
   async actualizarFechas(id: string, dto: ActualizarFechasDto, user: UserJwt) {
     if (!this.isSupervisorOrAdmin(user)) {
@@ -299,28 +412,14 @@ export class EstadoProductoService {
       throw new NotFoundException('Estado de producto no encontrado');
     }
 
-    const updateData: any = {};
-
-    // Actualizar fechas proporcionadas
-    if (dto.fechaCotizado) updateData.fechaCotizado = new Date(dto.fechaCotizado);
-    if (dto.fechaConDescuento) updateData.fechaConDescuento = new Date(dto.fechaConDescuento);
-    if (dto.fechaComprado) updateData.fechaComprado = new Date(dto.fechaComprado);
-    if (dto.fechaPagado) updateData.fechaPagado = new Date(dto.fechaPagado);
-    if (dto.fechaPrimerSeguimiento) updateData.fechaPrimerSeguimiento = new Date(dto.fechaPrimerSeguimiento);
-    if (dto.fechaEnFOB) updateData.fechaEnFOB = new Date(dto.fechaEnFOB);
-    if (dto.fechaConBL) updateData.fechaConBL = new Date(dto.fechaConBL);
-    if (dto.fechaSegundoSeguimiento) updateData.fechaSegundoSeguimiento = new Date(dto.fechaSegundoSeguimiento);
-    if (dto.fechaEnCIF) updateData.fechaEnCIF = new Date(dto.fechaEnCIF);
-    if (dto.fechaRecibido) updateData.fechaRecibido = new Date(dto.fechaRecibido);
-
     return this.prisma.estadoProducto.update({
       where: { id },
-      data: updateData
+      data: dto as any
     });
   }
 
   /**
-   * Actualizar fechas límite manualmente
+   * Actualizar fechas límite
    */
   async actualizarFechasLimite(id: string, dto: ActualizarFechasLimiteDto, user: UserJwt) {
     if (!this.isSupervisorOrAdmin(user)) {
@@ -335,49 +434,10 @@ export class EstadoProductoService {
       throw new NotFoundException('Estado de producto no encontrado');
     }
 
-    const updateData: any = {};
-
-    if (dto.fechaLimiteCotizado) updateData.fechaLimiteCotizado = new Date(dto.fechaLimiteCotizado);
-    if (dto.fechaLimiteConDescuento) updateData.fechaLimiteConDescuento = new Date(dto.fechaLimiteConDescuento);
-    if (dto.fechaLimiteComprado) updateData.fechaLimiteComprado = new Date(dto.fechaLimiteComprado);
-    if (dto.fechaLimitePagado) updateData.fechaLimitePagado = new Date(dto.fechaLimitePagado);
-    if (dto.fechaLimitePrimerSeguimiento) updateData.fechaLimitePrimerSeguimiento = new Date(dto.fechaLimitePrimerSeguimiento);
-    if (dto.fechaLimiteEnFOB) updateData.fechaLimiteEnFOB = new Date(dto.fechaLimiteEnFOB);
-    if (dto.fechaLimiteConBL) updateData.fechaLimiteConBL = new Date(dto.fechaLimiteConBL);
-    if (dto.fechaLimiteSegundoSeguimiento) updateData.fechaLimiteSegundoSeguimiento = new Date(dto.fechaLimiteSegundoSeguimiento);
-    if (dto.fechaLimiteEnCIF) updateData.fechaLimiteEnCIF = new Date(dto.fechaLimiteEnCIF);
-    if (dto.fechaLimiteRecibido) updateData.fechaLimiteRecibido = new Date(dto.fechaLimiteRecibido);
-
     return this.prisma.estadoProducto.update({
       where: { id },
-      data: updateData
+      data: dto as any
     });
-  }
-
-  /**
-   * Obtener timeline completo con retrasos
-   */
-  async getTimeline(id: string, user: UserJwt) {
-    const estado = await this.prisma.estadoProducto.findUnique({
-      where: { id }
-    });
-
-    if (!estado) {
-      throw new NotFoundException('Estado de producto no encontrado');
-    }
-
-    const timeline = this.generarTimeline(estado);
-    const estadoActual = this.obtenerEstadoActual(estado);
-    const progreso = this.calcularProgreso(estado);
-
-    return {
-      estadoActual,
-      progreso,
-      timeline,
-      criticidad: estado.criticidad,
-      nivelCriticidad: estado.nivelCriticidad,
-      diasRetrasoTotal: estado.diasRetrasoActual
-    };
   }
 
   /**
@@ -385,10 +445,13 @@ export class EstadoProductoService {
    */
   async getByProyecto(proyectoId: string, user: UserJwt) {
     const productos = await this.prisma.estadoProducto.findMany({
-      where: { proyectoId },
+      where: { 
+        proyectoId,
+        aprobadoPorSupervisor: true
+      },
       include: {
         cotizacion: {
-          select: { nombreCotizacion: true }
+          select: { nombreCotizacion: true, tipoCompra: true }
         },
         paisOrigen: {
           select: { nombre: true }
@@ -403,7 +466,8 @@ export class EstadoProductoService {
     return productos.map(p => ({
       ...p,
       estadoActual: this.obtenerEstadoActual(p),
-      progreso: this.calcularProgreso(p)
+      progreso: this.calcularProgreso(p, p.cotizacion?.tipoCompra),
+      tipoCompra: p.cotizacion?.tipoCompra || 'INTERNACIONAL'
     }));
   }
 
@@ -413,6 +477,7 @@ export class EstadoProductoService {
   async getCriticos(user: UserJwt) {
     const productos = await this.prisma.estadoProducto.findMany({
       where: {
+        aprobadoPorSupervisor: true,
         OR: [
           { nivelCriticidad: 'ALTO' },
           { diasRetrasoActual: { gt: 0 } }
@@ -420,7 +485,7 @@ export class EstadoProductoService {
       },
       include: {
         proyecto: { select: { nombre: true } },
-        cotizacion: { select: { nombreCotizacion: true } },
+        cotizacion: { select: { nombreCotizacion: true, tipoCompra: true } },
         paisOrigen: { select: { nombre: true } }
       },
       orderBy: [
@@ -433,7 +498,8 @@ export class EstadoProductoService {
     return productos.map(p => ({
       ...p,
       estadoActual: this.obtenerEstadoActual(p),
-      progreso: this.calcularProgreso(p)
+      progreso: this.calcularProgreso(p, p.cotizacion?.tipoCompra),
+      tipoCompra: p.cotizacion?.tipoCompra || 'INTERNACIONAL'
     }));
   }
 
@@ -463,12 +529,13 @@ export class EstadoProductoService {
       }
     });
 
-    let Estado = estado.cotizacionId ? estado.cotizacionId : '';
-    if (Estado === '') {
+    let cotizacionId = estado.cotizacionId;
+    if (!cotizacionId) {
       throw new BadRequestException('Cotización asociada no encontrada');
     }
+    
     // Verificar si todos los productos de la cotización están aprobados
-    await this.verificarAprobacionCompleta(Estado);
+    await this.verificarAprobacionCompleta(cotizacionId);
 
     return updated;
   }
@@ -478,62 +545,100 @@ export class EstadoProductoService {
   // ============================================
 
   /**
+   * Obtener estados aplicables según tipo de compra
+   */
+  private getEstadosAplicables(tipoCompra?: string): EstadoProceso[] {
+    return tipoCompra === 'NACIONAL' ? ESTADOS_NACIONAL : ESTADOS_INTERNACIONAL;
+  }
+
+  /**
    * Obtener el estado actual del producto
    */
   private obtenerEstadoActual(estado: any): string {
-    for (let i = ORDEN_ESTADOS.length - 1; i >= 0; i--) {
-      const estadoKey = ORDEN_ESTADOS[i];
+    // Recorremos de atrás hacia adelante para encontrar el último estado completado
+    const estadosAplicables = this.getEstadosAplicables(estado.cotizacion?.tipoCompra);
+    
+    for (let i = estadosAplicables.length - 1; i >= 0; i--) {
+      const estadoKey = estadosAplicables[i];
       if (estado[estadoKey]) {
         return estadoKey;
       }
     }
-    return ORDEN_ESTADOS[0]; // cotizado por defecto
+    return estadosAplicables[0]; // cotizado por defecto
+  }
+
+  /**
+   * Obtener el siguiente estado
+   */
+  private obtenerSiguienteEstado(estado: any, tipoCompra?: string): EstadoProceso | null {
+    const estadosAplicables = this.getEstadosAplicables(tipoCompra);
+    const estadoActual = this.obtenerEstadoActual(estado);
+    const indexActual = estadosAplicables.indexOf(estadoActual as EstadoProceso);
+
+    if (indexActual === -1 || indexActual >= estadosAplicables.length - 1) {
+      return null; // Ya está en el último estado
+    }
+
+    return estadosAplicables[indexActual + 1];
   }
 
   /**
    * Calcular progreso en porcentaje (0-100)
    */
-  private calcularProgreso(estado: any): number {
+  private calcularProgreso(estado: any, tipoCompra?: string): number {
+    const estadosAplicables = this.getEstadosAplicables(tipoCompra);
     let estadosCompletados = 0;
-    for (const estadoKey of ORDEN_ESTADOS) {
+    
+    for (const estadoKey of estadosAplicables) {
       if (estado[estadoKey]) {
         estadosCompletados++;
       }
     }
-    return Math.round((estadosCompletados / ORDEN_ESTADOS.length) * 100);
+    
+    return Math.round((estadosCompletados / estadosAplicables.length) * 100);
   }
 
   /**
    * Generar timeline completo con fechas y retrasos
+   * Solo incluye los estados aplicables según el tipo de compra
    */
-  private generarTimeline(estado: any) {
-    return ORDEN_ESTADOS.map(estadoKey => {
+  private generarTimeline(estado: any, tipoCompra?: string) {
+    const estadosAplicables = this.getEstadosAplicables(tipoCompra);
+    
+    return estadosAplicables.map(estadoKey => {
       const completado = estado[estadoKey];
       const campoFecha = ESTADO_A_CAMPO_FECHA[estadoKey];
       const campoFechaLimite = `fechaLimite${campoFecha.replace('fecha', '')}`;
+      const campoEvidencia = `evidencia${estadoKey.charAt(0).toUpperCase() + estadoKey.slice(1)}`;
       
       const fecha = estado[campoFecha];
       const fechaLimite = estado[campoFechaLimite];
+      const evidencia = estado[campoEvidencia];
 
       let diasRetraso = 0;
       let enTiempo = true;
 
       if (fechaLimite) {
-        const fechaComparar = fecha || new Date();
+        const fechaComparar = fecha ? new Date(fecha) : new Date();
+        const limite = new Date(fechaLimite);
         diasRetraso = Math.max(
           0,
-          Math.floor((fechaComparar.getTime() - fechaLimite.getTime()) / (1000 * 60 * 60 * 24))
+          Math.floor((fechaComparar.getTime() - limite.getTime()) / (1000 * 60 * 60 * 24))
         );
         enTiempo = diasRetraso === 0;
       }
 
       return {
         estado: estadoKey,
+        label: ESTADO_LABELS[estadoKey],
         completado,
         fecha,
         fechaLimite,
         diasRetraso,
-        enTiempo
+        enTiempo,
+        evidencia,
+        tieneEvidencia: !!evidencia,
+        esNoAplica: evidencia?.startsWith('NO_APLICA_') || false
       };
     });
   }
@@ -549,7 +654,7 @@ export class EstadoProductoService {
     if (fechaLimite) {
       diasRetraso = Math.max(
         0,
-        Math.floor((fecha.getTime() - fechaLimite.getTime()) / (1000 * 60 * 60 * 24))
+        Math.floor((fecha.getTime() - new Date(fechaLimite).getTime()) / (1000 * 60 * 60 * 24))
       );
     }
 
