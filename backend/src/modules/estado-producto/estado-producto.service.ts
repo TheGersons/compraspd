@@ -162,7 +162,25 @@ export class EstadoProductoService {
         where,
         include: {
           proyecto: { select: { nombre: true } },
-          cotizacion: { select: { nombreCotizacion: true, tipoCompra: true } },
+          cotizacion: { 
+            select: { 
+              nombreCotizacion: true, 
+              tipoCompra: true,
+              solicitante: {
+                select: {
+                  id: true,
+                  nombre: true,
+                  email: true,
+                  departamento: {
+                    select: {
+                      id: true,
+                      nombre: true
+                    }
+                  }
+                }
+              }
+            } 
+          },
           paisOrigen: { select: { nombre: true } }
         },
         orderBy: [
@@ -485,7 +503,25 @@ export class EstadoProductoService {
       },
       include: {
         proyecto: { select: { nombre: true } },
-        cotizacion: { select: { nombreCotizacion: true, tipoCompra: true } },
+        cotizacion: { 
+          select: { 
+            nombreCotizacion: true, 
+            tipoCompra: true,
+            solicitante: {
+              select: {
+                id: true,
+                nombre: true,
+                email: true,
+                departamento: {
+                  select: {
+                    id: true,
+                    nombre: true
+                  }
+                }
+              }
+            }
+          } 
+        },
         paisOrigen: { select: { nombre: true } }
       },
       orderBy: [

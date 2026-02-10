@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import PageMeta from "../../components/common/PageMeta";
 import { getToken } from "../../lib/api";
@@ -10,11 +10,15 @@ import { useNotifications } from "../Notifications/context/NotificationContext";
 
 type TimelineItem = {
   estado: string;
+  label: string;
   completado: boolean;
   fecha?: Date | string | null;
   fechaLimite?: Date | string | null;
   diasRetraso: number;
   enTiempo: boolean;
+  evidencia?: string;
+  tieneEvidencia: boolean;
+  esNoAplica: boolean;
 };
 
 type EstadoProducto = {
@@ -79,6 +83,7 @@ type EstadoProducto = {
   cotizacion?: {
     id: string;
     nombreCotizacion: string;
+    tipoCompra: 'NACIONAL' | 'INTERNACIONAL';
   };
   paisOrigen?: {
     id: string;
@@ -91,6 +96,11 @@ type EstadoProducto = {
   aprobadoPorSupervisor: boolean;
   fechaAprobacion?: string | null;
   
+  // Tipo de compra y estados aplicables
+  tipoCompra: 'NACIONAL' | 'INTERNACIONAL';
+  estadosAplicables?: string[];
+  siguienteEstado?: string | null;
+  
   // Timeline calculado
   estadoActual?: string;
   progreso?: number;
@@ -98,158 +108,7 @@ type EstadoProducto = {
 };
 
 // ============================================================================
-// API SERVICE
-// ============================================================================
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
-const token = getToken();
-
-const api = {
-  async getEstadosProductos(filters?: {
-    proyectoId?: string;
-    cotizacionId?: string;
-    sku?: string;
-    nivelCriticidad?: string;
-    page?: number;
-    pageSize?: number;
-  }) {
-    const params = new URLSearchParams();
-    if (filters?.proyectoId) params.append("proyectoId", filters.proyectoId);
-    if (filters?.cotizacionId) params.append("cotizacionId", filters.cotizacionId);
-    if (filters?.sku) params.append("sku", filters.sku);
-    if (filters?.nivelCriticidad) params.append("nivelCriticidad", filters.nivelCriticidad);
-    if (filters?.page) params.append("page", String(filters.page));
-    if (filters?.pageSize) params.append("pageSize", String(filters.pageSize));
-
-    const response = await fetch(
-      `${API_BASE_URL}/api/v1/estado-productos?${params}`,
-      {
-        credentials: "include",
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
-    if (!response.ok) throw new Error("Error al cargar productos");
-    return response.json();
-  },
-
-  async getEstadoProductoById(id: string) {
-    const response = await fetch(
-      `${API_BASE_URL}/api/v1/estado-productos/${id}`,
-      {
-        credentials: "include",
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
-    if (!response.ok) throw new Error("Error al cargar detalle");
-    return response.json();
-  },
-
-  async getTimeline(id: string) {
-    const response = await fetch(
-      `${API_BASE_URL}/api/v1/estado-productos/${id}/timeline`,
-      {
-        credentials: "include",
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
-    if (!response.ok) throw new Error("Error al cargar timeline");
-    return response.json();
-  },
-
-  async avanzarEstado(id: string, observacion?: string) {
-    const response = await fetch(
-      `${API_BASE_URL}/api/v1/estado-productos/${id}/avanzar`,
-      {
-        method: "PATCH",
-        credentials: "include",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ observacion }),
-      }
-    );
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || "Error al avanzar estado");
-    }
-    return response.json();
-  },
-
-  async cambiarEstado(id: string, estado: string, observacion?: string) {
-    const response = await fetch(
-      `${API_BASE_URL}/api/v1/estado-productos/${id}/estado`,
-      {
-        method: "PATCH",
-        credentials: "include",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ estado, observacion }),
-      }
-    );
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || "Error al cambiar estado");
-    }
-    return response.json();
-  },
-
-  async actualizarFechas(id: string, fechas: any) {
-    const response = await fetch(
-      `${API_BASE_URL}/api/v1/estado-productos/${id}/fechas`,
-      {
-        method: "PATCH",
-        credentials: "include",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(fechas),
-      }
-    );
-    if (!response.ok) throw new Error("Error al actualizar fechas");
-    return response.json();
-  },
-
-  async actualizarFechasLimite(id: string, fechasLimite: any) {
-    const response = await fetch(
-      `${API_BASE_URL}/api/v1/estado-productos/${id}/fechas-limite`,
-      {
-        method: "PATCH",
-        credentials: "include",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(fechasLimite),
-      }
-    );
-    if (!response.ok) throw new Error("Error al actualizar fechas límite");
-    return response.json();
-  },
-
-  async aprobarProducto(id: string, aprobado: boolean, observaciones?: string) {
-    const response = await fetch(
-      `${API_BASE_URL}/api/v1/estado-productos/${id}/aprobar`,
-      {
-        method: "PATCH",
-        credentials: "include",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ aprobado, observaciones }),
-      }
-    );
-    if (!response.ok) throw new Error("Error al aprobar producto");
-    return response.json();
-  },
-};
-
-// ============================================================================
-// HELPER FUNCTIONS
+// CONSTANTS
 // ============================================================================
 
 const ESTADOS_LABELS: Record<string, string> = {
@@ -278,43 +137,138 @@ const ESTADOS_ICONOS: Record<string, string> = {
   recibido: "📦",
 };
 
-const getEstadoActual = (producto: EstadoProducto): string => {
-  const estados = [
-    "recibido",
-    "enCIF",
-    "segundoSeguimiento",
-    "conBL",
-    "enFOB",
-    "primerSeguimiento",
-    "pagado",
-    "comprado",
-    "conDescuento",
-    "cotizado",
-  ];
+const ESTADOS_NACIONAL = ['cotizado', 'conDescuento', 'comprado', 'pagado', 'recibido'];
+const ESTADOS_INTERNACIONAL = ['cotizado', 'conDescuento', 'comprado', 'pagado', 'primerSeguimiento', 'enFOB', 'conBL', 'segundoSeguimiento', 'enCIF', 'recibido'];
 
-  for (const estado of estados) {
-    if (producto[estado as keyof EstadoProducto]) {
-      return estado;
+// ============================================================================
+// API SERVICE
+// ============================================================================
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
+
+const api = {
+  getToken: () => getToken(),
+
+  async getEstadosProductos(filters?: {
+    proyectoId?: string;
+    cotizacionId?: string;
+    sku?: string;
+    nivelCriticidad?: string;
+    tipoCompra?: string;
+    page?: number;
+    pageSize?: number;
+  }) {
+    const token = this.getToken();
+    const params = new URLSearchParams();
+    if (filters?.proyectoId) params.append("proyectoId", filters.proyectoId);
+    if (filters?.cotizacionId) params.append("cotizacionId", filters.cotizacionId);
+    if (filters?.sku) params.append("sku", filters.sku);
+    if (filters?.nivelCriticidad) params.append("nivelCriticidad", filters.nivelCriticidad);
+    if (filters?.tipoCompra) params.append("tipoCompra", filters.tipoCompra);
+    if (filters?.page) params.append("page", String(filters.page));
+    if (filters?.pageSize) params.append("pageSize", String(filters.pageSize));
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/estado-productos?${params}`,
+      {
+        credentials: "include",
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+    if (!response.ok) throw new Error("Error al cargar productos");
+    return response.json();
+  },
+
+  async getEstadoProductoById(id: string) {
+    const token = this.getToken();
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/estado-productos/${id}`,
+      {
+        credentials: "include",
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+    if (!response.ok) throw new Error("Error al cargar detalle");
+    return response.json();
+  },
+
+  async getTimeline(id: string) {
+    const token = this.getToken();
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/estado-productos/${id}/timeline`,
+      {
+        credentials: "include",
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+    if (!response.ok) throw new Error("Error al cargar timeline");
+    return response.json();
+  },
+
+  async avanzarEstado(id: string, data: { observacion?: string; evidenciaUrl?: string; noAplicaEvidencia?: boolean }) {
+    const token = this.getToken();
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/estado-productos/${id}/avanzar`,
+      {
+        method: "PATCH",
+        credentials: "include",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      }
+    );
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || "Error al avanzar estado");
     }
-  }
-  return "cotizado";
+    return response.json();
+  },
+
+  async uploadEvidencia(file: File, cotizacionId: string, sku: string, proveedor: string, estado: string) {
+    const token = this.getToken();
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('cotizacionId', cotizacionId);
+    formData.append('sku', sku);
+    formData.append('proveedorNombre', proveedor || 'sin-proveedor');
+    formData.append('tipo', `evidencia_${estado}`);
+
+    const response = await fetch(`${API_BASE_URL}/api/v1/storage/upload`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Error al subir archivo');
+    }
+
+    return response.json();
+  },
+
+  async generateNoAplica() {
+    const token = this.getToken();
+    const response = await fetch(`${API_BASE_URL}/api/v1/storage/no-aplica`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!response.ok) throw new Error('Error al generar comprobante');
+    return response.json();
+  },
 };
 
-const calcularProgreso = (producto: EstadoProducto): number => {
-  const estados = [
-    producto.cotizado,
-    producto.conDescuento,
-    producto.comprado,
-    producto.pagado,
-    producto.primerSeguimiento,
-    producto.enFOB,
-    producto.conBL,
-    producto.segundoSeguimiento,
-    producto.enCIF,
-    producto.recibido,
-  ];
-  const completados = estados.filter(Boolean).length;
-  return Math.round((completados / 10) * 100);
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+const getEstadosAplicables = (tipoCompra?: string): string[] => {
+  return tipoCompra === 'NACIONAL' ? ESTADOS_NACIONAL : ESTADOS_INTERNACIONAL;
 };
 
 const getCriticidadColor = (nivel: string) => {
@@ -354,36 +308,13 @@ const formatDate = (date: string | Date | null | undefined): string => {
   });
 };
 
-const formatDateTime = (date: string | Date | null | undefined): string => {
-  if (!date) return "-";
-  const d = new Date(date);
-  return d.toLocaleDateString("es-ES", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-};
-
-const calcularDiasRetraso = (
-  fechaReal: string | null | undefined,
-  fechaLimite: string | null | undefined
-): number => {
-  if (!fechaLimite) return 0;
-  const fechaComparar = fechaReal ? new Date(fechaReal) : new Date();
-  const limite = new Date(fechaLimite);
-  const diff = fechaComparar.getTime() - limite.getTime();
-  return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
-};
-
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
 export default function ShoppingFollowUps() {
   const { addNotification } = useNotifications();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
 
   // Estados principales
   const [productos, setProductos] = useState<EstadoProducto[]>([]);
@@ -396,42 +327,41 @@ export default function ShoppingFollowUps() {
   // Filtros
   const [searchQuery, setSearchQuery] = useState("");
   const [filtroNivel, setFiltroNivel] = useState<string>("");
+  const [filtroTipoCompra, setFiltroTipoCompra] = useState<string>("");
+  const [verCompletados, setVerCompletados] = useState<boolean>(false);
 
   // UI States
-  const [showEditFechas, setShowEditFechas] = useState(false);
-  const [showCambiarEstado, setShowCambiarEstado] = useState(false);
-  const [estadoSeleccionado, setEstadoSeleccionado] = useState("");
+  const [showAvanzarModal, setShowAvanzarModal] = useState(false);
   const [observacion, setObservacion] = useState("");
+  const [archivoEvidencia, setArchivoEvidencia] = useState<File | null>(null);
+  const [noAplicaEvidencia, setNoAplicaEvidencia] = useState(false);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // ============================================================================
-  // EFFECTS
-  // ============================================================================
-
+  // Efectos
   useEffect(() => {
     cargarProductos();
-  }, [filtroNivel]);
+  }, [filtroNivel, filtroTipoCompra]);
 
   useEffect(() => {
     const productoId = searchParams.get("producto");
-    if (productoId && productos.length > 0) {
-      const producto = productos.find((p) => p.id === productoId);
-      if (producto) {
-        seleccionarProducto(producto);
-      }
+    if (productoId) {
+      seleccionarProducto(productoId);
     }
-  }, [searchParams, productos]);
+  }, [searchParams]);
 
   // ============================================================================
-  // FUNCTIONS
+  // HANDLERS
   // ============================================================================
 
   const cargarProductos = async () => {
     try {
       setLoading(true);
-      const data = await api.getEstadosProductos({
-        nivelCriticidad: filtroNivel || undefined,
-        pageSize: 100,
-      });
+      const filters: any = { pageSize: 50 };
+      if (filtroNivel) filters.nivelCriticidad = filtroNivel;
+      if (filtroTipoCompra) filters.tipoCompra = filtroTipoCompra;
+      
+      const data = await api.getEstadosProductos(filters);
       setProductos(data.items || []);
     } catch (error) {
       console.error("Error al cargar productos:", error);
@@ -441,17 +371,13 @@ export default function ShoppingFollowUps() {
     }
   };
 
-  const seleccionarProducto = async (producto: EstadoProducto) => {
+  const seleccionarProducto = async (id: string) => {
     try {
       setLoadingDetalle(true);
-      setProductoSeleccionado(producto);
-      setSearchParams({ producto: producto.id });
-      
       const [detalle, timelineData] = await Promise.all([
-        api.getEstadoProductoById(producto.id),
-        api.getTimeline(producto.id),
+        api.getEstadoProductoById(id),
+        api.getTimeline(id)
       ]);
-      
       setProductoSeleccionado(detalle);
       setTimeline(timelineData);
     } catch (error) {
@@ -465,12 +391,44 @@ export default function ShoppingFollowUps() {
   const handleAvanzarEstado = async () => {
     if (!productoSeleccionado) return;
 
+    // Validar que tenga evidencia o "No aplica"
+    if (!archivoEvidencia && !noAplicaEvidencia) {
+      addNotification("warn", "Advertencia", "Debe subir un archivo de evidencia o marcar 'No aplica'");
+      return;
+    }
+
     try {
       setLoadingAccion(true);
-      await api.avanzarEstado(productoSeleccionado.id, observacion);
+      let evidenciaUrl: string | undefined;
+
+      // Subir archivo si existe
+      if (archivoEvidencia && productoSeleccionado.cotizacion) {
+        const uploadResult = await api.uploadEvidencia(
+          archivoEvidencia,
+          productoSeleccionado.cotizacion.id,
+          productoSeleccionado.sku,
+          productoSeleccionado.proveedor || 'sin-proveedor',
+          productoSeleccionado.siguienteEstado || 'estado'
+        );
+        evidenciaUrl = uploadResult.url || uploadResult.fileName;
+      }
+
+      // Avanzar estado
+      await api.avanzarEstado(productoSeleccionado.id, {
+        observacion: observacion || undefined,
+        evidenciaUrl,
+        noAplicaEvidencia: noAplicaEvidencia && !archivoEvidencia
+      });
+
       addNotification("success", "Éxito", "Estado avanzado correctamente");
+      
+      // Limpiar y recargar
+      setShowAvanzarModal(false);
       setObservacion("");
-      await seleccionarProducto(productoSeleccionado);
+      setArchivoEvidencia(null);
+      setNoAplicaEvidencia(false);
+      
+      await seleccionarProducto(productoSeleccionado.id);
       await cargarProductos();
     } catch (error: any) {
       console.error("Error al avanzar estado:", error);
@@ -480,299 +438,311 @@ export default function ShoppingFollowUps() {
     }
   };
 
-  const handleCambiarEstado = async () => {
-    if (!productoSeleccionado || !estadoSeleccionado) return;
-
-    try {
-      setLoadingAccion(true);
-      await api.cambiarEstado(productoSeleccionado.id, estadoSeleccionado, observacion);
-      addNotification("success", "Éxito", "Estado cambiado correctamente");
-      setShowCambiarEstado(false);
-      setEstadoSeleccionado("");
-      setObservacion("");
-      await seleccionarProducto(productoSeleccionado);
-      await cargarProductos();
-    } catch (error: any) {
-      console.error("Error al cambiar estado:", error);
-      addNotification("danger", "Error", error.message || "Error al cambiar estado");
-    } finally {
-      setLoadingAccion(false);
-    }
+  const abrirModalAvanzar = () => {
+    setObservacion("");
+    setArchivoEvidencia(null);
+    setNoAplicaEvidencia(false);
+    setShowAvanzarModal(true);
   };
 
-  const filteredProductos = productos.filter((p) =>
-    p.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.descripcion.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.proyecto?.nombre.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filtrar productos por búsqueda y estado de completado
+  const productosFiltrados = productos.filter(p => {
+    // Filtro por búsqueda
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      const matchQuery = (
+        p.sku.toLowerCase().includes(query) ||
+        p.descripcion.toLowerCase().includes(query) ||
+        p.proveedor?.toLowerCase().includes(query)
+      );
+      if (!matchQuery) return false;
+    }
+    
+    // Filtro por estado de completado (100% = completado)
+    const estaCompletado = p.progreso === 100;
+    if (verCompletados) {
+      return estaCompletado; // Solo mostrar completados
+    } else {
+      return !estaCompletado; // Solo mostrar pendientes
+    }
+  });
+
+  // Contadores para los badges
+  const totalPendientes = productos.filter(p => p.progreso !== 100).length;
+  const totalCompletados = productos.filter(p => p.progreso === 100).length;
 
   // ============================================================================
   // RENDER
   // ============================================================================
 
-  if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
-      </div>
-    );
-  }
-
   return (
     <>
-      <PageMeta description="Seguimiento detallado de productos" title="Shopping Follow-Ups" />
+      <PageMeta title="Seguimiento de Compras" description="Tracking de productos en proceso" />
 
-      <div className="space-y-4">
+      <div className="space-y-6">
         {/* Header */}
-        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
-          <h2 className="text-2xl font-semibold text-gray-800 dark:text-white/90">
-            Seguimiento de Productos
-          </h2>
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            Tracking detallado de las 10 etapas del proceso logístico
-          </p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+              Seguimiento de Compras
+            </h1>
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+              Tracking detallado de productos aprobados
+            </p>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          {/* Panel Izquierdo - Lista de Productos */}
-          <div className="lg:col-span-1">
-            <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
-              {/* Filtros */}
-              <div className="mb-4 space-y-3">
-                <input
-                  type="text"
-                  placeholder="Buscar por SKU, descripción o proyecto..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-                />
+        {/* Filtros */}
+        <div className="flex flex-wrap items-center gap-4">
+          {/* Toggle Pendientes / Completados */}
+          <div className="flex rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden">
+            <button
+              onClick={() => setVerCompletados(false)}
+              className={`px-4 py-2 text-sm font-medium transition-colors ${
+                !verCompletados
+                  ? "bg-blue-600 text-white"
+                  : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+              }`}
+            >
+              📋 En Proceso ({totalPendientes})
+            </button>
+            <button
+              onClick={() => setVerCompletados(true)}
+              className={`px-4 py-2 text-sm font-medium transition-colors ${
+                verCompletados
+                  ? "bg-green-600 text-white"
+                  : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+              }`}
+            >
+              ✅ Completados ({totalCompletados})
+            </button>
+          </div>
 
-                <select
-                  value={filtroNivel}
-                  onChange={(e) => setFiltroNivel(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-                >
-                  <option value="">Todas las criticidades</option>
-                  <option value="BAJO">🟢 Bajo</option>
-                  <option value="MEDIO">🟡 Medio</option>
-                  <option value="ALTO">🔴 Alto</option>
-                </select>
+          {/* Búsqueda */}
+          <div className="flex-1 min-w-[200px]">
+            <input
+              type="text"
+              placeholder="Buscar por SKU, descripción o proveedor..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+            />
+          </div>
+
+          {/* Filtro Tipo Compra */}
+          <select
+            value={filtroTipoCompra}
+            onChange={(e) => setFiltroTipoCompra(e.target.value)}
+            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+          >
+            <option value="">Todos los tipos</option>
+            <option value="NACIONAL">🇭🇳 Nacional (5 etapas)</option>
+            <option value="INTERNACIONAL">🌍 Internacional (10 etapas)</option>
+          </select>
+
+          {/* Filtro Criticidad */}
+          <select
+            value={filtroNivel}
+            onChange={(e) => setFiltroNivel(e.target.value)}
+            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+          >
+            <option value="">Todas las criticidades</option>
+            <option value="BAJO">🟢 Bajo</option>
+            <option value="MEDIO">🟡 Medio</option>
+            <option value="ALTO">🔴 Alto</option>
+          </select>
+        </div>
+
+        {/* Layout principal */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          {/* Lista de productos */}
+          <div className="lg:col-span-1">
+            <div className="rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+              <div className="border-b border-gray-200 p-4 dark:border-gray-700">
+                <h3 className="font-semibold text-gray-900 dark:text-white">
+                  {verCompletados ? "✅ Completados" : "📋 En Proceso"} ({productosFiltrados.length})
+                </h3>
               </div>
 
-              {/* Lista de Productos */}
-              <div className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto">
-                {filteredProductos.length === 0 ? (
-                  <div className="py-8 text-center">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      No hay productos
-                    </p>
+              <div className="max-h-[600px] overflow-y-auto">
+                {loading ? (
+                  <div className="flex h-32 items-center justify-center">
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+                  </div>
+                ) : productosFiltrados.length === 0 ? (
+                  <div className="p-6 text-center text-gray-500 dark:text-gray-400">
+                    {verCompletados 
+                      ? "No hay productos completados" 
+                      : "No hay productos en proceso"}
                   </div>
                 ) : (
-                  filteredProductos.map((producto) => {
-                    const estadoActual = getEstadoActual(producto);
-                    const progreso = calcularProgreso(producto);
-                    const isSelected = productoSeleccionado?.id === producto.id;
-
-                    return (
+                  <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                    {productosFiltrados.map((producto) => (
                       <button
                         key={producto.id}
-                        onClick={() => seleccionarProducto(producto)}
-                        className={`w-full rounded-lg border p-3 text-left transition-all ${
-                          isSelected
-                            ? "border-blue-500 bg-blue-50 dark:border-blue-600 dark:bg-blue-900/20"
-                            : "border-gray-200 hover:border-blue-300 dark:border-gray-700 dark:hover:border-blue-600"
+                        onClick={() => seleccionarProducto(producto.id)}
+                        className={`w-full p-4 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                          productoSeleccionado?.id === producto.id
+                            ? "bg-blue-50 dark:bg-blue-900/20"
+                            : ""
                         }`}
                       >
-                        <div className="flex items-start justify-between">
+                        <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="font-mono text-sm font-medium text-gray-900 dark:text-white truncate">
+                              <span className="font-mono text-sm font-medium text-gray-900 dark:text-white">
                                 {producto.sku}
                               </span>
-                              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${getCriticidadColor(producto.nivelCriticidad)}`}>
+                              <span className={`rounded-full px-1.5 py-0.5 text-xs font-medium ${getCriticidadBg(producto.nivelCriticidad)}`}>
                                 {getCriticidadBadge(producto.nivelCriticidad)}
                               </span>
                             </div>
-                            <p className="mt-1 text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
+                            <p className="mt-1 truncate text-sm text-gray-600 dark:text-gray-400">
                               {producto.descripcion}
                             </p>
                             <div className="mt-2 flex items-center gap-2">
-                              <span className="text-xs text-gray-500">
-                                {ESTADOS_ICONOS[estadoActual]} {ESTADOS_LABELS[estadoActual]}
+                              {/* Badge completado */}
+                              {producto.progreso === 100 && (
+                                <span className="rounded px-1.5 py-0.5 text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                  ✅ Completado
+                                </span>
+                              )}
+                              {/* Badge tipo compra */}
+                              <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${
+                                producto.tipoCompra === 'NACIONAL' 
+                                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                  : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                              }`}>
+                                {producto.tipoCompra === 'NACIONAL' ? '🇭🇳 Nacional' : '🌍 Internacional'}
+                              </span>
+                              {/* Estado actual */}
+                              <span className="text-xs text-gray-500 dark:text-gray-500">
+                                {ESTADOS_ICONOS[producto.estadoActual || 'cotizado']} {ESTADOS_LABELS[producto.estadoActual || 'cotizado']}
                               </span>
                             </div>
                           </div>
-                        </div>
-
-                        {/* Progress Bar */}
-                        <div className="mt-2">
-                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-                            <div
-                              className={`h-full rounded-full transition-all ${
-                                producto.nivelCriticidad === "ALTO"
-                                  ? "bg-red-600"
-                                  : producto.nivelCriticidad === "MEDIO"
-                                  ? "bg-yellow-500"
-                                  : "bg-green-600"
-                              }`}
-                              style={{ width: `${progreso}%` }}
-                            />
+                          <div className="text-right">
+                            <span className={`text-lg font-bold ${
+                              producto.progreso === 100 
+                                ? 'text-green-600 dark:text-green-400' 
+                                : 'text-gray-900 dark:text-white'
+                            }`}>
+                              {producto.progreso}%
+                            </span>
                           </div>
                         </div>
+                        {/* Barra de progreso */}
+                        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+                          <div
+                            className={`h-full rounded-full transition-all ${
+                              producto.progreso === 100
+                                ? "bg-green-600"
+                                : producto.nivelCriticidad === "ALTO"
+                                ? "bg-red-600"
+                                : producto.nivelCriticidad === "MEDIO"
+                                ? "bg-yellow-500"
+                                : "bg-green-600"
+                            }`}
+                            style={{ width: `${producto.progreso}%` }}
+                          />
+                        </div>
                       </button>
-                    );
-                  })
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Panel Derecho - Detalle del Producto */}
+          {/* Detalle del producto */}
           <div className="lg:col-span-2">
-            {!productoSeleccionado ? (
-              <div className="rounded-xl border border-gray-200 bg-white p-12 text-center dark:border-gray-800 dark:bg-gray-900">
-                <svg
-                  className="mx-auto h-16 w-16 text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
-                  />
-                </svg>
-                <p className="mt-4 text-gray-600 dark:text-gray-400">
-                  Selecciona un producto para ver el detalle
-                </p>
-              </div>
-            ) : loadingDetalle ? (
+            {loadingDetalle ? (
               <div className="flex h-64 items-center justify-center rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-                <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
               </div>
-            ) : (
+            ) : productoSeleccionado ? (
               <div className="space-y-4">
-                {/* Información General */}
+                {/* Info del producto */}
                 <div className={`rounded-xl border p-6 ${getCriticidadBg(productoSeleccionado.nivelCriticidad)}`}>
                   <div className="flex items-start justify-between">
-                    <div className="flex-1">
+                    <div>
                       <div className="flex items-center gap-3">
-                        <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                           {productoSeleccionado.sku}
-                        </h3>
-                        <span className={`rounded-full px-3 py-1 text-sm font-medium ${getCriticidadColor(productoSeleccionado.nivelCriticidad)}`}>
+                        </h2>
+                        <span className={`rounded-full px-2 py-1 text-xs font-medium ${getCriticidadBg(productoSeleccionado.nivelCriticidad)}`}>
                           {getCriticidadBadge(productoSeleccionado.nivelCriticidad)}
+                        </span>
+                        <span className={`rounded px-2 py-1 text-xs font-medium ${
+                          productoSeleccionado.tipoCompra === 'NACIONAL'
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                        }`}>
+                          {productoSeleccionado.tipoCompra === 'NACIONAL' ? '🇭🇳 Nacional' : '🌍 Internacional'}
                         </span>
                       </div>
                       <p className="mt-2 text-gray-700 dark:text-gray-300">
                         {productoSeleccionado.descripcion}
                       </p>
-                      
-                      <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
-                        {productoSeleccionado.proyecto && (
-                          <div>
-                            <span className="text-gray-600 dark:text-gray-400">Proyecto:</span>
-                            <p className="font-medium text-gray-900 dark:text-white">
-                              {productoSeleccionado.proyecto.nombre}
-                            </p>
-                          </div>
-                        )}
+                      <div className="mt-3 flex flex-wrap gap-4 text-sm text-gray-600 dark:text-gray-400">
                         {productoSeleccionado.proveedor && (
-                          <div>
-                            <span className="text-gray-600 dark:text-gray-400">Proveedor:</span>
-                            <p className="font-medium text-gray-900 dark:text-white">
-                              {productoSeleccionado.proveedor}
-                            </p>
-                          </div>
+                          <span>🏢 {productoSeleccionado.proveedor}</span>
                         )}
                         {productoSeleccionado.cantidad && (
-                          <div>
-                            <span className="text-gray-600 dark:text-gray-400">Cantidad:</span>
-                            <p className="font-medium text-gray-900 dark:text-white">
-                              {productoSeleccionado.cantidad} unidades
-                            </p>
-                          </div>
+                          <span>📦 Cantidad: {productoSeleccionado.cantidad}</span>
                         )}
                         {productoSeleccionado.precioTotal && (
-                          <div>
-                            <span className="text-gray-600 dark:text-gray-400">Precio Total:</span>
-                            <p className="font-medium text-gray-900 dark:text-white">
-                              ${Number(productoSeleccionado.precioTotal).toLocaleString()}
-                            </p>
-                          </div>
+                          <span>💰 Total: L. {Number(productoSeleccionado.precioTotal).toFixed(2)}</span>
                         )}
                         {productoSeleccionado.paisOrigen && (
-                          <div>
-                            <span className="text-gray-600 dark:text-gray-400">País Origen:</span>
-                            <p className="font-medium text-gray-900 dark:text-white">
-                              🌍 {productoSeleccionado.paisOrigen.nombre}
-                            </p>
-                          </div>
+                          <span>🌍 {productoSeleccionado.paisOrigen.nombre}</span>
                         )}
                         {productoSeleccionado.medioTransporte && (
-                          <div>
-                            <span className="text-gray-600 dark:text-gray-400">Transporte:</span>
-                            <p className="font-medium text-gray-900 dark:text-white">
-                              {productoSeleccionado.medioTransporte === "MARITIMO" && "🚢 Marítimo"}
-                              {productoSeleccionado.medioTransporte === "AEREO" && "✈️ Aéreo"}
-                              {productoSeleccionado.medioTransporte === "TERRESTRE" && "🚛 Terrestre"}
-                            </p>
-                          </div>
+                          <span>
+                            {productoSeleccionado.medioTransporte === "MARITIMO" && "🚢 Marítimo"}
+                            {productoSeleccionado.medioTransporte === "AEREO" && "✈️ Aéreo"}
+                            {productoSeleccionado.medioTransporte === "TERRESTRE" && "🚛 Terrestre"}
+                          </span>
                         )}
                       </div>
                     </div>
-                  </div>
-
-                  {/* Progreso General */}
-                  <div className="mt-4">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium text-gray-700 dark:text-gray-300">
-                        Progreso General
-                      </span>
-                      <span className="font-semibold text-gray-900 dark:text-white">
-                        {calcularProgreso(productoSeleccionado)}%
-                      </span>
-                    </div>
-                    <div className="mt-2 h-3 w-full overflow-hidden rounded-full bg-white/50 dark:bg-gray-800/50">
-                      <div
-                        className={`h-full rounded-full transition-all ${
-                          productoSeleccionado.nivelCriticidad === "ALTO"
-                            ? "bg-red-600"
-                            : productoSeleccionado.nivelCriticidad === "MEDIO"
-                            ? "bg-yellow-500"
-                            : "bg-green-600"
-                        }`}
-                        style={{ width: `${calcularProgreso(productoSeleccionado)}%` }}
-                      />
+                    <div className="text-right">
+                      <div className="text-3xl font-bold text-gray-900 dark:text-white">
+                        {productoSeleccionado.progreso}%
+                      </div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Progreso</p>
                     </div>
                   </div>
                 </div>
 
-                {/* Acciones Rápidas */}
-                <div className="flex gap-3">
-                  <button
-                    onClick={handleAvanzarEstado}
-                    disabled={loadingAccion || productoSeleccionado.recibido}
-                    className="flex-1 rounded-lg bg-blue-600 px-4 py-3 font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {loadingAccion ? "Procesando..." : "⏩ Avanzar al Siguiente Estado"}
-                  </button>
-                  <button
-                    onClick={() => setShowCambiarEstado(true)}
-                    disabled={loadingAccion}
-                    className="rounded-lg border border-blue-600 px-4 py-3 font-medium text-blue-600 hover:bg-blue-50 dark:border-blue-500 dark:text-blue-400 dark:hover:bg-blue-900/20"
-                  >
-                    Cambiar Estado
-                  </button>
-                </div>
+                {/* Botón Avanzar Estado */}
+                {productoSeleccionado.siguienteEstado && (
+                  <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-blue-800 dark:text-blue-200">
+                          Siguiente paso: {ESTADOS_ICONOS[productoSeleccionado.siguienteEstado]} {ESTADOS_LABELS[productoSeleccionado.siguienteEstado]}
+                        </p>
+                        <p className="text-sm text-blue-600 dark:text-blue-400">
+                          Se requiere evidencia o marcar "No aplica"
+                        </p>
+                      </div>
+                      <button
+                        onClick={abrirModalAvanzar}
+                        disabled={loadingAccion}
+                        className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                      >
+                        Avanzar Estado
+                      </button>
+                    </div>
+                  </div>
+                )}
 
-                {/* Timeline de 10 Etapas */}
+                {/* Timeline */}
                 {timeline && (
                   <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
                     <h4 className="mb-6 text-lg font-semibold text-gray-900 dark:text-white">
-                      Timeline del Proceso (10 Etapas)
+                      Timeline del Proceso ({productoSeleccionado.tipoCompra === 'NACIONAL' ? '5' : '10'} Etapas)
                     </h4>
 
                     <div className="space-y-4">
@@ -807,14 +777,19 @@ export default function ShoppingFollowUps() {
                                 </div>
                                 <div>
                                   <h5 className="font-medium text-gray-900 dark:text-white">
-                                    {ESTADOS_LABELS[item.estado] || item.estado}
+                                    {item.label || ESTADOS_LABELS[item.estado] || item.estado}
                                   </h5>
-                                  <div className="mt-1 flex items-center gap-4 text-xs text-gray-600 dark:text-gray-400">
+                                  <div className="mt-1 flex flex-wrap items-center gap-4 text-xs text-gray-600 dark:text-gray-400">
                                     {item.fecha && (
                                       <span>✅ {formatDate(item.fecha)}</span>
                                     )}
                                     {item.fechaLimite && (
                                       <span>🎯 Límite: {formatDate(item.fechaLimite)}</span>
+                                    )}
+                                    {item.tieneEvidencia && (
+                                      <span className={item.esNoAplica ? "text-gray-500" : "text-blue-600 dark:text-blue-400"}>
+                                        {item.esNoAplica ? "➖ No aplica" : "📎 Con evidencia"}
+                                      </span>
                                     )}
                                   </div>
                                 </div>
@@ -824,7 +799,7 @@ export default function ShoppingFollowUps() {
                                 {isCompletado ? (
                                   isRetrasado ? (
                                     <span className="inline-flex items-center gap-1 rounded-full bg-red-600 px-3 py-1 text-xs font-medium text-white">
-                                      ⏰ {diasRetraso} días de retraso
+                                      ⏰ {diasRetraso} días retraso
                                     </span>
                                   ) : (
                                     <span className="inline-flex items-center gap-1 rounded-full bg-green-600 px-3 py-1 text-xs font-medium text-white">
@@ -843,7 +818,7 @@ export default function ShoppingFollowUps() {
                       })}
                     </div>
 
-                    {/* Resumen del Timeline */}
+                    {/* Resumen */}
                     <div className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50">
                       <div className="grid grid-cols-3 gap-4 text-center text-sm">
                         <div>
@@ -868,53 +843,81 @@ export default function ShoppingFollowUps() {
                     </div>
                   </div>
                 )}
-
-                {/* Observaciones */}
-                {productoSeleccionado.observaciones && (
-                  <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
-                    <h5 className="font-medium text-gray-900 dark:text-white">Observaciones</h5>
-                    <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                      {productoSeleccionado.observaciones}
-                    </p>
-                  </div>
-                )}
+              </div>
+            ) : (
+              <div className="flex h-64 flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-700">
+                <svg className="h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                <p className="mt-4 text-gray-600 dark:text-gray-400">
+                  Selecciona un producto para ver su detalle
+                </p>
               </div>
             )}
           </div>
         </div>
 
-        {/* Modal Cambiar Estado */}
-        {showCambiarEstado && productoSeleccionado && (
+        {/* Modal Avanzar Estado */}
+        {showAvanzarModal && productoSeleccionado && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-800 dark:bg-gray-900">
+            <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl dark:bg-gray-900">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Cambiar Estado del Producto
+                Avanzar al siguiente estado
               </h3>
-              
-              <div className="mt-4 space-y-4">
+              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                {ESTADOS_ICONOS[productoSeleccionado.siguienteEstado || '']} {ESTADOS_LABELS[productoSeleccionado.siguienteEstado || '']}
+              </p>
+
+              <div className="mt-6 space-y-4">
+                {/* Subir evidencia */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Seleccionar Estado
+                    Evidencia (archivo)
                   </label>
-                  <select
-                    value={estadoSeleccionado}
-                    onChange={(e) => setEstadoSeleccionado(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-                  >
-                    <option value="">Selecciona un estado...</option>
-                    <option value="cotizado">📋 Cotizado</option>
-                    <option value="conDescuento">💰 Con Descuento</option>
-                    <option value="comprado">🛒 Comprado</option>
-                    <option value="pagado">💳 Pagado</option>
-                    <option value="primerSeguimiento">📞 1er Seguimiento</option>
-                    <option value="enFOB">🚢 En FOB</option>
-                    <option value="conBL">📄 Con BL</option>
-                    <option value="segundoSeguimiento">📞 2do Seguimiento</option>
-                    <option value="enCIF">🌊 En CIF</option>
-                    <option value="recibido">📦 Recibido</option>
-                  </select>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,.png,.jpg,.jpeg,.gif,.webp"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setArchivoEvidencia(file);
+                        setNoAplicaEvidencia(false);
+                      }
+                    }}
+                    className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm file:mr-4 file:rounded file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                  />
+                  {archivoEvidencia && (
+                    <p className="mt-1 text-sm text-green-600 dark:text-green-400">
+                      ✓ Archivo seleccionado: {archivoEvidencia.name}
+                    </p>
+                  )}
                 </div>
 
+                {/* O marcar No aplica */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500">— o —</span>
+                </div>
+
+                <label className="flex items-center gap-3 rounded-lg border border-gray-300 p-3 cursor-pointer hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800">
+                  <input
+                    type="checkbox"
+                    checked={noAplicaEvidencia}
+                    onChange={(e) => {
+                      setNoAplicaEvidencia(e.target.checked);
+                      if (e.target.checked) {
+                        setArchivoEvidencia(null);
+                        if (fileInputRef.current) fileInputRef.current.value = '';
+                      }
+                    }}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                    No aplica evidencia para este estado
+                  </span>
+                </label>
+
+                {/* Observación */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                     Observación (opcional)
@@ -923,8 +926,8 @@ export default function ShoppingFollowUps() {
                     value={observacion}
                     onChange={(e) => setObservacion(e.target.value)}
                     rows={3}
-                    className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-                    placeholder="Agrega una observación sobre este cambio..."
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                    placeholder="Agrega una observación..."
                   />
                 </div>
               </div>
@@ -932,20 +935,29 @@ export default function ShoppingFollowUps() {
               <div className="mt-6 flex gap-3">
                 <button
                   onClick={() => {
-                    setShowCambiarEstado(false);
-                    setEstadoSeleccionado("");
+                    setShowAvanzarModal(false);
                     setObservacion("");
+                    setArchivoEvidencia(null);
+                    setNoAplicaEvidencia(false);
                   }}
-                  className="flex-1 rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+                  disabled={loadingAccion}
+                  className="flex-1 rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
                 >
                   Cancelar
                 </button>
                 <button
-                  onClick={handleCambiarEstado}
-                  disabled={!estadoSeleccionado || loadingAccion}
+                  onClick={handleAvanzarEstado}
+                  disabled={loadingAccion || (!archivoEvidencia && !noAplicaEvidencia)}
                   className="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 disabled:opacity-50"
                 >
-                  {loadingAccion ? "Guardando..." : "Guardar Cambio"}
+                  {loadingAccion ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Procesando...
+                    </span>
+                  ) : (
+                    "Confirmar"
+                  )}
                 </button>
               </div>
             </div>

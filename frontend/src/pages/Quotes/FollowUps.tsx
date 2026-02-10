@@ -904,9 +904,26 @@ export default function FollowUps() {
   };
 
   const manejarArchivo = async (precio: Precio, sku: string, mode: 'inline' | 'attachment') => {
-    if (!precio.ComprobanteDescuento || !cotizacionSeleccionada) return;
+    if (!precio.ComprobanteDescuento) return;
 
-    const toastId = toast.loading(mode === 'inline' ? "Abriendo archivo..." : "Descargando...");
+    // CASO 1: Es un Link Público de Nextcloud (Lo que tienes en tu BD)
+    if (precio.ComprobanteDescuento.startsWith('http')) {
+        let url = precio.ComprobanteDescuento;
+        
+        // Truco Nextcloud: Si queremos forzar descarga, agregamos "/download" al final
+        if (mode === 'attachment' && !url.endsWith('/download')) {
+            url = `${url.replace(/\/$/, '')}/download`;
+        }
+
+        window.open(url, '_blank');
+        return; // ¡Listo! No molestamos al backend
+    }
+
+    // CASO 2: Es solo un nombre de archivo (Fallback al Backend Proxy)
+    // Esto se ejecuta solo si en la BD se guardó "archivo.pdf" en vez del link
+    if (!cotizacionSeleccionada) return;
+    
+    const toastId = toast.loading(mode === 'inline' ? "Buscando archivo..." : "Descargando...");
 
     try {
       const blob = await api.downloadFile({
@@ -917,23 +934,19 @@ export default function FollowUps() {
         mode: mode
       });
 
-      // Crear URL temporal en el navegador
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
 
       if (mode === 'attachment') {
-        // Forzar descarga
         link.download = precio.ComprobanteDescuento;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
       } else {
-        // Abrir en nueva pestaña (Visualizar)
         window.open(url, '_blank');
       }
 
-      // Limpiar memoria después de un momento
       setTimeout(() => window.URL.revokeObjectURL(url), 100);
       toast.dismiss(toastId);
 
