@@ -44,7 +44,7 @@ export class StorageService {
                 // Si falla, intentar crear carpetas padre
                 const parentPath = folderPath.split('/').slice(0, -1).join('/');
                 if (parentPath && parentPath.length > 0) {
-                    await this.createFolder(parentPath);
+                    await this.createFolderRecursive(parentPath);
                     // Reintentar crear la carpeta actual
                     await fetch(url, {
                         method: 'MKCOL',
@@ -56,6 +56,35 @@ export class StorageService {
             }
         } catch (error) {
             console.warn(`No se pudo crear carpeta ${folderPath}:`, (error as Error).message);
+        }
+    }
+
+    /**
+ * Crea una carpeta en Nextcloud (recursivamente)
+ */
+    private async createFolderRecursive(folderPath: string): Promise<void> {
+        const parts = folderPath.split('/').filter(p => p.length > 0);
+        let currentPath = '';
+
+        for (const part of parts) {
+            currentPath = currentPath ? `${currentPath}/${part}` : part;
+            const url = `${this.webdavUrl}/${currentPath}`;
+
+            try {
+                const response = await fetch(url, {
+                    method: 'MKCOL',
+                    headers: {
+                        'Authorization': this.getAuthHeader(),
+                    },
+                });
+
+                // 201 = creado, 405 = ya existe, 409 = ya existe - todos OK
+                if (response.ok || response.status === 405 || response.status === 409) {
+                    continue;
+                }
+            } catch (error) {
+                console.warn(`Error creando carpeta ${currentPath}:`, (error as Error).message);
+            }
         }
     }
 
@@ -121,7 +150,7 @@ export class StorageService {
             const fullPath = `${folderPath}/${fileName}`;
 
             // Crear carpeta si no existe
-            await this.createFolder(folderPath);
+            await this.createFolderRecursive(folderPath);
 
             // Subir archivo
             const uploadUrl = `${this.webdavUrl}/${fullPath}`;
