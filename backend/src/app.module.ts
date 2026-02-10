@@ -28,6 +28,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { SessionCleanupService } from './cron/session-cleanup.service';
 import { TimelineSKUModule } from './modules/timeline-sku/timeline-sku.module';
 import { EstadoProductoModule } from './modules/estado-producto/estado-producto.module';
+import { StorageModule } from './modules/storage';
 
 
 
@@ -61,7 +62,7 @@ import { EstadoProductoModule } from './modules/estado-producto/estado-producto.
     HistorialGeneralModule,
     TimelineSKUModule,
     EstadoProductoModule,
-
+    StorageModule,
   ],
   providers: [
     SessionCleanupService

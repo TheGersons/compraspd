@@ -6,6 +6,7 @@ import Historial from "./components/Historial";
 import { useAuth } from "../../context/AuthContext";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
+import DescuentoActions from "./components/DescuentoActions";
 
 // ============================================================================
 // TYPES
@@ -1712,15 +1713,20 @@ export default function FollowUps() {
                                                       )}
                                                     </div>
 
-                                                    {precio.ComprobanteDescuento && (
-                                                      <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
-                                                        📄 Comprobante: {precio.ComprobanteDescuento}
-                                                      </p>
-                                                    )}
-
                                                     <p className="mt-1 text-xs text-gray-400 dark:text-gray-600">
                                                       Agregado: {new Date(precio.creado).toLocaleDateString("es-HN")}
                                                     </p>
+
+                                                    {/* Acciones de descuento */}
+                                                    <DescuentoActions
+                                                      precio={precio}
+                                                      productoId={producto.id}
+                                                      cotizacionId={cotizacionSeleccionada!.id}
+                                                      sku={producto.sku}
+                                                      onUpdate={() => cargarPreciosProducto(producto.id)}
+                                                      onNotification={addNotification}
+
+                                                    />
                                                   </div>
                                                 </div>
 
