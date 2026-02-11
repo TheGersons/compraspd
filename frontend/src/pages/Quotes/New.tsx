@@ -6,6 +6,8 @@ import { useNotifications } from "../Notifications/context/NotificationContext";
 import { getToken } from "../../lib/api";
 import { LoadingScreen } from "../../components/common/LoadingScreen";
 import { useAuth } from "../../context/AuthContext";
+import "../../components/common/datepicker.css";
+import DatePicker from "../../components/common/DatePicker";
 
 
 // ============================================================================
@@ -152,18 +154,21 @@ export default function New() {
   const [nombreCotizacion, setNombreCotizacion] = useState("");
   const [tipoCompra, setTipoCompra] = useState<TipoCompra>("NACIONAL");
   const [lugarEntrega, setLugarEntrega] = useState<LugarEntrega>("ALMACEN");
-  const [fechaLimite, setFechaLimite] = useState("");
   const [comentarios, setComentarios] = useState("");
   const [tipoId, setTipoId] = useState("");
   const { user, isLoading } = useAuth();
-  
+
   const [solicitanteId, setSolicitanteId] = useState("");
   const [searchSolicitante, setSearchSolicitante] = useState("");
   const [proyectoId, setProyectoId] = useState("");
   const [items, setItems] = useState<ItemCotizacion[]>([
     { descripcionProducto: "", cantidad: 1, tipoUnidad: "UNIDAD", notas: "" },
   ]);
+  const [fechaLimite, setFechaLimite] = useState<Date | null>(null);
 
+  // Calcular fecha mínima (+5 días desde hoy)
+  const minDate = new Date();
+  minDate.setDate(minDate.getDate() + 5);
   // Catálogos
   const [tipos, setTipos] = useState<Tipo[]>([]);
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
@@ -172,6 +177,8 @@ export default function New() {
   // Estados de carga y errores
   const [loading, setLoading] = useState(false);
   const [loadingCatalogos, setLoadingCatalogos] = useState(true);
+
+
   // 1. LOADING
   if (isLoading) {
     return (
@@ -203,11 +210,11 @@ export default function New() {
       // 1. Manejar Tipos (CON VALIDACIÓN DE NULOS EXTRA)
       if (tiposResult.status === 'fulfilled') {
         // Si tiposResult.value es null o undefined, usamos [] para evitar pantallas blancas
-        const datosSeguros = tiposResult.value || []; 
+        const datosSeguros = tiposResult.value || [];
         setTipos(datosSeguros);
       } else {
         console.warn("⚠️ Error cargando Tipos:", tiposResult.reason);
-        setTipos([]); 
+        setTipos([]);
       }
 
       // 2. Manejar Usuarios
@@ -339,7 +346,7 @@ export default function New() {
         nombreCotizacion: nombreCotizacion.trim(),
         tipoCompra,
         lugarEntrega,
-        fechaLimite: new Date(fechaLimite).toISOString(),
+        fechaLimite: fechaLimite?.toISOString(),
         fechaEstimada: fechaEstimadaDefault.toISOString(),
         comentarios: comentarios.trim() || undefined,
         tipoId,
@@ -607,14 +614,15 @@ export default function New() {
               <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Fecha Límite <span className="text-rose-500">*</span>
               </label>
-              <input
-                type="date"
-                value={fechaLimite}
-                onChange={(e) => setFechaLimite(e.target.value)}
-                min={new Date().toISOString().split("T")[0]}
-                className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-2.5 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
-                required
+              <DatePicker
+                selected={fechaLimite}
+                onChange={(date) => setFechaLimite(date)}
+                minDate={minDate}
+                placeholder="Seleccionar fecha límite"
               />
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Mínimo 5 días a partir de hoy
+              </p>
             </div>
 
             {/* Comentarios */}

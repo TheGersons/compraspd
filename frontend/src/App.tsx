@@ -50,6 +50,7 @@ import NotificationPanel from "./pages/Notifications/components/notifications/No
 import Projects from "./pages/projects/Projects";
 import NewProject from "./pages/projects/NewProject";
 import { useState, useEffect } from "react";
+import Profile from "./pages/Profile/Profile";
 
 const SHOPPING_MANAGER_ROLES = ["ADMIN", "SUPERVISOR"];
 const QUOTES_SUPERVISOR_ROLES = ["SUPERVISOR", "ADMIN"];
@@ -254,6 +255,14 @@ export default function App() {
                     <UserProfiles />
                   </ProtectedRoute>
                 }
+              />
+              <Route
+                path="/profile" 
+                element={
+                  <ProtectedRoute roles={STAFF_ROLES}>
+                    <Profile />
+                  </ProtectedRoute>
+                } 
               />
               <Route
                 path="/roles"

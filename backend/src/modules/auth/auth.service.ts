@@ -30,7 +30,7 @@ export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwt: JwtService
-  ) {}
+  ) { }
 
   /**
    * Valida las credenciales del usuario
@@ -75,177 +75,177 @@ export class AuthService {
 
   // AGREGAR ESTOS MÉTODOS A auth.service.ts
 
-/**
- * Genera tokens y crea sesión en DB
- * IMPORTANTE: Cierra sesiones anteriores del mismo dispositivo
- */
-async sign(usuario: UsuarioWithRoleName, metadata?: LoginMetadata) {
-  const roleName = usuario.rol?.nombre || 'USER';
+  /**
+   * Genera tokens y crea sesión en DB
+   * IMPORTANTE: Cierra sesiones anteriores del mismo dispositivo
+   */
+  async sign(usuario: UsuarioWithRoleName, metadata?: LoginMetadata) {
+    const roleName = usuario.rol?.nombre || 'USER';
 
-  // 1. CERRAR SESIONES ANTERIORES DEL MISMO DISPOSITIVO
-  // Esto evita sesiones duplicadas
-  if (metadata?.userAgent) {
-    await this.prisma.sesion.updateMany({
-      where: {
-        usuarioId: usuario.id,
-        userAgent: metadata.userAgent,
-        activa: true
-      },
-      data: { activa: false }
-    });
-    
-    this.logger.log(`Sesiones anteriores cerradas para: ${usuario.email}`);
-  }
-
-  // Generar IDs únicos
-  const jti = randomUUID();
-  const refreshJti = randomUUID();
-
-  // Configuración de expiración
-  const accessTokenExpiry = process.env.JWT_EXPIRES as any || '15m';
-  const refreshTokenExpiry = process.env.JWT_REFRESH_EXPIRES as any || '7d';
-
-  // Payload del access token
-  const accessPayload = {
-    sub: usuario.id,
-    email: usuario.email,
-    nombre: usuario.nombre,
-    role: roleName,
-    jti: jti
-  };
-
-  // Payload del refresh token
-  const refreshPayload = {
-    sub: usuario.id,
-    jti: refreshJti,
-    type: 'refresh'
-  };
-
-  // Generar tokens
-  const accessToken = this.jwt.sign(accessPayload, { expiresIn: accessTokenExpiry });
-  const refreshToken = this.jwt.sign(refreshPayload, { expiresIn: refreshTokenExpiry });
-
-  // Calcular fechas de expiración
-  const now = new Date();
-  const accessExpiry = new Date(now.getTime() + this.parseExpiry(accessTokenExpiry));
-  const refreshExpiry = new Date(now.getTime() + this.parseExpiry(refreshTokenExpiry));
-
-  // 2. LIMITAR NÚMERO DE SESIONES ACTIVAS (opcional)
-  // Mantener máximo 5 sesiones activas por usuario
-  const sesionesActivas = await this.prisma.sesion.count({
-    where: {
-      usuarioId: usuario.id,
-      activa: true
-    }
-  });
-
-  if (sesionesActivas >= 5) {
-    // Cerrar la sesión más antigua
-    const sesionMasAntigua = await this.prisma.sesion.findFirst({
-      where: {
-        usuarioId: usuario.id,
-        activa: true
-      },
-      orderBy: { creado: 'asc' }
-    });
-
-    if (sesionMasAntigua) {
-      await this.prisma.sesion.update({
-        where: { id: sesionMasAntigua.id },
+    // 1. CERRAR SESIONES ANTERIORES DEL MISMO DISPOSITIVO
+    // Esto evita sesiones duplicadas
+    if (metadata?.userAgent) {
+      await this.prisma.sesion.updateMany({
+        where: {
+          usuarioId: usuario.id,
+          userAgent: metadata.userAgent,
+          activa: true
+        },
         data: { activa: false }
       });
-      
-      this.logger.log(`Sesión antigua cerrada para mantener límite de 5`);
+
+      this.logger.log(`Sesiones anteriores cerradas para: ${usuario.email}`);
     }
-  }
 
-  // 3. Guardar nueva sesión en DB
-  await this.prisma.sesion.create({
-    data: {
-      usuarioId: usuario.id,
-      token: accessToken,
-      jti: jti,
-      refreshToken: refreshToken,
-      userAgent: metadata?.userAgent,
-      ip: metadata?.ip,
-      dispositivo: metadata?.dispositivo,
-      navegador: metadata?.navegador,
-      expiraEn: accessExpiry,
-      refreshExpiraEn: refreshExpiry,
-      activa: true
-    }
-  });
+    // Generar IDs únicos
+    const jti = randomUUID();
+    const refreshJti = randomUUID();
 
-  this.logger.log(`Nueva sesión creada para: ${usuario.email} (JTI: ${jti})`);
+    // Configuración de expiración
+    const accessTokenExpiry = process.env.JWT_EXPIRES as any || '15m';
+    const refreshTokenExpiry = process.env.JWT_REFRESH_EXPIRES as any || '7d';
 
-  return {
-    access_token: accessToken,
-    refresh_token: refreshToken,
-    token_type: 'Bearer',
-    expires_in: accessTokenExpiry,
-    user: {
-      id: usuario.id,
+    // Payload del access token
+    const accessPayload = {
+      sub: usuario.id,
       email: usuario.email,
       nombre: usuario.nombre,
-      role: roleName
-    }
-  };
-}
+      role: roleName,
+      jti: jti
+    };
 
-/**
- * NUEVO: Limpia sesiones expiradas automáticamente
- * Llamar al inicio de la aplicación
- */
-async cleanExpiredSessions() {
-  try {
+    // Payload del refresh token
+    const refreshPayload = {
+      sub: usuario.id,
+      jti: refreshJti,
+      type: 'refresh'
+    };
+
+    // Generar tokens
+    const accessToken = this.jwt.sign(accessPayload, { expiresIn: accessTokenExpiry });
+    const refreshToken = this.jwt.sign(refreshPayload, { expiresIn: refreshTokenExpiry });
+
+    // Calcular fechas de expiración
     const now = new Date();
-    
-    const result = await this.prisma.sesion.updateMany({
+    const accessExpiry = new Date(now.getTime() + this.parseExpiry(accessTokenExpiry));
+    const refreshExpiry = new Date(now.getTime() + this.parseExpiry(refreshTokenExpiry));
+
+    // 2. LIMITAR NÚMERO DE SESIONES ACTIVAS (opcional)
+    // Mantener máximo 5 sesiones activas por usuario
+    const sesionesActivas = await this.prisma.sesion.count({
       where: {
-        OR: [
-          { expiraEn: { lt: now } },
-          { refreshExpiraEn: { lt: now } }
-        ],
+        usuarioId: usuario.id,
         activa: true
-      },
-      data: { activa: false }
-    });
-
-    this.logger.log(`Sesiones expiradas limpiadas: ${result.count}`);
-
-    return { count: result.count };
-  } catch (error) {
-    this.logger.error('Error al limpiar sesiones:', error);
-    return { count: 0 };
-  }
-}
-
-/**
- * NUEVO: Elimina físicamente sesiones inactivas viejas (más de 30 días)
- * Para mantener la tabla limpia
- */
-async deleteOldSessions() {
-  try {
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-    const result = await this.prisma.sesion.deleteMany({
-      where: {
-        activa: false,
-        actualizado: { lt: thirtyDaysAgo }
       }
     });
 
-    this.logger.log(`Sesiones antiguas eliminadas: ${result.count}`);
+    if (sesionesActivas >= 5) {
+      // Cerrar la sesión más antigua
+      const sesionMasAntigua = await this.prisma.sesion.findFirst({
+        where: {
+          usuarioId: usuario.id,
+          activa: true
+        },
+        orderBy: { creado: 'asc' }
+      });
 
-    return { count: result.count };
-  } catch (error) {
-    this.logger.error('Error al eliminar sesiones antiguas:', error);
-    return { count: 0 };
+      if (sesionMasAntigua) {
+        await this.prisma.sesion.update({
+          where: { id: sesionMasAntigua.id },
+          data: { activa: false }
+        });
+
+        this.logger.log(`Sesión antigua cerrada para mantener límite de 5`);
+      }
+    }
+
+    // 3. Guardar nueva sesión en DB
+    await this.prisma.sesion.create({
+      data: {
+        usuarioId: usuario.id,
+        token: accessToken,
+        jti: jti,
+        refreshToken: refreshToken,
+        userAgent: metadata?.userAgent,
+        ip: metadata?.ip,
+        dispositivo: metadata?.dispositivo,
+        navegador: metadata?.navegador,
+        expiraEn: accessExpiry,
+        refreshExpiraEn: refreshExpiry,
+        activa: true
+      }
+    });
+
+    this.logger.log(`Nueva sesión creada para: ${usuario.email} (JTI: ${jti})`);
+
+    return {
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      token_type: 'Bearer',
+      expires_in: accessTokenExpiry,
+      user: {
+        id: usuario.id,
+        email: usuario.email,
+        nombre: usuario.nombre,
+        role: roleName
+      }
+    };
   }
-}
 
-  
+  /**
+   * NUEVO: Limpia sesiones expiradas automáticamente
+   * Llamar al inicio de la aplicación
+   */
+  async cleanExpiredSessions() {
+    try {
+      const now = new Date();
+
+      const result = await this.prisma.sesion.updateMany({
+        where: {
+          OR: [
+            { expiraEn: { lt: now } },
+            { refreshExpiraEn: { lt: now } }
+          ],
+          activa: true
+        },
+        data: { activa: false }
+      });
+
+      this.logger.log(`Sesiones expiradas limpiadas: ${result.count}`);
+
+      return { count: result.count };
+    } catch (error) {
+      this.logger.error('Error al limpiar sesiones:', error);
+      return { count: 0 };
+    }
+  }
+
+  /**
+   * NUEVO: Elimina físicamente sesiones inactivas viejas (más de 30 días)
+   * Para mantener la tabla limpia
+   */
+  async deleteOldSessions() {
+    try {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const result = await this.prisma.sesion.deleteMany({
+        where: {
+          activa: false,
+          actualizado: { lt: thirtyDaysAgo }
+        }
+      });
+
+      this.logger.log(`Sesiones antiguas eliminadas: ${result.count}`);
+
+      return { count: result.count };
+    } catch (error) {
+      this.logger.error('Error al eliminar sesiones antiguas:', error);
+      return { count: 0 };
+    }
+  }
+
+
 
   /**
    * Renueva el access token usando un refresh token válido
@@ -499,71 +499,110 @@ async deleteOldSessions() {
 
   // AGREGAR ESTE MÉTODO A auth.service.ts
 
-/**
- * Obtiene estadísticas de sesiones para reportes
- */
-async getSessionStats() {
-  try {
-    const [
-      activeSessions,
-      uniqueUsers,
-      webSessions,
-      mobileSessions,
-      desktopSessions
-    ] = await Promise.all([
-      // Total de sesiones activas
-      this.prisma.sesion.count({
-        where: { activa: true }
-      }),
-      
-      // Usuarios únicos con sesión activa
-      this.prisma.sesion.groupBy({
-        by: ['usuarioId'],
-        where: { activa: true },
-        _count: true
-      }),
-      
-      // Sesiones web
-      this.prisma.sesion.count({
-        where: {
-          activa: true,
-          dispositivo: 'web'
-        }
-      }),
-      
-      // Sesiones móviles
-      this.prisma.sesion.count({
-        where: {
-          activa: true,
-          dispositivo: 'mobile'
-        }
-      }),
-      
-      // Sesiones desktop
-      this.prisma.sesion.count({
-        where: {
-          activa: true,
-          dispositivo: 'desktop'
-        }
-      })
-    ]);
+  /**
+   * Obtiene estadísticas de sesiones para reportes
+   */
+  async getSessionStats() {
+    try {
+      const [
+        activeSessions,
+        uniqueUsers,
+        webSessions,
+        mobileSessions,
+        desktopSessions
+      ] = await Promise.all([
+        // Total de sesiones activas
+        this.prisma.sesion.count({
+          where: { activa: true }
+        }),
 
-    return {
-      activeSessions,
-      uniqueUsers: uniqueUsers.length,
-      webSessions,
-      mobileSessions,
-      desktopSessions
-    };
-  } catch (error) {
-    this.logger.error('Error al obtener estadísticas de sesiones:', error);
-    return {
-      activeSessions: 0,
-      uniqueUsers: 0,
-      webSessions: 0,
-      mobileSessions: 0,
-      desktopSessions: 0
-    };
+        // Usuarios únicos con sesión activa
+        this.prisma.sesion.groupBy({
+          by: ['usuarioId'],
+          where: { activa: true },
+          _count: true
+        }),
+
+        // Sesiones web
+        this.prisma.sesion.count({
+          where: {
+            activa: true,
+            dispositivo: 'web'
+          }
+        }),
+
+        // Sesiones móviles
+        this.prisma.sesion.count({
+          where: {
+            activa: true,
+            dispositivo: 'mobile'
+          }
+        }),
+
+        // Sesiones desktop
+        this.prisma.sesion.count({
+          where: {
+            activa: true,
+            dispositivo: 'desktop'
+          }
+        })
+      ]);
+
+      return {
+        activeSessions,
+        uniqueUsers: uniqueUsers.length,
+        webSessions,
+        mobileSessions,
+        desktopSessions
+      };
+    } catch (error) {
+      this.logger.error('Error al obtener estadísticas de sesiones:', error);
+      return {
+        activeSessions: 0,
+        uniqueUsers: 0,
+        webSessions: 0,
+        mobileSessions: 0,
+        desktopSessions: 0
+      };
+    }
   }
-}
+
+  /**
+   * Cambiar contraseña del usuario
+   */
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    // Obtener usuario con su hash de contraseña
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        passwordHash: true,
+      }
+    });
+
+    if (!usuario) {
+      throw new UnauthorizedException('Usuario no encontrado');
+    }
+
+    // Verificar contraseña actual
+    const isPasswordValid = await bcrypt.compare(currentPassword, usuario.passwordHash);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('La contraseña actual es incorrecta');
+    }
+
+    // Hashear nueva contraseña
+    const saltRounds = 10;
+    const newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
+
+    // Actualizar contraseña
+    await this.prisma.usuario.update({
+      where: { id: userId },
+      data: {
+        passwordHash: newPasswordHash,
+        actualizado: new Date()
+      }
+    });
+
+    return { message: 'Contraseña actualizada correctamente' };
+  }
 }

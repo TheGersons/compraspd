@@ -1,36 +1,38 @@
 // src/auth/auth.controller.ts - VERSIÓN COMPLETA
 
-import { 
-  Body, 
-  Controller, 
-  Get, 
-  Post, 
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
   Delete,
   Param,
-  Req, 
-  UseGuards, 
+  Req,
+  UseGuards,
   Logger,
   HttpCode,
   HttpStatus,
   Headers,
+  Request,
   Ip
 } from '@nestjs/common';
-import { 
-  ApiTags, 
-  ApiBearerAuth, 
-  ApiOperation, 
-  ApiResponse 
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { ChangePasswordDto } from './dto/change-passwird.dto';
 
 @ApiTags('Auth')
 @Controller('api/v1/auth')
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
-  
-  constructor(private readonly authService: AuthService) {}
+
+  constructor(private readonly authService: AuthService) { }
 
   /**
    * Login - Autenticación de usuario
@@ -47,21 +49,21 @@ export class AuthController {
     @Ip() ip?: string
   ) {
     this.logger.log(`Intento de login: ${dto.email}`);
-    
+
     const usuario = await this.authService.validateUser(dto.email, dto.password);
-    
+
     // Detectar dispositivo/navegador
     const metadata = this.parseUserAgent(userAgent);
-    
+
     const result = await this.authService.sign(usuario, {
       ip,
       userAgent,
       dispositivo: metadata.dispositivo,
       navegador: metadata.navegador
     });
-    
+
     this.logger.log(`Login exitoso: ${usuario.email} - Rol: ${usuario.rol?.nombre}`);
-    
+
     return result;
   }
 
@@ -150,10 +152,10 @@ export class AuthController {
   ) {
     const userId = req.user?.sub;
     this.logger.log(`Usuario ${userId} cerrando sesión: ${sessionId}`);
-    
+
     // Verificar que la sesión pertenece al usuario
     await this.authService.revokeSession(sessionId, userId);
-    
+
     return { ok: true, message: 'Sesión cerrada' };
   }
 
@@ -166,7 +168,7 @@ export class AuthController {
     }
 
     const ua = userAgent.toLowerCase();
-    
+
     // Detectar dispositivo
     let dispositivo = 'web';
     if (ua.includes('mobile') || ua.includes('android') || ua.includes('iphone')) {
@@ -183,5 +185,11 @@ export class AuthController {
     else if (ua.includes('edge')) navegador = 'Edge';
 
     return { dispositivo, navegador };
+  }
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Cambiar contraseña del usuario actual' })
+  async changePassword(@Body() dto: ChangePasswordDto, @Request() req: any) {
+    return this.authService.changePassword(req.user.sub, dto.currentPassword, dto.newPassword);
   }
 }
