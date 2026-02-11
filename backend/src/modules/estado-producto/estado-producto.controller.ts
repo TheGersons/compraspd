@@ -7,6 +7,7 @@ import {
   Param,
   Query,
   UseGuards,
+  Request,
   ParseUUIDPipe,
   HttpCode,
   HttpStatus
@@ -40,7 +41,7 @@ type UserJwt = { sub: string; role?: string };
 @UseGuards(AuthGuard('jwt'))
 @Controller('api/v1/estado-productos')
 export class EstadoProductoController {
-  constructor(private readonly service: EstadoProductoService) {}
+  constructor(private readonly service: EstadoProductoService) { }
 
   // ============================================
   // GESTIÓN DE ESTADOS
@@ -238,5 +239,16 @@ export class EstadoProductoController {
     @CurrentUser() user: UserJwt
   ) {
     return this.service.aprobarProducto(id, dto, user);
+  }
+
+
+  /**
+   * Obtener mis productos (para solicitantes)
+   * Permite al usuario ver el estado de compra de sus productos aprobados
+   */
+  @Get('mis-productos')
+  @ApiOperation({ summary: 'Obtener mis productos en compra (solicitante)' })
+  async getMisProductos(@Request() req: any) {
+    return this.service.getMisProductos(req.user);
   }
 }

@@ -540,6 +540,59 @@ export class EstadoProductoService {
   }
 
   /**
+   * Obtener productos del solicitante actual (mis productos en compra)
+   * Permite al usuario ver el estado de compra de sus productos aprobados
+   */
+  async getMisProductos(user: UserJwt) {
+    // Obtener todos los productos de cotizaciones donde el usuario es el solicitante
+    const productos = await this.prisma.estadoProducto.findMany({
+      where: {
+        aprobadoPorSupervisor: true,
+        cotizacion: {
+          solicitanteId: user.sub
+        }
+      },
+      include: {
+        proyecto: { select: { nombre: true } },
+        cotizacion: { 
+          select: { 
+            id: true,
+            nombreCotizacion: true, 
+            tipoCompra: true,
+            estado: true,
+            fechaLimite: true,
+            solicitante: {
+              select: {
+                id: true,
+                nombre: true,
+                email: true
+              }
+            }
+          } 
+        },
+        paisOrigen: { select: { nombre: true } }
+      },
+      orderBy: [
+        { recibido: 'asc' }, // Los no recibidos primero
+        { criticidad: 'desc' },
+        { actualizado: 'desc' }
+      ]
+    });
+
+    return {
+      total: productos.length,
+      recibidos: productos.filter(p => p.recibido).length,
+      enProceso: productos.filter(p => !p.recibido).length,
+      items: productos.map(p => ({
+        ...p,
+        estadoActual: this.obtenerEstadoActual(p),
+        progreso: this.calcularProgreso(p, p.cotizacion?.tipoCompra),
+        tipoCompra: p.cotizacion?.tipoCompra || 'INTERNACIONAL'
+      }))
+    };
+  }
+
+  /**
    * Aprobar producto por supervisor
    */
   async aprobarProducto(id: string, dto: AprobarProductoDto, user: UserJwt) {

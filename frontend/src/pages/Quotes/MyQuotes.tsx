@@ -10,8 +10,54 @@ import toast from "react-hot-toast";
 // TYPES
 // ============================================================================
 
+type EstadoProductoCompra = {
+    id: string;
+    sku: string;
+    descripcion: string;
+    cantidad?: number;
+    precioUnitario?: number;
+    precioTotal?: number;
+    proveedor?: string;
+    
+    // Estados booleanos
+    cotizado: boolean;
+    conDescuento: boolean;
+    comprado: boolean;
+    pagado: boolean;
+    primerSeguimiento: boolean;
+    enFOB: boolean;
+    conBL: boolean;
+    segundoSeguimiento: boolean;
+    enCIF: boolean;
+    recibido: boolean;
+    
+    // Fechas
+    fechaCotizado?: string | null;
+    fechaConDescuento?: string | null;
+    fechaComprado?: string | null;
+    fechaPagado?: string | null;
+    fechaPrimerSeguimiento?: string | null;
+    fechaEnFOB?: string | null;
+    fechaConBL?: string | null;
+    fechaSegundoSeguimiento?: string | null;
+    fechaEnCIF?: string | null;
+    fechaRecibido?: string | null;
+    
+    // Criticidad
+    criticidad: number;
+    nivelCriticidad: string;
+    diasRetrasoActual: number;
+    estadoGeneral: string;
+    
+    // Calculados
+    estadoActual?: string;
+    progreso?: number;
+    tipoCompra?: 'NACIONAL' | 'INTERNACIONAL';
+};
+
 type Producto = {
     id: string;
+    sku?: string;
     descripcionProducto: string;
     cantidad: number;
     tipoUnidad: string;
@@ -26,6 +72,30 @@ type Producto = {
         rechazado?: boolean;
         fechaRechazo?: string;
         motivoRechazo?: string;
+        // Estados de compra
+        cotizado?: boolean;
+        conDescuento?: boolean;
+        comprado?: boolean;
+        pagado?: boolean;
+        primerSeguimiento?: boolean;
+        enFOB?: boolean;
+        conBL?: boolean;
+        segundoSeguimiento?: boolean;
+        enCIF?: boolean;
+        recibido?: boolean;
+        progreso?: number;
+        estadoActual?: string;
+        // Fechas de compra
+        fechaCotizado?: string | null;
+        fechaConDescuento?: string | null;
+        fechaComprado?: string | null;
+        fechaPagado?: string | null;
+        fechaPrimerSeguimiento?: string | null;
+        fechaEnFOB?: string | null;
+        fechaConBL?: string | null;
+        fechaSegundoSeguimiento?: string | null;
+        fechaEnCIF?: string | null;
+        fechaRecibido?: string | null;
     };
 };
 
@@ -38,7 +108,7 @@ type Cotizacion = {
     aprobadaParcialmente: boolean;
     todosProductosAprobados: boolean;
     comentarios?: string;
-    tipoCompra: string;
+    tipoCompra: 'NACIONAL' | 'INTERNACIONAL';
     lugarEntrega: string;
     solicitante: {
         id: string;
@@ -65,6 +135,10 @@ type Cotizacion = {
     productosRechazados?: number;
     porcentajeAprobado?: number;
     detalles?: Producto[];
+    // Nuevos campos para tracking de compras
+    productosEnCompra?: number;
+    productosRecibidos?: number;
+    progresoCompraTotal?: number;
 };
 
 type ChatMessage = {
@@ -79,16 +153,50 @@ type ChatMessage = {
 };
 
 // ============================================================================
+// CONSTANTS
+// ============================================================================
+
+const ESTADOS_COMPRA_ICONOS: Record<string, string> = {
+    cotizado: "📋",
+    conDescuento: "💰",
+    comprado: "🛒",
+    pagado: "💳",
+    primerSeguimiento: "📞",
+    enFOB: "🚢",
+    conBL: "📄",
+    segundoSeguimiento: "📞",
+    enCIF: "🌊",
+    recibido: "📦",
+};
+
+const ESTADOS_COMPRA_LABELS: Record<string, string> = {
+    cotizado: "Cotizado",
+    conDescuento: "Con Descuento",
+    comprado: "Comprado",
+    pagado: "Pagado",
+    primerSeguimiento: "1er Seguimiento",
+    enFOB: "En FOB",
+    conBL: "Con BL",
+    segundoSeguimiento: "2do Seguimiento",
+    enCIF: "En CIF",
+    recibido: "Recibido",
+};
+
+const ESTADOS_NACIONAL = ['cotizado', 'conDescuento', 'comprado', 'pagado', 'recibido'];
+const ESTADOS_INTERNACIONAL = ['cotizado', 'conDescuento', 'comprado', 'pagado', 'primerSeguimiento', 'enFOB', 'conBL', 'segundoSeguimiento', 'enCIF', 'recibido'];
+
+// ============================================================================
 // API SERVICE
 // ============================================================================
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
-const token = getToken();
-
 
 const api = {
+    getToken: () => getToken(),
+
     // Obtener mis cotizaciones (como solicitante)
     async getMisCotizaciones() {
+        const token = this.getToken();
         const response = await fetch(`${API_BASE_URL}/api/v1/quotations/my-quotations`, {
             credentials: "include",
             headers: { Authorization: `Bearer ${token}` },
@@ -98,10 +206,10 @@ const api = {
         } else {
             return response.json();
         }
-
     },
 
     async getMe() {
+        const token = this.getToken();
         const response = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
             credentials: "include",
             headers: { Authorization: `Bearer ${token}` },
@@ -109,8 +217,10 @@ const api = {
         if (!response.ok) throw new Error("Error al cargar usuario");
         return response.json();
     },
+
     // Obtener detalle de una cotización
     async getCotizacionDetalle(id: string) {
+        const token = this.getToken();
         const response = await fetch(`${API_BASE_URL}/api/v1/quotations/${id}`, {
             credentials: "include",
             headers: { Authorization: `Bearer ${token}` },
@@ -120,23 +230,76 @@ const api = {
 
         // Adaptar respuesta para incluir estadísticas
         const totalProductos = data.detalles?.length || 0;
-        const productosAprobados = data.estadosProductos?.filter(
-            (ep: any) => ep.aprobadoPorSupervisor
-        ).length || 0;
+        const estadosProductos = data.estadosProductos || [];
+        
+        const productosAprobados = estadosProductos.filter(
+            (ep: any) => ep.aprobadoPorSupervisor && !ep.rechazado
+        ).length;
+        
+        const productosRechazados = estadosProductos.filter(
+            (ep: any) => ep.rechazado
+        ).length;
+
+        // Calcular progreso de compras
+        let productosEnCompra = 0;
+        let productosRecibidos = 0;
+        let sumaProgreso = 0;
+
+        estadosProductos.forEach((ep: any) => {
+            if (ep.aprobadoPorSupervisor && !ep.rechazado) {
+                productosEnCompra++;
+                if (ep.recibido) {
+                    productosRecibidos++;
+                }
+                // Calcular progreso individual
+                const tipoCompra = data.tipoCompra || 'INTERNACIONAL';
+                const estados = tipoCompra === 'NACIONAL' ? ESTADOS_NACIONAL : ESTADOS_INTERNACIONAL;
+                let completados = 0;
+                estados.forEach(estado => {
+                    if (ep[estado]) completados++;
+                });
+                sumaProgreso += (completados / estados.length) * 100;
+            }
+        });
+
+        const progresoCompraTotal = productosEnCompra > 0 
+            ? Math.round(sumaProgreso / productosEnCompra)
+            : 0;
 
         return {
             ...data,
             totalProductos,
             productosAprobados,
-            productosPendientes: totalProductos - productosAprobados,
+            productosPendientes: totalProductos - productosAprobados - productosRechazados,
+            productosRechazados,
             porcentajeAprobado: totalProductos > 0
                 ? Math.round((productosAprobados / totalProductos) * 100)
                 : 0,
+            productosEnCompra,
+            productosRecibidos,
+            progresoCompraTotal,
         };
+    },
+
+    // Obtener estados de productos de mis cotizaciones (para vista de compras)
+    async getMisProductosEnCompra() {
+        const token = this.getToken();
+        const response = await fetch(`${API_BASE_URL}/api/v1/estado-productos/mis-productos`, {
+            credentials: "include",
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) {
+            // Si el endpoint no existe, retornar array vacío
+            console.warn("Endpoint mis-productos no disponible");
+            return [];
+        }
+        const data = await response.json();
+        return data.items || data || [];
     },
 
     // Chat - Obtener mensajes
     async getChatMessages(chatId: string) {
+        const token = this.getToken();
         const response = await fetch(`${API_BASE_URL}/api/v1/messages/${chatId}/messages`, {
             credentials: "include",
             headers: { Authorization: `Bearer ${token}` },
@@ -147,6 +310,7 @@ const api = {
 
     // Chat - Enviar mensaje
     async sendMessage(chatId: string, contenido: string) {
+        const token = this.getToken();
         const response = await fetch(`${API_BASE_URL}/api/v1/messages/${chatId}/messages`, {
             method: "POST",
             credentials: "include",
@@ -232,6 +396,38 @@ const getCriticidadColor = (nivel: string) => {
     return colores[nivel] || "text-gray-600";
 };
 
+const getCriticidadBadge = (nivel: string) => {
+    const badges: Record<string, string> = {
+        BAJO: "🟢",
+        MEDIO: "🟡",
+        ALTO: "🔴",
+    };
+    return badges[nivel] || "⚪";
+};
+
+const calcularProgresoProducto = (producto: any, tipoCompra: string): number => {
+    if (producto.progreso !== undefined) return producto.progreso;
+    
+    const estados = tipoCompra === 'NACIONAL' ? ESTADOS_NACIONAL : ESTADOS_INTERNACIONAL;
+    let completados = 0;
+    estados.forEach(estado => {
+        if (producto[estado]) completados++;
+    });
+    return Math.round((completados / estados.length) * 100);
+};
+
+const getEstadoActualProducto = (producto: any, tipoCompra: string): string => {
+    if (producto.estadoActual) return producto.estadoActual;
+    
+    const estados = tipoCompra === 'NACIONAL' ? ESTADOS_NACIONAL : ESTADOS_INTERNACIONAL;
+    for (let i = estados.length - 1; i >= 0; i--) {
+        if (producto[estados[i]]) {
+            return estados[i];
+        }
+    }
+    return estados[0];
+};
+
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
@@ -248,6 +444,7 @@ export default function MyQuotes() {
 
     // Estados de búsqueda y filtros
     const [searchQuery, setSearchQuery] = useState("");
+    const [vistaActual, setVistaActual] = useState<'cotizaciones' | 'enCompras' | 'completadas'>('cotizaciones');
 
     // Estados del chat
     const [mensajes, setMensajes] = useState<ChatMessage[]>([]);
@@ -255,10 +452,13 @@ export default function MyQuotes() {
     const [loadingChat, setLoadingChat] = useState(false);
     const [sendingMessage, setSendingMessage] = useState(false);
     const navigate = useNavigate();
+    
     // Estados de UI
     const [showProductos, setShowProductos] = useState(false);
+    const [productoExpandido, setProductoExpandido] = useState<string | null>(null);
 
-    const { user, isLoading } = useAuth()
+    const { user, isLoading } = useAuth();
+    
     if (isLoading) {
         return (
             <div className="flex h-screen items-center justify-center">
@@ -266,8 +466,9 @@ export default function MyQuotes() {
             </div>
         );
     }
+    
     const [currentUserId, setCurrentUserId] = useState<string>("");
-    // 2. SIN USUARIO (ProtectedRoute redirigirá)
+    
     if (!user) {
         return null;
     }
@@ -295,18 +496,15 @@ export default function MyQuotes() {
     // FUNCTIONS
     // ============================================================================
 
-    // En MyQuotes - Parte 2
-
     const obtenerUsuarioActual = async () => {
         setCurrentUserId(user.id);
     };
 
-    const  cargarMisCotizaciones = async () => {
+    const cargarMisCotizaciones = async () => {
         try {
             setLoading(true);
             const data = await api.getMisCotizaciones();
             if (data === 0) {
-
                 navigate('/quotes/new');
                 toast.error('No cuentas con los permisos necesarios');
                 return;
@@ -326,6 +524,7 @@ export default function MyQuotes() {
             const detalle = await api.getCotizacionDetalle(cotizacion.id);
             setCotizacionSeleccionada(detalle);
             setShowProductos(false);
+            setProductoExpandido(null);
         } catch (error) {
             console.error("Error al cargar detalle:", error);
             addNotification("danger", "Error", "Error al cargar detalle de cotización");
@@ -338,12 +537,9 @@ export default function MyQuotes() {
         try {
             setLoadingChat(true);
             const data = await api.getChatMessages(chatId);
-
-            // CORRECCIÓN: Ordenar por fecha ascendente (más antiguos primero)
             const mensajesOrdenados = (data.items || data || []).sort((a: ChatMessage, b: ChatMessage) => {
                 return new Date(a.creado).getTime() - new Date(b.creado).getTime();
             });
-
             setMensajes(mensajesOrdenados);
         } catch (error) {
             console.error("Error al cargar mensajes:", error);
@@ -376,18 +572,157 @@ export default function MyQuotes() {
         chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
 
+    // Filtrar cotizaciones según la vista
     const filteredCotizaciones = cotizaciones.filter((cot) => {
         const matchesSearch =
             cot.nombreCotizacion.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            cot.proyecto?.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            cot.proyecto?.nombre?.toLowerCase().includes(searchQuery.toLowerCase()) ||
             cot.tipo.nombre.toLowerCase().includes(searchQuery.toLowerCase());
 
-        return matchesSearch;
+        if (!matchesSearch) return false;
+
+        // Filtrar por vista
+        if (vistaActual === 'cotizaciones') {
+            // Mostrar cotizaciones que aún no están todas aprobadas o no tienen productos en compra
+            return !cot.todosProductosAprobados || cot.productosAprobados === 0;
+        } else if (vistaActual === 'enCompras') {
+            // Mostrar cotizaciones con productos aprobados que NO están todos recibidos
+            return cot.productosAprobados > 0 && (cot.productosRecibidos || 0) < cot.productosAprobados;
+        } else if (vistaActual === 'completadas') {
+            // Mostrar cotizaciones donde TODOS los productos aprobados están recibidos
+            return cot.productosAprobados > 0 && (cot.productosRecibidos || 0) >= cot.productosAprobados;
+        }
+        
+        return true;
     });
+
+    // Contar por vista
+    const countCotizaciones = cotizaciones.filter(c => !c.todosProductosAprobados || c.productosAprobados === 0).length;
+    const countEnCompras = cotizaciones.filter(c => c.productosAprobados > 0 && (c.productosRecibidos || 0) < c.productosAprobados).length;
+    const countCompletadas = cotizaciones.filter(c => c.productosAprobados > 0 && (c.productosRecibidos || 0) >= c.productosAprobados).length;
 
     const daysLeft = cotizacionSeleccionada
         ? calculateDaysLeft(cotizacionSeleccionada.fechaLimite)
         : 0;
+
+    // ============================================================================
+    // RENDER - Timeline de producto
+    // ============================================================================
+
+    const renderTimelineProducto = (producto: Producto, tipoCompra: 'NACIONAL' | 'INTERNACIONAL') => {
+        if (!producto.estadoProducto?.aprobadoPorSupervisor) return null;
+        
+        const ep = producto.estadoProducto;
+        const estados = tipoCompra === 'NACIONAL' ? ESTADOS_NACIONAL : ESTADOS_INTERNACIONAL;
+        const progreso = calcularProgresoProducto(ep, tipoCompra);
+        const estadoActual = getEstadoActualProducto(ep, tipoCompra);
+
+        return (
+            <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-900/20">
+                <div className="mb-2 flex items-center justify-between">
+                    <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                        🛒 Proceso de Compra
+                    </span>
+                    <span className={`text-sm font-bold ${progreso === 100 ? 'text-green-600 dark:text-green-400' : 'text-blue-600 dark:text-blue-400'}`}>
+                        {progreso}%
+                    </span>
+                </div>
+                
+                {/* Barra de progreso */}
+                <div className="mb-3 h-2 w-full overflow-hidden rounded-full bg-blue-200 dark:bg-blue-800">
+                    <div
+                        className={`h-full rounded-full transition-all ${
+                            progreso === 100 ? 'bg-green-600' : 'bg-blue-600'
+                        }`}
+                        style={{ width: `${progreso}%` }}
+                    />
+                </div>
+
+                {/* Timeline compacto */}
+                <div className="flex flex-wrap gap-1">
+                    {estados.map((estado, index) => {
+                        const completado = ep[estado as keyof typeof ep];
+                        const esActual = estado === estadoActual;
+                        
+                        return (
+                            <div
+                                key={estado}
+                                className={`flex items-center gap-1 rounded px-2 py-1 text-xs ${
+                                    completado
+                                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                        : esActual
+                                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 ring-2 ring-blue-500'
+                                        : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500'
+                                }`}
+                                title={ESTADOS_COMPRA_LABELS[estado]}
+                            >
+                                <span>{ESTADOS_COMPRA_ICONOS[estado]}</span>
+                                {completado && <span>✓</span>}
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {/* Estado actual */}
+                <div className="mt-2 flex items-center justify-between text-xs">
+                    <span className="text-gray-600 dark:text-gray-400">
+                        Estado actual: <span className="font-medium text-gray-900 dark:text-white">
+                            {ESTADOS_COMPRA_ICONOS[estadoActual]} {ESTADOS_COMPRA_LABELS[estadoActual]}
+                        </span>
+                    </span>
+                    {ep.diasRetrasoActual > 0 && (
+                        <span className="text-red-600 dark:text-red-400">
+                            ⏰ {ep.diasRetrasoActual} días de retraso
+                        </span>
+                    )}
+                </div>
+
+                {/* Info adicional si está expandido */}
+                {productoExpandido === producto.id && (
+                    <div className="mt-3 space-y-2 border-t border-blue-200 pt-3 dark:border-blue-700">
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                            {ep.paisOrigen && (
+                                <div>
+                                    <span className="text-gray-500 dark:text-gray-400">País origen:</span>
+                                    <span className="ml-1 font-medium text-gray-900 dark:text-white">
+                                        🌍 {ep.paisOrigen.nombre}
+                                    </span>
+                                </div>
+                            )}
+                            {ep.medioTransporte && (
+                                <div>
+                                    <span className="text-gray-500 dark:text-gray-400">Transporte:</span>
+                                    <span className="ml-1 font-medium text-gray-900 dark:text-white">
+                                        {ep.medioTransporte === 'MARITIMO' && '🚢'}
+                                        {ep.medioTransporte === 'AEREO' && '✈️'}
+                                        {ep.medioTransporte === 'TERRESTRE' && '🚛'}
+                                        {' '}{ep.medioTransporte}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                        
+                        {/* Fechas */}
+                        <div className="text-xs text-gray-600 dark:text-gray-400">
+                            {ep.fechaCotizado && <div>📋 Cotizado: {shortDate(String(ep.fechaCotizado))}</div>}
+                            {ep.fechaConDescuento && <div>💰 Descuento: {shortDate(String(ep.fechaConDescuento))}</div>}
+                            {ep.fechaComprado && <div>🛒 Comprado: {shortDate(String(ep.fechaComprado))}</div>}
+                            {ep.fechaPagado && <div>💳 Pagado: {shortDate(String(ep.fechaPagado))}</div>}
+                            {ep.fechaRecibido && <div>📦 Recibido: {shortDate(String(ep.fechaRecibido))}</div>}
+                        </div>
+                    </div>
+                )}
+
+                {/* Botón expandir/colapsar */}
+                <button
+                    onClick={() => setProductoExpandido(productoExpandido === producto.id ? null : producto.id)}
+                    className="mt-2 text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                >
+                    {productoExpandido === producto.id ? '▲ Ver menos' : '▼ Ver más detalles'}
+                </button>
+            </div>
+        );
+    };
 
     // ============================================================================
     // RENDER
@@ -412,16 +747,65 @@ export default function MyQuotes() {
                         Mis Cotizaciones
                     </h2>
                     <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                        Realiza seguimiento a tus solicitudes de cotización
+                        Realiza seguimiento completo a tus solicitudes - desde cotización hasta recepción
                     </p>
+                </div>
+
+                {/* Toggle de vistas */}
+                <div className="mb-6 flex flex-wrap gap-2">
+                    <button
+                        onClick={() => { setVistaActual('cotizaciones'); setCotizacionSeleccionada(null); }}
+                        className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                            vistaActual === 'cotizaciones'
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                        }`}
+                    >
+                        📝 Cotizaciones
+                        <span className={`rounded-full px-2 py-0.5 text-xs ${
+                            vistaActual === 'cotizaciones' ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'
+                        }`}>
+                            {countCotizaciones}
+                        </span>
+                    </button>
+                    <button
+                        onClick={() => { setVistaActual('enCompras'); setCotizacionSeleccionada(null); }}
+                        className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                            vistaActual === 'enCompras'
+                                ? 'bg-orange-600 text-white'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                        }`}
+                    >
+                        🛒 En Compras
+                        <span className={`rounded-full px-2 py-0.5 text-xs ${
+                            vistaActual === 'enCompras' ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-600'
+                        }`}>
+                            {countEnCompras}
+                        </span>
+                    </button>
+                    <button
+                        onClick={() => { setVistaActual('completadas'); setCotizacionSeleccionada(null); }}
+                        className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                            vistaActual === 'completadas'
+                                ? 'bg-green-600 text-white'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                        }`}
+                    >
+                        ✅ Recibidas
+                        <span className={`rounded-full px-2 py-0.5 text-xs ${
+                            vistaActual === 'completadas' ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
+                        }`}>
+                            {countCompletadas}
+                        </span>
+                    </button>
                 </div>
 
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
                     {/* ========================================
-              PANEL IZQUIERDO - LISTA DE COTIZACIONES
-          ======================================== */}
+                        PANEL IZQUIERDO - LISTA DE COTIZACIONES
+                    ======================================== */}
                     <div className="lg:col-span-1">
-                        <div className="my-8 rounded-lg border border-gray-200 bg-white p-4 shadow-xl dark:border-gray-700 dark:bg-gray-800">
+                        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
                             {/* Buscador */}
                             <div className="mb-3">
                                 <input
@@ -433,16 +817,22 @@ export default function MyQuotes() {
                                 />
                             </div>
 
-                            {/* Contador */}
+                            {/* Título según vista */}
                             <h3 className="mb-3 font-semibold text-gray-800 dark:text-white/90">
-                                Mis Solicitudes ({filteredCotizaciones.length})
+                                {vistaActual === 'cotizaciones' && `📝 Mis Solicitudes (${filteredCotizaciones.length})`}
+                                {vistaActual === 'enCompras' && `🛒 En Proceso de Compra (${filteredCotizaciones.length})`}
+                                {vistaActual === 'completadas' && `✅ Pedidos Recibidos (${filteredCotizaciones.length})`}
                             </h3>
 
                             {/* Lista */}
                             {filteredCotizaciones.length === 0 ? (
-                                <p className="text-sm text-gray-600 dark:text-gray-400">
-                                    {searchQuery ? "No se encontraron solicitudes." : "No tienes solicitudes aún."}
-                                </p>
+                                <div className="rounded-lg bg-gray-50 p-4 text-center dark:bg-gray-900">
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                                        {vistaActual === 'cotizaciones' && "No tienes cotizaciones pendientes"}
+                                        {vistaActual === 'enCompras' && "No tienes productos en proceso de compra"}
+                                        {vistaActual === 'completadas' && "No tienes pedidos completados aún"}
+                                    </p>
+                                </div>
                             ) : (
                                 <ul className="max-h-[600px] space-y-2 overflow-y-auto">
                                     {filteredCotizaciones.map((cot) => {
@@ -453,29 +843,26 @@ export default function MyQuotes() {
                                             <li key={cot.id}>
                                                 <button
                                                     onClick={() => seleccionarCotizacion(cot)}
-                                                    className={`w-full rounded-lg border p-3 text-left transition-all ${isSelected
-                                                        ? "border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/20"
-                                                        : "border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/50"
-                                                        }`}
+                                                    className={`w-full rounded-lg border p-3 text-left transition-all ${
+                                                        isSelected
+                                                            ? "border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/20"
+                                                            : "border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/50"
+                                                    }`}
                                                 >
                                                     {/* Header con estado */}
                                                     <div className="mb-2 flex items-center justify-between">
                                                         <span
-                                                            className={`rounded-full px-2 py-0.5 text-xs font-medium ${getEstadoBadgeColor(
-                                                                cot.estado
-                                                            )}`}
+                                                            className={`rounded-full px-2 py-0.5 text-xs font-medium ${getEstadoBadgeColor(cot.estado)}`}
                                                         >
                                                             {getEstadoLabel(cot.estado)}
                                                         </span>
-                                                        <span
-                                                            className={`text-xs font-medium ${days < 0
-                                                                ? "text-red-600 dark:text-red-400"
-                                                                : days <= 3
-                                                                    ? "text-yellow-600 dark:text-yellow-400"
-                                                                    : "text-green-600 dark:text-green-400"
-                                                                }`}
-                                                        >
-                                                            {days < 0 ? `${Math.abs(days)}d vencido` : days === 0 ? "Hoy" : `${days}d`}
+                                                        {/* Badge tipo compra */}
+                                                        <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${
+                                                            cot.tipoCompra === 'NACIONAL'
+                                                                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                                                : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                                                        }`}>
+                                                            {cot.tipoCompra === 'NACIONAL' ? '🇭🇳' : '🌍'}
                                                         </span>
                                                     </div>
 
@@ -488,26 +875,44 @@ export default function MyQuotes() {
                                                     <div className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
                                                         <p>📦 {cot.totalProductos} productos</p>
                                                         {cot.proyecto && <p>🏗️ {cot.proyecto.nombre}</p>}
-                                                        {cot.supervisorResponsable && (
-                                                            <p>👤 {cot.supervisorResponsable.nombre}</p>
-                                                        )}
                                                     </div>
 
-                                                    {/* Progreso */}
-                                                    {cot.totalProductos > 0 && (
+                                                    {/* Progreso según vista */}
+                                                    {vistaActual === 'cotizaciones' && cot.totalProductos > 0 && (
                                                         <div className="mt-2">
                                                             <div className="flex items-center justify-between text-xs">
                                                                 <span className="text-gray-600 dark:text-gray-400">
                                                                     Aprobados: {cot.productosAprobados}/{cot.totalProductos}
                                                                 </span>
-                                                                <span className="font-medium text-gray-900 dark:text-white">
-                                                                    {cot.porcentajeAprobado || 0}%
+                                                                <span className="font-medium">{cot.porcentajeAprobado || 0}%</span>
+                                                            </div>
+                                                            <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+                                                                <div
+                                                                    className="h-full rounded-full bg-blue-600"
+                                                                    style={{ width: `${cot.porcentajeAprobado || 0}%` }}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {(vistaActual === 'enCompras' || vistaActual === 'completadas') && (
+                                                        <div className="mt-2">
+                                                            <div className="flex items-center justify-between text-xs">
+                                                                <span className="text-gray-600 dark:text-gray-400">
+                                                                    Recibidos: {cot.productosRecibidos || 0}/{cot.productosAprobados}
+                                                                </span>
+                                                                <span className={`font-medium ${
+                                                                    cot.progresoCompraTotal === 100 ? 'text-green-600 dark:text-green-400' : ''
+                                                                }`}>
+                                                                    {cot.progresoCompraTotal || 0}%
                                                                 </span>
                                                             </div>
                                                             <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
                                                                 <div
-                                                                    className="h-full rounded-full bg-blue-600 transition-all dark:bg-blue-500"
-                                                                    style={{ width: `${cot.porcentajeAprobado || 0}%` }}
+                                                                    className={`h-full rounded-full ${
+                                                                        cot.progresoCompraTotal === 100 ? 'bg-green-600' : 'bg-orange-500'
+                                                                    }`}
+                                                                    style={{ width: `${cot.progresoCompraTotal || 0}%` }}
                                                                 />
                                                             </div>
                                                         </div>
@@ -521,349 +926,321 @@ export default function MyQuotes() {
                         </div>
                     </div>
 
-
                     {/* ========================================
-              PANEL DERECHO - DETALLE Y CHAT
-          ======================================== */}
+                        PANEL DERECHO - DETALLE Y CHAT
+                    ======================================== */}
                     <div className="space-y-6 lg:col-span-2">
                         {/* CARD DE DETALLE */}
-                        <div className="my-8 rounded-lg border border-gray-200 bg-white p-4 shadow-xl dark:border-gray-700 dark:bg-gray-800">
+                        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
                             <h3 className="mb-4 font-semibold text-gray-800 dark:text-white/90">
-                                Detalle de Solicitud
+                                {vistaActual === 'cotizaciones' && 'Detalle de Solicitud'}
+                                {vistaActual === 'enCompras' && 'Seguimiento de Compra'}
+                                {vistaActual === 'completadas' && 'Pedido Completado'}
                             </h3>
 
                             {!cotizacionSeleccionada ? (
-                                <p className="text-sm text-gray-600 dark:text-gray-400">
-                                    Selecciona una solicitud para ver los detalles.
-                                </p>
+                                <div className="rounded-lg bg-gray-50 p-8 text-center dark:bg-gray-900">
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                                        Selecciona una solicitud para ver los detalles
+                                    </p>
+                                </div>
                             ) : loadingDetalle ? (
                                 <div className="flex h-32 items-center justify-center">
                                     <div className="h-6 w-6 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
                                 </div>
                             ) : (
                                 <div className="space-y-4">
-                                    {/* Header con días restantes */}
+                                    {/* Header */}
                                     <div className="flex items-start justify-between">
                                         <div>
                                             <h4 className="text-lg font-bold text-gray-900 dark:text-white">
                                                 {cotizacionSeleccionada.nombreCotizacion}
                                             </h4>
-                                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                                                {cotizacionSeleccionada.tipo.area.nombreArea} • {cotizacionSeleccionada.tipo.nombre}
-                                            </p>
-                                        </div>
-                                        <div className="text-right">
-                                            <div
-                                                className={`text-2xl font-bold ${daysLeft < 0
-                                                    ? "text-red-600 dark:text-red-400"
-                                                    : daysLeft <= 3
-                                                        ? "text-yellow-600 dark:text-yellow-400"
-                                                        : "text-green-600 dark:text-green-400"
-                                                    }`}
-                                            >
-                                                {daysLeft < 0 ? `${Math.abs(daysLeft)}` : daysLeft}
-                                            </div>
-                                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                                                {daysLeft < 0 ? "días vencido" : "días restantes"}
+                                            <div className="mt-1 flex items-center gap-2">
+                                                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${getEstadoBadgeColor(cotizacionSeleccionada.estado)}`}>
+                                                    {getEstadoLabel(cotizacionSeleccionada.estado)}
+                                                </span>
+                                                <span className={`rounded px-2 py-0.5 text-xs font-medium ${
+                                                    cotizacionSeleccionada.tipoCompra === 'NACIONAL'
+                                                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                                        : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                                                }`}>
+                                                    {cotizacionSeleccionada.tipoCompra === 'NACIONAL' ? '🇭🇳 Nacional' : '🌍 Internacional'}
+                                                </span>
                                             </div>
                                         </div>
+                                        {daysLeft !== 99999 && (
+                                            <div className={`text-right ${daysLeft < 0 ? 'text-red-600' : daysLeft <= 3 ? 'text-yellow-600' : 'text-green-600'}`}>
+                                                <p className="text-2xl font-bold">{Math.abs(daysLeft)}</p>
+                                                <p className="text-xs">{daysLeft < 0 ? 'días vencido' : 'días restantes'}</p>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Info grid */}
-                                    <div className="grid grid-cols-2 gap-3 text-sm">
-                                        <div className="rounded-lg p-3 ring-1 ring-gray-200 dark:ring-gray-800">
-                                            <div className="text-xs text-gray-500 dark:text-gray-400">Tipo de Compra</div>
-                                            <div className="font-semibold text-gray-800 dark:text-white/90">
-                                                {cotizacionSeleccionada.tipoCompra === "NACIONAL" ? "Nacional" : "Internacional"}
-                                            </div>
+                                    <div className="grid grid-cols-2 gap-4 rounded-lg bg-gray-50 p-4 text-sm dark:bg-gray-900">
+                                        <div>
+                                            <span className="text-gray-500 dark:text-gray-400">Área:</span>
+                                            <span className="ml-1 font-medium text-gray-900 dark:text-white">
+                                                {cotizacionSeleccionada.tipo.area.nombreArea}
+                                            </span>
                                         </div>
-                                        <div className="rounded-lg p-3 ring-1 ring-gray-200 dark:ring-gray-800">
-                                            <div className="text-xs text-gray-500 dark:text-gray-400">Lugar de Entrega</div>
-                                            <div className="font-semibold text-gray-800 dark:text-white/90">
-                                                {cotizacionSeleccionada.lugarEntrega === "ALMACEN" ? "Almacén" : cotizacionSeleccionada.lugarEntrega === "PROYECTO" ? "Proyecto" : "Oficina"}
-                                            </div>
-                                        </div>
-                                        <div className="rounded-lg p-3 ring-1 ring-gray-200 dark:ring-gray-800">
-                                            <div className="text-xs text-gray-500 dark:text-gray-400">Fecha Solicitud</div>
-                                            <div className="font-semibold text-gray-800 dark:text-white/90">
-                                                {shortDate(cotizacionSeleccionada.fechaSolicitud)}
-                                            </div>
-                                        </div>
-                                        <div className="rounded-lg p-3 ring-1 ring-gray-200 dark:ring-gray-800">
-                                            <div className="text-xs text-gray-500 dark:text-gray-400">Fecha Límite</div>
-                                            <div className="font-semibold text-gray-800 dark:text-white/90">
-                                                {shortDate(cotizacionSeleccionada.fechaLimite)}
-                                            </div>
+                                        <div>
+                                            <span className="text-gray-500 dark:text-gray-400">Tipo:</span>
+                                            <span className="ml-1 font-medium text-gray-900 dark:text-white">
+                                                {cotizacionSeleccionada.tipo.nombre}
+                                            </span>
                                         </div>
                                         {cotizacionSeleccionada.proyecto && (
-                                            <div className="col-span-2 rounded-lg p-3 ring-1 ring-gray-200 dark:ring-gray-800">
-                                                <div className="text-xs text-gray-500 dark:text-gray-400">Proyecto</div>
-                                                <div className="font-semibold text-gray-800 dark:text-white/90">
+                                            <div>
+                                                <span className="text-gray-500 dark:text-gray-400">Proyecto:</span>
+                                                <span className="ml-1 font-medium text-gray-900 dark:text-white">
                                                     {cotizacionSeleccionada.proyecto.nombre}
-                                                </div>
+                                                </span>
+                                            </div>
+                                        )}
+                                        <div>
+                                            <span className="text-gray-500 dark:text-gray-400">Entrega:</span>
+                                            <span className="ml-1 font-medium text-gray-900 dark:text-white">
+                                                {cotizacionSeleccionada.lugarEntrega}
+                                            </span>
+                                        </div>
+                                        {cotizacionSeleccionada.supervisorResponsable && (
+                                            <div className="col-span-2">
+                                                <span className="text-gray-500 dark:text-gray-400">Supervisor:</span>
+                                                <span className="ml-1 font-medium text-gray-900 dark:text-white">
+                                                    👤 {cotizacionSeleccionada.supervisorResponsable.nombre}
+                                                </span>
                                             </div>
                                         )}
                                     </div>
 
-                                    {/* Comentarios */}
-                                    {cotizacionSeleccionada.comentarios && (
-                                        <div className="rounded-lg p-3 ring-1 ring-gray-200 dark:ring-gray-800">
-                                            <div className="mb-1 text-xs text-gray-500 dark:text-gray-400">Comentarios</div>
-                                            <p className="text-sm text-gray-700 dark:text-gray-300">
-                                                {cotizacionSeleccionada.comentarios}
-                                            </p>
+                                    {/* Resumen de progreso */}
+                                    {(vistaActual === 'enCompras' || vistaActual === 'completadas') && (
+                                        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
+                                            <h5 className="mb-2 font-medium text-blue-800 dark:text-blue-200">
+                                                📊 Resumen de Compra
+                                            </h5>
+                                            <div className="grid grid-cols-3 gap-4 text-center">
+                                                <div>
+                                                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                                                        {cotizacionSeleccionada.productosAprobados}
+                                                    </p>
+                                                    <p className="text-xs text-gray-600 dark:text-gray-400">En compra</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                                                        {cotizacionSeleccionada.productosRecibidos || 0}
+                                                    </p>
+                                                    <p className="text-xs text-gray-600 dark:text-gray-400">Recibidos</p>
+                                                </div>
+                                                <div>
+                                                    <p className={`text-2xl font-bold ${
+                                                        cotizacionSeleccionada.progresoCompraTotal === 100 
+                                                            ? 'text-green-600 dark:text-green-400' 
+                                                            : 'text-orange-600 dark:text-orange-400'
+                                                    }`}>
+                                                        {cotizacionSeleccionada.progresoCompraTotal || 0}%
+                                                    </p>
+                                                    <p className="text-xs text-gray-600 dark:text-gray-400">Progreso</p>
+                                                </div>
+                                            </div>
                                         </div>
                                     )}
 
-                                    {/* Botón ver productos */}
-                                    <button
-                                        onClick={() => setShowProductos(!showProductos)}
-                                        className={`w-full rounded-lg px-4 py-2 text-sm font-medium transition-colors ${showProductos
-                                            ? "bg-gray-400 text-gray-800 hover:bg-gray-500"
-                                            : "bg-blue-500 text-white hover:bg-blue-600"
-                                            }`}
-                                    >
-                                        {showProductos
-                                            ? "Ocultar productos"
-                                            : `Ver ${cotizacionSeleccionada.totalProductos} productos solicitados`}
-                                    </button>
+                                    {/* Lista de productos con timeline */}
+                                    <div>
+                                        <button
+                                            onClick={() => setShowProductos(!showProductos)}
+                                            className="flex w-full items-center justify-between rounded-lg bg-gray-100 px-4 py-3 text-left font-medium text-gray-900 hover:bg-gray-200 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
+                                        >
+                                            <span>
+                                                📦 Productos ({cotizacionSeleccionada.totalProductos})
+                                                {(vistaActual === 'enCompras' || vistaActual === 'completadas') && (
+                                                    <span className="ml-2 text-sm font-normal text-gray-500">
+                                                        - Click para ver estado de cada producto
+                                                    </span>
+                                                )}
+                                            </span>
+                                            <span>{showProductos ? '▲' : '▼'}</span>
+                                        </button>
 
-                                    {/* Tabla de productos */}
-                                    {showProductos && cotizacionSeleccionada.detalles && (
-                                        <div className="overflow-hidden transition-all duration-300">
-                                            <div className="overflow-x-auto">
-                                                <table className="w-full text-sm">
-                                                    <thead className="border-b border-gray-200 dark:border-gray-700">
-                                                        <tr>
-                                                            <th className="pb-2 text-left font-semibold text-gray-700 dark:text-gray-300">
-                                                                Producto
-                                                            </th>
-                                                            <th className="pb-2 text-left font-semibold text-gray-700 dark:text-gray-300">
-                                                                Cantidad
-                                                            </th>
-                                                            <th className="pb-2 text-left font-semibold text-gray-700 dark:text-gray-300">
-                                                                Estado
-                                                            </th>
-                                                            <th className="pb-2 text-left font-semibold text-gray-700 dark:text-gray-300">
-                                                                Criticidad
-                                                            </th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                                        {cotizacionSeleccionada.detalles.map((prod) => (
-                                                            <tr key={prod.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                                                                <td className="py-3">
-                                                                    <div className="text-xs text-gray-600 dark:text-gray-400">
-                                                                        {prod.descripcionProducto}
-                                                                    </div>
-                                                                </td>
-                                                                <td className="py-3 text-gray-700 dark:text-gray-300">
-                                                                    {prod.cantidad} {prod.tipoUnidad.toLowerCase()}
-                                                                </td>
-                                                                {/* En la celda de estado/aprobación */}
-                                                                <td className="py-3 text-center">
-                                                                    {prod.estadoProducto?.rechazado ? (
-                                                                        <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                                        {showProductos && (
+                                            <div className="mt-2 max-h-[400px] space-y-3 overflow-y-auto">
+                                                {cotizacionSeleccionada.detalles?.map((producto) => (
+                                                    <div
+                                                        key={producto.id}
+                                                        className={`rounded-lg border p-3 ${
+                                                            producto.estadoProducto?.rechazado
+                                                                ? 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/10'
+                                                                : producto.estadoProducto?.aprobadoPorSupervisor
+                                                                ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/10'
+                                                                : 'border-gray-200 dark:border-gray-700'
+                                                        }`}
+                                                    >
+                                                        <div className="flex items-start justify-between">
+                                                            <div className="flex-1">
+                                                                <div className="flex items-center gap-2">
+                                                                    {producto.sku && (
+                                                                        <span className="font-mono text-xs text-gray-500 dark:text-gray-400">
+                                                                            {producto.sku}
+                                                                        </span>
+                                                                    )}
+                                                                    {producto.estadoProducto?.rechazado && (
+                                                                        <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">
                                                                             ❌ Rechazado
                                                                         </span>
-                                                                    ) : prod.estadoProducto?.aprobadoPorSupervisor ? (
-                                                                        <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                                                                            ✓ Aprobado
-                                                                        </span>
-                                                                    ) : (
-                                                                        <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
-                                                                            ⏳ Pendiente
+                                                                    )}
+                                                                    {producto.estadoProducto?.aprobadoPorSupervisor && !producto.estadoProducto?.rechazado && (
+                                                                        <span className="rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                                                            ✅ Aprobado
                                                                         </span>
                                                                     )}
-                                                                </td>
-                                                                <td className="py-3">
-                                                                    {prod.estadoProducto ? (
-                                                                        <div>
-                                                                            <span
-                                                                                className={`font-semibold ${getCriticidadColor(
-                                                                                    prod.estadoProducto.nivelCriticidad
-                                                                                )}`}
-                                                                            >
-                                                                                {prod.estadoProducto.nivelCriticidad}
-                                                                            </span>
-                                                                            {prod.estadoProducto.diasRetrasoActual > 0 && (
-                                                                                <div className="text-xs text-red-600 dark:text-red-400">
-                                                                                    +{prod.estadoProducto.diasRetrasoActual}d retraso
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    ) : (
-                                                                        <span className="text-gray-400">—</span>
+                                                                    {producto.estadoProducto && (
+                                                                        <span className="text-xs">
+                                                                            {getCriticidadBadge(producto.estadoProducto.nivelCriticidad)}
+                                                                        </span>
                                                                     )}
-                                                                </td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Indicador de progreso general */}
-                                    {cotizacionSeleccionada.supervisorResponsable && (
-                                        <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
-                                            <div className="flex items-center gap-2 text-sm">
-                                                <span className="text-blue-700 dark:text-blue-300">
-                                                    👤 Supervisor asignado:
-                                                </span>
-                                                <span className="font-semibold text-blue-900 dark:text-blue-200">
-                                                    {cotizacionSeleccionada.supervisorResponsable.nombre}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Alerta de productos rechazados */}
-                        {/* 1. Asegúrate de que cotizacionSeleccionada no sea null antes de evaluar detalles */}
-                        {cotizacionSeleccionada && cotizacionSeleccionada.detalles?.some(p => p.estadoProducto?.rechazado) && (
-                            <div className="mb-4 rounded-lg border-2 border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
-                                <div className="flex items-start gap-3">
-                                    <svg className="h-6 w-6 flex-shrink-0 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                    </svg>
-                                    <div className="flex-1">
-                                        <h4 className="font-semibold text-red-900 dark:text-red-300">
-                                            ⚠️ Productos Rechazados
-                                        </h4>
-                                        <p className="mt-1 text-sm text-red-700 dark:text-red-400">
-                                            Algunos productos de esta cotización han sido rechazados por el supervisor.
-                                        </p>
-                                        <div className="mt-3 space-y-2">
-                                            {/* Aquí ya es seguro mapear porque entramos solo si cotizacionSeleccionada existe */}
-                                            {cotizacionSeleccionada.detalles
-                                                ?.filter(p => p.estadoProducto?.rechazado)
-                                                .map(prod => (
-                                                    <div key={prod.id} className="rounded-lg bg-white p-3 dark:bg-gray-800">
-                                                        <p className="font-medium text-gray-900 dark:text-white">
-                                                            {prod.descripcionProducto}
-                                                        </p>
-                                                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                                                            <strong>Motivo:</strong> {prod.estadoProducto?.motivoRechazo}
-                                                        </p>
-                                                    </div>
-                                                ))
-                                            }
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* CARD DE CHAT */}
-                        <div className="my-8 rounded-lg border border-gray-200 bg-white p-4 shadow-xl dark:border-gray-700 dark:bg-gray-800">
-                            <h3 className="mb-3 font-semibold text-gray-800 dark:text-white/90">
-                                Chat con {cotizacionSeleccionada?.supervisorResponsable?.nombre || "el equipo"}
-                            </h3>
-
-                            {!cotizacionSeleccionada ? (
-                                <p className="text-sm text-gray-600 dark:text-gray-400">
-                                    Selecciona una solicitud para iniciar el chat.
-                                </p>
-                            ) : !cotizacionSeleccionada.chatId ? (
-                                <div className="rounded-lg bg-yellow-50 p-4 dark:bg-yellow-900/20">
-                                    <p className="text-sm text-yellow-700 dark:text-yellow-400">
-                                        ⚠️ El chat aún no está disponible para esta cotización.
-                                    </p>
-                                </div>
-                            ) : (
-                                <div className="flex h-[420px] flex-col">
-                                    {/* Mensajes */}
-                                    <div className="flex-1 space-y-3 overflow-auto rounded-lg p-3 ring-1 ring-gray-200 dark:ring-gray-800">
-                                        {loadingChat ? (
-                                            <div className="flex h-full items-center justify-center">
-                                                <div className="h-6 w-6 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
-                                            </div>
-                                        ) : mensajes.length === 0 ? (
-                                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                                                No hay mensajes aún. Inicia la conversación.
-                                            </p>
-                                        ) : (
-                                            <>
-                                                {mensajes.map((mensaje) => {
-                                                    const esPropio = mensaje.emisor.id === currentUserId;
-
-                                                    return (
-                                                        <div
-                                                            key={mensaje.id}
-                                                            className={`flex ${esPropio ? "justify-end" : "justify-start"}`}
-                                                        >
-                                                            <div
-                                                                className={`max-w-[70%] ${esPropio ? "items-end" : "items-start"
-                                                                    } flex flex-col`}
-                                                            >
-                                                                {/* Nombre del emisor */}
-                                                                {!esPropio && (
-                                                                    <span className="mb-1 text-xs font-medium text-gray-600 dark:text-gray-400">
-                                                                        {mensaje.emisor.nombre}
-                                                                    </span>
-                                                                )}
-
-                                                                {/* Burbuja del mensaje */}
-                                                                <div
-                                                                    className={`rounded-2xl px-4 py-2 ${esPropio
-                                                                        ? "bg-blue-600 text-white dark:bg-blue-500"
-                                                                        : "bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white"
-                                                                        }`}
-                                                                >
-                                                                    <p className="whitespace-pre-wrap break-words text-sm">
-                                                                        {mensaje.contenido}
-                                                                    </p>
                                                                 </div>
-
-                                                                {/* Fecha */}
-                                                                <span className="mt-1 text-xs text-gray-500 dark:text-gray-500">
-                                                                    {formatDate(mensaje.creado)}
-                                                                </span>
+                                                                <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
+                                                                    {producto.descripcionProducto}
+                                                                </p>
+                                                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                                    {producto.cantidad} {producto.tipoUnidad}
+                                                                </p>
                                                             </div>
                                                         </div>
-                                                    );
-                                                })}
-                                                <div ref={chatEndRef} />
-                                            </>
+
+                                                        {/* Motivo de rechazo */}
+                                                        {producto.estadoProducto?.rechazado && producto.estadoProducto?.motivoRechazo && (
+                                                            <div className="mt-2 rounded bg-red-100 p-2 text-xs text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                                                                <strong>Motivo:</strong> {producto.estadoProducto.motivoRechazo}
+                                                            </div>
+                                                        )}
+
+                                                        {/* Timeline de compra (solo si está aprobado y en vista de compras) */}
+                                                        {(vistaActual === 'enCompras' || vistaActual === 'completadas') && 
+                                                         producto.estadoProducto?.aprobadoPorSupervisor && 
+                                                         !producto.estadoProducto?.rechazado && (
+                                                            renderTimelineProducto(producto, cotizacionSeleccionada.tipoCompra)
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
                                         )}
                                     </div>
 
-                                    {/* Input para enviar mensaje */}
-                                    <div className="mt-2 flex items-end gap-2">
-                                        <textarea
-                                            value={nuevoMensaje}
-                                            onChange={(e) => setNuevoMensaje(e.target.value)}
-                                            onKeyDown={(e) => {
-                                                if (e.key === "Enter" && !e.shiftKey) {
-                                                    e.preventDefault();
-                                                    enviarMensaje();
-                                                }
-                                            }}
-                                            disabled={sendingMessage}
-                                            className="max-h-40 min-h-[44px] flex-1 rounded-lg bg-white px-3 py-2 text-sm ring-1 ring-gray-300 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-900 dark:text-gray-200 dark:ring-gray-700"
-                                            placeholder="Escribe un mensaje... (Enter para enviar)"
-                                        />
-                                        <button
-                                            onClick={enviarMensaje}
-                                            disabled={!nuevoMensaje.trim() || sendingMessage}
-                                            className="rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
-                                        >
-                                            {sendingMessage ? (
-                                                <div className="flex items-center gap-2">
-                                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-                                                    Enviando...
+                                    {/* Productos rechazados alert */}
+                                    {cotizacionSeleccionada.detalles?.some(p => p.estadoProducto?.rechazado) && (
+                                        <div className="rounded-lg border-2 border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
+                                            <div className="flex items-start gap-3">
+                                                <span className="text-2xl">⚠️</span>
+                                                <div>
+                                                    <h4 className="font-semibold text-red-900 dark:text-red-300">
+                                                        Productos Rechazados
+                                                    </h4>
+                                                    <p className="mt-1 text-sm text-red-700 dark:text-red-400">
+                                                        {cotizacionSeleccionada.detalles?.filter(p => p.estadoProducto?.rechazado).length} producto(s) 
+                                                        han sido rechazados. Revisa los detalles arriba.
+                                                    </p>
                                                 </div>
-                                            ) : (
-                                                "Enviar"
-                                            )}
-                                        </button>
-                                    </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
+
+                        {/* CARD DE CHAT */}
+                        {cotizacionSeleccionada && (
+                            <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                                <h3 className="mb-3 font-semibold text-gray-800 dark:text-white/90">
+                                    💬 Chat con {cotizacionSeleccionada.supervisorResponsable?.nombre || "el equipo"}
+                                </h3>
+
+                                {!cotizacionSeleccionada.chatId ? (
+                                    <div className="rounded-lg bg-yellow-50 p-4 dark:bg-yellow-900/20">
+                                        <p className="text-sm text-yellow-700 dark:text-yellow-400">
+                                            ⚠️ El chat aún no está disponible para esta cotización.
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="flex h-[350px] flex-col">
+                                        {/* Mensajes */}
+                                        <div className="flex-1 space-y-3 overflow-auto rounded-lg bg-gray-50 p-3 dark:bg-gray-900">
+                                            {loadingChat ? (
+                                                <div className="flex h-full items-center justify-center">
+                                                    <div className="h-6 w-6 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+                                                </div>
+                                            ) : mensajes.length === 0 ? (
+                                                <p className="text-center text-sm text-gray-500 dark:text-gray-400">
+                                                    No hay mensajes aún. Inicia la conversación.
+                                                </p>
+                                            ) : (
+                                                <>
+                                                    {mensajes.map((mensaje) => {
+                                                        const esPropio = mensaje.emisor.id === currentUserId;
+                                                        return (
+                                                            <div
+                                                                key={mensaje.id}
+                                                                className={`flex ${esPropio ? "justify-end" : "justify-start"}`}
+                                                            >
+                                                                <div className={`max-w-[70%] ${esPropio ? "items-end" : "items-start"} flex flex-col`}>
+                                                                    {!esPropio && (
+                                                                        <span className="mb-1 text-xs font-medium text-gray-600 dark:text-gray-400">
+                                                                            {mensaje.emisor.nombre}
+                                                                        </span>
+                                                                    )}
+                                                                    <div
+                                                                        className={`rounded-2xl px-4 py-2 ${
+                                                                            esPropio
+                                                                                ? "bg-blue-600 text-white"
+                                                                                : "bg-white text-gray-900 dark:bg-gray-800 dark:text-white"
+                                                                        }`}
+                                                                    >
+                                                                        <p className="whitespace-pre-wrap break-words text-sm">
+                                                                            {mensaje.contenido}
+                                                                        </p>
+                                                                    </div>
+                                                                    <span className="mt-1 text-xs text-gray-500">
+                                                                        {formatDate(mensaje.creado)}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                    <div ref={chatEndRef} />
+                                                </>
+                                            )}
+                                        </div>
+
+                                        {/* Input */}
+                                        <div className="mt-2 flex items-end gap-2">
+                                            <textarea
+                                                value={nuevoMensaje}
+                                                onChange={(e) => setNuevoMensaje(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === "Enter" && !e.shiftKey) {
+                                                        e.preventDefault();
+                                                        enviarMensaje();
+                                                    }
+                                                }}
+                                                disabled={sendingMessage}
+                                                className="max-h-24 min-h-[44px] flex-1 resize-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none disabled:opacity-50 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                                                placeholder="Escribe un mensaje..."
+                                            />
+                                            <button
+                                                onClick={enviarMensaje}
+                                                disabled={!nuevoMensaje.trim() || sendingMessage}
+                                                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                                            >
+                                                {sendingMessage ? "..." : "Enviar"}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
