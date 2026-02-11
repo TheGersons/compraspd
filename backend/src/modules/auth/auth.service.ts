@@ -5,6 +5,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { randomUUID } from 'crypto';
+import { MailService } from '../Mail/mail.service';
 
 type UsuarioWithRoleName = {
   id: string;
@@ -29,8 +30,87 @@ export class AuthService {
 
   constructor(
     private prisma: PrismaService,
-    private jwt: JwtService
+    private jwt: JwtService,
+    private readonly mailService: MailService,
   ) { }
+
+  /**
+ * Generar contraseña temporal segura
+ */
+  private generateTempPassword(length: number = 12): string {
+    const lowercase = 'abcdefghijklmnopqrstuvwxyz';
+    const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const numbers = '0123456789';
+    const special = '!@#$%&*';
+    const all = lowercase + uppercase + numbers + special;
+
+    // Asegurar al menos uno de cada tipo
+    let password = '';
+    password += lowercase[Math.floor(Math.random() * lowercase.length)];
+    password += uppercase[Math.floor(Math.random() * uppercase.length)];
+    password += numbers[Math.floor(Math.random() * numbers.length)];
+    password += special[Math.floor(Math.random() * special.length)];
+
+    // Completar el resto
+    for (let i = password.length; i < length; i++) {
+      password += all[Math.floor(Math.random() * all.length)];
+    }
+
+    // Mezclar caracteres
+    return password.split('').sort(() => Math.random() - 0.5).join('');
+  }
+
+  /**
+   * Restablecer contraseña - envía contraseña temporal por email
+   */
+  async resetPassword(email: string) {
+    // Buscar usuario por email
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { email: email.toLowerCase().trim() },
+      select: {
+        id: true,
+        nombre: true,
+        email: true,
+        activo: true,
+      }
+    });
+
+    // Por seguridad, siempre respondemos igual (no revelar si existe el email)
+    if (!usuario || !usuario.activo) {
+      // Simulamos un pequeño delay para no revelar si existe o no
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return { message: 'Si el correo existe, recibirás una contraseña temporal' };
+    }
+
+    // Generar contraseña temporal
+    const tempPassword = this.generateTempPassword(12);
+
+    // Hashear contraseña
+    const saltRounds = 10;
+    const passwordHash = await bcrypt.hash(tempPassword, saltRounds);
+
+    // Actualizar en base de datos
+    await this.prisma.usuario.update({
+      where: { id: usuario.id },
+      data: {
+        passwordHash,
+        actualizado: new Date(),
+      }
+    });
+
+    // Enviar email
+    const emailSent = await this.mailService.sendPasswordResetEmail(
+      usuario.email,
+      tempPassword,
+      usuario.nombre
+    );
+
+    if (!emailSent) {
+      throw new Error('Error al enviar el correo. Intenta de nuevo.');
+    }
+
+    return { message: 'Si el correo existe, recibirás una contraseña temporal' };
+  }
 
   /**
    * Valida las credenciales del usuario

@@ -51,6 +51,7 @@ import Projects from "./pages/projects/Projects";
 import NewProject from "./pages/projects/NewProject";
 import { useState, useEffect } from "react";
 import Profile from "./pages/Profile/Profile";
+import ResetPassword from "./pages/AuthPages/ResetPass";
 
 const SHOPPING_MANAGER_ROLES = ["ADMIN", "SUPERVISOR"];
 const QUOTES_SUPERVISOR_ROLES = ["SUPERVISOR", "ADMIN"];
@@ -130,6 +131,7 @@ export default function App() {
           {/* públicas solo */}
           <Route path="/signin" element={<PublicOnlyRoute><SignIn /></PublicOnlyRoute>} />
           <Route path="/signup" element={<PublicOnlyRoute><SignUp /></PublicOnlyRoute>} />
+          <Route path="/reset-password" element={<PublicOnlyRoute><ResetPassword /></PublicOnlyRoute>} />
 
           {/* protegidas */}
           <Route element={<ProtectedRoute />}>

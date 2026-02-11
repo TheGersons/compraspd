@@ -29,6 +29,7 @@ import { SessionCleanupService } from './cron/session-cleanup.service';
 import { TimelineSKUModule } from './modules/timeline-sku/timeline-sku.module';
 import { EstadoProductoModule } from './modules/estado-producto/estado-producto.module';
 import { StorageModule } from './modules/storage';
+import { MailModule } from './modules/Mail/mail.module';
 
 
 
@@ -63,6 +64,7 @@ import { StorageModule } from './modules/storage';
     TimelineSKUModule,
     EstadoProductoModule,
     StorageModule,
+    MailModule
   ],
   providers: [
     SessionCleanupService
