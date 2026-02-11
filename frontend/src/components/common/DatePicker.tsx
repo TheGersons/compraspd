@@ -2,7 +2,7 @@ import { forwardRef } from "react";
 import ReactDatePicker, { registerLocale } from "react-datepicker";
 import { es } from "date-fns/locale";
 import "react-datepicker/dist/react-datepicker.css";
-import "./DatePicker.css";
+import "./datepicker.css";
 
 // Registrar locale español
 registerLocale("es", es);
