@@ -6,7 +6,7 @@ import { useNotifications } from "../Notifications/context/NotificationContext";
 import { getToken } from "../../lib/api";
 import { LoadingScreen } from "../../components/common/LoadingScreen";
 import { useAuth } from "../../context/AuthContext";
-import "../../components/common/datepicker.css";
+import "../../components/common/datepick.css";
 import DatePicker from "../../components/common/DatePicker";
 
 
