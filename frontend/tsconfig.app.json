@@ -7,6 +7,9 @@
     "module": "ESNext",
     "skipLibCheck": true,
     "resolveJsonModule": true,  // ← AGREGAR ESTA LÍNEA
+    "paths": {
+      "@/*": ["./src/*"],
+    },
 
     /* Bundler mode */
     "moduleResolution": "bundler",

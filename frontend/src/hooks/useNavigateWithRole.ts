@@ -33,6 +33,7 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   '/profiles': ['ADMIN'],
   '/settings': ['ADMIN', 'SUPERVISOR'],
   '/roles': ['ADMIN'],
+  '/profile': [],
   
   // Calendar y otros
   '/calendar': ['ADMIN', 'SUPERVISOR'],

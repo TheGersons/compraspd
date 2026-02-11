@@ -169,6 +169,7 @@ export default function New() {
   // Calcular fecha mínima (+5 días desde hoy)
   const minDate = new Date();
   minDate.setDate(minDate.getDate() + 5);
+  minDate.setHours(0, 0, 0, 0);
   // Catálogos
   const [tipos, setTipos] = useState<Tipo[]>([]);
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);

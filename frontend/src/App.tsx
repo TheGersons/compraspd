@@ -259,9 +259,7 @@ export default function App() {
               <Route
                 path="/profile" 
                 element={
-                  <ProtectedRoute roles={STAFF_ROLES}>
-                    <Profile />
-                  </ProtectedRoute>
+                  <Profile />
                 } 
               />
               <Route
