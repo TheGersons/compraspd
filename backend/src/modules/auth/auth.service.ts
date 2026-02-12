@@ -14,6 +14,7 @@ type UsuarioWithRoleName = {
   nombre: string;
   activo: boolean;
   departamentoId: string;
+  requiereCambioPassword: boolean;
   rol: { nombre: string } | null;
 };
 
@@ -94,6 +95,7 @@ export class AuthService {
       where: { id: usuario.id },
       data: {
         passwordHash,
+        requiereCambioPassword: true,
         actualizado: new Date(),
       }
     });
@@ -113,6 +115,47 @@ export class AuthService {
   }
 
   /**
+ * Cambiar contraseña temporal (desde el enlace del email)
+ */
+  async changeTempPassword(email: string, tempPassword: string, newPassword: string) {
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { email: email.toLowerCase().trim() },
+      select: {
+        id: true,
+        passwordHash: true,
+        requiereCambioPassword: true,
+        activo: true,
+      }
+    });
+
+    if (!usuario || !usuario.activo) {
+      throw new UnauthorizedException('Credenciales inválidas');
+    }
+
+    // Verificar contraseña temporal
+    const isValidTemp = await bcrypt.compare(tempPassword, usuario.passwordHash);
+    if (!isValidTemp) {
+      throw new UnauthorizedException('La contraseña temporal es incorrecta');
+    }
+
+    // Hashear nueva contraseña
+    const saltRounds = 10;
+    const newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
+
+    // Actualizar contraseña y quitar flag
+    await this.prisma.usuario.update({
+      where: { id: usuario.id },
+      data: {
+        passwordHash: newPasswordHash,
+        requiereCambioPassword: false,
+        actualizado: new Date(),
+      }
+    });
+
+    return { message: 'Contraseña actualizada correctamente' };
+  }
+
+  /**
    * Valida las credenciales del usuario
    */
   async validateUser(email: string, pass: string): Promise<UsuarioWithRoleName> {
@@ -127,6 +170,7 @@ export class AuthService {
         nombre: true,
         activo: true,
         departamentoId: true,
+        requiereCambioPassword:true,
         rol: {
           select: { nombre: true }
         }
@@ -267,7 +311,8 @@ export class AuthService {
         id: usuario.id,
         email: usuario.email,
         nombre: usuario.nombre,
-        role: roleName
+        role: roleName,
+        requiereCambioPassword: usuario.departamentoId
       }
     };
   }

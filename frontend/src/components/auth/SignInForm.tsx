@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, redirect, useNavigate } from "react-router-dom";
 import { EyeCloseIcon, EyeIcon } from "../../icons";
 import Label from "../form/Label";
 import Input from "../form/input/InputField";
@@ -123,6 +123,7 @@ export default function SignInForm() {
         return;
       }
 
+
       console.log("Inicio de sesión exitoso");
 
       // Usar el método login del AuthContext con ambos tokens
@@ -131,6 +132,13 @@ export default function SignInForm() {
         data.refresh_token,
         data.user
       );
+
+      if (data.user.requiereCambioPassword) {
+        const msg = 'Debes cambiar tu contraseña temporal';
+        setError(msg);
+        code: 'PASSWORD_CHANGE_REQUIRED';
+        redirect: '/change-password-required'
+      }
 
       // Toast de bienvenida
       toast.success(`¡Bienvenido ${data.user?.nombre || ''}!`, {

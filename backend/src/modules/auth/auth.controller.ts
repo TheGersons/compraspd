@@ -27,6 +27,7 @@ import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { ChangePasswordDto } from './dto/change-passwird.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { ChangeTempPasswordDto } from './dto/change-temp-password.dto';
 
 @ApiTags('Auth')
 @Controller('api/v1/auth')
@@ -197,5 +198,11 @@ export class AuthController {
   @ApiOperation({ summary: 'Solicitar restablecimiento de contraseña' })
   async resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto.email);
+  }
+
+  @Post('change-temp-password')
+  @ApiOperation({ summary: 'Cambiar contraseña temporal por una nueva' })
+  async changeTempPassword(@Body() dto: ChangeTempPasswordDto) {
+    return this.authService.changeTempPassword(dto.email, dto.tempPassword, dto.newPassword);
   }
 }

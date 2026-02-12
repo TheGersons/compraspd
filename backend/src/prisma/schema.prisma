@@ -147,6 +147,7 @@ model Usuario {
   activo          Boolean   @default(true)
   creado          DateTime  @default(now())
   actualizado     DateTime? @default(now())
+  requiereCambioPassword Boolean @default(false) @map("requiere_cambio_password")
   
   rol             Rol           @relation(fields: [rolId], references: [id], onDelete: Restrict)
   departamento    Departamento  @relation(fields: [departamentoId], references: [id], onDelete: Restrict)
