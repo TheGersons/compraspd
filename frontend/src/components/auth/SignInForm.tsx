@@ -133,12 +133,19 @@ export default function SignInForm() {
         data.user
       );
 
-      /* if (data.user.requierecambiocassword) {
-        const msg = 'Debes cambiar tu contraseña temporal';
-        setError(msg);
-        code: 'PASSWORD_CHANGE_REQUIRED';
-        redirect: '/change-password-required'
-      } */
+      if (data.user.requierecambiocassword) {
+        toast.success('Sesión iniciada. Por seguridad, debes actualizar tu contraseña.', {
+          id: toastId,
+          duration: 5000,
+          icon: '🔐',
+        });
+
+        setTimeout(() => {
+          navigateSafe('/change-password-required');
+        }, 500);
+
+        return;
+      }
 
       // Toast de bienvenida
       toast.success(`¡Bienvenido ${data.user?.nombre || ''}!`, {
