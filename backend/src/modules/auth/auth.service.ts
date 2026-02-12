@@ -312,7 +312,7 @@ export class AuthService {
         email: usuario.email,
         nombre: usuario.nombre,
         role: roleName,
-        requierecambiopassword: usuario.departamentoId
+        requierecambiopassword: usuario.requierecambiopassword
       }
     };
   }
