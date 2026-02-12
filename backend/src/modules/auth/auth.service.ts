@@ -554,6 +554,7 @@ export class AuthService {
         departamentoId: true,
         activo: true,
         creado: true,
+        requierecambiopassword: true,
         rol: {
           select: {
             id: true,

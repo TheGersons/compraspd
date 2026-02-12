@@ -20,6 +20,7 @@ type User = {
   rol: { id: string; nombre: string };
   departmentId?: string;
   isActive?: boolean;
+  requierecambiopassword?: boolean;
 };
 
 type AuthCtx = {

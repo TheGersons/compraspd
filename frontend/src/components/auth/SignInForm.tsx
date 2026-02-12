@@ -126,41 +126,34 @@ export default function SignInForm() {
 
       console.log("Inicio de sesión exitoso");
 
-      // Usar el método login del AuthContext con ambos tokens
-      await login(
-        data.access_token,
-        data.refresh_token,
-        data.user
-      );
+      // 1. Guardar sesión
+      await login(data.access_token, data.refresh_token, data.user);
 
-      if (data.user.requierecambiocassword) {
-        toast.success('Sesión iniciada. Por seguridad, debes actualizar tu contraseña.', {
-          id: toastId,
-          duration: 5000,
-          icon: '🔐',
-        });
+      // 2. CASO: Cambio de contraseña obligatorio
+      if (data.user.requierecambiopassword) {
+        console.log('Redirigiendo a cambio de password...');
+        toast.success('Debes actualizar tu contraseña.', { id: toastId });
 
+        // Usamos setTimeout para asegurar que el AuthContext termine de procesar el login
         setTimeout(() => {
-          navigateSafe('/change-password-required');
-        }, 500);
-
-        return;
+          navigate('/change-password-required');
+        }, 100);
+        return; // Detenemos la ejecución aquí
       }
 
-      // Toast de bienvenida
+      // 3. CASO: Login normal
       toast.success(`¡Bienvenido ${data.user?.nombre || ''}!`, {
         id: toastId,
         duration: 3000,
         icon: '👋',
       });
 
-      // Después del login exitoso
-      window.location.href = '/quotes';  // En lugar de navigate()
-
-      // Redirigir después de un breve delay para que se vea el toast
+      // Redirigir al dashboard normal
       setTimeout(() => {
-        navigateSafe('/quotes/assignment');
+        // Usa navigate o navigateSafe, NO window.location.href
+        navigate('/quotes/assignment');
       }, 500);
+
 
     } catch (err: any) {
       console.error("Error en login:", err);

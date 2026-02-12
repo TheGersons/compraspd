@@ -9,33 +9,32 @@ interface ProtectedRouteProps {
   roles?: string[];
 }
 
+
 export default function ProtectedRoute({ children, roles }: ProtectedRouteProps) {
   const { user, isLoading } = useAuth();
 
-  // 1. MOSTRAR LOADING MIENTRAS CARGA
   if (isLoading) {
     return <LoadingScreen message="Verificando sesión..." fullScreen />;
   }
 
-  // 2. REDIRIGIR A LOGIN SI NO HAY USUARIO
   if (!user) {
     return <Navigate to="/signin" replace />;
   }
 
-  // 3. VERIFICAR ROLES SI SE ESPECIFICARON
-if (roles && roles.length > 0) {
-  const userRole = user.rol?.nombre;
-  
-  if (!userRole || !roles.includes(userRole)) {
-    // Si es USUARIO, redirigir a /quotes/new
-    if (userRole === "USUARIO") {
-      return <Navigate to="/quotes/new" replace />;
-    }
-    // Otros casos, redirigir al dashboard
-    return <Navigate to="/quotes" replace />;
+  if (user.requierecambiopassword && window.location.pathname !== '/change-password-required') {
+    return <Navigate to="/change-password-required" replace />;
   }
-}
 
-  // 4. RENDERIZAR CONTENIDO
+  if (roles && roles.length > 0) {
+    const userRole = user.rol?.nombre;
+    if (!userRole || !roles.includes(userRole)) {
+
+      if (userRole === "USUARIO") {
+        return <Navigate to="/quotes/new" replace />;
+      }
+      return <Navigate to="/quotes" replace />;
+    }
+  }
+
   return children ? <>{children}</> : <Outlet />;
 }
