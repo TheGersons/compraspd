@@ -123,7 +123,7 @@ export class AuthService {
       select: {
         id: true,
         passwordHash: true,
-        requiereCambioPassword: true,
+        requierecambiopassword: true,
         activo: true,
       }
     });
