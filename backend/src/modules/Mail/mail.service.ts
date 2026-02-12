@@ -12,8 +12,8 @@ export class MailService {
       port: 465,
       secure: true,
       auth: {
-        user: process.env.MAIL_USER || 'noreply@energiapd.com',
-        pass: process.env.MAIL_PASS || '17isdg743f33R',
+        user: process.env.MAIL_USER ,
+        pass: process.env.MAIL_PASS ,
       },
     });
   }
@@ -92,7 +92,7 @@ export class MailService {
 
                       <!-- Botón -->
                       <div style="text-align: center; margin-bottom: 24px;">
-                        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/signin" 
+                        <a href="${process.env.FRONTEND_URL}/signin" 
                            style="display: inline-block; background: linear-gradient(135deg, #0D76B8 0%, #14559c 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 15px;">
                           Iniciar Sesión
                         </a>
@@ -128,6 +128,7 @@ export class MailService {
     };
 
     try {
+        console.log(mailOptions);
       const info = await this.transporter.sendMail(mailOptions);
       this.logger.log(`Email enviado a ${to}: ${info.messageId}`);
       return true;
