@@ -74,9 +74,13 @@ export default function ChangePasswordRequired() {
       updateUser({ requierecambiopassword: false });
       // Redirigir al login después de 3 segundos
 
+      window.location.href = '/signin';
+      
       setTimeout(() => {
         navigate("/signin");
       }, 3000);
+
+      
     } catch (err: any) {
       setError(err.message || "Error al procesar la solicitud");
     } finally {

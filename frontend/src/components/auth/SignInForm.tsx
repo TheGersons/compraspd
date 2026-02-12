@@ -148,6 +148,8 @@ export default function SignInForm() {
         icon: '👋',
       });
 
+
+      window.location.href = '/quotes';
       // Redirigir al dashboard normal
       setTimeout(() => {
         // Usa navigate o navigateSafe, NO window.location.href
