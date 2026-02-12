@@ -133,12 +133,12 @@ export default function SignInForm() {
         data.user
       );
 
-      if (data.user.requiereCambioPassword) {
+      /* if (data.user.requierecambiocassword) {
         const msg = 'Debes cambiar tu contraseña temporal';
         setError(msg);
         code: 'PASSWORD_CHANGE_REQUIRED';
         redirect: '/change-password-required'
-      }
+      } */
 
       // Toast de bienvenida
       toast.success(`¡Bienvenido ${data.user?.nombre || ''}!`, {

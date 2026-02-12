@@ -14,7 +14,7 @@ type UsuarioWithRoleName = {
   nombre: string;
   activo: boolean;
   departamentoId: string;
-  requiereCambioPassword: boolean;
+  requierecambiopassword: boolean;
   rol: { nombre: string } | null;
 };
 
@@ -95,7 +95,7 @@ export class AuthService {
       where: { id: usuario.id },
       data: {
         passwordHash,
-        requiereCambioPassword: true,
+        requierecambiopassword: true,
         actualizado: new Date(),
       }
     });
@@ -147,7 +147,7 @@ export class AuthService {
       where: { id: usuario.id },
       data: {
         passwordHash: newPasswordHash,
-        requiereCambioPassword: false,
+        requierecambiopassword: false,
         actualizado: new Date(),
       }
     });
@@ -170,7 +170,7 @@ export class AuthService {
         nombre: true,
         activo: true,
         departamentoId: true,
-        requiereCambioPassword:true,
+        requierecambiopassword:true,
         rol: {
           select: { nombre: true }
         }
@@ -312,7 +312,7 @@ export class AuthService {
         email: usuario.email,
         nombre: usuario.nombre,
         role: roleName,
-        requiereCambioPassword: usuario.departamentoId
+        requierecambiopassword: usuario.departamentoId
       }
     };
   }
