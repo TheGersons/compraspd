@@ -29,6 +29,7 @@ type AuthCtx = {
   login: (accessToken: string, refreshToken: string, userData?: any) => Promise<void>;
   refresh: () => Promise<void>;
   logout: () => Promise<void>;
+  updateUser: (userData: Partial<User>) => void;
 };
 
 const Ctx = createContext<AuthCtx>({} as any);
@@ -133,7 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       navigateSafe('/quotes');
 
       await new Promise(resolve => setTimeout(resolve, 100));
-      
+
       setIsLoading(false);
     } else {
       setIsLoading(true);
@@ -179,8 +180,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     navigate("/signin", { replace: true });
   };
 
+  /**
+ * Actualiza parcialmente los datos del usuario en estado y cache
+ */
+  const updateUser = (data: Partial<User>) => {
+    setUser((prev) => {
+      if (!prev) return null;
+      const updated = { ...prev, ...data };
+      saveUser(updated); // Esto actualiza el localStorage mediante tu utilidad api.ts
+      return updated;
+    });
+  };
+
+
   const value = useMemo(
-    () => ({ user, isLoading, login, refresh, logout }),
+    () => ({ user, isLoading, login, refresh, logout, updateUser }),
     [user, isLoading]
   );
 

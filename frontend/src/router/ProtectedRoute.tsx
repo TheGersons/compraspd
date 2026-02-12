@@ -1,6 +1,6 @@
 // src/router/ProtectedRoute.tsx - VERSIÓN MEJORADA
 
-import { Navigate, Outlet } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { LoadingScreen } from "../components/common/LoadingScreen";
 
@@ -12,6 +12,7 @@ interface ProtectedRouteProps {
 
 export default function ProtectedRoute({ children, roles }: ProtectedRouteProps) {
   const { user, isLoading } = useAuth();
+  const use = useLocation();
 
   if (isLoading) {
     return <LoadingScreen message="Verificando sesión..." fullScreen />;

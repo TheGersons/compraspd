@@ -133,7 +133,7 @@ export default function App() {
           <Route path="/signin" element={<PublicOnlyRoute><SignIn /></PublicOnlyRoute>} />
           <Route path="/signup" element={<PublicOnlyRoute><SignUp /></PublicOnlyRoute>} />
           <Route path="/reset-password" element={<PublicOnlyRoute><ResetPassword /></PublicOnlyRoute>} />
-          <Route path="/change-password-required" element={<PublicOnlyRoute><ChangePasswordRequired /></PublicOnlyRoute>} />
+          <Route path="/change-password-required" element={<ChangePasswordRequired />} />
 
           {/* protegidas */}
           <Route element={<ProtectedRoute />}>

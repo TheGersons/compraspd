@@ -1,12 +1,13 @@
+import { useAuth } from "@/context/AuthContext";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 export default function ChangePasswordRequired() {
-  console.log('estoy aca')
-  window.location.href = '/change-password-required';
   const navigate = useNavigate();
+  const { updateUser } = useAuth();
+  
   
   const [email, setEmail] = useState("");
   const [tempPassword, setTempPassword] = useState("");
@@ -68,8 +69,11 @@ export default function ChangePasswordRequired() {
       }
 
       setSuccess(true);
-      
+
+      console.log('se va a actualizar el requiere');
+      updateUser({ requierecambiopassword: false });
       // Redirigir al login después de 3 segundos
+
       setTimeout(() => {
         navigate("/signin");
       }, 3000);
