@@ -10,13 +10,14 @@ export class MailService {
     this.transporter = nodemailer.createTransport({
       host: 'smtppro.zoho.com',
       port: 587,
-      secure: true,
+      secure: false,
       auth: {
         user: process.env.MAIL_USER ,
         pass: process.env.MAIL_PASS ,
       },
       connectionTimeout: 5000,
       tls: {
+        ciphers: 'SSLv3',
         rejectUnauthorized: false
       }
     });
@@ -132,7 +133,6 @@ export class MailService {
     };
 
     try {
-        console.log(mailOptions);
       const info = await this.transporter.sendMail(mailOptions);
       this.logger.log(`Email enviado a ${to}: ${info.messageId}`);
       return true;
