@@ -3,6 +3,15 @@ import { useSearchParams } from "react-router-dom";
 import PageMeta from "../../components/common/PageMeta";
 import { getToken } from "../../lib/api";
 import { useNotifications } from "../Notifications/context/NotificationContext";
+import toast from "react-hot-toast";
+import { Download, Eye, X, FileText, CalendarIcon } from "lucide-react"; // AGREGUÉ LOS ICONOS FALTANTES
+import DatePicker from "@/components/common/DatePicker";
+import { PopoverTrigger, PopoverContent, Popover } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 
 // ============================================================================
 // TYPES
@@ -21,7 +30,7 @@ type TimelineItem = {
   esNoAplica: boolean;
 };
 
-type EstadoProducto = {
+export type EstadoProducto = {
   id: string;
   sku: string;
   descripcion: string;
@@ -31,7 +40,7 @@ type EstadoProducto = {
   proveedor?: string;
   responsable?: string;
   observaciones?: string;
-  
+
   // 10 estados booleanos
   cotizado: boolean;
   conDescuento: boolean;
@@ -43,7 +52,7 @@ type EstadoProducto = {
   segundoSeguimiento: boolean;
   enCIF: boolean;
   recibido: boolean;
-  
+
   // Fechas reales
   fechaCotizado?: string | null;
   fechaConDescuento?: string | null;
@@ -55,7 +64,7 @@ type EstadoProducto = {
   fechaSegundoSeguimiento?: string | null;
   fechaEnCIF?: string | null;
   fechaRecibido?: string | null;
-  
+
   // Fechas límite
   fechaLimiteCotizado?: string | null;
   fechaLimiteConDescuento?: string | null;
@@ -67,13 +76,34 @@ type EstadoProducto = {
   fechaLimiteSegundoSeguimiento?: string | null;
   fechaLimiteEnCIF?: string | null;
   fechaLimiteRecibido?: string | null;
-  
+
+  // ==========================================
+  //  NUEVO: Campos de Evidencia (Links o Filenames)
+  // ==========================================
+  evidenciaCotizado?: string | null;
+  evidenciaConDescuento?: string | null;
+  evidenciaComprado?: string | null;
+  evidenciaPagado?: string | null;
+  evidenciaPrimerSeguimiento?: string | null;
+  evidenciaEnFOB?: string | null;
+  evidenciaConBL?: string | null;
+  evidenciaSegundoSeguimiento?: string | null;
+  evidenciaEnCIF?: string | null;
+  evidenciaRecibido?: string | null;
+
+  // ==========================================
+  //  NUEVO: Campos de Rechazo (Según tu Prisma)
+  // ==========================================
+  rechazado: boolean;
+  fechaRechazo?: string | null;
+  motivoRechazo?: string | null;
+
   // Criticidad y retrasos
   criticidad: number;
   nivelCriticidad: string;
   diasRetrasoActual: number;
   estadoGeneral: string;
-  
+
   // Relaciones
   proyecto?: {
     id: string;
@@ -91,21 +121,22 @@ type EstadoProducto = {
     codigo: string;
   };
   medioTransporte?: string;
-  
+
   // Aprobación
   aprobadoPorSupervisor: boolean;
   fechaAprobacion?: string | null;
-  
+
   // Tipo de compra y estados aplicables
   tipoCompra: 'NACIONAL' | 'INTERNACIONAL';
   estadosAplicables?: string[];
   siguienteEstado?: string | null;
-  
+
   // Timeline calculado
   estadoActual?: string;
   progreso?: number;
   timeline?: TimelineItem[];
 };
+
 
 // ============================================================================
 // CONSTANTS
@@ -135,6 +166,20 @@ const ESTADOS_ICONOS: Record<string, string> = {
   segundoSeguimiento: "📞",
   enCIF: "🌊",
   recibido: "📦",
+};
+
+// Mapeo para saber qué campo leer y a qué carpeta del Storage ir
+const EVIDENCE_CONFIG: Record<string, { dbField: keyof EstadoProducto; storageType: string }> = {
+  cotizado: { dbField: 'evidenciaCotizado', storageType: 'otros' },
+  conDescuento: { dbField: 'evidenciaConDescuento', storageType: 'comprobantes_descuento' },
+  comprado: { dbField: 'evidenciaComprado', storageType: 'evidencia_comprado' },
+  pagado: { dbField: 'evidenciaPagado', storageType: 'evidencia_pagado' },
+  primerSeguimiento: { dbField: 'evidenciaPrimerSeguimiento', storageType: 'evidencia_primerSeguimiento' },
+  enFOB: { dbField: 'evidenciaEnFOB', storageType: 'envidencia_enFOB' },
+  conBL: { dbField: 'evidenciaConBL', storageType: 'envidencia_conBL' },
+  segundoSeguimiento: { dbField: 'evidenciaSegundoSeguimiento', storageType: 'evidencia_segundoSeguimiento' },
+  enCIF: { dbField: 'evidenciaEnCIF', storageType: 'evidencia_enCIF' },
+  recibido: { dbField: 'evidenciaRecibido', storageType: 'evidencia_recibido' }
 };
 
 const ESTADOS_NACIONAL = ['cotizado', 'conDescuento', 'comprado', 'pagado', 'recibido'];
@@ -261,6 +306,36 @@ const api = {
     if (!response.ok) throw new Error('Error al generar comprobante');
     return response.json();
   },
+  async downloadFile(params: {
+    cotizacionId: string;
+    sku: string;
+    proveedor: string;
+    filename: string;
+    mode: 'inline' | 'attachment'; // CORREGIDO: Faltaba punto y coma o coma
+    tipo: string;
+  }) {
+    const token = getToken();
+    // Construimos los Query Params para el GET
+    const query = new URLSearchParams({
+      cotizacionId: params.cotizacionId,
+      sku: params.sku,
+      proveedor: params.proveedor,
+      tipo: params.tipo, // Ajusta si manejas otros tipos
+      filename: params.filename,
+      mode: params.mode
+    });
+
+    const response = await fetch(`${API_BASE_URL}/api/v1/storage/download?${query.toString()}`, {
+      method: 'GET',
+      credentials: "include",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!response.ok) throw new Error("Error al descargar archivo");
+
+    // Retornamos el Blob para que el frontend cree la URL temporal
+    return response.blob();
+  },
 };
 
 // ============================================================================
@@ -309,6 +384,331 @@ const formatDate = (date: string | Date | null | undefined): string => {
 };
 
 // ============================================================================
+// SUB-COMPONENT: TIMELINE ITEM (Aquí moví tu código del modal)
+// ============================================================================
+export const TimelineItem = ({ item, producto, sku }: { item: any, producto: any, sku: string }) => {
+  const [showModal, setShowModal] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  // Lógica para manejar la descarga/vista
+  const handleFileAction = async (action: 'view' | 'download') => {
+    // 1. Identificar configuración según el estado actual
+    const config = EVIDENCE_CONFIG[item.estado];
+    if (!config) {
+      toast.error("Configuración de evidencia no encontrada para este estado");
+      return;
+    }
+
+    // 2. Obtener el nombre del archivo o URL desde el objeto producto
+    const filenameOrUrl = producto[config.dbField];
+
+    if (!filenameOrUrl) {
+      toast.error("No se encontró el archivo en el registro");
+      return;
+    }
+
+    // CASO A: Es Link Público (empieza con http)
+    if (filenameOrUrl.startsWith('http')) {
+      let url = filenameOrUrl;
+      if (action === 'download' && !url.endsWith('/download')) {
+        url = `${url.replace(/\/$/, '')}/download`;
+      }
+      window.open(url, '_blank');
+      setShowModal(false);
+      return;
+    }
+
+    // CASO B: Es archivo interno (nombre de archivo) -> Usar Backend Proxy
+    setLoading(true);
+    const toastId = toast.loading(action === 'view' ? "Recuperando archivo..." : "Preparando descarga...");
+
+    try {
+      // Llamada a tu servicio (adaptado con los parámetros correctos)
+      const blob = await api.downloadFile({
+        cotizacionId: producto.cotizacionId, // ID vital para la ruta en backend
+        sku: sku,
+        proveedor: producto.proveedor || 'SinProveedor',
+        filename: filenameOrUrl,
+        mode: action === 'view' ? 'inline' : 'attachment',
+        tipo: config.storageType // ¡Importante! Pasa el tipo de carpeta correcto
+      });
+
+      const url = window.URL.createObjectURL(blob);
+
+      if (action === 'download') {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filenameOrUrl; // Nombre sugerido
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        window.open(url, '_blank');
+      }
+
+      // Limpieza
+      setTimeout(() => window.URL.revokeObjectURL(url), 100);
+      toast.dismiss(toastId);
+      setShowModal(false);
+
+    } catch (error) {
+      console.error(error);
+      toast.error("Error al obtener el archivo", { id: toastId });
+    } finally {
+      setLoading(false);
+    }
+  }
+  // Estados para controlar el modal de fecha
+  const [showDateModal, setShowDateModal] = useState(false);
+  // Cambiamos 'productId: string' por 'product: EstadoProducto'
+  const [selectedItem, setSelectedItem] = useState<{ item: TimelineItem, product: EstadoProducto } | null>(null);
+
+  const handleUpdateFechaLimite = async (newDate: Date) => {
+    if (!selectedItem) return;
+
+    const { item, product } = selectedItem; // Ya tenemos el objeto completo aquí
+
+    // --- LÓGICA DE VALIDACIÓN ---
+    // Buscamos el índice dentro del timeline del producto actual
+    const currentIndex = product.timeline?.findIndex(t => t.estado === item.estado) ?? -1;
+
+    if (currentIndex > 0 && product.timeline) {
+      const estadoAnterior = product.timeline[currentIndex - 1];
+      // Validamos contra la fecha real (fecha) del estado anterior
+      const fechaReferenciaStr = estadoAnterior.fecha;
+
+      if (fechaReferenciaStr) {
+        const fechaReferencia = new Date(fechaReferenciaStr);
+        if (newDate < fechaReferencia) {
+          toast.error(`Error: No puede ser menor a la fecha de ${estadoAnterior.label}`);
+          return;
+        }
+      }
+    }
+
+    // --- LLAMADA A API (Igual que antes pero usando product.id) ---
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/v1/estado-productos/${product.id}/update-fecha-limite`, {
+        method: "PATCH",
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ estado: item.estado, nuevaFechaLimite: newDate.toISOString() }),
+      });
+
+      if (response.ok) {
+        toast.success("Fecha actualizada");
+        setShowDateModal(false);
+        // Aquí llama a la función que refresca tu lista (ej. fetchData())
+      }
+    } catch (error) {
+      toast.error("Error de conexión");
+    }
+  };
+
+
+
+  return (
+    <>
+      <div>
+        <h5 className="font-medium text-gray-900 dark:text-white">
+          {item.label || item.estado}
+        </h5>
+
+        <div className="mt-1 flex flex-wrap items-center gap-4 text-xs text-gray-600 dark:text-gray-400">
+          {/* 1. Fecha de cumplimiento */}
+          {item.fecha && (
+            <span>✅ {formatDate(item.fecha)}</span>
+          )}
+
+          {/* 2. Lógica de Fecha Límite Condicional */}
+          {item.fechaLimite && (
+            /* Definimos la condición de bloqueo: si es No Aplica O tiene los labels específicos */
+            (item.esNoaplica || item.label === "Cotizado" || item.label === "Con Descuento" || item.estado === "true") ? (
+              // VISTA ESTÁTICA: No hay Popover, solo texto
+              <span className="flex items-center gap-1 text-gray-400 cursor-default opacity-70">
+                <CalendarIcon size={14} />
+                🎯 Límite: {formatDate(item.fechaLimite)}
+              </span>
+            ) : (
+              // VISTA INTERACTIVA: El Popover permite editar
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    className="group flex items-center gap-1 text-orange-400 dark:text-blue-400 hover:text-orange-600 hover:underline transition-all cursor-pointer"
+                    title="Cambiar fecha limite"
+                  >
+                    <CalendarIcon size={14} className="group-hover:scale-110 transition-transform" />
+                    🎯 Límite: {formatDate(item.fechaLimite)}
+                  </button>
+                </PopoverTrigger>
+
+                <PopoverContent className="w-auto p-0 z-50" align="start">
+                  <div className="p-3 border-b border-orange-400 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                      Ajustar Límite: {item.label}
+                    </p>
+                  </div>
+                  <Calendar
+                    mode="single"
+                    // Aseguramos que el Date sea válido para que se marque en el calendario
+                    selected={item.fechaLimite ? new Date(item.fechaLimite) : undefined}
+                    onSelect={(date) => {
+                      console.log(item.estado)
+                      // Aquí debe ir tu función handleDateChange(date, item.id) o similar
+                      console.log("Nueva fecha:", date);
+                    }}
+                    // Corregimos las clases para forzar el color naranja
+                    classNames={{
+                      day_selected: "bg-orange-500 !text-white hover:bg-orange-600 focus:bg-orange-500",
+                      day_today: "bg-orange-100 text-orange-900 font-bold",
+                      day_button: "hover:bg-orange-500 hover:text-white transition-colors",
+                    }}
+                  />
+                </PopoverContent>
+              </Popover>
+            )
+          )}
+
+          {/* 3. Lógica de Evidencia */}
+          {item.tieneEvidencia && (
+            (item.esNoaplica || item.label === "Cotizado" || item.label === "Con Descuento") ? (
+              <span className="text-gray-500 flex items-center gap-1 cursor-default">
+                ➖ No aplica
+              </span>
+            ) : (
+              <button
+                onClick={() => setShowModal(true)}
+                className="group flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:text-blue-800 hover:underline transition-all cursor-pointer"
+                title="Ver opciones de archivo"
+              >
+                <FileText size={14} className="group-hover:scale-110 transition-transform" />
+                📎 Ver evidencia
+              </button>
+            )
+          )}
+        </div>
+      </div>
+
+      {/* --- EL PEQUEÑO MODAL --- */}
+      {showModal && (
+        <div className="fixed inset-0 z-5000 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-sm overflow-hidden border border-gray-200 dark:border-gray-700">
+
+            {/* Header del Modal */}
+            <div className="flex justify-between items-center p-3 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                Evidencia: {item.label || item.estado}
+                
+              </h3>
+              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-red-500 transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body del Modal */}
+            <div className="p-4 space-y-3">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                Selecciona una acción para el archivo adjunto.
+              </p>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => handleFileAction('view')}
+                  disabled={loading}
+                  className="flex flex-col items-center justify-center gap-2 p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-200 dark:hover:border-blue-700 transition-all group"
+                >
+                  <Eye className="w-6 h-6 text-gray-600 dark:text-gray-300 group-hover:text-blue-600" />
+                  <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Ver Online</span>
+                </button>
+
+                <button
+                  onClick={() => handleFileAction('download')}
+                  disabled={loading}
+                  className="flex flex-col items-center justify-center gap-2 p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-green-50 dark:hover:bg-green-900/20 hover:border-green-200 dark:hover:border-green-700 transition-all group"
+                >
+                  <Download className="w-6 h-6 text-gray-600 dark:text-gray-300 group-hover:text-green-600" />
+                  <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Descargar</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* MODAL DE AJUSTE DE FECHA */}
+      {showDateModal && selectedItem && (
+        <div className="fixed inset-0 z-[6000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-2xl w-full max-w-sm border border-gray-200 dark:border-gray-700">
+
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-gray-800 dark:text-white">
+                Ajustar Límite: {selectedItem.item.label}
+              </h3>
+              <button onClick={() => setShowDateModal(false)} className="text-gray-400 hover:text-red-500 transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Nueva fecha límite</label>
+
+              <Popover>
+                <PopoverTrigger asChild>
+                  {/* Este es el ÚNICO botón que se verá inicialmente */}
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal h-11 border-gray-200 dark:border-gray-700",
+                      !selectedItem.item.fechaLimite && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4 text-orange-500" />
+                    {selectedItem.item.fechaLimite ? (
+                      format(new Date(selectedItem.item.fechaLimite), "PPP", { locale: es })
+                    ) : (
+                      <span>Seleccionar fecha...</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+
+                {/* El calendario SOLO se verá cuando hagas clic en el botón de arriba */}
+                <PopoverContent
+                  className="w-auto p-0 z-[7000]"
+                  align="start"
+                  side="bottom"
+                >
+                  <Calendar
+                    mode="single"
+                    selected={selectedItem.item.fechaLimite ? new Date(selectedItem.item.fechaLimite) : undefined}
+                    onSelect={(date) => {
+                      if (date) {
+                        handleUpdateFechaLimite(date);
+                        // Opcional: podrías cerrar el modal principal aquí si lo deseas
+                      }
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <p className="text-[10px] leading-relaxed text-gray-500 dark:text-gray-400 italic">
+              * La validación impedirá fechas incoherentes con el proceso anterior.
+            </p>
+          </div>
+        </div>
+      )}
+
+
+
+
+    </>
+
+  );
+
+};
+
+
+// ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
@@ -335,7 +735,11 @@ export default function ShoppingFollowUps() {
   const [observacion, setObservacion] = useState("");
   const [archivoEvidencia, setArchivoEvidencia] = useState<File | null>(null);
   const [noAplicaEvidencia, setNoAplicaEvidencia] = useState(false);
-  
+  const [fechaLimite, setFechaLimite] = useState<Date | null>(null);
+
+  const [showDateModal, setShowDateModal] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<{ item: TimelineItem, productId: string } | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Efectos
@@ -354,13 +758,59 @@ export default function ShoppingFollowUps() {
   // HANDLERS
   // ============================================================================
 
+  const handleUpdateFechaLimite = async (newDate: Date) => {
+    if (!selectedItem) return;
+
+    const { item, productId } = selectedItem;
+    const product = productos.find(p => p.id === productId); // 'productos' es tu array del state
+    if (!product) return;
+
+    // --- LÓGICA DE VALIDACIÓN ---
+    // Ejemplo: No permitir que la fecha límite de un estado sea menor a la fecha real del estado anterior
+    const currentIndex = product.timeline.findIndex(t => t.estado === item.estado);
+
+    if (currentIndex > 0) {
+      const estadoAnterior = product.timeline[currentIndex - 1];
+      const fechaReferencia = estadoAnterior.fecha ? new Date(estadoAnterior.fecha) : null;
+
+      if (fechaReferencia && newDate < fechaReferencia) {
+        toast.error(`La fecha límite no puede ser menor a la ejecución de ${estadoAnterior.label} (${formatDate(fechaReferencia)})`);
+        return;
+      }
+    }
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/v1/estado-productos/${productId}/update-fecha-limite`, {
+        method: "PATCH",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          estado: item.estado,
+          nuevaFechaLimite: newDate.toISOString()
+        }),
+      });
+
+      if (response.ok) {
+        toast.success("Fecha límite actualizada correctamente");
+        setShowDateModal(false);
+        // Aquí deberías refrescar los datos (ej. llamar a fetchProductos())
+      } else {
+        throw new Error("Error en el servidor");
+      }
+    } catch (error) {
+      toast.error("No se pudo actualizar la fecha");
+    }
+  };
+
   const cargarProductos = async () => {
     try {
       setLoading(true);
       const filters: any = { pageSize: 50 };
       if (filtroNivel) filters.nivelCriticidad = filtroNivel;
       if (filtroTipoCompra) filters.tipoCompra = filtroTipoCompra;
-      
+
       const data = await api.getEstadosProductos(filters);
       setProductos(data.items || []);
     } catch (error) {
@@ -421,13 +871,13 @@ export default function ShoppingFollowUps() {
       });
 
       addNotification("success", "Éxito", "Estado avanzado correctamente");
-      
+
       // Limpiar y recargar
       setShowAvanzarModal(false);
       setObservacion("");
       setArchivoEvidencia(null);
       setNoAplicaEvidencia(false);
-      
+
       await seleccionarProducto(productoSeleccionado.id);
       await cargarProductos();
     } catch (error: any) {
@@ -457,7 +907,7 @@ export default function ShoppingFollowUps() {
       );
       if (!matchQuery) return false;
     }
-    
+
     // Filtro por estado de completado (100% = completado)
     const estaCompletado = p.progreso === 100;
     if (verCompletados) {
@@ -498,21 +948,19 @@ export default function ShoppingFollowUps() {
           <div className="flex rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden">
             <button
               onClick={() => setVerCompletados(false)}
-              className={`px-4 py-2 text-sm font-medium transition-colors ${
-                !verCompletados
-                  ? "bg-blue-600 text-white"
-                  : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-              }`}
+              className={`px-4 py-2 text-sm font-medium transition-colors ${!verCompletados
+                ? "bg-blue-600 text-white"
+                : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                }`}
             >
               📋 En Proceso ({totalPendientes})
             </button>
             <button
               onClick={() => setVerCompletados(true)}
-              className={`px-4 py-2 text-sm font-medium transition-colors ${
-                verCompletados
-                  ? "bg-green-600 text-white"
-                  : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-              }`}
+              className={`px-4 py-2 text-sm font-medium transition-colors ${verCompletados
+                ? "bg-green-600 text-white"
+                : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                }`}
             >
               ✅ Completados ({totalCompletados})
             </button>
@@ -571,8 +1019,8 @@ export default function ShoppingFollowUps() {
                   </div>
                 ) : productosFiltrados.length === 0 ? (
                   <div className="p-6 text-center text-gray-500 dark:text-gray-400">
-                    {verCompletados 
-                      ? "No hay productos completados" 
+                    {verCompletados
+                      ? "No hay productos completados"
                       : "No hay productos en proceso"}
                   </div>
                 ) : (
@@ -581,11 +1029,10 @@ export default function ShoppingFollowUps() {
                       <button
                         key={producto.id}
                         onClick={() => seleccionarProducto(producto.id)}
-                        className={`w-full p-4 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${
-                          productoSeleccionado?.id === producto.id
-                            ? "bg-blue-50 dark:bg-blue-900/20"
-                            : ""
-                        }`}
+                        className={`w-full p-4 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${productoSeleccionado?.id === producto.id
+                          ? "bg-blue-50 dark:bg-blue-900/20"
+                          : ""
+                          }`}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
@@ -608,11 +1055,10 @@ export default function ShoppingFollowUps() {
                                 </span>
                               )}
                               {/* Badge tipo compra */}
-                              <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${
-                                producto.tipoCompra === 'NACIONAL' 
-                                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                  : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                              }`}>
+                              <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${producto.tipoCompra === 'NACIONAL'
+                                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                                }`}>
                                 {producto.tipoCompra === 'NACIONAL' ? '🇭🇳 Nacional' : '🌍 Internacional'}
                               </span>
                               {/* Estado actual */}
@@ -622,11 +1068,10 @@ export default function ShoppingFollowUps() {
                             </div>
                           </div>
                           <div className="text-right">
-                            <span className={`text-lg font-bold ${
-                              producto.progreso === 100 
-                                ? 'text-green-600 dark:text-green-400' 
-                                : 'text-gray-900 dark:text-white'
-                            }`}>
+                            <span className={`text-lg font-bold ${producto.progreso === 100
+                              ? 'text-green-600 dark:text-green-400'
+                              : 'text-gray-900 dark:text-white'
+                              }`}>
                               {producto.progreso}%
                             </span>
                           </div>
@@ -634,15 +1079,14 @@ export default function ShoppingFollowUps() {
                         {/* Barra de progreso */}
                         <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
                           <div
-                            className={`h-full rounded-full transition-all ${
-                              producto.progreso === 100
-                                ? "bg-green-600"
-                                : producto.nivelCriticidad === "ALTO"
+                            className={`h-full rounded-full transition-all ${producto.progreso === 100
+                              ? "bg-green-600"
+                              : producto.nivelCriticidad === "ALTO"
                                 ? "bg-red-600"
                                 : producto.nivelCriticidad === "MEDIO"
-                                ? "bg-yellow-500"
-                                : "bg-green-600"
-                            }`}
+                                  ? "bg-yellow-500"
+                                  : "bg-green-600"
+                              }`}
                             style={{ width: `${producto.progreso}%` }}
                           />
                         </div>
@@ -673,11 +1117,10 @@ export default function ShoppingFollowUps() {
                         <span className={`rounded-full px-2 py-1 text-xs font-medium ${getCriticidadBg(productoSeleccionado.nivelCriticidad)}`}>
                           {getCriticidadBadge(productoSeleccionado.nivelCriticidad)}
                         </span>
-                        <span className={`rounded px-2 py-1 text-xs font-medium ${
-                          productoSeleccionado.tipoCompra === 'NACIONAL'
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                            : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                        }`}>
+                        <span className={`rounded px-2 py-1 text-xs font-medium ${productoSeleccionado.tipoCompra === 'NACIONAL'
+                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                          : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                          }`}>
                           {productoSeleccionado.tipoCompra === 'NACIONAL' ? '🇭🇳 Nacional' : '🌍 Internacional'}
                         </span>
                       </div>
@@ -754,45 +1197,33 @@ export default function ShoppingFollowUps() {
                         return (
                           <div
                             key={index}
-                            className={`relative rounded-lg border p-4 ${
-                              isCompletado
-                                ? isRetrasado
-                                  ? "border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-900/10"
-                                  : "border-green-300 bg-green-50 dark:border-green-800 dark:bg-green-900/10"
-                                : "border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50"
-                            }`}
+                            className={`relative rounded-lg border p-4 ${isCompletado
+                              ? isRetrasado
+                                ? "border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-900/10"
+                                : "border-green-300 bg-green-50 dark:border-green-800 dark:bg-green-900/10"
+                              : "border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50"
+                              }`}
                           >
                             <div className="flex items-start justify-between">
                               <div className="flex items-center gap-3">
                                 <div
-                                  className={`flex h-10 w-10 items-center justify-center rounded-full text-lg ${
-                                    isCompletado
-                                      ? isRetrasado
-                                        ? "bg-red-200 dark:bg-red-800"
-                                        : "bg-green-200 dark:bg-green-800"
-                                      : "bg-gray-200 dark:bg-gray-700"
-                                  }`}
+                                  className={`flex h-10 w-10 items-center justify-center rounded-full text-lg ${isCompletado
+                                    ? isRetrasado
+                                      ? "bg-red-200 dark:bg-red-800"
+                                      : "bg-green-200 dark:bg-green-800"
+                                    : "bg-gray-200 dark:bg-gray-700"
+                                    }`}
                                 >
                                   {ESTADOS_ICONOS[item.estado] || "📌"}
                                 </div>
-                                <div>
-                                  <h5 className="font-medium text-gray-900 dark:text-white">
-                                    {item.label || ESTADOS_LABELS[item.estado] || item.estado}
-                                  </h5>
-                                  <div className="mt-1 flex flex-wrap items-center gap-4 text-xs text-gray-600 dark:text-gray-400">
-                                    {item.fecha && (
-                                      <span>✅ {formatDate(item.fecha)}</span>
-                                    )}
-                                    {item.fechaLimite && (
-                                      <span>🎯 Límite: {formatDate(item.fechaLimite)}</span>
-                                    )}
-                                    {item.tieneEvidencia && (
-                                      <span className={item.esNoAplica ? "text-gray-500" : "text-blue-600 dark:text-blue-400"}>
-                                        {item.esNoAplica ? "➖ No aplica" : "📎 Con evidencia"}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
+
+                                {/* AQUI ESTABA EL ERROR: Usar el componente refactorizado */}
+                                <TimelineItem
+                                  item={item}
+                                  producto={productoSeleccionado}
+                                  sku={productoSeleccionado.sku}
+                                />
+
                               </div>
 
                               <div className="text-right">
@@ -859,7 +1290,7 @@ export default function ShoppingFollowUps() {
 
         {/* Modal Avanzar Estado */}
         {showAvanzarModal && productoSeleccionado && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="fixed inset-0 z-5000 flex items-center justify-center bg-black/50 p-4">
             <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl dark:bg-gray-900">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                 Avanzar al siguiente estado
@@ -964,6 +1395,8 @@ export default function ShoppingFollowUps() {
           </div>
         )}
       </div>
+
     </>
+
   );
 }

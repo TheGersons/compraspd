@@ -24,40 +24,6 @@ export class StorageService {
         return `Basic ${credentials}`;
     }
 
-    /**
-     * Crea una carpeta en Nextcloud (recursivamente si es necesario)
-     */
-    private async createFolder(folderPath: string): Promise<void> {
-        // Construir URL completa
-        const url = `${this.webdavUrl}/${folderPath}`;
-
-        try {
-            const response = await fetch(url, {
-                method: 'MKCOL',
-                headers: {
-                    'Authorization': this.getAuthHeader(),
-                },
-            });
-
-            // 201 = creado, 405 = ya existe (ambos son OK)
-            if (!response.ok && response.status !== 405 && response.status !== 409) {
-                // Si falla, intentar crear carpetas padre
-                const parentPath = folderPath.split('/').slice(0, -1).join('/');
-                if (parentPath && parentPath.length > 0) {
-                    await this.createFolderRecursive(parentPath);
-                    // Reintentar crear la carpeta actual
-                    await fetch(url, {
-                        method: 'MKCOL',
-                        headers: {
-                            'Authorization': this.getAuthHeader(),
-                        },
-                    });
-                }
-            }
-        } catch (error) {
-            console.warn(`No se pudo crear carpeta ${folderPath}:`, (error as Error).message);
-        }
-    }
 
     /**
  * Crea una carpeta en Nextcloud (recursivamente)

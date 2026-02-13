@@ -108,8 +108,8 @@ export class StorageController {
         @Query('proveedor') proveedor: string,
         @Query('tipo') tipo: string,
         @Query('filename') filename: string,
-        @Query('mode') mode: string = 'inline', // 'inline' para ver, 'attachment' para descargar
-        @Res() res: Response // Inyectamos la respuesta de Express
+        @Query('mode') mode: string = 'inline',
+        @Res() res: Response 
     ) {
         if (!cotizacionId || !sku || !proveedor || !filename) {
             throw new BadRequestException('Faltan parámetros para ubicar el archivo');
@@ -123,15 +123,12 @@ export class StorageController {
             filename
         );
 
-        // Configurar headers para que el navegador entienda qué hacer
         res.set({
             'Content-Type': fileData.contentType,
             'Content-Length': fileData.buffer.length,
-            // inline = ver en navegador (pdf, imagenes). attachment = forzar descarga.
             'Content-Disposition': `${mode}; filename="${fileData.filename}"`,
         });
 
-        // Enviar el archivo
         res.send(fileData.buffer);
     }
 }
