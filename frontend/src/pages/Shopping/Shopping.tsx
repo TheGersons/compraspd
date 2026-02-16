@@ -18,6 +18,7 @@ type EstadoProducto = {
   pagado: boolean;
   primerSeguimiento: boolean;
   enFOB: boolean;
+  cotizacionFleteInternacional: boolean;
   conBL: boolean;
   segundoSeguimiento: boolean;
   enCIF: boolean;
@@ -72,6 +73,7 @@ type Stats = {
     pagado: number;
     primerSeguimiento: number;
     enFOB: number;
+    cotizacionFleteInternacional: number;
     conBL: number;
     segundoSeguimiento: number;
     enCIF: number;
@@ -169,11 +171,13 @@ const api = {
 const getEstadoActual = (producto: EstadoProducto): string => {
   if (producto.estadoActual) return producto.estadoActual;
   
+  // Orden inverso para encontrar el último estado completado
   const estados = [
     { key: "recibido", label: "recibido" },
     { key: "enCIF", label: "enCIF" },
     { key: "segundoSeguimiento", label: "segundoSeguimiento" },
     { key: "conBL", label: "conBL" },
+    { key: "cotizacionFleteInternacional", label: "cotizacionFleteInternacional" },  // ← NUEVO
     { key: "enFOB", label: "enFOB" },
     { key: "primerSeguimiento", label: "primerSeguimiento" },
     { key: "pagado", label: "pagado" },
@@ -261,6 +265,7 @@ const calcularStats = (productos: EstadoProducto[]): Stats => {
       pagado: 0,
       primerSeguimiento: 0,
       enFOB: 0,
+      cotizacionFleteInternacional: 0,
       conBL: 0,
       segundoSeguimiento: 0,
       enCIF: 0,
@@ -721,7 +726,7 @@ export default function Shopping() {
                     {/* Progress Bar */}
                     <div className="mt-3">
                       <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
-                        <span>Progreso ({tipoCompra === 'NACIONAL' ? '5' : '10'} etapas)</span>
+                        <span>Progreso ({tipoCompra === 'NACIONAL' ? '5' : '11'} etapas)</span>
                         <span className={progreso === 100 ? 'text-green-600 dark:text-green-400 font-medium' : ''}>
                           {progreso}%
                         </span>

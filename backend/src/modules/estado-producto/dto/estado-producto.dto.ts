@@ -1,6 +1,15 @@
-import { IsBoolean, IsEnum, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsEnum,
+  IsIn,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Min,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer'
+import { Type } from 'class-transformer';
 
 /**
  * Estados del proceso de compra (10 etapas)
@@ -12,10 +21,11 @@ export enum EstadoProceso {
   PAGADO = 'pagado',
   PRIMER_SEGUIMIENTO = 'primerSeguimiento',
   EN_FOB = 'enFOB',
+  COTIZACION_FLETE_INTERNACIONAL = 'cotizacionFleteInternacional',
   CON_BL = 'conBL',
   SEGUNDO_SEGUIMIENTO = 'segundoSeguimiento',
   EN_CIF = 'enCIF',
-  RECIBIDO = 'recibido'
+  RECIBIDO = 'recibido',
 }
 
 /**
@@ -26,7 +36,7 @@ export const ESTADOS_NACIONAL: EstadoProceso[] = [
   EstadoProceso.CON_DESCUENTO,
   EstadoProceso.COMPRADO,
   EstadoProceso.PAGADO,
-  EstadoProceso.RECIBIDO
+  EstadoProceso.RECIBIDO,
 ];
 
 /**
@@ -42,7 +52,7 @@ export const ESTADOS_INTERNACIONAL: EstadoProceso[] = [
   EstadoProceso.CON_BL,
   EstadoProceso.SEGUNDO_SEGUIMIENTO,
   EstadoProceso.EN_CIF,
-  EstadoProceso.RECIBIDO
+  EstadoProceso.RECIBIDO,
 ];
 
 /**
@@ -54,11 +64,12 @@ export const ESTADO_LABELS: Record<EstadoProceso, string> = {
   [EstadoProceso.COMPRADO]: 'Comprado',
   [EstadoProceso.PAGADO]: 'Pagado',
   [EstadoProceso.PRIMER_SEGUIMIENTO]: '1er Seguimiento',
-  [EstadoProceso.EN_FOB]: 'En FOB',
-  [EstadoProceso.CON_BL]: 'Con BL',
-  [EstadoProceso.SEGUNDO_SEGUIMIENTO]: '2do Seguimiento',
-  [EstadoProceso.EN_CIF]: 'En CIF',
-  [EstadoProceso.RECIBIDO]: 'Recibido'
+  [EstadoProceso.EN_FOB]: 'En FOB / En CIF', // ← RENOMBRADO
+  [EstadoProceso.COTIZACION_FLETE_INTERNACIONAL]: 'Cotización Flete Int.', // ← NUEVO
+  [EstadoProceso.CON_BL]: 'Con BL / Póliza Seguros', // ← RENOMBRADO
+  [EstadoProceso.SEGUNDO_SEGUIMIENTO]: '2do Seg. / En Tránsito', // ← RENOMBRADO
+  [EstadoProceso.EN_CIF]: 'Proceso Aduana', // ← RENOMBRADO
+  [EstadoProceso.RECIBIDO]: 'Recibido',
 };
 
 // ============================================================================
@@ -125,20 +136,21 @@ export class CreateEstadoProductoDto {
 }
 
 export class AvanzarEstadoDto {
-  @ApiPropertyOptional({ description: 'Observación del cambio de estado' })
   @IsOptional()
   @IsString()
   observacion?: string;
 
-  @ApiPropertyOptional({ description: 'URL o referencia del archivo de evidencia' })
   @IsOptional()
   @IsString()
   evidenciaUrl?: string;
 
-  @ApiPropertyOptional({ description: 'Marcar como "No aplica evidencia"' })
   @IsOptional()
-  @IsBoolean()
   noAplicaEvidencia?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['FOB', 'CIF'])
+  tipoEntrega?: 'FOB' | 'CIF'; // ← NUEVO
 }
 
 export class CambiarEstadoDto {
@@ -151,7 +163,9 @@ export class CambiarEstadoDto {
   @IsString()
   observacion?: string;
 
-  @ApiPropertyOptional({ description: 'URL o referencia del archivo de evidencia' })
+  @ApiPropertyOptional({
+    description: 'URL o referencia del archivo de evidencia',
+  })
   @IsOptional()
   @IsString()
   evidenciaUrl?: string;
@@ -274,14 +288,14 @@ export class ListEstadoProductoQueryDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @Type(()=>Number)
+  @Type(() => Number)
   @IsNumber()
   @Min(1)
   page?: number;
 
   @ApiPropertyOptional()
   @IsOptional()
-  @Type(()=>Number)
+  @Type(() => Number)
   @IsNumber()
   @Min(1)
   pageSize?: number;
@@ -303,7 +317,10 @@ export class AprobarProductoDto {
 // ============================================================================
 
 export class RegistrarEvidenciaDto {
-  @ApiProperty({ enum: EstadoProceso, description: 'Estado al que pertenece la evidencia' })
+  @ApiProperty({
+    enum: EstadoProceso,
+    description: 'Estado al que pertenece la evidencia',
+  })
   @IsEnum(EstadoProceso)
   estado!: EstadoProceso;
 

@@ -17,6 +17,7 @@ type EstadoProducto = {
   pagado: boolean;
   primerSeguimiento: boolean;
   enFOB: boolean;
+  cotizacionFleteInternacional: boolean;
   conBL: boolean;
   segundoSeguimiento: boolean;
   enCIF: boolean;
@@ -119,9 +120,10 @@ const getAccionColor = (tipo: string): string => {
     pagado: "bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400",
     primerSeguimiento: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-400",
     enFOB: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/20 dark:text-cyan-400",
+    cotizacionFleteInternacional: "bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400",  // ← NUEVO
     conBL: "bg-teal-100 text-teal-800 dark:bg-teal-900/20 dark:text-teal-400",
     segundoSeguimiento: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-400",
-    enCIF: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/20 dark:text-cyan-400",
+    enCIF: "bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400",  // ← CAMBIADO (aduana)
     recibido: "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400",
   };
   return colores[tipo] || "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300";
@@ -135,9 +137,10 @@ const getAccionIcon = (tipo: string): string => {
     pagado: "💳",
     primerSeguimiento: "📞",
     enFOB: "🚢",
+    cotizacionFleteInternacional: "📊",
     conBL: "📄",
-    segundoSeguimiento: "📞",
-    enCIF: "🌊",
+    segundoSeguimiento: "🚚",
+    enCIF: "🛃",
     recibido: "📦",
   };
   return iconos[tipo] || "📝";
@@ -150,10 +153,11 @@ const getAccionLabel = (tipo: string): string => {
     comprado: "Comprado",
     pagado: "Pagado",
     primerSeguimiento: "1er Seguimiento",
-    enFOB: "En FOB",
-    conBL: "Con BL",
-    segundoSeguimiento: "2do Seguimiento",
-    enCIF: "En CIF",
+    enFOB: "En FOB / En CIF",
+    cotizacionFleteInternacional: "Cotización Flete Int.",
+    conBL: "Con BL / Póliza Seguros",
+    segundoSeguimiento: "2do Seg. / En Tránsito",
+    enCIF: "Proceso Aduana",
     recibido: "Recibido",
   };
   return labels[tipo] || tipo;
@@ -168,6 +172,7 @@ const extractEventos = (producto: EstadoProducto): EventoTimeline[] => {
     { key: 'pagado', fecha: 'fechaPagado' },
     { key: 'primerSeguimiento', fecha: 'fechaPrimerSeguimiento' },
     { key: 'enFOB', fecha: 'fechaEnFOB' },
+    { key: 'cotizacionFleteInternacional', fecha: 'fechaCotizacionFleteInternacional' },  // ← NUEVO
     { key: 'conBL', fecha: 'fechaConBL' },
     { key: 'segundoSeguimiento', fecha: 'fechaSegundoSeguimiento' },
     { key: 'enCIF', fecha: 'fechaEnCIF' },

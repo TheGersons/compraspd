@@ -4,7 +4,7 @@ import PageMeta from "../../components/common/PageMeta";
 import { getToken } from "../../lib/api";
 import { useNotifications } from "../Notifications/context/NotificationContext";
 import toast from "react-hot-toast";
-import { Download, Eye, X, FileText, CalendarIcon } from "lucide-react"; // AGREGUÉ LOS ICONOS FALTANTES
+import { Download, Eye, X, FileText, CalendarIcon } from "lucide-react";
 
 import { PopoverTrigger, PopoverContent, Popover } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -18,7 +18,7 @@ import TimelineItem from "./components/TimeLineItem";
 // TYPES
 // ============================================================================
 
-type TimelineItem = {
+type TimelineItemType = {
   estado: string;
   label: string;
   completado: boolean;
@@ -42,62 +42,65 @@ export type EstadoProducto = {
   responsable?: string;
   observaciones?: string;
 
-  // 10 estados booleanos
+  // 11 estados booleanos (ACTUALIZADO)
   cotizado: boolean;
   conDescuento: boolean;
   comprado: boolean;
   pagado: boolean;
   primerSeguimiento: boolean;
   enFOB: boolean;
+  cotizacionFleteInternacional: boolean;
   conBL: boolean;
   segundoSeguimiento: boolean;
   enCIF: boolean;
   recibido: boolean;
 
-  // Fechas reales
+  // Fechas reales (ACTUALIZADO - 11 fechas)
   fechaCotizado?: string | null;
   fechaConDescuento?: string | null;
   fechaComprado?: string | null;
   fechaPagado?: string | null;
   fechaPrimerSeguimiento?: string | null;
   fechaEnFOB?: string | null;
+  fechaCotizacionFleteInternacional?: string | null;
   fechaConBL?: string | null;
   fechaSegundoSeguimiento?: string | null;
   fechaEnCIF?: string | null;
   fechaRecibido?: string | null;
 
-  // Fechas límite
+  // Fechas límite (ACTUALIZADO - 11 fechas)
   fechaLimiteCotizado?: string | null;
   fechaLimiteConDescuento?: string | null;
   fechaLimiteComprado?: string | null;
   fechaLimitePagado?: string | null;
   fechaLimitePrimerSeguimiento?: string | null;
   fechaLimiteEnFOB?: string | null;
+  fechaLimiteCotizacionFleteInternacional?: string | null;
   fechaLimiteConBL?: string | null;
   fechaLimiteSegundoSeguimiento?: string | null;
   fechaLimiteEnCIF?: string | null;
   fechaLimiteRecibido?: string | null;
 
-  // ==========================================
-  //  NUEVO: Campos de Evidencia (Links o Filenames)
-  // ==========================================
+  // Campos de Evidencia (ACTUALIZADO - 11 campos)
   evidenciaCotizado?: string | null;
   evidenciaConDescuento?: string | null;
   evidenciaComprado?: string | null;
   evidenciaPagado?: string | null;
   evidenciaPrimerSeguimiento?: string | null;
   evidenciaEnFOB?: string | null;
+  evidenciaCotizacionFleteInternacional?: string | null;
   evidenciaConBL?: string | null;
   evidenciaSegundoSeguimiento?: string | null;
   evidenciaEnCIF?: string | null;
   evidenciaRecibido?: string | null;
 
-  // ==========================================
-  //  NUEVO: Campos de Rechazo (Según tu Prisma)
-  // ==========================================
+  // Campos de Rechazo
   rechazado: boolean;
   fechaRechazo?: string | null;
   motivoRechazo?: string | null;
+
+  // NUEVO: Tipo de entrega seleccionado (FOB o CIF)
+  tipoEntrega?: 'FOB' | 'CIF' | null;
 
   // Criticidad y retrasos
   criticidad: number;
@@ -135,12 +138,12 @@ export type EstadoProducto = {
   // Timeline calculado
   estadoActual?: string;
   progreso?: number;
-  timeline?: TimelineItem[];
+  timeline?: TimelineItemType[];
 };
 
 
 // ============================================================================
-// CONSTANTS
+// CONSTANTS (ACTUALIZADO - 11 ESTADOS)
 // ============================================================================
 
 const ESTADOS_LABELS: Record<string, string> = {
@@ -149,10 +152,11 @@ const ESTADOS_LABELS: Record<string, string> = {
   comprado: "Comprado",
   pagado: "Pagado",
   primerSeguimiento: "1er Seguimiento",
-  enFOB: "En FOB",
-  conBL: "Con BL",
-  segundoSeguimiento: "2do Seguimiento",
-  enCIF: "En CIF",
+  enFOB: "En FOB / En CIF",
+  cotizacionFleteInternacional: "Cotización Flete Int.",
+  conBL: "Con BL / Póliza Seguros",
+  segundoSeguimiento: "2do Seg. / En Tránsito",
+  enCIF: "Proceso Aduana",
   recibido: "Recibido",
 };
 
@@ -163,28 +167,42 @@ const ESTADOS_ICONOS: Record<string, string> = {
   pagado: "💳",
   primerSeguimiento: "📞",
   enFOB: "🚢",
+  cotizacionFleteInternacional: "📊",
   conBL: "📄",
-  segundoSeguimiento: "📞",
-  enCIF: "🌊",
+  segundoSeguimiento: "🚚",
+  enCIF: "🛃",
   recibido: "📦",
 };
 
-// Mapeo para saber qué campo leer y a qué carpeta del Storage ir
+// Mapeo para evidencias (ACTUALIZADO - 11 estados)
 const EVIDENCE_CONFIG: Record<string, { dbField: keyof EstadoProducto; storageType: string }> = {
   cotizado: { dbField: 'evidenciaCotizado', storageType: 'otros' },
   conDescuento: { dbField: 'evidenciaConDescuento', storageType: 'comprobantes_descuento' },
   comprado: { dbField: 'evidenciaComprado', storageType: 'evidencia_comprado' },
   pagado: { dbField: 'evidenciaPagado', storageType: 'evidencia_pagado' },
   primerSeguimiento: { dbField: 'evidenciaPrimerSeguimiento', storageType: 'evidencia_primerSeguimiento' },
-  enFOB: { dbField: 'evidenciaEnFOB', storageType: 'envidencia_enFOB' },
-  conBL: { dbField: 'evidenciaConBL', storageType: 'envidencia_conBL' },
+  enFOB: { dbField: 'evidenciaEnFOB', storageType: 'evidencia_enFOB' },
+  cotizacionFleteInternacional: { dbField: 'evidenciaCotizacionFleteInternacional', storageType: 'evidencia_cotizacionFleteInternacional' },
+  conBL: { dbField: 'evidenciaConBL', storageType: 'evidencia_conBL' },
   segundoSeguimiento: { dbField: 'evidenciaSegundoSeguimiento', storageType: 'evidencia_segundoSeguimiento' },
   enCIF: { dbField: 'evidenciaEnCIF', storageType: 'evidencia_enCIF' },
   recibido: { dbField: 'evidenciaRecibido', storageType: 'evidencia_recibido' }
 };
 
 const ESTADOS_NACIONAL = ['cotizado', 'conDescuento', 'comprado', 'pagado', 'recibido'];
-const ESTADOS_INTERNACIONAL = ['cotizado', 'conDescuento', 'comprado', 'pagado', 'primerSeguimiento', 'enFOB', 'conBL', 'segundoSeguimiento', 'enCIF', 'recibido'];
+const ESTADOS_INTERNACIONAL = [
+  'cotizado', 
+  'conDescuento', 
+  'comprado', 
+  'pagado', 
+  'primerSeguimiento', 
+  'enFOB',
+  'cotizacionFleteInternacional',
+  'conBL',
+  'segundoSeguimiento',
+  'enCIF',
+  'recibido'
+];
 
 // ============================================================================
 // API SERVICE
@@ -251,7 +269,12 @@ const api = {
     return response.json();
   },
 
-  async avanzarEstado(id: string, data: { observacion?: string; evidenciaUrl?: string; noAplicaEvidencia?: boolean }) {
+  async avanzarEstado(id: string, data: { 
+    observacion?: string; 
+    evidenciaUrl?: string; 
+    noAplicaEvidencia?: boolean;
+    tipoEntrega?: 'FOB' | 'CIF';
+  }) {
     const token = this.getToken();
     const response = await fetch(
       `${API_BASE_URL}/api/v1/estado-productos/${id}/avanzar`,
@@ -307,21 +330,21 @@ const api = {
     if (!response.ok) throw new Error('Error al generar comprobante');
     return response.json();
   },
+
   async downloadFile(params: {
     cotizacionId: string;
     sku: string;
     proveedor: string;
     filename: string;
-    mode: 'inline' | 'attachment'; // CORREGIDO: Faltaba punto y coma o coma
+    mode: 'inline' | 'attachment';
     tipo: string;
   }) {
     const token = getToken();
-    // Construimos los Query Params para el GET
     const query = new URLSearchParams({
       cotizacionId: params.cotizacionId,
       sku: params.sku,
       proveedor: params.proveedor,
-      tipo: params.tipo, // Ajusta si manejas otros tipos
+      tipo: params.tipo,
       filename: params.filename,
       mode: params.mode
     });
@@ -333,8 +356,6 @@ const api = {
     });
 
     if (!response.ok) throw new Error("Error al descargar archivo");
-
-    // Retornamos el Blob para que el frontend cree la URL temporal
     return response.blob();
   },
 };
@@ -384,8 +405,6 @@ const formatDate = (date: string | Date | null | undefined): string => {
   });
 };
 
-
-
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
@@ -413,10 +432,9 @@ export default function ShoppingFollowUps() {
   const [observacion, setObservacion] = useState("");
   const [archivoEvidencia, setArchivoEvidencia] = useState<File | null>(null);
   const [noAplicaEvidencia, setNoAplicaEvidencia] = useState(false);
-  const [fechaLimite, setFechaLimite] = useState<Date | null>(null);
-
-  const [showDateModal, setShowDateModal] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<{ item: TimelineItem, productId: string } | null>(null);
+  
+  // NUEVO: Estado para selección FOB/CIF
+  const [tipoEntregaSeleccionado, setTipoEntregaSeleccionado] = useState<'FOB' | 'CIF' | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -435,52 +453,6 @@ export default function ShoppingFollowUps() {
   // ============================================================================
   // HANDLERS
   // ============================================================================
-
-  const handleUpdateFechaLimite = async (newDate: Date) => {
-    if (!selectedItem) return;
-
-    const { item, productId } = selectedItem;
-    const product = productos.find(p => p.id === productId); // 'productos' es tu array del state
-    if (!product) return;
-
-    // --- LÓGICA DE VALIDACIÓN ---
-    // Ejemplo: No permitir que la fecha límite de un estado sea menor a la fecha real del estado anterior
-    const currentIndex = product.timeline.findIndex(t => t.estado === item.estado);
-
-    if (currentIndex > 0) {
-      const estadoAnterior = product.timeline[currentIndex - 1];
-      const fechaReferencia = estadoAnterior.fecha ? new Date(estadoAnterior.fecha) : null;
-
-      if (fechaReferencia && newDate < fechaReferencia) {
-        toast.error(`La fecha límite no puede ser menor a la ejecución de ${estadoAnterior.label} (${formatDate(fechaReferencia)})`);
-        return;
-      }
-    }
-    try {
-      const token = getToken();
-      const response = await fetch(`${API_BASE_URL}/api/v1/estado-productos/${productId}/update-fecha-limite`, {
-        method: "PATCH",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          estado: item.estado,
-          nuevaFechaLimite: newDate.toISOString()
-        }),
-      });
-
-      if (response.ok) {
-        toast.success("Fecha límite actualizada correctamente");
-        setShowDateModal(false);
-        // Aquí deberías refrescar los datos (ej. llamar a fetchProductos())
-      } else {
-        throw new Error("Error en el servidor");
-      }
-    } catch (error) {
-      toast.error("No se pudo actualizar la fecha");
-    }
-  };
 
   const cargarProductos = async () => {
     try {
@@ -525,6 +497,12 @@ export default function ShoppingFollowUps() {
       return;
     }
 
+    // NUEVO: Validar selección FOB/CIF si es el estado enFOB
+    if (productoSeleccionado.siguienteEstado === 'enFOB' && !tipoEntregaSeleccionado) {
+      addNotification("warn", "Advertencia", "Debe seleccionar si es FOB o CIF");
+      return;
+    }
+
     try {
       setLoadingAccion(true);
       let evidenciaUrl: string | undefined;
@@ -541,11 +519,12 @@ export default function ShoppingFollowUps() {
         evidenciaUrl = uploadResult.url || uploadResult.fileName;
       }
 
-      // Avanzar estado
+      // Avanzar estado (incluyendo tipoEntrega si aplica)
       await api.avanzarEstado(productoSeleccionado.id, {
         observacion: observacion || undefined,
         evidenciaUrl,
-        noAplicaEvidencia: noAplicaEvidencia && !archivoEvidencia
+        noAplicaEvidencia: noAplicaEvidencia && !archivoEvidencia,
+        tipoEntrega: productoSeleccionado.siguienteEstado === 'enFOB' ? tipoEntregaSeleccionado || undefined : undefined
       });
 
       addNotification("success", "Éxito", "Estado avanzado correctamente");
@@ -555,6 +534,7 @@ export default function ShoppingFollowUps() {
       setObservacion("");
       setArchivoEvidencia(null);
       setNoAplicaEvidencia(false);
+      setTipoEntregaSeleccionado(null);
 
       await seleccionarProducto(productoSeleccionado.id);
       await cargarProductos();
@@ -570,12 +550,12 @@ export default function ShoppingFollowUps() {
     setObservacion("");
     setArchivoEvidencia(null);
     setNoAplicaEvidencia(false);
+    setTipoEntregaSeleccionado(null);
     setShowAvanzarModal(true);
   };
 
   // Filtrar productos por búsqueda y estado de completado
   const productosFiltrados = productos.filter(p => {
-    // Filtro por búsqueda
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       const matchQuery = (
@@ -586,18 +566,19 @@ export default function ShoppingFollowUps() {
       if (!matchQuery) return false;
     }
 
-    // Filtro por estado de completado (100% = completado)
     const estaCompletado = p.progreso === 100;
     if (verCompletados) {
-      return estaCompletado; // Solo mostrar completados
+      return estaCompletado;
     } else {
-      return !estaCompletado; // Solo mostrar pendientes
+      return !estaCompletado;
     }
   });
 
-  // Contadores para los badges
   const totalPendientes = productos.filter(p => p.progreso !== 100).length;
   const totalCompletados = productos.filter(p => p.progreso === 100).length;
+
+  // Determinar si el siguiente estado requiere selección FOB/CIF
+  const requiereSeleccionFobCif = productoSeleccionado?.siguienteEstado === 'enFOB';
 
   // ============================================================================
   // RENDER
@@ -655,7 +636,7 @@ export default function ShoppingFollowUps() {
             />
           </div>
 
-          {/* Filtro Tipo Compra */}
+          {/* Filtro Tipo Compra - ACTUALIZADO */}
           <select
             value={filtroTipoCompra}
             onChange={(e) => setFiltroTipoCompra(e.target.value)}
@@ -663,7 +644,7 @@ export default function ShoppingFollowUps() {
           >
             <option value="">Todos los tipos</option>
             <option value="NACIONAL">🇭🇳 Nacional (5 etapas)</option>
-            <option value="INTERNACIONAL">🌍 Internacional (10 etapas)</option>
+            <option value="INTERNACIONAL">🌍 Internacional (11 etapas)</option>
           </select>
 
           {/* Filtro Criticidad */}
@@ -726,20 +707,17 @@ export default function ShoppingFollowUps() {
                               {producto.descripcion}
                             </p>
                             <div className="mt-2 flex items-center gap-2">
-                              {/* Badge completado */}
                               {producto.progreso === 100 && (
                                 <span className="rounded px-1.5 py-0.5 text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
                                   ✅ Completado
                                 </span>
                               )}
-                              {/* Badge tipo compra */}
                               <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${producto.tipoCompra === 'NACIONAL'
                                 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                                 : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
                                 }`}>
                                 {producto.tipoCompra === 'NACIONAL' ? '🇭🇳 Nacional' : '🌍 Internacional'}
                               </span>
-                              {/* Estado actual */}
                               <span className="text-xs text-gray-500 dark:text-gray-500">
                                 {ESTADOS_ICONOS[producto.estadoActual || 'cotizado']} {ESTADOS_LABELS[producto.estadoActual || 'cotizado']}
                               </span>
@@ -783,69 +761,59 @@ export default function ShoppingFollowUps() {
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
               </div>
             ) : productoSeleccionado ? (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {/* Info del producto */}
-                <div className={`rounded-xl border p-6 ${getCriticidadBg(productoSeleccionado.nivelCriticidad)}`}>
+                <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="flex items-center gap-3">
-                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white">
                           {productoSeleccionado.sku}
-                        </h2>
+                        </h3>
                         <span className={`rounded-full px-2 py-1 text-xs font-medium ${getCriticidadBg(productoSeleccionado.nivelCriticidad)}`}>
                           {getCriticidadBadge(productoSeleccionado.nivelCriticidad)}
                         </span>
-                        <span className={`rounded px-2 py-1 text-xs font-medium ${productoSeleccionado.tipoCompra === 'NACIONAL'
-                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                          : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                          }`}>
-                          {productoSeleccionado.tipoCompra === 'NACIONAL' ? '🇭🇳 Nacional' : '🌍 Internacional'}
-                        </span>
+                        {/* Mostrar si es FOB o CIF cuando aplique */}
+                        {productoSeleccionado.tipoEntrega && (
+                          <span className="rounded-full px-2 py-1 text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                            {productoSeleccionado.tipoEntrega === 'FOB' ? '🚢 FOB' : '📦 CIF'}
+                          </span>
+                        )}
                       </div>
-                      <p className="mt-2 text-gray-700 dark:text-gray-300">
+                      <p className="mt-1 text-gray-600 dark:text-gray-400">
                         {productoSeleccionado.descripcion}
                       </p>
-                      <div className="mt-3 flex flex-wrap gap-4 text-sm text-gray-600 dark:text-gray-400">
+                      <div className="mt-3 flex flex-wrap gap-4 text-sm text-gray-500">
                         {productoSeleccionado.proveedor && (
                           <span>🏢 {productoSeleccionado.proveedor}</span>
                         )}
-                        {productoSeleccionado.cantidad && (
-                          <span>📦 Cantidad: {productoSeleccionado.cantidad}</span>
-                        )}
-                        {productoSeleccionado.precioTotal && (
-                          <span>💰 Total: L. {Number(productoSeleccionado.precioTotal).toFixed(2)}</span>
+                        {productoSeleccionado.proyecto && (
+                          <span>📁 {productoSeleccionado.proyecto.nombre}</span>
                         )}
                         {productoSeleccionado.paisOrigen && (
                           <span>🌍 {productoSeleccionado.paisOrigen.nombre}</span>
                         )}
                         {productoSeleccionado.medioTransporte && (
                           <span>
-                            {productoSeleccionado.medioTransporte === "MARITIMO" && "🚢 Marítimo"}
-                            {productoSeleccionado.medioTransporte === "AEREO" && "✈️ Aéreo"}
-                            {productoSeleccionado.medioTransporte === "TERRESTRE" && "🚛 Terrestre"}
+                            {productoSeleccionado.medioTransporte === 'MARITIMO' && '🚢'}
+                            {productoSeleccionado.medioTransporte === 'AEREO' && '✈️'}
+                            {productoSeleccionado.medioTransporte === 'TERRESTRE' && '🚛'}
+                            {' '}{productoSeleccionado.medioTransporte}
                           </span>
                         )}
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-3xl font-bold text-gray-900 dark:text-white">
-                        {productoSeleccionado.progreso}%
-                      </div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Progreso</p>
-                    </div>
                   </div>
                 </div>
 
-                {/* Botón Avanzar Estado */}
-                {productoSeleccionado.siguienteEstado && (
+                {/* Siguiente estado y botón avanzar */}
+                {productoSeleccionado.siguienteEstado && productoSeleccionado.progreso !== 100 && (
                   <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-medium text-blue-800 dark:text-blue-200">
-                          Siguiente paso: {ESTADOS_ICONOS[productoSeleccionado.siguienteEstado]} {ESTADOS_LABELS[productoSeleccionado.siguienteEstado]}
-                        </p>
-                        <p className="text-sm text-blue-600 dark:text-blue-400">
-                          Se requiere evidencia o marcar "No aplica"
+                        <p className="text-sm text-blue-600 dark:text-blue-400">Siguiente estado</p>
+                        <p className="mt-1 text-lg font-semibold text-blue-900 dark:text-blue-100">
+                          {ESTADOS_ICONOS[productoSeleccionado.siguienteEstado]} {ESTADOS_LABELS[productoSeleccionado.siguienteEstado]}
                         </p>
                       </div>
                       <button
@@ -859,15 +827,15 @@ export default function ShoppingFollowUps() {
                   </div>
                 )}
 
-                {/* Timeline */}
+                {/* Timeline - ACTUALIZADO */}
                 {timeline && (
                   <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
                     <h4 className="mb-6 text-lg font-semibold text-gray-900 dark:text-white">
-                      Timeline del Proceso ({productoSeleccionado.tipoCompra === 'NACIONAL' ? '5' : '10'} Etapas)
+                      Timeline del Proceso ({productoSeleccionado.tipoCompra === 'NACIONAL' ? '5' : '11'} Etapas)
                     </h4>
 
                     <div className="space-y-4">
-                      {timeline.timeline?.map((item: TimelineItem, index: number) => {
+                      {timeline.timeline?.map((item: TimelineItemType, index: number) => {
                         const diasRetraso = item.diasRetraso || 0;
                         const isRetrasado = diasRetraso > 0;
                         const isCompletado = item.completado;
@@ -895,7 +863,6 @@ export default function ShoppingFollowUps() {
                                   {ESTADOS_ICONOS[item.estado] || "📌"}
                                 </div>
 
-                                {/* AQUI ESTABA EL ERROR: Usar el componente refactorizado */}
                                 <TimelineItem
                                   item={item}
                                   producto={productoSeleccionado}
@@ -967,9 +934,9 @@ export default function ShoppingFollowUps() {
           </div>
         </div>
 
-        {/* Modal Avanzar Estado */}
+        {/* Modal Avanzar Estado - ACTUALIZADO con selector FOB/CIF */}
         {showAvanzarModal && productoSeleccionado && (
-          <div className="fixed inset-0 z-5000 flex items-center justify-center bg-black/50 p-4">
+          <div className="fixed inset-0 z-[5000] flex items-center justify-center bg-black/50 p-4">
             <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl dark:bg-gray-900">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                 Avanzar al siguiente estado
@@ -979,6 +946,59 @@ export default function ShoppingFollowUps() {
               </p>
 
               <div className="mt-6 space-y-4">
+                
+                {/* NUEVO: Selector FOB/CIF cuando el siguiente estado es enFOB */}
+                {requiereSeleccionFobCif && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Tipo de Entrega <span className="text-red-500">*</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setTipoEntregaSeleccionado('FOB')}
+                        className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 p-4 transition-all ${
+                          tipoEntregaSeleccionado === 'FOB'
+                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
+                            : 'border-gray-200 hover:border-blue-300 dark:border-gray-600 dark:hover:border-blue-600'
+                        }`}
+                      >
+                        <span className="text-3xl">🚢</span>
+                        <span className="font-semibold text-gray-900 dark:text-white">FOB</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400 text-center">
+                          Free On Board<br/>
+                          <span className="text-blue-600 dark:text-blue-400">Requiere cotización de flete</span>
+                        </span>
+                      </button>
+                      
+                      <button
+                        type="button"
+                        onClick={() => setTipoEntregaSeleccionado('CIF')}
+                        className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 p-4 transition-all ${
+                          tipoEntregaSeleccionado === 'CIF'
+                            ? 'border-green-500 bg-green-50 dark:bg-green-900/30'
+                            : 'border-gray-200 hover:border-green-300 dark:border-gray-600 dark:hover:border-green-600'
+                        }`}
+                      >
+                        <span className="text-3xl">📦</span>
+                        <span className="font-semibold text-gray-900 dark:text-white">CIF</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400 text-center">
+                          Cost, Insurance & Freight<br/>
+                          <span className="text-green-600 dark:text-green-400">Flete incluido en precio</span>
+                        </span>
+                      </button>
+                    </div>
+                    
+                    {tipoEntregaSeleccionado === 'CIF' && (
+                      <div className="mt-3 rounded-lg bg-green-50 p-3 dark:bg-green-900/20">
+                        <p className="text-sm text-green-700 dark:text-green-300">
+                          ✓ Al seleccionar CIF, el estado "Cotización Flete Int." se marcará automáticamente como completado.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Subir evidencia */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -1049,6 +1069,7 @@ export default function ShoppingFollowUps() {
                     setObservacion("");
                     setArchivoEvidencia(null);
                     setNoAplicaEvidencia(false);
+                    setTipoEntregaSeleccionado(null);
                   }}
                   disabled={loadingAccion}
                   className="flex-1 rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
@@ -1057,7 +1078,11 @@ export default function ShoppingFollowUps() {
                 </button>
                 <button
                   onClick={handleAvanzarEstado}
-                  disabled={loadingAccion || (!archivoEvidencia && !noAplicaEvidencia)}
+                  disabled={
+                    loadingAccion || 
+                    (!archivoEvidencia && !noAplicaEvidencia) ||
+                    (requiereSeleccionFobCif && !tipoEntregaSeleccionado)
+                  }
                   className="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 disabled:opacity-50"
                 >
                   {loadingAccion ? (
@@ -1074,8 +1099,6 @@ export default function ShoppingFollowUps() {
           </div>
         )}
       </div>
-
     </>
-
   );
 }

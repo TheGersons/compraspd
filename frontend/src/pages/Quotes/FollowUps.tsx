@@ -26,7 +26,8 @@ type TimelineConfig = {
   diasCompradoAPagado?: number;
   diasPagadoASeguimiento1?: number;
   diasSeguimiento1AFob?: number;
-  diasFobABl?: number;
+  diasFobACotizacionFlete?: number;
+  diasCotizacionFleteABl?: number;
   diasBlASeguimiento2?: number;
   diasSeguimiento2ACif?: number;
   diasCifARecibido?: number;
@@ -2026,18 +2027,19 @@ function TimelineModalContent({
     producto.estadoProducto?.medioTransporte || "TERRESTRE"
   );
   const [timeline, setTimeline] = useState<TimelineConfig>({
-    diasCotizadoADescuento: producto.timelineSugerido?.diasCotizadoADescuento || 2,
-    diasDescuentoAComprado: producto.timelineSugerido?.diasDescuentoAComprado || 3,
-    diasCompradoAPagado: producto.timelineSugerido?.diasCompradoAPagado || 5,
-    diasPagadoASeguimiento1: esNacional ? undefined : producto.timelineSugerido?.diasPagadoASeguimiento1,
-    diasSeguimiento1AFob: esNacional ? undefined : producto.timelineSugerido?.diasSeguimiento1AFob,
-    diasFobABl: esNacional ? undefined : producto.timelineSugerido?.diasFobABl,
-    diasBlASeguimiento2: esNacional ? undefined : producto.timelineSugerido?.diasBlASeguimiento2,
-    diasSeguimiento2ACif: esNacional ? undefined : producto.timelineSugerido?.diasSeguimiento2ACif,
-    diasCifARecibido: esNacional
-      ? (producto.timelineSugerido?.diasCifARecibido || 3)
-      : (producto.timelineSugerido?.diasCifARecibido || 5),
-  });
+  diasCotizadoADescuento: producto.timelineSugerido?.diasCotizadoADescuento || 2,
+  diasDescuentoAComprado: producto.timelineSugerido?.diasDescuentoAComprado || 3,
+  diasCompradoAPagado: producto.timelineSugerido?.diasCompradoAPagado || 5,
+  diasPagadoASeguimiento1: esNacional ? undefined : producto.timelineSugerido?.diasPagadoASeguimiento1,
+  diasSeguimiento1AFob: esNacional ? undefined : producto.timelineSugerido?.diasSeguimiento1AFob,
+  diasFobACotizacionFlete: esNacional ? undefined : (producto.timelineSugerido?.diasFobACotizacionFlete || 3),  // ← NUEVO
+  diasCotizacionFleteABl: esNacional ? undefined : (producto.timelineSugerido?.diasCotizacionFleteABl || 2),   // ← NUEVO
+  diasBlASeguimiento2: esNacional ? undefined : producto.timelineSugerido?.diasBlASeguimiento2,
+  diasSeguimiento2ACif: esNacional ? undefined : producto.timelineSugerido?.diasSeguimiento2ACif,
+  diasCifARecibido: esNacional
+    ? (producto.timelineSugerido?.diasCifARecibido || 3)
+    : (producto.timelineSugerido?.diasCifARecibido || 5),
+});
   const [notas, setNotas] = useState(producto.timelineSugerido?.notas || "");
 
   // NUEVOS ESTADOS para rechazo
@@ -2054,16 +2056,17 @@ function TimelineModalContent({
   ];
 
   const procesosInternacional = [
-    { key: "diasCotizadoADescuento", label: "Cotizado → Con Descuento" },
-    { key: "diasDescuentoAComprado", label: "Con Descuento → Comprado" },
-    { key: "diasCompradoAPagado", label: "Comprado → Pagado" },
-    { key: "diasPagadoASeguimiento1", label: "Pagado → 1er Seguimiento" },
-    { key: "diasSeguimiento1AFob", label: "1er Seg. → En FOB" },
-    { key: "diasFobABl", label: "FOB → Con BL" },
-    { key: "diasBlASeguimiento2", label: "BL → 2do Seguimiento" },
-    { key: "diasSeguimiento2ACif", label: "2do Seg. → En CIF" },
-    { key: "diasCifARecibido", label: "CIF → Recibido" },
-  ];
+  { key: "diasCotizadoADescuento", label: "Cotizado → Con Descuento" },
+  { key: "diasDescuentoAComprado", label: "Con Descuento → Comprado" },
+  { key: "diasCompradoAPagado", label: "Comprado → Pagado" },
+  { key: "diasPagadoASeguimiento1", label: "Pagado → 1er Seguimiento" },
+  { key: "diasSeguimiento1AFob", label: "1er Seg. → En FOB / En CIF" },                         // ← RENOMBRADO
+  { key: "diasFobACotizacionFlete", label: "FOB/CIF → Cotización Flete Int." },                 // ← NUEVO
+  { key: "diasCotizacionFleteABl", label: "Cotización Flete → BL / Póliza Seguros" },           // ← NUEVO
+  { key: "diasBlASeguimiento2", label: "BL/Póliza → 2do Seg. / En Tránsito" },                  // ← RENOMBRADO
+  { key: "diasSeguimiento2ACif", label: "2do Seg./Tránsito → Proceso Aduana" },                 // ← RENOMBRADO
+  { key: "diasCifARecibido", label: "Proceso Aduana → Recibido" },                              // ← RENOMBRADO
+];
 
   const procesos = esNacional ? procesosNacional : procesosInternacional;
 

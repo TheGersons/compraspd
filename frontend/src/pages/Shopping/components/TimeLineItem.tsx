@@ -52,8 +52,9 @@ const EVIDENCE_CONFIG: Record<string, { dbField: string; storageType: string }> 
   comprado: { dbField: 'evidenciaComprado', storageType: 'evidencia_comprado' },
   pagado: { dbField: 'evidenciaPagado', storageType: 'evidencia_pagado' },
   primerSeguimiento: { dbField: 'evidenciaPrimerSeguimiento', storageType: 'evidencia_primerSeguimiento' },
-  enFOB: { dbField: 'evidenciaEnFOB', storageType: 'envidencia_enFOB' },
-  conBL: { dbField: 'evidenciaConBL', storageType: 'envidencia_conBL' },
+  enFOB: { dbField: 'evidenciaEnFOB', storageType: 'evidencia_enFOB' },
+  cotizacionFleteInternacional: { dbField: 'evidenciaCotizacionFleteInternacional', storageType: 'evidencia_cotizacionFleteInternacional' },  // ← NUEVO
+  conBL: { dbField: 'evidenciaConBL', storageType: 'evidencia_conBL' },
   segundoSeguimiento: { dbField: 'evidenciaSegundoSeguimiento', storageType: 'evidencia_segundoSeguimiento' },
   enCIF: { dbField: 'evidenciaEnCIF', storageType: 'evidencia_enCIF' },
   recibido: { dbField: 'evidenciaRecibido', storageType: 'evidencia_recibido' }

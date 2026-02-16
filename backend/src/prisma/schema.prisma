@@ -289,6 +289,8 @@ model TimelineSKU {
   diasCompradoAPagado     Int?
   diasPagadoASeguimiento1 Int?
   diasSeguimiento1AFob    Int? // null si no es importación
+  diasFobACotizacionFlete Int?
+  diasCotizacionFleteABl  Int?
   diasFobABl              Int? // null si no es marítimo
   diasBlASeguimiento2     Int?
   diasSeguimiento2ACif    Int? // null si no es importación
@@ -432,45 +434,48 @@ model EstadoProducto {
   // ========================================
   // 10 estados booleanos
   // ========================================
-  cotizado           Boolean @default(false)
-  conDescuento       Boolean @default(false)
-  comprado           Boolean @default(false)
-  pagado             Boolean @default(false)
-  primerSeguimiento  Boolean @default(false)
-  enFOB              Boolean @default(false)
-  conBL              Boolean @default(false)
-  segundoSeguimiento Boolean @default(false)
-  enCIF              Boolean @default(false)
-  recibido           Boolean @default(false)
+  cotizado                     Boolean @default(false)
+  conDescuento                 Boolean @default(false)
+  comprado                     Boolean @default(false)
+  pagado                       Boolean @default(false)
+  primerSeguimiento            Boolean @default(false)
+  enFOB                        Boolean @default(false)
+  cotizacionFleteInternacional Boolean @default(false)
+  conBL                        Boolean @default(false)
+  segundoSeguimiento           Boolean @default(false)
+  enCIF                        Boolean @default(false)
+  recibido                     Boolean @default(false)
 
   // ========================================
   // 10 fechas para tracking temporal
   // ========================================
-  fechaCotizado           DateTime?
-  fechaConDescuento       DateTime?
-  fechaComprado           DateTime?
-  fechaPagado             DateTime?
-  fechaPrimerSeguimiento  DateTime?
-  fechaEnFOB              DateTime?
-  fechaConBL              DateTime?
-  fechaSegundoSeguimiento DateTime?
-  fechaEnCIF              DateTime?
-  fechaRecibido           DateTime?
+  fechaCotizado                     DateTime?
+  fechaConDescuento                 DateTime?
+  fechaComprado                     DateTime?
+  fechaPagado                       DateTime?
+  fechaPrimerSeguimiento            DateTime?
+  fechaEnFOB                        DateTime?
+  fechaCotizacionFleteInternacional DateTime?
+  fechaConBL                        DateTime?
+  fechaSegundoSeguimiento           DateTime?
+  fechaEnCIF                        DateTime?
+  fechaRecibido                     DateTime?
 
   // ========================================
   // NUEVOS CAMPOS - Fechas límite por proceso
   // ========================================
   // Estas se calculan automáticamente desde el timeline del SKU
-  fechaLimiteCotizado           DateTime?
-  fechaLimiteConDescuento       DateTime?
-  fechaLimiteComprado           DateTime?
-  fechaLimitePagado             DateTime?
-  fechaLimitePrimerSeguimiento  DateTime?
-  fechaLimiteEnFOB              DateTime?
-  fechaLimiteConBL              DateTime?
-  fechaLimiteSegundoSeguimiento DateTime?
-  fechaLimiteEnCIF              DateTime?
-  fechaLimiteRecibido           DateTime?
+  fechaLimiteCotizado                     DateTime?
+  fechaLimiteConDescuento                 DateTime?
+  fechaLimiteComprado                     DateTime?
+  fechaLimitePagado                       DateTime?
+  fechaLimitePrimerSeguimiento            DateTime?
+  fechaLimiteEnFOB                        DateTime?
+  fechaLimiteCotizacionFleteInternacional DateTime?
+  fechaLimiteConBL                        DateTime?
+  fechaLimiteSegundoSeguimiento           DateTime?
+  fechaLimiteEnCIF                        DateTime?
+  fechaLimiteRecibido                     DateTime?
 
   // ========================================
   // CÁLCULOS DE RETRASO Y CRITICIDAD
@@ -497,16 +502,17 @@ model EstadoProducto {
   fechaRechazo  DateTime? @map("fecha_rechazo")
   motivoRechazo String?   @map("motivo_rechazo") @db.Text
 
-  evidenciaCotizado           String? @db.Text
-  evidenciaConDescuento       String? @db.Text
-  evidenciaComprado           String? @db.Text
-  evidenciaPagado             String? @db.Text
-  evidenciaPrimerSeguimiento  String? @db.Text
-  evidenciaEnFOB              String? @db.Text
-  evidenciaConBL              String? @db.Text
-  evidenciaSegundoSeguimiento String? @db.Text
-  evidenciaEnCIF              String? @db.Text
-  evidenciaRecibido           String? @db.Text
+  evidenciaCotizado                     String? @db.Text
+  evidenciaConDescuento                 String? @db.Text
+  evidenciaComprado                     String? @db.Text
+  evidenciaPagado                       String? @db.Text
+  evidenciaPrimerSeguimiento            String? @db.Text
+  evidenciaEnFOB                        String? @db.Text
+  evidenciaCotizacionFleteInternacional String? @db.Text
+  evidenciaConBL                        String? @db.Text
+  evidenciaSegundoSeguimiento           String? @db.Text
+  evidenciaEnCIF                        String? @db.Text
+  evidenciaRecibido                     String? @db.Text
 
   // Relaciones
   proyecto              Proyecto?          @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
@@ -516,6 +522,7 @@ model EstadoProducto {
   compraDetalle         CompraDetalle?     @relation(fields: [compraDetalleId], references: [id], onDelete: Cascade)
   aprobadoPorSupervisor Boolean            @default(false) @map("aprobado_por_supervisor")
   fechaAprobacion       DateTime?          @map("fecha_aprobacion")
+  tipoEntrega           String?            @map("tipo_entrega") @db.VarChar(10) // 'FOB' | 'CIF'
 
   @@index([proyectoId])
   @@index([cotizacionId])
