@@ -342,6 +342,7 @@ export class EstadoProductoService {
     'pagado',
     'primerSeguimiento',
     'enFOB',
+    'conFleteInternacional',
     'conBL',
     'segundoSeguimiento',
     'enCIF',

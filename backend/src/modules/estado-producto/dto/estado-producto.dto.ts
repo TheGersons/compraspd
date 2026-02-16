@@ -40,7 +40,7 @@ export const ESTADOS_NACIONAL: EstadoProceso[] = [
 ];
 
 /**
- * Estados para compras INTERNACIONALES (10 etapas)
+ * Estados para compras INTERNACIONALES (11 etapas)
  */
 export const ESTADOS_INTERNACIONAL: EstadoProceso[] = [
   EstadoProceso.COTIZADO,
@@ -49,6 +49,7 @@ export const ESTADOS_INTERNACIONAL: EstadoProceso[] = [
   EstadoProceso.PAGADO,
   EstadoProceso.PRIMER_SEGUIMIENTO,
   EstadoProceso.EN_FOB,
+  EstadoProceso.COTIZACION_FLETE_INTERNACIONAL,
   EstadoProceso.CON_BL,
   EstadoProceso.SEGUNDO_SEGUIMIENTO,
   EstadoProceso.EN_CIF,

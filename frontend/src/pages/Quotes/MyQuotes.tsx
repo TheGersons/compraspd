@@ -183,7 +183,7 @@ const ESTADOS_COMPRA_LABELS: Record<string, string> = {
 };
 
 const ESTADOS_NACIONAL = ['cotizado', 'conDescuento', 'comprado', 'pagado', 'recibido'];
-const ESTADOS_INTERNACIONAL = ['cotizado', 'conDescuento', 'comprado', 'pagado', 'primerSeguimiento', 'enFOB', 'conBL', 'segundoSeguimiento', 'enCIF', 'recibido'];
+const ESTADOS_INTERNACIONAL = ['cotizado', 'conDescuento', 'comprado', 'pagado', 'primerSeguimiento', 'enFOB', 'conFleteInternacional', 'conBL', 'segundoSeguimiento', 'enCIF', 'recibido'];
 
 // ============================================================================
 // API SERVICE
