@@ -196,7 +196,7 @@ export class MailService {
                       <div style="margin-bottom: 16px;">
                         ${this.getLogoSvg()}
                       </div>
-                      <p style="margin: 0; color: rgba(255,255,255,0.85); font-size: 13px; letter-spacing: 0.5px; text-transform: uppercase;">
+                      <p style="margin: 0; color: white; font-size: 13px; letter-spacing: 0.5px; text-transform: uppercase;">
                         Sistema de Gestión Empresarial
                       </p>
                     </td>

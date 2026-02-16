@@ -2,7 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
-  NotFoundException
+  NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
@@ -17,7 +17,7 @@ import {
   ESTADOS_NACIONAL,
   ESTADOS_INTERNACIONAL,
   ESTADO_LABELS,
-  RegistrarEvidenciaDto
+  RegistrarEvidenciaDto,
 } from './dto/estado-producto.dto';
 
 type UserJwt = { sub: string; role?: string };
@@ -40,7 +40,7 @@ const ESTADO_A_CAMPO_FECHA: Record<EstadoProceso, string> = {
   [EstadoProceso.CON_BL]: 'fechaConBL',
   [EstadoProceso.SEGUNDO_SEGUIMIENTO]: 'fechaSegundoSeguimiento',
   [EstadoProceso.EN_CIF]: 'fechaEnCIF',
-  [EstadoProceso.RECIBIDO]: 'fechaRecibido'
+  [EstadoProceso.RECIBIDO]: 'fechaRecibido',
 };
 
 /**
@@ -56,7 +56,7 @@ const ESTADO_A_CAMPO_EVIDENCIA: Record<EstadoProceso, string> = {
   [EstadoProceso.CON_BL]: 'evidenciaConBL',
   [EstadoProceso.SEGUNDO_SEGUIMIENTO]: 'evidenciaSegundoSeguimiento',
   [EstadoProceso.EN_CIF]: 'evidenciaEnCIF',
-  [EstadoProceso.RECIBIDO]: 'evidenciaRecibido'
+  [EstadoProceso.RECIBIDO]: 'evidenciaRecibido',
 };
 
 /**
@@ -74,7 +74,7 @@ export class EstadoProductoService {
   async create(dto: CreateEstadoProductoDto, user: UserJwt) {
     // Verificar que la cotización existe
     const cotizacion = await this.prisma.cotizacion.findUnique({
-      where: { id: dto.cotizacionId }
+      where: { id: dto.cotizacionId },
     });
 
     if (!cotizacion) {
@@ -83,7 +83,7 @@ export class EstadoProductoService {
 
     // Obtener timeline del SKU si existe
     const timelineSKU = await this.prisma.timelineSKU.findUnique({
-      where: { sku: dto.sku }
+      where: { sku: dto.sku },
     });
 
     const fechaCotizado = new Date();
@@ -118,15 +118,15 @@ export class EstadoProductoService {
         criticidad: 5,
         nivelCriticidad: 'MEDIO',
         diasRetrasoActual: 0,
-        estadoGeneral: 'warn'
+        estadoGeneral: 'warn',
       },
       include: {
         proyecto: true,
         cotizacion: {
-          select: { nombreCotizacion: true, tipoCompra: true }
+          select: { nombreCotizacion: true, tipoCompra: true },
         },
-        paisOrigen: true
-      }
+        paisOrigen: true,
+      },
     });
   }
 
@@ -141,18 +141,19 @@ export class EstadoProductoService {
 
     const where: any = {
       // Solo mostrar productos aprobados por supervisor
-      aprobadoPorSupervisor: true
+      aprobadoPorSupervisor: true,
     };
-    
+
     if (filters.proyectoId) where.proyectoId = filters.proyectoId;
     if (filters.cotizacionId) where.cotizacionId = filters.cotizacionId;
     if (filters.sku) where.sku = { contains: filters.sku, mode: 'insensitive' };
-    if (filters.nivelCriticidad) where.nivelCriticidad = filters.nivelCriticidad;
-    
+    if (filters.nivelCriticidad)
+      where.nivelCriticidad = filters.nivelCriticidad;
+
     // Filtrar por tipo de compra
     if (filters.tipoCompra) {
       where.cotizacion = {
-        tipoCompra: filters.tipoCompra
+        tipoCompra: filters.tipoCompra,
       };
     }
 
@@ -162,9 +163,9 @@ export class EstadoProductoService {
         where,
         include: {
           proyecto: { select: { nombre: true } },
-          cotizacion: { 
-            select: { 
-              nombreCotizacion: true, 
+          cotizacion: {
+            select: {
+              nombreCotizacion: true,
               tipoCompra: true,
               solicitante: {
                 select: {
@@ -174,35 +175,34 @@ export class EstadoProductoService {
                   departamento: {
                     select: {
                       id: true,
-                      nombre: true
-                    }
-                  }
-                }
-              }
-            } 
+                      nombre: true,
+                    },
+                  },
+                },
+              },
+            },
           },
-          paisOrigen: { select: { nombre: true } }
+          paisOrigen: { select: { nombre: true } },
         },
-        orderBy: [
-          { criticidad: 'desc' },
-          { actualizado: 'desc' }
-        ],
+        orderBy: [{ criticidad: 'desc' }, { actualizado: 'desc' }],
         skip,
-        take: pageSize
-      })
+        take: pageSize,
+      }),
     ]);
 
     return {
       page,
       pageSize,
       total,
-      items: items.map(item => ({
+      items: items.map((item) => ({
         ...item,
         estadoActual: this.obtenerEstadoActual(item),
         progreso: this.calcularProgreso(item, item.cotizacion?.tipoCompra),
         tipoCompra: item.cotizacion?.tipoCompra || 'INTERNACIONAL',
-        estadosAplicables: this.getEstadosAplicables(item.cotizacion?.tipoCompra)
-      }))
+        estadosAplicables: this.getEstadosAplicables(
+          item.cotizacion?.tipoCompra,
+        ),
+      })),
     };
   }
 
@@ -217,15 +217,15 @@ export class EstadoProductoService {
         cotizacion: {
           include: {
             solicitante: {
-              select: { nombre: true, email: true }
-            }
-          }
+              select: { nombre: true, email: true },
+            },
+          },
         },
         cotizacionDetalle: true,
         compra: true,
         compraDetalle: true,
-        paisOrigen: true
-      }
+        paisOrigen: true,
+      },
     });
 
     if (!estado) {
@@ -242,7 +242,7 @@ export class EstadoProductoService {
       estadoActual: this.obtenerEstadoActual(estado),
       progreso: this.calcularProgreso(estado, tipoCompra),
       timeline: this.generarTimeline(estado, tipoCompra),
-      siguienteEstado: this.obtenerSiguienteEstado(estado, tipoCompra)
+      siguienteEstado: this.obtenerSiguienteEstado(estado, tipoCompra),
     };
   }
 
@@ -254,9 +254,9 @@ export class EstadoProductoService {
       where: { id },
       include: {
         cotizacion: {
-          select: { tipoCompra: true }
-        }
-      }
+          select: { tipoCompra: true },
+        },
+      },
     });
 
     if (!estado) {
@@ -275,7 +275,188 @@ export class EstadoProductoService {
       nivelCriticidad: estado.nivelCriticidad,
       diasRetrasoTotal: estado.diasRetrasoActual,
       tipoCompra,
-      siguienteEstado: this.obtenerSiguienteEstado(estado, tipoCompra)
+      siguienteEstado: this.obtenerSiguienteEstado(estado, tipoCompra),
+    };
+  }
+
+  // ============================================
+  // AGREGAR ESTE MÉTODO AL SERVICIO estado-producto.service.ts
+  // ============================================
+
+  // Mapeo de estados a sus campos de fecha límite
+  private readonly ESTADO_TO_FECHA_LIMITE_FIELD: Record<string, string> = {
+    cotizado: 'fechaLimiteCotizado',
+    conDescuento: 'fechaLimiteConDescuento',
+    comprado: 'fechaLimiteComprado',
+    pagado: 'fechaLimitePagado',
+    primerSeguimiento: 'fechaLimitePrimerSeguimiento',
+    enFOB: 'fechaLimiteEnFOB',
+    conBL: 'fechaLimiteConBL',
+    segundoSeguimiento: 'fechaLimiteSegundoSeguimiento',
+    enCIF: 'fechaLimiteEnCIF',
+    recibido: 'fechaLimiteRecibido',
+  };
+
+  // Mapeo de estados a sus campos de fecha real (completado)
+  private readonly ESTADO_TO_FECHA_REAL_FIELD: Record<string, string> = {
+    cotizado: 'fechaCotizado',
+    conDescuento: 'fechaConDescuento',
+    comprado: 'fechaComprado',
+    pagado: 'fechaPagado',
+    primerSeguimiento: 'fechaPrimerSeguimiento',
+    enFOB: 'fechaEnFOB',
+    conBL: 'fechaConBL',
+    segundoSeguimiento: 'fechaSegundoSeguimiento',
+    enCIF: 'fechaEnCIF',
+    recibido: 'fechaRecibido',
+  };
+
+  // Mapeo de estados a sus campos booleanos
+  private readonly ESTADO_TO_BOOLEAN_FIELD: Record<string, string> = {
+    cotizado: 'cotizado',
+    conDescuento: 'conDescuento',
+    comprado: 'comprado',
+    pagado: 'pagado',
+    primerSeguimiento: 'primerSeguimiento',
+    enFOB: 'enFOB',
+    conBL: 'conBL',
+    segundoSeguimiento: 'segundoSeguimiento',
+    enCIF: 'enCIF',
+    recibido: 'recibido',
+  };
+
+  // Orden de estados para Nacional e Internacional
+  private readonly ESTADOS_NACIONAL = [
+    'cotizado',
+    'conDescuento',
+    'comprado',
+    'pagado',
+    'recibido',
+  ];
+  private readonly ESTADOS_INTERNACIONAL = [
+    'cotizado',
+    'conDescuento',
+    'comprado',
+    'pagado',
+    'primerSeguimiento',
+    'enFOB',
+    'conBL',
+    'segundoSeguimiento',
+    'enCIF',
+    'recibido',
+  ];
+
+  /**
+   * Actualizar fecha límite de un estado específico
+   *
+   * Reglas:
+   * 1. No se puede modificar fechas de estados ya completados
+   * 2. No se puede modificar cotizado ni conDescuento
+   * 3. La nueva fecha no puede ser menor a la fecha límite actual
+   * 4. La nueva fecha no puede ser mayor a la fecha límite del siguiente estado
+   */
+  async updateFechaLimite(
+    id: string,
+    estado: string,
+    nuevaFechaLimite: Date,
+  ): Promise<{
+    message: string;
+    fechaAnterior: Date | null;
+    fechaNueva: Date;
+  }> {
+    // 1. Validar que el estado sea válido y modificable
+    const estadosNoModificables = ['cotizado', 'conDescuento'];
+    if (estadosNoModificables.includes(estado)) {
+      throw new BadRequestException(
+        `No se puede modificar la fecha límite del estado "${estado}". Los estados Cotizado y Con Descuento no son editables.`,
+      );
+    }
+
+    const fechaLimiteField = this.ESTADO_TO_FECHA_LIMITE_FIELD[estado];
+    if (!fechaLimiteField) {
+      throw new BadRequestException(`Estado "${estado}" no es válido`);
+    }
+
+    // 2. Obtener el producto
+    const producto = await this.prisma.estadoProducto.findUnique({
+      where: { id },
+      include: {
+        cotizacion: {
+          select: { tipoCompra: true },
+        },
+      },
+    });
+
+    if (!producto) {
+      throw new NotFoundException(`Producto con ID ${id} no encontrado`);
+    }
+
+    // 3. Determinar el tipo de compra y estados aplicables
+    const tipoCompra = producto.cotizacion?.tipoCompra || 'INTERNACIONAL';
+    const estadosAplicables =
+      tipoCompra === 'NACIONAL'
+        ? this.ESTADOS_NACIONAL
+        : this.ESTADOS_INTERNACIONAL;
+
+    // Verificar que el estado aplique para este tipo de compra
+    if (!estadosAplicables.includes(estado)) {
+      throw new BadRequestException(
+        `El estado "${estado}" no aplica para compras de tipo ${tipoCompra}`,
+      );
+    }
+
+    // 4. Verificar que el estado NO esté completado
+    const booleanField = this.ESTADO_TO_BOOLEAN_FIELD[estado];
+    if (producto[booleanField] === true) {
+      throw new BadRequestException(
+        `No se puede modificar la fecha límite de "${estado}" porque ya fue completado`,
+      );
+    }
+
+    // 5. Obtener la fecha límite actual
+    const fechaLimiteActual = producto[fechaLimiteField] as Date | null;
+
+    // 6. Validar que la nueva fecha no sea menor a la actual
+    if (fechaLimiteActual && nuevaFechaLimite < fechaLimiteActual) {
+      throw new BadRequestException(
+        `La nueva fecha límite no puede ser menor a la fecha actual (${fechaLimiteActual.toISOString().split('T')[0]})`,
+      );
+    }
+
+    // 7. Validar contra la fecha límite del siguiente estado
+    const indexActual = estadosAplicables.indexOf(estado);
+    if (indexActual < estadosAplicables.length - 1) {
+      const siguienteEstado = estadosAplicables[indexActual + 1];
+      const siguienteFechaLimiteField =
+        this.ESTADO_TO_FECHA_LIMITE_FIELD[siguienteEstado];
+      const siguienteFechaLimite = producto[
+        siguienteFechaLimiteField
+      ] as Date | null;
+
+      if (siguienteFechaLimite && nuevaFechaLimite > siguienteFechaLimite) {
+        throw new BadRequestException(
+          `La nueva fecha límite no puede ser mayor a la fecha límite del siguiente estado "${siguienteEstado}" (${siguienteFechaLimite.toISOString().split('T')[0]})`,
+        );
+      }
+    }
+
+    // 8. Actualizar la fecha límite
+    const updateData = {
+      [fechaLimiteField]: nuevaFechaLimite,
+      actualizado: new Date(),
+    };
+
+    await this.prisma.estadoProducto.update({
+      where: { id },
+      data: updateData,
+    });
+
+    console.log(`Fecha límite de "${estado}" actualizada para producto ${id}`);
+
+    return {
+      message: `Fecha límite de "${estado}" actualizada correctamente`,
+      fechaAnterior: fechaLimiteActual,
+      fechaNueva: nuevaFechaLimite,
     };
   }
 
@@ -291,8 +472,8 @@ export class EstadoProductoService {
     const estado = await this.prisma.estadoProducto.findUnique({
       where: { id },
       include: {
-        cotizacion: { select: { tipoCompra: true } }
-      }
+        cotizacion: { select: { tipoCompra: true } },
+      },
     });
 
     if (!estado) {
@@ -302,7 +483,9 @@ export class EstadoProductoService {
     const tipoCompra = estado.cotizacion?.tipoCompra || 'INTERNACIONAL';
     const estadosAplicables = this.getEstadosAplicables(tipoCompra);
     const estadoActual = this.obtenerEstadoActual(estado);
-    const indexActual = estadosAplicables.indexOf(estadoActual as EstadoProceso);
+    const indexActual = estadosAplicables.indexOf(
+      estadoActual as EstadoProceso,
+    );
 
     if (indexActual === -1 || indexActual >= estadosAplicables.length - 1) {
       throw new BadRequestException('El producto ya está en el último estado');
@@ -311,20 +494,27 @@ export class EstadoProductoService {
     const siguienteEstado = estadosAplicables[indexActual + 1];
 
     // Validar que tenga evidencia o "No aplica" (excepto para cotizado y conDescuento que ya se manejaron)
-    if (siguienteEstado !== EstadoProceso.COTIZADO && siguienteEstado !== EstadoProceso.CON_DESCUENTO) {
+    if (
+      siguienteEstado !== EstadoProceso.COTIZADO &&
+      siguienteEstado !== EstadoProceso.CON_DESCUENTO
+    ) {
       if (!dto.evidenciaUrl && !dto.noAplicaEvidencia) {
         throw new BadRequestException(
-          `Debe proporcionar evidencia o marcar "No aplica" para avanzar al estado "${ESTADO_LABELS[siguienteEstado]}"`
+          `Debe proporcionar evidencia o marcar "No aplica" para avanzar al estado "${ESTADO_LABELS[siguienteEstado]}"`,
         );
       }
     }
 
-    return this.cambiarEstado(id, {
-      estado: siguienteEstado,
-      observacion: dto.observacion,
-      evidenciaUrl: dto.evidenciaUrl,
-      noAplicaEvidencia: dto.noAplicaEvidencia
-    }, user);
+    return this.cambiarEstado(
+      id,
+      {
+        estado: siguienteEstado,
+        observacion: dto.observacion,
+        evidenciaUrl: dto.evidenciaUrl,
+        noAplicaEvidencia: dto.noAplicaEvidencia,
+      },
+      user,
+    );
   }
 
   /**
@@ -339,8 +529,8 @@ export class EstadoProductoService {
     const estado = await this.prisma.estadoProducto.findUnique({
       where: { id },
       include: {
-        cotizacion: { select: { tipoCompra: true } }
-      }
+        cotizacion: { select: { tipoCompra: true } },
+      },
     });
 
     if (!estado) {
@@ -354,7 +544,7 @@ export class EstadoProductoService {
     if (!estadosAplicables.includes(dto.estado)) {
       throw new BadRequestException(
         `El estado "${ESTADO_LABELS[dto.estado]}" no aplica para compras ${tipoCompra}. ` +
-        `Estados válidos: ${estadosAplicables.map(e => ESTADO_LABELS[e]).join(', ')}`
+          `Estados válidos: ${estadosAplicables.map((e) => ESTADO_LABELS[e]).join(', ')}`,
       );
     }
 
@@ -364,14 +554,18 @@ export class EstadoProductoService {
     // Preparar data para actualizar
     const updateData: any = {
       [dto.estado]: true,
-      [campoFecha]: fechaActual
+      [campoFecha]: fechaActual,
     };
 
     // Guardar evidencia si se proporcionó
     if (dto.evidenciaUrl) {
-      updateData[`evidencia${dto.estado.charAt(0).toUpperCase() + dto.estado.slice(1)}`] = dto.evidenciaUrl;
+      updateData[
+        `evidencia${dto.estado.charAt(0).toUpperCase() + dto.estado.slice(1)}`
+      ] = dto.evidenciaUrl;
     } else if (dto.noAplicaEvidencia) {
-      updateData[`evidencia${dto.estado.charAt(0).toUpperCase() + dto.estado.slice(1)}`] = `NO_APLICA_${Date.now()}`;
+      updateData[
+        `evidencia${dto.estado.charAt(0).toUpperCase() + dto.estado.slice(1)}`
+      ] = `NO_APLICA_${Date.now()}`;
     }
 
     // Si hay observaciones, actualizar
@@ -385,11 +579,8 @@ export class EstadoProductoService {
     }
 
     // Recalcular criticidad y retraso
-    const { criticidad, nivelCriticidad, diasRetraso } = this.calcularCriticidad(
-      estado,
-      dto.estado,
-      fechaActual
-    );
+    const { criticidad, nivelCriticidad, diasRetraso } =
+      this.calcularCriticidad(estado, dto.estado, fechaActual);
 
     updateData.criticidad = criticidad;
     updateData.nivelCriticidad = nivelCriticidad;
@@ -402,15 +593,15 @@ export class EstadoProductoService {
       include: {
         proyecto: { select: { nombre: true } },
         cotizacion: { select: { nombreCotizacion: true, tipoCompra: true } },
-        paisOrigen: { select: { nombre: true } }
-      }
+        paisOrigen: { select: { nombre: true } },
+      },
     });
 
     return {
       ...updated,
       estadoActual: this.obtenerEstadoActual(updated),
       progreso: this.calcularProgreso(updated, tipoCompra),
-      siguienteEstado: this.obtenerSiguienteEstado(updated, tipoCompra)
+      siguienteEstado: this.obtenerSiguienteEstado(updated, tipoCompra),
     };
   }
 
@@ -419,11 +610,13 @@ export class EstadoProductoService {
    */
   async actualizarFechas(id: string, dto: ActualizarFechasDto, user: UserJwt) {
     if (!this.isSupervisorOrAdmin(user)) {
-      throw new ForbiddenException('Solo supervisores pueden actualizar fechas');
+      throw new ForbiddenException(
+        'Solo supervisores pueden actualizar fechas',
+      );
     }
 
     const estado = await this.prisma.estadoProducto.findUnique({
-      where: { id }
+      where: { id },
     });
 
     if (!estado) {
@@ -432,20 +625,26 @@ export class EstadoProductoService {
 
     return this.prisma.estadoProducto.update({
       where: { id },
-      data: dto as any
+      data: dto as any,
     });
   }
 
   /**
    * Actualizar fechas límite
    */
-  async actualizarFechasLimite(id: string, dto: ActualizarFechasLimiteDto, user: UserJwt) {
+  async actualizarFechasLimite(
+    id: string,
+    dto: ActualizarFechasLimiteDto,
+    user: UserJwt,
+  ) {
     if (!this.isSupervisorOrAdmin(user)) {
-      throw new ForbiddenException('Solo supervisores pueden actualizar fechas límite');
+      throw new ForbiddenException(
+        'Solo supervisores pueden actualizar fechas límite',
+      );
     }
 
     const estado = await this.prisma.estadoProducto.findUnique({
-      where: { id }
+      where: { id },
     });
 
     if (!estado) {
@@ -454,7 +653,7 @@ export class EstadoProductoService {
 
     return this.prisma.estadoProducto.update({
       where: { id },
-      data: dto as any
+      data: dto as any,
     });
   }
 
@@ -463,29 +662,26 @@ export class EstadoProductoService {
    */
   async getByProyecto(proyectoId: string, user: UserJwt) {
     const productos = await this.prisma.estadoProducto.findMany({
-      where: { 
+      where: {
         proyectoId,
-        aprobadoPorSupervisor: true
+        aprobadoPorSupervisor: true,
       },
       include: {
         cotizacion: {
-          select: { nombreCotizacion: true, tipoCompra: true }
+          select: { nombreCotizacion: true, tipoCompra: true },
         },
         paisOrigen: {
-          select: { nombre: true }
-        }
+          select: { nombre: true },
+        },
       },
-      orderBy: [
-        { criticidad: 'desc' },
-        { actualizado: 'desc' }
-      ]
+      orderBy: [{ criticidad: 'desc' }, { actualizado: 'desc' }],
     });
 
-    return productos.map(p => ({
+    return productos.map((p) => ({
       ...p,
       estadoActual: this.obtenerEstadoActual(p),
       progreso: this.calcularProgreso(p, p.cotizacion?.tipoCompra),
-      tipoCompra: p.cotizacion?.tipoCompra || 'INTERNACIONAL'
+      tipoCompra: p.cotizacion?.tipoCompra || 'INTERNACIONAL',
     }));
   }
 
@@ -496,16 +692,13 @@ export class EstadoProductoService {
     const productos = await this.prisma.estadoProducto.findMany({
       where: {
         aprobadoPorSupervisor: true,
-        OR: [
-          { nivelCriticidad: 'ALTO' },
-          { diasRetrasoActual: { gt: 0 } }
-        ]
+        OR: [{ nivelCriticidad: 'ALTO' }, { diasRetrasoActual: { gt: 0 } }],
       },
       include: {
         proyecto: { select: { nombre: true } },
-        cotizacion: { 
-          select: { 
-            nombreCotizacion: true, 
+        cotizacion: {
+          select: {
+            nombreCotizacion: true,
             tipoCompra: true,
             solicitante: {
               select: {
@@ -515,27 +708,24 @@ export class EstadoProductoService {
                 departamento: {
                   select: {
                     id: true,
-                    nombre: true
-                  }
-                }
-              }
-            }
-          } 
+                    nombre: true,
+                  },
+                },
+              },
+            },
+          },
         },
-        paisOrigen: { select: { nombre: true } }
+        paisOrigen: { select: { nombre: true } },
       },
-      orderBy: [
-        { diasRetrasoActual: 'desc' },
-        { criticidad: 'desc' }
-      ],
-      take: 50
+      orderBy: [{ diasRetrasoActual: 'desc' }, { criticidad: 'desc' }],
+      take: 50,
     });
 
-    return productos.map(p => ({
+    return productos.map((p) => ({
       ...p,
       estadoActual: this.obtenerEstadoActual(p),
       progreso: this.calcularProgreso(p, p.cotizacion?.tipoCompra),
-      tipoCompra: p.cotizacion?.tipoCompra || 'INTERNACIONAL'
+      tipoCompra: p.cotizacion?.tipoCompra || 'INTERNACIONAL',
     }));
   }
 
@@ -549,15 +739,15 @@ export class EstadoProductoService {
       where: {
         aprobadoPorSupervisor: true,
         cotizacion: {
-          solicitanteId: user.sub
-        }
+          solicitanteId: user.sub,
+        },
       },
       include: {
         proyecto: { select: { nombre: true } },
-        cotizacion: { 
-          select: { 
+        cotizacion: {
+          select: {
             id: true,
-            nombreCotizacion: true, 
+            nombreCotizacion: true,
             tipoCompra: true,
             estado: true,
             fechaLimite: true,
@@ -565,30 +755,30 @@ export class EstadoProductoService {
               select: {
                 id: true,
                 nombre: true,
-                email: true
-              }
-            }
-          } 
+                email: true,
+              },
+            },
+          },
         },
-        paisOrigen: { select: { nombre: true } }
+        paisOrigen: { select: { nombre: true } },
       },
       orderBy: [
         { recibido: 'asc' }, // Los no recibidos primero
         { criticidad: 'desc' },
-        { actualizado: 'desc' }
-      ]
+        { actualizado: 'desc' },
+      ],
     });
 
     return {
       total: productos.length,
-      recibidos: productos.filter(p => p.recibido).length,
-      enProceso: productos.filter(p => !p.recibido).length,
-      items: productos.map(p => ({
+      recibidos: productos.filter((p) => p.recibido).length,
+      enProceso: productos.filter((p) => !p.recibido).length,
+      items: productos.map((p) => ({
         ...p,
         estadoActual: this.obtenerEstadoActual(p),
         progreso: this.calcularProgreso(p, p.cotizacion?.tipoCompra),
-        tipoCompra: p.cotizacion?.tipoCompra || 'INTERNACIONAL'
-      }))
+        tipoCompra: p.cotizacion?.tipoCompra || 'INTERNACIONAL',
+      })),
     };
   }
 
@@ -597,12 +787,14 @@ export class EstadoProductoService {
    */
   async aprobarProducto(id: string, dto: AprobarProductoDto, user: UserJwt) {
     if (!this.isSupervisorOrAdmin(user)) {
-      throw new ForbiddenException('Solo supervisores pueden aprobar productos');
+      throw new ForbiddenException(
+        'Solo supervisores pueden aprobar productos',
+      );
     }
 
     const estado = await this.prisma.estadoProducto.findUnique({
       where: { id },
-      include: { cotizacion: true }
+      include: { cotizacion: true },
     });
 
     if (!estado) {
@@ -614,15 +806,15 @@ export class EstadoProductoService {
       data: {
         aprobadoPorSupervisor: dto.aprobado,
         fechaAprobacion: dto.aprobado ? new Date() : null,
-        observaciones: dto.observaciones
-      }
+        observaciones: dto.observaciones,
+      },
     });
 
     let cotizacionId = estado.cotizacionId;
     if (!cotizacionId) {
       throw new BadRequestException('Cotización asociada no encontrada');
     }
-    
+
     // Verificar si todos los productos de la cotización están aprobados
     await this.verificarAprobacionCompleta(cotizacionId);
 
@@ -645,8 +837,10 @@ export class EstadoProductoService {
    */
   private obtenerEstadoActual(estado: any): string {
     // Recorremos de atrás hacia adelante para encontrar el último estado completado
-    const estadosAplicables = this.getEstadosAplicables(estado.cotizacion?.tipoCompra);
-    
+    const estadosAplicables = this.getEstadosAplicables(
+      estado.cotizacion?.tipoCompra,
+    );
+
     for (let i = estadosAplicables.length - 1; i >= 0; i--) {
       const estadoKey = estadosAplicables[i];
       if (estado[estadoKey]) {
@@ -659,10 +853,15 @@ export class EstadoProductoService {
   /**
    * Obtener el siguiente estado
    */
-  private obtenerSiguienteEstado(estado: any, tipoCompra?: string): EstadoProceso | null {
+  private obtenerSiguienteEstado(
+    estado: any,
+    tipoCompra?: string,
+  ): EstadoProceso | null {
     const estadosAplicables = this.getEstadosAplicables(tipoCompra);
     const estadoActual = this.obtenerEstadoActual(estado);
-    const indexActual = estadosAplicables.indexOf(estadoActual as EstadoProceso);
+    const indexActual = estadosAplicables.indexOf(
+      estadoActual as EstadoProceso,
+    );
 
     if (indexActual === -1 || indexActual >= estadosAplicables.length - 1) {
       return null; // Ya está en el último estado
@@ -677,13 +876,13 @@ export class EstadoProductoService {
   private calcularProgreso(estado: any, tipoCompra?: string): number {
     const estadosAplicables = this.getEstadosAplicables(tipoCompra);
     let estadosCompletados = 0;
-    
+
     for (const estadoKey of estadosAplicables) {
       if (estado[estadoKey]) {
         estadosCompletados++;
       }
     }
-    
+
     return Math.round((estadosCompletados / estadosAplicables.length) * 100);
   }
 
@@ -693,13 +892,13 @@ export class EstadoProductoService {
    */
   private generarTimeline(estado: any, tipoCompra?: string) {
     const estadosAplicables = this.getEstadosAplicables(tipoCompra);
-    
-    return estadosAplicables.map(estadoKey => {
+
+    return estadosAplicables.map((estadoKey) => {
       const completado = estado[estadoKey];
       const campoFecha = ESTADO_A_CAMPO_FECHA[estadoKey];
       const campoFechaLimite = `fechaLimite${campoFecha.replace('fecha', '')}`;
       const campoEvidencia = `evidencia${estadoKey.charAt(0).toUpperCase() + estadoKey.slice(1)}`;
-      
+
       const fecha = estado[campoFecha];
       const fechaLimite = estado[campoFechaLimite];
       const evidencia = estado[campoEvidencia];
@@ -712,7 +911,10 @@ export class EstadoProductoService {
         const limite = new Date(fechaLimite);
         diasRetraso = Math.max(
           0,
-          Math.floor((fechaComparar.getTime() - limite.getTime()) / (1000 * 60 * 60 * 24))
+          Math.floor(
+            (fechaComparar.getTime() - limite.getTime()) /
+              (1000 * 60 * 60 * 24),
+          ),
         );
         enTiempo = diasRetraso === 0;
       }
@@ -727,7 +929,7 @@ export class EstadoProductoService {
         enTiempo,
         evidencia,
         tieneEvidencia: !!evidencia,
-        esNoAplica: evidencia?.startsWith('NO_APLICA_') || false
+        esNoAplica: evidencia?.startsWith('NO_APLICA_') || false,
       };
     });
   }
@@ -735,7 +937,11 @@ export class EstadoProductoService {
   /**
    * Calcular criticidad basada en retrasos
    */
-  private calcularCriticidad(estado: any, nuevoEstado: EstadoProceso, fecha: Date) {
+  private calcularCriticidad(
+    estado: any,
+    nuevoEstado: EstadoProceso,
+    fecha: Date,
+  ) {
     const campoFechaLimite = `fechaLimite${ESTADO_A_CAMPO_FECHA[nuevoEstado].replace('fecha', '')}`;
     const fechaLimite = estado[campoFechaLimite];
 
@@ -743,7 +949,10 @@ export class EstadoProductoService {
     if (fechaLimite) {
       diasRetraso = Math.max(
         0,
-        Math.floor((fecha.getTime() - new Date(fechaLimite).getTime()) / (1000 * 60 * 60 * 24))
+        Math.floor(
+          (fecha.getTime() - new Date(fechaLimite).getTime()) /
+            (1000 * 60 * 60 * 24),
+        ),
       );
     }
 
@@ -772,10 +981,14 @@ export class EstadoProductoService {
    */
   private determinarEstadoGeneral(nivelCriticidad: string): string {
     switch (nivelCriticidad) {
-      case 'BAJO': return 'success';
-      case 'MEDIO': return 'warn';
-      case 'ALTO': return 'danger';
-      default: return 'warn';
+      case 'BAJO':
+        return 'success';
+      case 'MEDIO':
+        return 'warn';
+      case 'ALTO':
+        return 'danger';
+      default:
+        return 'warn';
     }
   }
 
@@ -787,22 +1000,33 @@ export class EstadoProductoService {
     let fechaActual = new Date(fechaInicial);
 
     const mapeo = [
-      { dias: timeline.diasCotizadoADescuento, campo: 'fechaLimiteConDescuento' },
+      {
+        dias: timeline.diasCotizadoADescuento,
+        campo: 'fechaLimiteConDescuento',
+      },
       { dias: timeline.diasDescuentoAComprado, campo: 'fechaLimiteComprado' },
       { dias: timeline.diasCompradoAPagado, campo: 'fechaLimitePagado' },
-      { dias: timeline.diasPagadoASeguimiento1, campo: 'fechaLimitePrimerSeguimiento' },
+      {
+        dias: timeline.diasPagadoASeguimiento1,
+        campo: 'fechaLimitePrimerSeguimiento',
+      },
       { dias: timeline.diasSeguimiento1AFob, campo: 'fechaLimiteEnFOB' },
       { dias: timeline.diasFobABl, campo: 'fechaLimiteConBL' },
-      { dias: timeline.diasBlASeguimiento2, campo: 'fechaLimiteSegundoSeguimiento' },
+      {
+        dias: timeline.diasBlASeguimiento2,
+        campo: 'fechaLimiteSegundoSeguimiento',
+      },
       { dias: timeline.diasSeguimiento2ACif, campo: 'fechaLimiteEnCIF' },
-      { dias: timeline.diasCifARecibido, campo: 'fechaLimiteRecibido' }
+      { dias: timeline.diasCifARecibido, campo: 'fechaLimiteRecibido' },
     ];
 
     fechas.fechaLimiteCotizado = fechaInicial;
 
     for (const { dias, campo } of mapeo) {
       if (dias !== null && dias !== undefined) {
-        fechaActual = new Date(fechaActual.getTime() + dias * 24 * 60 * 60 * 1000);
+        fechaActual = new Date(
+          fechaActual.getTime() + dias * 24 * 60 * 60 * 1000,
+        );
         fechas[campo] = new Date(fechaActual);
       }
     }
@@ -815,18 +1039,18 @@ export class EstadoProductoService {
    */
   private async verificarAprobacionCompleta(cotizacionId: string) {
     const productos = await this.prisma.estadoProducto.findMany({
-      where: { cotizacionId }
+      where: { cotizacionId },
     });
 
-    const todosAprobados = productos.every(p => p.aprobadoPorSupervisor);
-    const algunoAprobado = productos.some(p => p.aprobadoPorSupervisor);
+    const todosAprobados = productos.every((p) => p.aprobadoPorSupervisor);
+    const algunoAprobado = productos.some((p) => p.aprobadoPorSupervisor);
 
     await this.prisma.cotizacion.update({
       where: { id: cotizacionId },
       data: {
         todosProductosAprobados: todosAprobados,
-        aprobadaParcialmente: algunoAprobado && !todosAprobados
-      }
+        aprobadaParcialmente: algunoAprobado && !todosAprobados,
+      },
     });
   }
 
