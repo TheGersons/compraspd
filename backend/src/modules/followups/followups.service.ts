@@ -599,6 +599,11 @@ export class FollowUpsService {
       updates.fechaLimiteEnFOB = new Date(fechaActual);
     }
 
+    console.log('timeline', timeline);
+    console.log('fechaActual', fechaActual);
+    console.log('updates', updates);
+    console.log('DiasFobACotizacionFlete', timeline.diasFobACotizacionFlete);
+
     // Cotización Flete Internacional ← NUEVO
     if (timeline.diasFobACotizacionFlete) {
       fechaActual = this.agregarDias(
@@ -607,6 +612,10 @@ export class FollowUpsService {
       );
       updates.fechaLimiteCotizacionFleteInternacional = new Date(fechaActual);
     }
+
+    console.log('fechaActual', fechaActual);
+    console.log('updates', updates);
+    console.log('DiascotizacionconfleteAbl', timeline.diasCotizacionFleteABl);
 
     // Con BL / Póliza Seguros ← ACTUALIZADO
     if (timeline.diasCotizacionFleteABl) {

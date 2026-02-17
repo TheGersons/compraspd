@@ -26,8 +26,8 @@ type TimelineConfig = {
   diasCompradoAPagado?: number;
   diasPagadoASeguimiento1?: number;
   diasSeguimiento1AFob?: number;
-  diasFobACotizacionFlete?: number;
-  diasCotizacionFleteABl?: number;
+  diasFobACotizacionFlete: number;
+  diasCotizacionFleteABl: number;
   diasBlASeguimiento2?: number;
   diasSeguimiento2ACif?: number;
   diasCifARecibido?: number;
