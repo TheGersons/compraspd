@@ -590,7 +590,7 @@ export class FollowUpsService {
       updates.fechaLimitePrimerSeguimiento = new Date(fechaActual);
     }
 
-    // En FOB
+    // En FOB / En CIF
     if (timeline.diasSeguimiento1AFob) {
       fechaActual = this.agregarDias(
         fechaActual,
@@ -599,19 +599,35 @@ export class FollowUpsService {
       updates.fechaLimiteEnFOB = new Date(fechaActual);
     }
 
-    // Con BL
-    if (timeline.diasFobABl) {
+    // Cotización Flete Internacional ← NUEVO
+    if (timeline.diasFobACotizacionFlete) {
+      fechaActual = this.agregarDias(
+        fechaActual,
+        timeline.diasFobACotizacionFlete,
+      );
+      updates.fechaLimiteCotizacionFleteInternacional = new Date(fechaActual);
+    }
+
+    // Con BL / Póliza Seguros ← ACTUALIZADO
+    if (timeline.diasCotizacionFleteABl) {
+      fechaActual = this.agregarDias(
+        fechaActual,
+        timeline.diasCotizacionFleteABl,
+      );
+      updates.fechaLimiteConBL = new Date(fechaActual);
+    } else if (timeline.diasFobABl) {
+      // Fallback para compatibilidad con datos antiguos
       fechaActual = this.agregarDias(fechaActual, timeline.diasFobABl);
       updates.fechaLimiteConBL = new Date(fechaActual);
     }
 
-    // 2do Seguimiento
+    // 2do Seguimiento / En Tránsito
     if (timeline.diasBlASeguimiento2) {
       fechaActual = this.agregarDias(fechaActual, timeline.diasBlASeguimiento2);
       updates.fechaLimiteSegundoSeguimiento = new Date(fechaActual);
     }
 
-    // En CIF
+    // Proceso Aduana (antes En CIF)
     if (timeline.diasSeguimiento2ACif) {
       fechaActual = this.agregarDias(
         fechaActual,
