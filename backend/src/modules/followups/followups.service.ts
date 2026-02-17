@@ -2,18 +2,17 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
-  BadRequestException
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AprobarProductosDto } from './dto/aprobar-productos.dto';
 import { ConfigurarCotizacionDto } from './dto/configurar-cotizacion.dto';
 
-
 type UserJwt = { sub: string; role?: string };
 
 /**
  * Service principal para gestión de seguimiento de cotizaciones
- * 
+ *
  * Funcionalidades:
  * - Listar cotizaciones pendientes para supervisores
  * - Configurar timeline de productos
@@ -24,7 +23,7 @@ type UserJwt = { sub: string; role?: string };
  */
 @Injectable()
 export class FollowUpsService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
    * Lista cotizaciones pendientes de configuración/aprobación
@@ -38,17 +37,19 @@ export class FollowUpsService {
       search?: string;
       page?: number;
       pageSize?: number;
-    }
+    },
   ) {
     // Verificar que el usuario es supervisor
     const usuario = await this.prisma.usuario.findUnique({
       where: { id: user.sub },
-      include: { rol: true }
+      include: { rol: true },
     });
     let rol = usuario?.rol.nombre.toLowerCase() === 'supervisor' ? true : false;
     rol = rol || usuario?.rol.nombre.toLowerCase() === 'admin' ? true : false;
     if (!rol) {
-      throw new ForbiddenException('Solo supervisores pueden acceder a esta función');
+      throw new ForbiddenException(
+        'Solo supervisores pueden acceder a esta función',
+      );
     }
 
     const page = filters?.page || 1;
@@ -58,8 +59,8 @@ export class FollowUpsService {
     // Construir filtros
     const where: any = {
       estado: {
-        in: ['ENVIADA', 'PENDIENTE', 'EN_CONFIGURACION', 'APROBADA_PARCIAL']
-      }
+        in: ['ENVIADA', 'PENDIENTE', 'EN_CONFIGURACION', 'APROBADA_PARCIAL'],
+      },
     };
 
     if (filters?.estado) {
@@ -73,7 +74,11 @@ export class FollowUpsService {
     if (filters?.search) {
       where.OR = [
         { nombreCotizacion: { contains: filters.search, mode: 'insensitive' } },
-        { solicitante: { nombre: { contains: filters.search, mode: 'insensitive' } } }
+        {
+          solicitante: {
+            nombre: { contains: filters.search, mode: 'insensitive' },
+          },
+        },
       ];
     }
 
@@ -87,50 +92,50 @@ export class FollowUpsService {
               id: true,
               nombre: true,
               email: true,
-              departamento: { select: { nombre: true } }
-            }
+              departamento: { select: { nombre: true } },
+            },
           },
           supervisorResponsable: {
             select: {
               id: true,
               nombre: true,
-              email: true
-            }
+              email: true,
+            },
           },
           proyecto: {
             select: {
               id: true,
               nombre: true,
-              criticidad: true
-            }
+              criticidad: true,
+            },
           },
           detalles: {
             select: {
               id: true,
               sku: true,
               descripcionProducto: true,
-              cantidad: true
-            }
+              cantidad: true,
+            },
           },
           estadosProductos: {
             select: {
               id: true,
-              aprobadoPorSupervisor: true
-            }
-          }
+              aprobadoPorSupervisor: true,
+            },
+          },
         },
-        orderBy: [
-          { fechaSolicitud: 'desc' }
-        ],
+        orderBy: [{ fechaSolicitud: 'desc' }],
         skip,
-        take: pageSize
-      })
+        take: pageSize,
+      }),
     ]);
 
     // Calcular estadísticas por cotización
-    const cotizacionesConEstadisticas = cotizaciones.map(cot => {
+    const cotizacionesConEstadisticas = cotizaciones.map((cot) => {
       const totalProductos = cot.detalles.length;
-      const productosAprobados = cot.estadosProductos.filter(ep => ep.aprobadoPorSupervisor).length;
+      const productosAprobados = cot.estadosProductos.filter(
+        (ep) => ep.aprobadoPorSupervisor,
+      ).length;
       const productosPendientes = totalProductos - productosAprobados;
 
       return {
@@ -148,9 +153,10 @@ export class FollowUpsService {
         totalProductos,
         productosAprobados,
         productosPendientes,
-        porcentajeAprobado: totalProductos > 0
-          ? Math.round((productosAprobados / totalProductos) * 100)
-          : 0
+        porcentajeAprobado:
+          totalProductos > 0
+            ? Math.round((productosAprobados / totalProductos) * 100)
+            : 0,
       };
     });
 
@@ -159,27 +165,30 @@ export class FollowUpsService {
       pageSize,
       total,
       totalPages: Math.ceil(total / pageSize),
-      items: cotizacionesConEstadisticas
+      items: cotizacionesConEstadisticas,
     };
   }
 
   /**
- * Obtiene detalle completo de una cotización
- * Incluye productos con timeline sugerido si existe
- * NUEVO: Agrega automáticamente al supervisor como participante del chat
- */
+   * Obtiene detalle completo de una cotización
+   * Incluye productos con timeline sugerido si existe
+   * NUEVO: Agrega automáticamente al supervisor como participante del chat
+   */
   async getCotizacionDetalle(cotizacionId: string, user: UserJwt) {
     // Verificar que es supervisor o admin
     const usuario = await this.prisma.usuario.findUnique({
       where: { id: user.sub },
-      include: { rol: true }
+      include: { rol: true },
     });
 
     const rolNombre = usuario?.rol.nombre.toLowerCase() || '';
-    const esSupervisorOAdmin = rolNombre.includes('supervisor') || rolNombre.includes('admin');
+    const esSupervisorOAdmin =
+      rolNombre.includes('supervisor') || rolNombre.includes('admin');
 
     if (!esSupervisorOAdmin) {
-      throw new ForbiddenException('Solo supervisores pueden acceder a esta función');
+      throw new ForbiddenException(
+        'Solo supervisores pueden acceder a esta función',
+      );
     }
 
     const cotizacion = await this.prisma.cotizacion.findUnique({
@@ -190,23 +199,23 @@ export class FollowUpsService {
             id: true,
             nombre: true,
             email: true,
-            departamento: { select: { nombre: true } }
-          }
+            departamento: { select: { nombre: true } },
+          },
         },
         supervisorResponsable: {
           select: {
             id: true,
             nombre: true,
-            email: true
-          }
+            email: true,
+          },
         },
         proyecto: {
           select: {
             id: true,
             nombre: true,
             descripcion: true,
-            criticidad: true
-          }
+            criticidad: true,
+          },
         },
         tipo: {
           select: {
@@ -215,10 +224,10 @@ export class FollowUpsService {
             area: {
               select: {
                 id: true,
-                nombreArea: true
-              }
-            }
-          }
+                nombreArea: true,
+              },
+            },
+          },
         },
         detalles: {
           include: {
@@ -227,28 +236,28 @@ export class FollowUpsService {
                 proveedor: {
                   select: {
                     id: true,
-                    nombre: true
-                  }
-                }
-              }
-            }
-          }
+                    nombre: true,
+                  },
+                },
+              },
+            },
+          },
         },
         estadosProductos: {
           include: {
-            paisOrigen: true
-          }
+            paisOrigen: true,
+          },
         },
         // Incluir chat con participantes para verificar
         chat: {
           select: {
             id: true,
             participantes: {
-              select: { userId: true }
-            }
-          }
-        }
-      }
+              select: { userId: true },
+            },
+          },
+        },
+      },
     });
 
     if (!cotizacion) {
@@ -260,7 +269,7 @@ export class FollowUpsService {
     // =====================================================
     if (cotizacion.chatId && cotizacion.chat) {
       const yaEsParticipante = cotizacion.chat.participantes.some(
-        p => p.userId === user.sub
+        (p) => p.userId === user.sub,
       );
 
       if (!yaEsParticipante) {
@@ -270,7 +279,7 @@ export class FollowUpsService {
               chatId: cotizacion.chatId,
               userId: user.sub,
               ultimoLeido: new Date(),
-            }
+            },
           });
         } catch (error) {
           // Ignorar error si ya existe (race condition)
@@ -289,22 +298,22 @@ export class FollowUpsService {
           timelineSugerido = await this.prisma.timelineSKU.findUnique({
             where: { sku: detalle.sku },
             include: {
-              paisOrigen: true
-            }
+              paisOrigen: true,
+            },
           });
         }
 
         // Buscar estado producto correspondiente
         const estadoProducto = cotizacion.estadosProductos.find(
-          ep => ep.sku === detalle.sku
+          (ep) => ep.sku === detalle.sku,
         );
 
         return {
           ...detalle,
           estadoProducto,
-          timelineSugerido
+          timelineSugerido,
         };
-      })
+      }),
     );
 
     // Retornar sin el objeto chat interno (solo chatId)
@@ -312,7 +321,7 @@ export class FollowUpsService {
 
     return {
       ...cotizacionSinChat,
-      detalles: productosConTimeline
+      detalles: productosConTimeline,
     };
   }
 
@@ -324,14 +333,14 @@ export class FollowUpsService {
   async configurarTimeline(
     cotizacionId: string,
     dto: ConfigurarCotizacionDto,
-    user: UserJwt
+    user: UserJwt,
   ) {
     // Verificar que la cotización existe
     const cotizacion = await this.prisma.cotizacion.findUnique({
       where: { id: cotizacionId },
       include: {
-        detalles: true
-      }
+        detalles: true,
+      },
     });
 
     if (!cotizacion) {
@@ -341,11 +350,13 @@ export class FollowUpsService {
     // Verificar que es supervisor
     const usuario = await this.prisma.usuario.findUnique({
       where: { id: user.sub },
-      include: { rol: true }
+      include: { rol: true },
     });
 
     if (!usuario?.rol.nombre.toLowerCase().includes('supervisor')) {
-      throw new ForbiddenException('Solo supervisores pueden configurar timelines');
+      throw new ForbiddenException(
+        'Solo supervisores pueden configurar timelines',
+      );
     }
 
     type ResultadoConfiguracion = {
@@ -369,40 +380,58 @@ export class FollowUpsService {
             sku: productoConfig.sku,
             paisOrigenId: productoConfig.paisOrigenId,
             medioTransporte: productoConfig.medioTransporte,
-            diasCotizadoADescuento: productoConfig.timeline.diasCotizadoADescuento,
-            diasDescuentoAComprado: productoConfig.timeline.diasDescuentoAComprado,
+            diasCotizadoADescuento:
+              productoConfig.timeline.diasCotizadoADescuento,
+            diasDescuentoAComprado:
+              productoConfig.timeline.diasDescuentoAComprado,
             diasCompradoAPagado: productoConfig.timeline.diasCompradoAPagado,
-            diasPagadoASeguimiento1: productoConfig.timeline.diasPagadoASeguimiento1,
+            diasPagadoASeguimiento1:
+              productoConfig.timeline.diasPagadoASeguimiento1,
             diasSeguimiento1AFob: productoConfig.timeline.diasSeguimiento1AFob,
-            diasFobABl: productoConfig.timeline.diasFobABl,
+            diasFobACotizacionFlete:
+              productoConfig.timeline.diasFobACotizacionFlete, // ← NUEVO
+            diasCotizacionFleteABl:
+              productoConfig.timeline.diasCotizacionFleteABl, // ← NUEVO
+            diasFobABl: productoConfig.timeline.diasFobABl, // Mantener por compatibilidad
             diasBlASeguimiento2: productoConfig.timeline.diasBlASeguimiento2,
             diasSeguimiento2ACif: productoConfig.timeline.diasSeguimiento2ACif,
             diasCifARecibido: productoConfig.timeline.diasCifARecibido,
             diasTotalesEstimados: diasTotales,
-            notas: productoConfig.notas
+            notas: productoConfig.notas,
           },
           update: {
             paisOrigenId: productoConfig.paisOrigenId,
             medioTransporte: productoConfig.medioTransporte,
-            diasCotizadoADescuento: productoConfig.timeline.diasCotizadoADescuento,
-            diasDescuentoAComprado: productoConfig.timeline.diasDescuentoAComprado,
+            diasCotizadoADescuento:
+              productoConfig.timeline.diasCotizadoADescuento,
+            diasDescuentoAComprado:
+              productoConfig.timeline.diasDescuentoAComprado,
             diasCompradoAPagado: productoConfig.timeline.diasCompradoAPagado,
-            diasPagadoASeguimiento1: productoConfig.timeline.diasPagadoASeguimiento1,
+            diasPagadoASeguimiento1:
+              productoConfig.timeline.diasPagadoASeguimiento1,
             diasSeguimiento1AFob: productoConfig.timeline.diasSeguimiento1AFob,
-            diasFobABl: productoConfig.timeline.diasFobABl,
+            diasFobACotizacionFlete:
+              productoConfig.timeline.diasFobACotizacionFlete, // ← NUEVO
+            diasCotizacionFleteABl:
+              productoConfig.timeline.diasCotizacionFleteABl, // ← NUEVO
+            diasFobABl: productoConfig.timeline.diasFobABl, // Mantener por compatibilidad
             diasBlASeguimiento2: productoConfig.timeline.diasBlASeguimiento2,
             diasSeguimiento2ACif: productoConfig.timeline.diasSeguimiento2ACif,
             diasCifARecibido: productoConfig.timeline.diasCifARecibido,
             diasTotalesEstimados: diasTotales,
-            notas: productoConfig.notas
-          }
+            notas: productoConfig.notas,
+          },
         });
 
         // 3. Buscar el detalle de cotización correspondiente
-        const detalle = cotizacion.detalles.find(d => d.sku === productoConfig.sku);
+        const detalle = cotizacion.detalles.find(
+          (d) => d.sku === productoConfig.sku,
+        );
 
         if (!detalle) {
-          throw new BadRequestException(`Producto con SKU ${productoConfig.sku} no encontrado en la cotización`);
+          throw new BadRequestException(
+            `Producto con SKU ${productoConfig.sku} no encontrado en la cotización`,
+          );
         }
 
         // 4. Crear o actualizar EstadoProducto
@@ -410,8 +439,8 @@ export class FollowUpsService {
         const estadoExistente = await tx.estadoProducto.findFirst({
           where: {
             cotizacionId: cotizacionId,
-            sku: productoConfig.sku
-          }
+            sku: productoConfig.sku,
+          },
         });
 
         let estadoProducto;
@@ -422,8 +451,8 @@ export class FollowUpsService {
             where: { id: estadoExistente.id },
             data: {
               paisOrigenId: productoConfig.paisOrigenId,
-              medioTransporte: productoConfig.medioTransporte
-            }
+              medioTransporte: productoConfig.medioTransporte,
+            },
           });
         } else {
           // Crear nuevo
@@ -438,8 +467,8 @@ export class FollowUpsService {
               paisOrigenId: productoConfig.paisOrigenId,
               medioTransporte: productoConfig.medioTransporte,
               cotizado: true,
-              fechaCotizado: cotizacion.fechaSolicitud
-            }
+              fechaCotizado: cotizacion.fechaSolicitud,
+            },
           });
         }
 
@@ -448,13 +477,13 @@ export class FollowUpsService {
           tx,
           estadoProducto.id,
           timelineSKU,
-          cotizacion.fechaSolicitud
+          cotizacion.fechaSolicitud,
         );
 
         resultados.push({
           sku: productoConfig.sku,
           timelineId: timelineSKU.id,
-          estadoProductoId: estadoProducto.id
+          estadoProductoId: estadoProducto.id,
         });
       }
 
@@ -464,8 +493,8 @@ export class FollowUpsService {
           where: { id: cotizacionId },
           data: {
             supervisorResponsableId: user.sub,
-            estado: 'EN_CONFIGURACION'
-          }
+            estado: 'EN_CONFIGURACION',
+          },
         });
       }
 
@@ -477,9 +506,9 @@ export class FollowUpsService {
           accion: 'TIMELINE_CONFIGURADO',
           detalles: {
             productosConfigurados: dto.productos.length,
-            skus: dto.productos.map(p => p.sku)
-          }
-        }
+            skus: dto.productos.map((p) => p.sku),
+          },
+        },
       });
 
       return resultados;
@@ -488,7 +517,7 @@ export class FollowUpsService {
     return {
       message: 'Timeline configurado exitosamente',
       productosConfigurados: resultado.length,
-      detalles: resultado
+      detalles: resultado,
     };
   }
 
@@ -505,7 +534,7 @@ export class FollowUpsService {
       timeline.diasFobABl,
       timeline.diasBlASeguimiento2,
       timeline.diasSeguimiento2ACif,
-      timeline.diasCifARecibido
+      timeline.diasCifARecibido,
     ];
 
     return campos.reduce((total, dias) => {
@@ -520,7 +549,7 @@ export class FollowUpsService {
     tx: any,
     estadoProductoId: string,
     timeline: any,
-    fechaInicio: Date
+    fechaInicio: Date,
   ) {
     let fechaActual = new Date(fechaInicio);
     const updates: any = {};
@@ -530,13 +559,19 @@ export class FollowUpsService {
 
     // Con descuento
     if (timeline.diasCotizadoADescuento) {
-      fechaActual = this.agregarDias(fechaActual, timeline.diasCotizadoADescuento);
+      fechaActual = this.agregarDias(
+        fechaActual,
+        timeline.diasCotizadoADescuento,
+      );
       updates.fechaLimiteConDescuento = new Date(fechaActual);
     }
 
     // Comprado
     if (timeline.diasDescuentoAComprado) {
-      fechaActual = this.agregarDias(fechaActual, timeline.diasDescuentoAComprado);
+      fechaActual = this.agregarDias(
+        fechaActual,
+        timeline.diasDescuentoAComprado,
+      );
       updates.fechaLimiteComprado = new Date(fechaActual);
     }
 
@@ -548,13 +583,19 @@ export class FollowUpsService {
 
     // 1er Seguimiento
     if (timeline.diasPagadoASeguimiento1) {
-      fechaActual = this.agregarDias(fechaActual, timeline.diasPagadoASeguimiento1);
+      fechaActual = this.agregarDias(
+        fechaActual,
+        timeline.diasPagadoASeguimiento1,
+      );
       updates.fechaLimitePrimerSeguimiento = new Date(fechaActual);
     }
 
     // En FOB
     if (timeline.diasSeguimiento1AFob) {
-      fechaActual = this.agregarDias(fechaActual, timeline.diasSeguimiento1AFob);
+      fechaActual = this.agregarDias(
+        fechaActual,
+        timeline.diasSeguimiento1AFob,
+      );
       updates.fechaLimiteEnFOB = new Date(fechaActual);
     }
 
@@ -572,7 +613,10 @@ export class FollowUpsService {
 
     // En CIF
     if (timeline.diasSeguimiento2ACif) {
-      fechaActual = this.agregarDias(fechaActual, timeline.diasSeguimiento2ACif);
+      fechaActual = this.agregarDias(
+        fechaActual,
+        timeline.diasSeguimiento2ACif,
+      );
       updates.fechaLimiteEnCIF = new Date(fechaActual);
     }
 
@@ -584,7 +628,7 @@ export class FollowUpsService {
 
     await tx.estadoProducto.update({
       where: { id: estadoProductoId },
-      data: updates
+      data: updates,
     });
   }
 
@@ -599,30 +643,32 @@ export class FollowUpsService {
 
   // Continúa en parte 2...
   /**
-     * Aprueba o desaprueba productos individualmente
-     * Actualiza flags de aprobación en cotización
-     */
+   * Aprueba o desaprueba productos individualmente
+   * Actualiza flags de aprobación en cotización
+   */
   async aprobarProductos(
     cotizacionId: string,
     dto: AprobarProductosDto,
-    user: UserJwt
+    user: UserJwt,
   ) {
     // Verificar que es supervisor
     const usuario = await this.prisma.usuario.findUnique({
       where: { id: user.sub },
-      include: { rol: true }
+      include: { rol: true },
     });
 
     if (!usuario?.rol.nombre.toLowerCase().includes('supervisor')) {
-      throw new ForbiddenException('Solo supervisores pueden aprobar productos');
+      throw new ForbiddenException(
+        'Solo supervisores pueden aprobar productos',
+      );
     }
 
     // Verificar que la cotización existe
     const cotizacion = await this.prisma.cotizacion.findUnique({
       where: { id: cotizacionId },
       include: {
-        estadosProductos: true
-      }
+        estadosProductos: true,
+      },
     });
 
     if (!cotizacion) {
@@ -635,12 +681,12 @@ export class FollowUpsService {
       if (aprobacion.aprobado) {
         // Encontrar el estado producto
         const estadoProducto = cotizacion.estadosProductos.find(
-          ep => ep.id === aprobacion.estadoProductoId
+          (ep) => ep.id === aprobacion.estadoProductoId,
         );
 
         if (!estadoProducto) {
           throw new BadRequestException(
-            `Producto ${aprobacion.estadoProductoId} no encontrado`
+            `Producto ${aprobacion.estadoProductoId} no encontrado`,
           );
         }
 
@@ -648,7 +694,7 @@ export class FollowUpsService {
         const detalle = await this.prisma.cotizacionDetalle.findFirst({
           where: {
             cotizacionId: cotizacionId,
-            sku: estadoProducto.sku
+            sku: estadoProducto.sku,
           },
           include: {
             precios: {
@@ -656,33 +702,33 @@ export class FollowUpsService {
                 id: true,
                 precio: true,
                 precioDescuento: true,
-                ComprobanteDescuento: true
-              }
-            }
-          }
+                ComprobanteDescuento: true,
+              },
+            },
+          },
         });
 
         if (!detalle) {
           throw new BadRequestException(
-            `No se encontró el detalle para el producto ${estadoProducto.sku}`
+            `No se encontró el detalle para el producto ${estadoProducto.sku}`,
           );
         }
 
         // VALIDACIÓN 1: Debe tener precio seleccionado
         if (!detalle.preciosId) {
           throw new BadRequestException(
-            `El producto "${estadoProducto.sku}" debe tener un precio seleccionado antes de aprobarlo`
+            `El producto "${estadoProducto.sku}" debe tener un precio seleccionado antes de aprobarlo`,
           );
         }
 
         // Obtener el precio seleccionado
         const precioSeleccionado = await this.prisma.precios.findUnique({
-          where: { id: detalle.preciosId }
+          where: { id: detalle.preciosId },
         });
 
         if (!precioSeleccionado) {
           throw new BadRequestException(
-            `No se encontró el precio seleccionado para "${estadoProducto.sku}"`
+            `No se encontró el precio seleccionado para "${estadoProducto.sku}"`,
           );
         }
 
@@ -690,7 +736,7 @@ export class FollowUpsService {
         if (!precioSeleccionado.ComprobanteDescuento) {
           throw new BadRequestException(
             `El producto "${estadoProducto.sku}" debe tener una solicitud de descuento con comprobante antes de aprobarlo. ` +
-            `Por favor, solicite el descuento primero.`
+              `Por favor, solicite el descuento primero.`,
           );
         }
 
@@ -698,7 +744,7 @@ export class FollowUpsService {
         if (precioSeleccionado.precioDescuento === null) {
           throw new BadRequestException(
             `El producto "${estadoProducto.sku}" debe tener el resultado del descuento (aprobado o denegado) antes de aprobarlo. ` +
-            `Por favor, agregue el resultado del descuento.`
+              `Por favor, agregue el resultado del descuento.`,
           );
         }
       }
@@ -714,7 +760,7 @@ export class FollowUpsService {
       aprobado: boolean;
     };
 
-    let CambioAprobacion
+    let CambioAprobacion;
     // Procesar aprobaciones en transacción
     const resultado = await this.prisma.$transaction(async (tx) => {
       const cambios: CambioAprobacion[] = [];
@@ -722,12 +768,12 @@ export class FollowUpsService {
       for (const aprobacion of dto.productos) {
         // Verificar que el estado producto pertenece a esta cotización
         const estadoProducto = cotizacion.estadosProductos.find(
-          ep => ep.id === aprobacion.estadoProductoId
+          (ep) => ep.id === aprobacion.estadoProductoId,
         );
 
         if (!estadoProducto) {
           throw new BadRequestException(
-            `Producto ${aprobacion.estadoProductoId} no pertenece a esta cotización`
+            `Producto ${aprobacion.estadoProductoId} no pertenece a esta cotización`,
           );
         }
 
@@ -737,20 +783,20 @@ export class FollowUpsService {
           const detalle = await tx.cotizacionDetalle.findFirst({
             where: {
               cotizacionId: cotizacionId,
-              sku: estadoProducto.sku
+              sku: estadoProducto.sku,
             },
             include: {
               precios: {
-                where: { id: { not: undefined } }
-              }
-            }
+                where: { id: { not: undefined } },
+              },
+            },
           });
 
           const precioSeleccionado = detalle?.preciosId
             ? await tx.precios.findUnique({
-              where: { id: detalle.preciosId },
-              include: { proveedor: true }
-            })
+                where: { id: detalle.preciosId },
+                include: { proveedor: true },
+              })
             : null;
 
           await tx.estadoProducto.update({
@@ -765,12 +811,20 @@ export class FollowUpsService {
               conDescuento: true,
               fechaConDescuento: new Date(),
               // Guardar info del proveedor seleccionado
-              proveedor: precioSeleccionado?.proveedor?.nombre || estadoProducto.proveedor,
-              precioUnitario: precioSeleccionado?.precioDescuento || precioSeleccionado?.precio || estadoProducto.precioUnitario,
+              proveedor:
+                precioSeleccionado?.proveedor?.nombre ||
+                estadoProducto.proveedor,
+              precioUnitario:
+                precioSeleccionado?.precioDescuento ||
+                precioSeleccionado?.precio ||
+                estadoProducto.precioUnitario,
               precioTotal: precioSeleccionado
-                ? (Number(precioSeleccionado.precioDescuento || precioSeleccionado.precio) * (estadoProducto.cantidad || 1))
+                ? Number(
+                    precioSeleccionado.precioDescuento ||
+                      precioSeleccionado.precio,
+                  ) * (estadoProducto.cantidad || 1)
                 : estadoProducto.precioTotal,
-            }
+            },
           });
         } else {
           // Si se desaprueba, solo quitar la aprobación (no revertir otros estados)
@@ -778,8 +832,8 @@ export class FollowUpsService {
             where: { id: aprobacion.estadoProductoId },
             data: {
               aprobadoPorSupervisor: false,
-              fechaAprobacion: null
-            }
+              fechaAprobacion: null,
+            },
           });
         }
 
@@ -788,33 +842,41 @@ export class FollowUpsService {
           data: {
             cotizacionId: cotizacionId,
             usuarioId: user.sub,
-            accion: aprobacion.aprobado ? 'PRODUCTO_APROBADO' : 'PRODUCTO_DESAPROBADO',
+            accion: aprobacion.aprobado
+              ? 'PRODUCTO_APROBADO'
+              : 'PRODUCTO_DESAPROBADO',
             detalles: {
               productoId: aprobacion.estadoProductoId,
               sku: estadoProducto.sku,
-              observaciones: aprobacion.observaciones
-            }
-          }
+              observaciones: aprobacion.observaciones,
+            },
+          },
         });
-        CambioAprobacion = aprobacion.aprobado ? 'PRODUCTO_APROBADO' : 'PRODUCTO_DESAPROBADO';
+        CambioAprobacion = aprobacion.aprobado
+          ? 'PRODUCTO_APROBADO'
+          : 'PRODUCTO_DESAPROBADO';
 
         cambios.push({
           estadoProductoId: aprobacion.estadoProductoId,
           sku: estadoProducto.sku,
-          aprobado: aprobacion.aprobado
+          aprobado: aprobacion.aprobado,
         });
       }
 
       // Calcular totales
       const todosProductos = await tx.estadoProducto.findMany({
         where: { cotizacionId: cotizacionId },
-        select: { aprobadoPorSupervisor: true }
+        select: { aprobadoPorSupervisor: true },
       });
 
       const totalProductos = todosProductos.length;
-      const productosAprobados = todosProductos.filter(p => p.aprobadoPorSupervisor).length;
-      const aprobadaParcialmente = productosAprobados > 0 && productosAprobados < totalProductos;
-      const todosAprobados = productosAprobados === totalProductos && totalProductos > 0;
+      const productosAprobados = todosProductos.filter(
+        (p) => p.aprobadoPorSupervisor,
+      ).length;
+      const aprobadaParcialmente =
+        productosAprobados > 0 && productosAprobados < totalProductos;
+      const todosAprobados =
+        productosAprobados === totalProductos && totalProductos > 0;
 
       // Actualizar cotización
       let nuevoEstado = todosAprobados
@@ -833,9 +895,11 @@ export class FollowUpsService {
           supervisorResponsableId: user.sub,
           aprobadaParcialmente,
           todosProductosAprobados: todosAprobados,
-          fechaAprobacion: todosAprobados ? new Date() : cotizacion.fechaAprobacion,
-          estado: nuevoEstado
-        }
+          fechaAprobacion: todosAprobados
+            ? new Date()
+            : cotizacion.fechaAprobacion,
+          estado: nuevoEstado,
+        },
       });
 
       return {
@@ -844,26 +908,29 @@ export class FollowUpsService {
         productosAprobados,
         aprobadaParcialmente,
         todosAprobados,
-        nuevoEstado
+        nuevoEstado,
       };
     });
 
     return {
       message: 'Aprobaciones actualizadas exitosamente',
-      ...resultado
+      ...resultado,
     };
   }
 
   /**
    * Obtiene historial completo de una cotización
    */
-  async getHistorial(cotizacionId: string, filters?: {
-    accion?: string;
-    fechaDesde?: Date;
-    fechaHasta?: Date;
-  }) {
+  async getHistorial(
+    cotizacionId: string,
+    filters?: {
+      accion?: string;
+      fechaDesde?: Date;
+      fechaHasta?: Date;
+    },
+  ) {
     const where: any = {
-      cotizacionId
+      cotizacionId,
     };
 
     if (filters?.accion) {
@@ -890,13 +957,13 @@ export class FollowUpsService {
             email: true,
             rol: {
               select: {
-                nombre: true
-              }
-            }
-          }
-        }
+                nombre: true,
+              },
+            },
+          },
+        },
       },
-      orderBy: { creado: 'desc' }
+      orderBy: { creado: 'desc' },
     });
 
     return historial;
@@ -909,34 +976,36 @@ export class FollowUpsService {
     // Verificar que es supervisor
     const usuario = await this.prisma.usuario.findUnique({
       where: { id: user.sub },
-      include: { rol: true }
+      include: { rol: true },
     });
 
     if (!usuario?.rol.nombre.toLowerCase().includes('supervisor')) {
-      throw new ForbiddenException('Solo supervisores pueden acceder a estadísticas');
+      throw new ForbiddenException(
+        'Solo supervisores pueden acceder a estadísticas',
+      );
     }
 
     const [
       totalPendientes,
       totalEnConfiguracion,
       totalAprobacionParcial,
-      misAsignadas
+      misAsignadas,
     ] = await Promise.all([
       this.prisma.cotizacion.count({
-        where: { estado: 'PENDIENTE' }
+        where: { estado: 'PENDIENTE' },
       }),
       this.prisma.cotizacion.count({
-        where: { estado: 'EN_CONFIGURACION' }
+        where: { estado: 'EN_CONFIGURACION' },
       }),
       this.prisma.cotizacion.count({
-        where: { estado: 'APROBADA_PARCIAL' }
+        where: { estado: 'APROBADA_PARCIAL' },
       }),
       this.prisma.cotizacion.count({
         where: {
           supervisorResponsableId: user.sub,
-          estado: { in: ['EN_CONFIGURACION', 'APROBADA_PARCIAL'] }
-        }
-      })
+          estado: { in: ['EN_CONFIGURACION', 'APROBADA_PARCIAL'] },
+        },
+      }),
     ]);
 
     return {
@@ -944,7 +1013,8 @@ export class FollowUpsService {
       totalEnConfiguracion,
       totalAprobacionParcial,
       misAsignadas,
-      totalEnProceso: totalPendientes + totalEnConfiguracion + totalAprobacionParcial
+      totalEnProceso:
+        totalPendientes + totalEnConfiguracion + totalAprobacionParcial,
     };
   }
 
@@ -954,12 +1024,12 @@ export class FollowUpsService {
   async reasignarSupervisor(
     cotizacionId: string,
     nuevoSupervisorId: string,
-    user: UserJwt
+    user: UserJwt,
   ) {
     // Verificar que es supervisor
     const usuario = await this.prisma.usuario.findUnique({
       where: { id: user.sub },
-      include: { rol: true }
+      include: { rol: true },
     });
 
     if (!usuario?.rol.nombre.toLowerCase().includes('supervisor')) {
@@ -969,7 +1039,7 @@ export class FollowUpsService {
     // Verificar que el nuevo supervisor existe y es supervisor
     const nuevoSupervisor = await this.prisma.usuario.findUnique({
       where: { id: nuevoSupervisorId },
-      include: { rol: true }
+      include: { rol: true },
     });
 
     if (!nuevoSupervisor?.rol.nombre.toLowerCase().includes('supervisor')) {
@@ -978,7 +1048,7 @@ export class FollowUpsService {
 
     const cotizacion = await this.prisma.cotizacion.findUnique({
       where: { id: cotizacionId },
-      select: { supervisorResponsableId: true }
+      select: { supervisorResponsableId: true },
     });
 
     if (!cotizacion) {
@@ -989,7 +1059,7 @@ export class FollowUpsService {
     await this.prisma.$transaction([
       this.prisma.cotizacion.update({
         where: { id: cotizacionId },
-        data: { supervisorResponsableId: nuevoSupervisorId }
+        data: { supervisorResponsableId: nuevoSupervisorId },
       }),
       this.prisma.historialCotizacion.create({
         data: {
@@ -999,10 +1069,10 @@ export class FollowUpsService {
           detalles: {
             supervisorAnterior: cotizacion.supervisorResponsableId,
             supervisorNuevo: nuevoSupervisorId,
-            reasignadoPor: user.sub
-          }
-        }
-      })
+            reasignadoPor: user.sub,
+          },
+        },
+      }),
     ]);
 
     return {
@@ -1010,8 +1080,8 @@ export class FollowUpsService {
       nuevoSupervisor: {
         id: nuevoSupervisor.id,
         nombre: nuevoSupervisor.nombre,
-        email: nuevoSupervisor.email
-      }
+        email: nuevoSupervisor.email,
+      },
     };
   }
 
@@ -1025,9 +1095,9 @@ export class FollowUpsService {
         rol: {
           nombre: {
             contains: 'supervisor',
-            mode: 'insensitive'
-          }
-        }
+            mode: 'insensitive',
+          },
+        },
       },
       select: {
         id: true,
@@ -1035,53 +1105,58 @@ export class FollowUpsService {
         email: true,
         departamento: {
           select: {
-            nombre: true
-          }
+            nombre: true,
+          },
         },
         _count: {
           select: {
             cotizacionesSupervisadas: {
               where: {
-                estado: { in: ['EN_CONFIGURACION', 'APROBADA_PARCIAL'] }
-              }
-            }
-          }
-        }
+                estado: { in: ['EN_CONFIGURACION', 'APROBADA_PARCIAL'] },
+              },
+            },
+          },
+        },
       },
-      orderBy: { nombre: 'asc' }
+      orderBy: { nombre: 'asc' },
     });
 
-    return supervisores.map(s => ({
+    return supervisores.map((s) => ({
       ...s,
-      cotizacionesActivas: s._count.cotizacionesSupervisadas
+      cotizacionesActivas: s._count.cotizacionesSupervisadas,
     }));
   }
 
   /**
- * Rechaza un producto individual con motivo
- * El producto queda marcado como rechazado y no puede ser aprobado hasta que se corrija
- */
+   * Rechaza un producto individual con motivo
+   * El producto queda marcado como rechazado y no puede ser aprobado hasta que se corrija
+   */
   async rechazarProducto(
     cotizacionId: string,
     dto: { estadoProductoId: string; motivoRechazo: string },
-    user: UserJwt
+    user: UserJwt,
   ) {
     // 1. Validaciones de Rol (IGUAL QUE ANTES)
     const usuario = await this.prisma.usuario.findUnique({
       where: { id: user.sub },
-      include: { rol: true }
+      include: { rol: true },
     });
 
     const rolNombre = usuario?.rol.nombre.toLowerCase() || '';
-    const esSupervisorOAdmin = rolNombre.includes('supervisor') || rolNombre.includes('admin');
+    const esSupervisorOAdmin =
+      rolNombre.includes('supervisor') || rolNombre.includes('admin');
 
     if (!esSupervisorOAdmin) {
-      throw new ForbiddenException('Solo supervisores pueden rechazar productos');
+      throw new ForbiddenException(
+        'Solo supervisores pueden rechazar productos',
+      );
     }
 
     // 2. Validar motivo (IGUAL QUE ANTES)
     if (!dto.motivoRechazo || dto.motivoRechazo.trim().length < 10) {
-      throw new BadRequestException('El motivo de rechazo debe tener al menos 10 caracteres');
+      throw new BadRequestException(
+        'El motivo de rechazo debe tener al menos 10 caracteres',
+      );
     }
 
     // ===========================================================================
@@ -1092,8 +1167,8 @@ export class FollowUpsService {
     let estadoProducto = await this.prisma.estadoProducto.findFirst({
       where: {
         id: dto.estadoProductoId,
-        cotizacionId: cotizacionId
-      }
+        cotizacionId: cotizacionId,
+      },
     });
 
     // Si no existe como estado, buscamos si es un Detalle de la cotización
@@ -1104,12 +1179,14 @@ export class FollowUpsService {
       const detalleProducto = await this.prisma.cotizacionDetalle.findFirst({
         where: {
           id: dto.estadoProductoId, // Aquí usamos el ID que mandó el front
-          cotizacionId: cotizacionId
-        }
+          cotizacionId: cotizacionId,
+        },
       });
 
       if (!detalleProducto) {
-        throw new BadRequestException('Producto no encontrado en esta cotización');
+        throw new BadRequestException(
+          'Producto no encontrado en esta cotización',
+        );
       }
 
       // Si encontramos el detalle, significa que debemos CREAR el estadoProducto ahora mismo
@@ -1146,7 +1223,7 @@ export class FollowUpsService {
             fechaAprobacion: null,
             // Asegúrate de llenar otros campos obligatorios de tu schema si los hay
             // Ej: criticidad: 1, nivelCriticidad: 'BAJA' (defaults)
-          }
+          },
         });
         estadoIdFinal = nuevoEstado.id;
 
@@ -1157,7 +1234,6 @@ export class FollowUpsService {
            data: { estadoProductoId: nuevoEstado.id }
         });
         */
-
       } else {
         // CASO A: Actualizar estado existente
         await tx.estadoProducto.update({
@@ -1167,8 +1243,8 @@ export class FollowUpsService {
             fechaRechazo: new Date(),
             motivoRechazo: dto.motivoRechazo.trim(),
             aprobadoPorSupervisor: false,
-            fechaAprobacion: null
-          }
+            fechaAprobacion: null,
+          },
         });
       }
 
@@ -1182,9 +1258,9 @@ export class FollowUpsService {
             productoId: estadoIdFinal,
             sku: estadoProducto!.sku,
             descripcion: estadoProducto?.descripcion ?? '',
-            motivoRechazo: dto.motivoRechazo.trim()
-          }
-        }
+            motivoRechazo: dto.motivoRechazo.trim(),
+          },
+        },
       });
 
       // 6. Recalcular estado de la cotización (IGUAL QUE ANTES)
@@ -1192,14 +1268,19 @@ export class FollowUpsService {
         where: { cotizacionId: cotizacionId },
         select: {
           aprobadoPorSupervisor: true,
-          rechazado: true
-        }
+          rechazado: true,
+        },
       });
 
       const totalProductos = todosProductos.length;
-      const productosAprobados = todosProductos.filter(p => p.aprobadoPorSupervisor).length;
-      const productosRechazados = todosProductos.filter(p => p.rechazado).length;
-      const aprobadaParcialmente = productosAprobados > 0 && productosAprobados < totalProductos;
+      const productosAprobados = todosProductos.filter(
+        (p) => p.aprobadoPorSupervisor,
+      ).length;
+      const productosRechazados = todosProductos.filter(
+        (p) => p.rechazado,
+      ).length;
+      const aprobadaParcialmente =
+        productosAprobados > 0 && productosAprobados < totalProductos;
 
       let nuevoEstado = 'EN_CONFIGURACION';
       if (productosRechazados === 0 && productosAprobados === totalProductos) {
@@ -1214,8 +1295,8 @@ export class FollowUpsService {
           supervisorResponsableId: user.sub,
           aprobadaParcialmente,
           todosProductosAprobados: false,
-          estado: nuevoEstado
-        }
+          estado: nuevoEstado,
+        },
       });
 
       return {
@@ -1223,13 +1304,13 @@ export class FollowUpsService {
         productosAprobados,
         productosRechazados,
         nuevoEstado,
-        idRechazado: estadoIdFinal
+        idRechazado: estadoIdFinal,
       };
     });
 
     return {
       message: 'Producto rechazado exitosamente',
-      ...resultado
+      ...resultado,
     };
   }
 }

@@ -1,9 +1,12 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { IsOptional, IsInt, Min } from "class-validator";
-
+import { ApiProperty } from '@nestjs/swagger';
+import { IsOptional, IsInt, Min } from 'class-validator';
 
 export class TimelineConfigDto {
-  @ApiProperty({ example: 2, required: false, description: 'Días de Cotizado a Con Descuento' })
+  @ApiProperty({
+    example: 2,
+    required: false,
+    description: 'Días de Cotizado a Con Descuento',
+  })
   @IsOptional()
   @IsInt()
   @Min(0)
@@ -56,4 +59,24 @@ export class TimelineConfigDto {
   @IsInt()
   @Min(0)
   diasCifARecibido?: number;
+
+  @ApiProperty({
+    example: 3,
+    required: false,
+    description: 'Días desde FOB hasta Cotización Flete',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  diasFobACotizacionFlete?: number;
+
+  @ApiProperty({
+    example: 2,
+    required: false,
+    description: 'Días desde Cotización Flete hasta BL',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  diasCotizacionFleteABl?: number;
 }
