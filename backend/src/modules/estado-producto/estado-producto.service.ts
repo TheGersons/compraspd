@@ -38,7 +38,7 @@ const ESTADO_A_CAMPO_FECHA: Record<EstadoProceso, string> = {
   [EstadoProceso.PRIMER_SEGUIMIENTO]: 'fechaPrimerSeguimiento',
   [EstadoProceso.EN_FOB]: 'fechaEnFOB',
   [EstadoProceso.COTIZACION_FLETE_INTERNACIONAL]:
-    'fechaCotizacionFleteInternacional', // ← NUEVO
+    'fechaCotizacionFleteInternacional',
   [EstadoProceso.CON_BL]: 'fechaConBL',
   [EstadoProceso.SEGUNDO_SEGUIMIENTO]: 'fechaSegundoSeguimiento',
   [EstadoProceso.EN_CIF]: 'fechaEnCIF',
@@ -1043,7 +1043,14 @@ export class EstadoProductoService {
         campo: 'fechaLimitePrimerSeguimiento',
       },
       { dias: timeline.diasSeguimiento1AFob, campo: 'fechaLimiteEnFOB' },
-      { dias: timeline.diasFobABl, campo: 'fechaLimiteConBL' },
+      {
+        dias: timeline.diasFobACotizacionFlete, // ← NUEVO
+        campo: 'fechaLimiteCotizacionFleteInternacional',
+      },
+      {
+        dias: timeline.diasCotizacionFleteABl, // ← ACTUALIZADO (antes era diasFobABl)
+        campo: 'fechaLimiteConBL',
+      },
       {
         dias: timeline.diasBlASeguimiento2,
         campo: 'fechaLimiteSegundoSeguimiento',
