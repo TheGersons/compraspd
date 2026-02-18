@@ -658,6 +658,9 @@ export class FollowUpsService {
         where: { id: estadoProductoId },
         data: updates,
       })
+      .then((result) => {
+        console.log('EstadoProducto actualizado:', result);
+      })
       .catch((error) => {
         console.error('Error al actualizar estadoProducto:', error);
         throw error;
