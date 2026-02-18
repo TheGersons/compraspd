@@ -19,6 +19,7 @@ import {
   ESTADO_LABELS,
   RegistrarEvidenciaDto,
 } from './dto/estado-producto.dto';
+import console from 'console';
 
 type UserJwt = { sub: string; role?: string };
 
@@ -303,20 +304,6 @@ export class EstadoProductoService {
     recibido: 'fechaLimiteRecibido',
   };
 
-  // Mapeo de estados a sus campos de fecha real (completado)
-  private readonly ESTADO_TO_FECHA_REAL_FIELD: Record<string, string> = {
-    cotizado: 'fechaCotizado',
-    conDescuento: 'fechaConDescuento',
-    comprado: 'fechaComprado',
-    pagado: 'fechaPagado',
-    primerSeguimiento: 'fechaPrimerSeguimiento',
-    enFOB: 'fechaEnFOB',
-    conBL: 'fechaConBL',
-    segundoSeguimiento: 'fechaSegundoSeguimiento',
-    enCIF: 'fechaEnCIF',
-    recibido: 'fechaRecibido',
-  };
-
   // Mapeo de estados a sus campos booleanos
   private readonly ESTADO_TO_BOOLEAN_FIELD: Record<string, string> = {
     cotizado: 'cotizado',
@@ -347,6 +334,36 @@ export class EstadoProductoService {
     'primerSeguimiento',
     'enFOB',
     'conFleteInternacional',
+    'conBL',
+    'segundoSeguimiento',
+    'enCIF',
+    'recibido',
+  ];
+
+  // Mapeo estado → campo de fecha real
+  private readonly ESTADO_TO_FECHA_REAL_FIELD: Record<string, string> = {
+    aprobacionCompra: 'fechaRealAprobacionCompra',
+    comprado: 'fechaRealComprado',
+    pagado: 'fechaRealPagado',
+    aprobacionPlanos: 'fechaRealAprobacionPlanos',
+    primerSeguimiento: 'fechaRealPrimerSeguimiento',
+    enFOB: 'fechaRealEnFOB',
+    cotizacionFleteInternacional: 'fechaRealCotizacionFleteInternacional',
+    conBL: 'fechaRealConBL',
+    segundoSeguimiento: 'fechaRealSegundoSeguimiento',
+    enCIF: 'fechaRealEnCIF',
+    recibido: 'fechaRealRecibido',
+  };
+
+  // Estados que tienen fecha real editable (desde aprobacionCompra en adelante)
+  private readonly ESTADOS_CON_FECHA_REAL: string[] = [
+    'aprobacionCompra',
+    'comprado',
+    'pagado',
+    'aprobacionPlanos',
+    'primerSeguimiento',
+    'enFOB',
+    'cotizacionFleteInternacional',
     'conBL',
     'segundoSeguimiento',
     'enCIF',
@@ -935,9 +952,16 @@ export class EstadoProductoService {
       const campoFechaLimite = `fechaLimite${campoFecha.replace('fecha', '')}`;
       const campoEvidencia = `evidencia${estadoKey.charAt(0).toUpperCase() + estadoKey.slice(1)}`;
 
+      // NUEVO: Campo de fecha real
+      const campoFechaReal = `fechaReal${campoFecha.replace('fecha', '')}`;
+
       const fecha = estado[campoFecha];
       const fechaLimite = estado[campoFechaLimite];
       const evidencia = estado[campoEvidencia];
+
+      // NUEVO: Obtener fecha real y determinar si este estado la tiene
+      const fechaReal = estado[campoFechaReal] || null;
+      const tieneFechaReal = this.ESTADOS_CON_FECHA_REAL.includes(estadoKey);
 
       let diasRetraso = 0;
       let enTiempo = true;
@@ -961,6 +985,8 @@ export class EstadoProductoService {
         completado,
         fecha,
         fechaLimite,
+        fechaReal, // ← NUEVO
+        tieneFechaReal, // ← NUEVO
         diasRetraso,
         enTiempo,
         evidencia,
@@ -1111,5 +1137,128 @@ export class EstadoProductoService {
   private isSupervisorOrAdmin(user: UserJwt): boolean {
     const role = (user.role || '').toUpperCase();
     return role === 'SUPERVISOR' || role === 'ADMIN';
+  }
+
+  /**
+   * Actualizar fecha real de un estado + registrar en historial
+   * Solo supervisores pueden hacer esto
+   */
+  async updateFechaReal(
+    id: string,
+    estado: string,
+    nuevaFechaReal: Date,
+    userId: string,
+  ): Promise<{
+    message: string;
+    fechaAnterior: Date | null;
+    fechaNueva: Date;
+    historialId: string;
+  }> {
+    // 1. Validar que el estado tenga fecha real
+    if (!this.ESTADOS_CON_FECHA_REAL.includes(estado)) {
+      throw new BadRequestException(
+        `El estado "${estado}" no tiene fecha real editable`,
+      );
+    }
+
+    const fechaRealField = this.ESTADO_TO_FECHA_REAL_FIELD[estado];
+    if (!fechaRealField) {
+      throw new BadRequestException(`Estado "${estado}" no es válido`);
+    }
+
+    // 2. Obtener el producto
+    const producto = await this.prisma.estadoProducto.findUnique({
+      where: { id },
+      include: {
+        cotizacion: {
+          select: { tipoCompra: true },
+        },
+      },
+    });
+
+    if (!producto) {
+      throw new NotFoundException(`Producto con ID ${id} no encontrado`);
+    }
+
+    // 3. Verificar que el estado aplique para este tipo de compra
+    const tipoCompra = producto.cotizacion?.tipoCompra || 'INTERNACIONAL';
+    const estadosAplicables =
+      tipoCompra === 'NACIONAL'
+        ? this.ESTADOS_NACIONAL
+        : this.ESTADOS_INTERNACIONAL;
+
+    if (!estadosAplicables.includes(estado)) {
+      throw new BadRequestException(
+        `El estado "${estado}" no aplica para compras de tipo ${tipoCompra}`,
+      );
+    }
+
+    // 4. Verificar que el estado NO esté completado
+    const booleanField = this.ESTADO_TO_BOOLEAN_FIELD[estado];
+    if (producto[booleanField] === true) {
+      throw new BadRequestException(
+        `No se puede modificar la fecha real de "${estado}" porque ya fue completado`,
+      );
+    }
+
+    // 5. Obtener la fecha real actual
+    const fechaRealActual = producto[fechaRealField] as Date | null;
+
+    // 6. Ejecutar en transacción: actualizar fecha real + crear historial
+    const resultado = await this.prisma.$transaction(async (tx) => {
+      // Actualizar la fecha real en estado_producto
+      await tx.estadoProducto.update({
+        where: { id },
+        data: {
+          [fechaRealField]: nuevaFechaReal,
+          actualizado: new Date(),
+        },
+      });
+
+      // Crear registro en historial
+      const historial = await tx.historialFechaLimite.create({
+        data: {
+          estadoProductoId: id,
+          estado: estado,
+          fechaAnterior: fechaRealActual,
+          fechaNueva: nuevaFechaReal,
+          creadoPorId: userId,
+        },
+      });
+
+      return historial;
+    });
+
+    console.log(
+      `Fecha real de "${estado}" actualizada para producto ${id} por usuario ${userId}`,
+    );
+
+    return {
+      message: `Fecha real de "${estado}" actualizada correctamente`,
+      fechaAnterior: fechaRealActual,
+      fechaNueva: nuevaFechaReal,
+      historialId: resultado.id,
+    };
+  }
+
+  /**
+   * Obtener historial de cambios de fecha para un estado producto
+   */
+  async getHistorialFechas(
+    estadoProductoId: string,
+    estado?: string,
+  ): Promise<any[]> {
+    const where: any = { estadoProductoId };
+    if (estado) where.estado = estado;
+
+    return this.prisma.historialFechaLimite.findMany({
+      where,
+      include: {
+        creadoPor: {
+          select: { id: true, nombre: true, email: true },
+        },
+      },
+      orderBy: { creado: 'desc' },
+    });
   }
 }

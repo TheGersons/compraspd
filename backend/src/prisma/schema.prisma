@@ -168,14 +168,15 @@ model Usuario {
   rol          Rol          @relation(fields: [rolId], references: [id], onDelete: Restrict)
   departamento Departamento @relation(fields: [departamentoId], references: [id], onDelete: Restrict)
 
-  cotizaciones             Cotizacion[]          @relation("UsuarioSolicitante")
+  cotizaciones             Cotizacion[]           @relation("UsuarioSolicitante")
   seguimientos             Seguimiento[]
   mensajes                 Mensaje[]
   notificaciones           Notificacion[]
   participantesChat        ParticipantesChat[]
-  cotizacionesSupervisadas Cotizacion[]          @relation("SupervisorCotizacion")
+  cotizacionesSupervisadas Cotizacion[]           @relation("SupervisorCotizacion")
   historialCotizaciones    HistorialCotizacion[]
   sesiones                 Sesion[]
+  historialFechasCreadas   HistorialFechaLimite[] @relation("HistorialFechaCreadoPor")
 
   @@index([email])
   @@index([rolId])
@@ -488,6 +489,22 @@ model EstadoProducto {
   fechaLimiteRecibido                     DateTime?
 
   // ========================================
+  // Fechas Reales (editables por supervisor)
+  // Se inicializan con el valor de la fecha base
+  // ========================================
+  fechaRealAprobacionCompra             DateTime?
+  fechaRealComprado                     DateTime?
+  fechaRealPagado                       DateTime?
+  fechaRealAprobacionPlanos             DateTime?
+  fechaRealPrimerSeguimiento            DateTime?
+  fechaRealEnFOB                        DateTime?
+  fechaRealCotizacionFleteInternacional DateTime?
+  fechaRealConBL                        DateTime?
+  fechaRealSegundoSeguimiento           DateTime?
+  fechaRealEnCIF                        DateTime?
+  fechaRealRecibido                     DateTime?
+
+  // ========================================
   // CÁLCULOS DE RETRASO Y CRITICIDAD
   // ========================================
   diasRetrasoActual Int    @default(0) // Días de retraso en el proceso actual
@@ -527,14 +544,16 @@ model EstadoProducto {
   evidenciaRecibido                     String? @db.Text
 
   // Relaciones
-  proyecto              Proyecto?          @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
-  cotizacion            Cotizacion?        @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
-  cotizacionDetalle     CotizacionDetalle? @relation(fields: [cotizacionDetalleId], references: [id], onDelete: Cascade)
-  compra                Compra?            @relation(fields: [compraId], references: [id], onDelete: Cascade)
-  compraDetalle         CompraDetalle?     @relation(fields: [compraDetalleId], references: [id], onDelete: Cascade)
-  aprobadoPorSupervisor Boolean            @default(false) @map("aprobado_por_supervisor")
-  fechaAprobacion       DateTime?          @map("fecha_aprobacion")
-  tipoEntrega           String?            @map("tipo_entrega") @db.VarChar(10) // 'FOB' | 'CIF'
+  proyecto              Proyecto?              @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  cotizacion            Cotizacion?            @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  cotizacionDetalle     CotizacionDetalle?     @relation(fields: [cotizacionDetalleId], references: [id], onDelete: Cascade)
+  compra                Compra?                @relation(fields: [compraId], references: [id], onDelete: Cascade)
+  compraDetalle         CompraDetalle?         @relation(fields: [compraDetalleId], references: [id], onDelete: Cascade)
+  aprobadoPorSupervisor Boolean                @default(false) @map("aprobado_por_supervisor")
+  fechaAprobacion       DateTime?              @map("fecha_aprobacion")
+  tipoEntrega           String?                @map("tipo_entrega") @db.VarChar(10) // 'FOB' | 'CIF'
+  // Relación con historial
+  historialFechas       HistorialFechaLimite[]
 
   @@index([proyectoId])
   @@index([cotizacionId])
@@ -544,6 +563,29 @@ model EstadoProducto {
   @@index([paisOrigenId])
   @@index([medioTransporte])
   @@map("estado_producto")
+}
+
+// ============================================
+// HISTORIAL DE CAMBIOS EN FECHAS REALES
+// ============================================
+
+model HistorialFechaLimite {
+  id               String    @id @default(uuid()) @db.Uuid
+  estadoProductoId String    @map("estado_producto_id") @db.Uuid
+  estado           String    @db.VarChar(50) // "aprobacionCompra", "comprado", etc.
+  fechaAnterior    DateTime?
+  fechaNueva       DateTime
+  creadoPorId      String    @map("creado_por") @db.Uuid
+  creado           DateTime  @default(now())
+
+  estadoProducto EstadoProducto @relation(fields: [estadoProductoId], references: [id], onDelete: Cascade)
+  creadoPor      Usuario        @relation("HistorialFechaCreadoPor", fields: [creadoPorId], references: [id], onDelete: Restrict)
+
+  @@index([estadoProductoId])
+  @@index([estado])
+  @@index([creado])
+  @@index([creadoPorId])
+  @@map("historial_fecha_limite")
 }
 
 model ProcesoPersonalizado {

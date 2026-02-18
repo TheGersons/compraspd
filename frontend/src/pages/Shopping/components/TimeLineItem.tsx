@@ -15,7 +15,9 @@ type TimelineItemData = {
   label: string;
   completado: boolean;
   fecha?: Date | string | null;
-  fechaLimite?: Date | string | null;
+  fechaLimite?: Date | string | null;       // Fecha base (inmutable)
+  fechaReal?: Date | string | null;         // ← NUEVO: Fecha real (editable)
+  tieneFechaReal?: boolean;                 // ← NUEVO: Si este estado tiene fecha real
   diasRetraso: number;
   enTiempo: boolean;
   evidencia?: string;
@@ -100,21 +102,19 @@ export const TimelineItem = ({ item, producto, sku, onRefresh }: TimelineItemPro
   /**
    * Determina si la fecha límite de este estado es editable
    */
-  const esFechaEditable = (): boolean => {
-    // 1. Estados cotizado y conDescuento no son editables
-    if (ESTADOS_NO_EDITABLES.includes(item.estado)) {
-      return false;
-    }
+  /**
+ * Ahora la fecha BASE nunca es editable.
+ * Solo la fecha REAL es editable (si el estado la tiene y no está completado).
+ */
+  const esFechaRealEditable = (): boolean => {
+    // Solo estados que tienen fecha real
+    if (!item.tieneFechaReal) return false;
 
-    // 2. Si el estado ya está completado, no es editable
-    if (item.completado) {
-      return false;
-    }
+    // Si ya está completado, no se edita
+    if (item.completado) return false;
 
-    // 3. Si es "No Aplica", no es editable
-    if (item.esNoAplica) {
-      return false;
-    }
+    // Si es "No Aplica", no se edita
+    if (item.esNoAplica) return false;
 
     return true;
   };
@@ -122,35 +122,22 @@ export const TimelineItem = ({ item, producto, sku, onRefresh }: TimelineItemPro
   /**
    * Calcula la fecha mínima permitida (fecha límite actual o fecha del estado anterior)
    */
+  /**
+  * Para la fecha real, la mínima es "hoy" (no tiene sentido poner fecha pasada)
+  */
   const calcularFechaMinima = (): Date | undefined => {
-    // La fecha mínima es la fecha límite actual (no puede ser menor)
-    if (item.fechaLimite) {
-      const fechaActual = new Date(item.fechaLimite);
-      // Permitir desde el día siguiente a la fecha actual
-      fechaActual.setDate(fechaActual.getDate() + 1);
-      return fechaActual;
-    }
-
-    // Si no hay fecha límite, usar hoy
-    return new Date();
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    return hoy;
   };
 
   /**
    * Calcula la fecha máxima permitida (fecha límite del siguiente estado)
    */
+  /**
+  * Sin límite máximo rígido para la fecha real - el supervisor sabe lo que hace
+  */
   const calcularFechaMaxima = (): Date | undefined => {
-    if (!producto.timeline) return undefined;
-
-    const indexActual = producto.timeline.findIndex(t => t.estado === item.estado);
-
-    // Si hay un siguiente estado, su fecha límite es el máximo
-    if (indexActual >= 0 && indexActual < producto.timeline.length - 1) {
-      const siguienteEstado = producto.timeline[indexActual + 1];
-      if (siguienteEstado.fechaLimite) {
-        return new Date(siguienteEstado.fechaLimite);
-      }
-    }
-
     return undefined;
   };
 
@@ -161,30 +148,26 @@ export const TimelineItem = ({ item, producto, sku, onRefresh }: TimelineItemPro
   /**
    * Actualizar fecha límite
    */
-  const handleUpdateFechaLimite = async (newDate: Date | undefined) => {
+  /**
+ * Actualizar fecha real (ya no fecha límite)
+ */
+  const handleUpdateFechaReal = async (newDate: Date | undefined) => {
     if (!newDate) return;
 
     const fechaMinima = calcularFechaMinima();
-    const fechaMaxima = calcularFechaMaxima();
 
-    // Validación frontend adicional
     if (fechaMinima && newDate < fechaMinima) {
-      toast.error("La nueva fecha no puede ser menor a la fecha límite actual");
-      return;
-    }
-
-    if (fechaMaxima && newDate > fechaMaxima) {
-      toast.error(`La nueva fecha no puede ser mayor al ${formatDate(fechaMaxima)}`);
+      toast.error("La fecha no puede ser anterior a hoy");
       return;
     }
 
     setLoadingDateUpdate(true);
-    const toastId = toast.loading("Actualizando fecha límite...");
+    const toastId = toast.loading("Actualizando fecha real...");
 
     try {
       const token = getToken();
       const response = await fetch(
-        `${API_BASE_URL}/api/v1/estado-productos/${producto.id}/update-fecha-limite`,
+        `${API_BASE_URL}/api/v1/estado-productos/${producto.id}/update-fecha-real`,
         {
           method: "PATCH",
           credentials: "include",
@@ -194,7 +177,7 @@ export const TimelineItem = ({ item, producto, sku, onRefresh }: TimelineItemPro
           },
           body: JSON.stringify({
             estado: item.estado,
-            nuevaFechaLimite: newDate.toISOString(),
+            nuevaFechaReal: newDate.toISOString(),
           }),
         }
       );
@@ -204,15 +187,14 @@ export const TimelineItem = ({ item, producto, sku, onRefresh }: TimelineItemPro
         throw new Error(error.message || "Error al actualizar fecha");
       }
 
-      toast.success("Fecha límite actualizada", { id: toastId });
+      toast.success("Fecha real actualizada", { id: toastId });
       setIsDatePopoverOpen(false);
 
-      // Refrescar datos si hay callback
       if (onRefresh) {
         onRefresh();
       }
     } catch (error: any) {
-      console.error("Error updating fecha limite:", error);
+      console.error("Error updating fecha real:", error);
       toast.error(error.message || "Error al actualizar fecha", { id: toastId });
     } finally {
       setLoadingDateUpdate(false);
@@ -301,9 +283,8 @@ export const TimelineItem = ({ item, producto, sku, onRefresh }: TimelineItemPro
   // RENDER
   // ============================================================================
 
-  const fechaEditable = esFechaEditable();
+  const fechaRealEditable = esFechaRealEditable();
   const fechaMinima = calcularFechaMinima();
-  const fechaMaxima = calcularFechaMaxima();
 
   return (
     <>
@@ -320,19 +301,27 @@ export const TimelineItem = ({ item, producto, sku, onRefresh }: TimelineItemPro
             </span>
           )}
 
-          {/* 2. Fecha Límite - Editable o Estática */}
+          {/* 2. Fecha Base (SIEMPRE estática, inmutable) */}
           {item.fechaLimite && (
-            fechaEditable ? (
+            <span className="flex items-center gap-1 text-gray-400 dark:text-gray-500 cursor-default">
+              <CalendarIcon size={14} />
+              📌 Base: {formatDate(item.fechaLimite)}
+            </span>
+          )}
+
+          {/* 3. Fecha Real (editable si aplica) */}
+          {item.tieneFechaReal && item.fechaReal && (
+            fechaRealEditable ? (
               // VISTA INTERACTIVA: Popover con calendario
               <Popover open={isDatePopoverOpen} onOpenChange={setIsDatePopoverOpen}>
                 <PopoverTrigger asChild>
                   <button
                     disabled={loadingDateUpdate}
-                    className="group flex items-center gap-1 text-orange-500 dark:text-orange-400 hover:text-orange-600 hover:underline transition-all cursor-pointer disabled:opacity-50"
-                    title="Clic para modificar fecha límite"
+                    className="group flex items-center gap-1 text-blue-500 dark:text-blue-400 hover:text-blue-600 hover:underline transition-all cursor-pointer disabled:opacity-50"
+                    title="Clic para modificar fecha real"
                   >
                     <CalendarIcon size={14} className="group-hover:scale-110 transition-transform" />
-                    🎯 Límite: {formatDate(item.fechaLimite)}
+                    🎯 Real: {formatDate(item.fechaReal)}
                     <span className="ml-1 text-[10px] opacity-60">(editar)</span>
                   </button>
                 </PopoverTrigger>
@@ -340,46 +329,61 @@ export const TimelineItem = ({ item, producto, sku, onRefresh }: TimelineItemPro
                 <PopoverContent className="w-auto p-0 z-[5001]" align="start">
                   <div className="p-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
                     <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                      Ajustar límite: {item.label}
+                      Ajustar fecha real: {item.label}
                     </p>
                     <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1">
-                      {fechaMaxima
-                        ? `Máximo: ${formatDate(fechaMaxima)}`
-                        : 'Sin límite máximo'}
+                      Base original: {formatDate(item.fechaLimite)}
                     </p>
                   </div>
                   <Calendar
                     mode="single"
-                    selected={item.fechaLimite ? new Date(item.fechaLimite) : undefined}
-                    onSelect={handleUpdateFechaLimite}
+                    selected={item.fechaReal ? new Date(item.fechaReal) : undefined}
+                    onSelect={handleUpdateFechaReal}
                     disabled={(date) => {
-                      // Deshabilitar fechas anteriores a la mínima
                       if (fechaMinima && date < fechaMinima) return true;
-                      // Deshabilitar fechas posteriores a la máxima
-                      if (fechaMaxima && date > fechaMaxima) return true;
                       return false;
                     }}
                     locale={es}
                     initialFocus
                     classNames={{
-                      day_selected: "bg-orange-500 text-white hover:bg-orange-600 focus:bg-orange-500",
-                      day_today: "bg-orange-100 text-orange-900 font-bold dark:bg-orange-900/30 dark:text-orange-300",
+                      day_selected: "bg-blue-500 text-white hover:bg-blue-600 focus:bg-blue-500",
+                      day_today: "bg-blue-100 text-blue-900 font-bold dark:bg-blue-900/30 dark:text-blue-300",
                     }}
                   />
                 </PopoverContent>
               </Popover>
             ) : (
-              // VISTA ESTÁTICA: Solo texto, no editable
-              <span className="flex items-center gap-1 text-gray-400 dark:text-gray-500 cursor-default">
+              // VISTA ESTÁTICA: Solo texto
+              <span className="flex items-center gap-1 text-blue-400 dark:text-blue-500 cursor-default">
                 <CalendarIcon size={14} />
-                🎯 Límite: {formatDate(item.fechaLimite)}
+                🎯 Real: {formatDate(item.fechaReal)}
                 {item.completado && <span className="ml-1 text-[10px]">(completado)</span>}
-                {ESTADOS_NO_EDITABLES.includes(item.estado) && <span className="ml-1 text-[10px]">(fijo)</span>}
               </span>
             )
           )}
 
-          {/* 3. Evidencia */}
+          {/* 4. Indicador de diferencia Base vs Real */}
+          {item.tieneFechaReal && item.fechaLimite && item.fechaReal && (
+            (() => {
+              const base = new Date(item.fechaLimite);
+              const real = new Date(item.fechaReal);
+              const diffDias = Math.round((real.getTime() - base.getTime()) / (1000 * 60 * 60 * 24));
+
+              if (diffDias === 0) return null;
+
+              return diffDias > 0 ? (
+                <span className="text-[10px] text-red-500 dark:text-red-400 font-medium">
+                  +{diffDias}d vs base
+                </span>
+              ) : (
+                <span className="text-[10px] text-green-500 dark:text-green-400 font-medium">
+                  {diffDias}d vs base
+                </span>
+              );
+            })()
+          )}
+
+          {/* 5. Evidencia */}
           {item.tieneEvidencia && (
             item.esNoAplica ? (
               <span className="text-gray-400 flex items-center gap-1">

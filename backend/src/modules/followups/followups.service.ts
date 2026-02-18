@@ -706,6 +706,43 @@ export class FollowUpsService {
       updates.fechaLimiteRecibido = new Date(fechaActual).toISOString();
     }
 
+    // Inicializar fechas reales con los mismos valores que las fechas base
+    if (updates.fechaLimiteAprobacionCompra) {
+      updates.fechaRealAprobacionCompra = updates.fechaLimiteAprobacionCompra;
+    }
+    if (updates.fechaLimiteComprado) {
+      updates.fechaRealComprado = updates.fechaLimiteComprado;
+    }
+    if (updates.fechaLimitePagado) {
+      updates.fechaRealPagado = updates.fechaLimitePagado;
+    }
+    if (updates.fechaLimiteAprobacionPlanos) {
+      updates.fechaRealAprobacionPlanos = updates.fechaLimiteAprobacionPlanos;
+    }
+    if (updates.fechaLimitePrimerSeguimiento) {
+      updates.fechaRealPrimerSeguimiento = updates.fechaLimitePrimerSeguimiento;
+    }
+    if (updates.fechaLimiteEnFOB) {
+      updates.fechaRealEnFOB = updates.fechaLimiteEnFOB;
+    }
+    if (updates.fechaLimiteCotizacionFleteInternacional) {
+      updates.fechaRealCotizacionFleteInternacional =
+        updates.fechaLimiteCotizacionFleteInternacional;
+    }
+    if (updates.fechaLimiteConBL) {
+      updates.fechaRealConBL = updates.fechaLimiteConBL;
+    }
+    if (updates.fechaLimiteSegundoSeguimiento) {
+      updates.fechaRealSegundoSeguimiento =
+        updates.fechaLimiteSegundoSeguimiento;
+    }
+    if (updates.fechaLimiteEnCIF) {
+      updates.fechaRealEnCIF = updates.fechaLimiteEnCIF;
+    }
+    if (updates.fechaLimiteRecibido) {
+      updates.fechaRealRecibido = updates.fechaLimiteRecibido;
+    }
+
     await transaction.estadoProducto.update({
       where: { id: estadoProductoId },
       data: updates,

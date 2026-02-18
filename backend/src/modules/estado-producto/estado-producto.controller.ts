@@ -11,6 +11,8 @@ import {
   ParseUUIDPipe,
   HttpCode,
   HttpStatus,
+  ForbiddenException,
+  Req,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -35,6 +37,9 @@ import {
 } from './dto/estado-producto.dto';
 import { UpdateFechaLimiteDto } from './dto/update-fecha-limite.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { UpdateFechaRealDto } from './dto/update-fecha-real.dto';
+import { UsersController } from '../users/users.controller';
+import { PrismaService } from '../../prisma/prisma.service';
 
 type UserJwt = { sub: string; role?: string };
 
@@ -43,7 +48,10 @@ type UserJwt = { sub: string; role?: string };
 @UseGuards(AuthGuard('jwt'))
 @Controller('api/v1/estado-productos')
 export class EstadoProductoController {
-  constructor(private readonly service: EstadoProductoService) {}
+  constructor(
+    private readonly service: EstadoProductoService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   // ============================================
   // GESTIÓN DE ESTADOS
@@ -265,7 +273,7 @@ export class EstadoProductoController {
    * PATCH /estado-productos/:id/update-fecha-limite
    * Actualiza la fecha límite de un estado específico
    */
-  @Patch(':id/update-fecha-limite')
+  /*   @Patch(':id/update-fecha-limite')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Actualizar fecha límite de un estado' })
   @ApiParam({ name: 'id', description: 'ID del estado producto' })
@@ -284,5 +292,66 @@ export class EstadoProductoController {
       dto.estado,
       new Date(dto.nuevaFechaLimite),
     );
+  } */
+
+  /**
+   * PATCH /estado-productos/:id/update-fecha-real
+   * Actualiza la fecha real de un estado específico (solo supervisores)
+   */
+  /**
+   * PATCH /estado-productos/:id/update-fecha-real
+   * Actualiza la fecha real de un estado específico (solo supervisores)
+   */
+  @Patch(':id/update-fecha-real')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Actualizar fecha real de un estado' })
+  @ApiParam({ name: 'id', description: 'ID del estado producto' })
+  async updateFechaReal(
+    @Param('id') id: string,
+    @Body() dto: UpdateFechaRealDto,
+    @Req() req: any,
+  ) {
+    // Verificar que es supervisor
+    const user = req.user;
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id: user.sub },
+      include: { rol: true },
+    });
+
+    if (
+      !usuario?.rol.nombre.toLowerCase().includes('supervisor') &&
+      !usuario?.rol.nombre.toLowerCase().includes('admin')
+    ) {
+      throw new ForbiddenException(
+        'Solo supervisores pueden modificar fechas reales',
+      );
+    }
+
+    return this.service.updateFechaReal(
+      id,
+      dto.estado,
+      new Date(dto.nuevaFechaReal),
+      user.sub,
+    );
+  }
+
+  /**
+   * GET /estado-productos/:id/historial-fechas
+   * Obtener historial de cambios de fechas
+   */
+  @Get(':id/historial-fechas')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Obtener historial de cambios de fechas reales' })
+  @ApiParam({ name: 'id', description: 'ID del estado producto' })
+  @ApiQuery({
+    name: 'estado',
+    required: false,
+    description: 'Filtrar por estado',
+  })
+  async getHistorialFechas(
+    @Param('id') id: string,
+    @Query('estado') estado?: string,
+  ) {
+    return this.service.getHistorialFechas(id, estado);
   }
 }
