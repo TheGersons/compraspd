@@ -565,10 +565,7 @@ export class FollowUpsService {
         fechaActual,
         timeline.diasCotizadoADescuento,
       );
-      updates.fechaLimiteConDescuento = new Date(fechaActual)
-        .toISOString()
-        .replace('T', ' ')
-        .replace('Z', '');
+      updates.fechaLimiteConDescuento = new Date(fechaActual).toISOString();
     }
 
     // Comprado
@@ -603,10 +600,7 @@ export class FollowUpsService {
         fechaActual,
         timeline.diasSeguimiento1AFob,
       );
-      updates.fechaLimiteEnFOB = new Date(fechaActual)
-        .toISOString()
-        .replace('T', ' ')
-        .replace('Z', '');
+      updates.fechaLimiteEnFOB = new Date(fechaActual).toISOString();
     }
 
     console.log('timeline', timeline);
