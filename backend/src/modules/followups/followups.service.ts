@@ -382,17 +382,25 @@ export class FollowUpsService {
             medioTransporte: productoConfig.medioTransporte,
             diasCotizadoADescuento:
               productoConfig.timeline.diasCotizadoADescuento,
+            diasDescuentoAAprobacionCompra:
+              productoConfig.timeline.diasDescuentoAAprobacionCompra, // ← NUEVO
+            diasAprobacionCompraAComprado:
+              productoConfig.timeline.diasAprobacionCompraAComprado, // ← NUEVO
             diasDescuentoAComprado:
               productoConfig.timeline.diasDescuentoAComprado,
             diasCompradoAPagado: productoConfig.timeline.diasCompradoAPagado,
+            diasPagadoAAprobacionPlanos:
+              productoConfig.timeline.diasPagadoAAprobacionPlanos, // ← NUEVO
+            diasAprobacionPlanosASeguimiento1:
+              productoConfig.timeline.diasAprobacionPlanosASeguimiento1, // ← NUEVO
             diasPagadoASeguimiento1:
               productoConfig.timeline.diasPagadoASeguimiento1,
             diasSeguimiento1AFob: productoConfig.timeline.diasSeguimiento1AFob,
             diasFobACotizacionFlete:
-              productoConfig.timeline.diasFobACotizacionFlete, // ← NUEVO
+              productoConfig.timeline.diasFobACotizacionFlete,
             diasCotizacionFleteABl:
-              productoConfig.timeline.diasCotizacionFleteABl, // ← NUEVO
-            diasFobABl: productoConfig.timeline.diasFobABl, // Mantener por compatibilidad
+              productoConfig.timeline.diasCotizacionFleteABl,
+            diasFobABl: productoConfig.timeline.diasFobABl,
             diasBlASeguimiento2: productoConfig.timeline.diasBlASeguimiento2,
             diasSeguimiento2ACif: productoConfig.timeline.diasSeguimiento2ACif,
             diasCifARecibido: productoConfig.timeline.diasCifARecibido,
@@ -404,17 +412,25 @@ export class FollowUpsService {
             medioTransporte: productoConfig.medioTransporte,
             diasCotizadoADescuento:
               productoConfig.timeline.diasCotizadoADescuento,
+            diasDescuentoAAprobacionCompra:
+              productoConfig.timeline.diasDescuentoAAprobacionCompra, // ← NUEVO
+            diasAprobacionCompraAComprado:
+              productoConfig.timeline.diasAprobacionCompraAComprado, // ← NUEVO
             diasDescuentoAComprado:
               productoConfig.timeline.diasDescuentoAComprado,
             diasCompradoAPagado: productoConfig.timeline.diasCompradoAPagado,
+            diasPagadoAAprobacionPlanos:
+              productoConfig.timeline.diasPagadoAAprobacionPlanos, // ← NUEVO
+            diasAprobacionPlanosASeguimiento1:
+              productoConfig.timeline.diasAprobacionPlanosASeguimiento1, // ← NUEVO
             diasPagadoASeguimiento1:
               productoConfig.timeline.diasPagadoASeguimiento1,
             diasSeguimiento1AFob: productoConfig.timeline.diasSeguimiento1AFob,
             diasFobACotizacionFlete:
-              productoConfig.timeline.diasFobACotizacionFlete, // ← NUEVO
+              productoConfig.timeline.diasFobACotizacionFlete,
             diasCotizacionFleteABl:
-              productoConfig.timeline.diasCotizacionFleteABl, // ← NUEVO
-            diasFobABl: productoConfig.timeline.diasFobABl, // Mantener por compatibilidad
+              productoConfig.timeline.diasCotizacionFleteABl,
+            diasFobABl: productoConfig.timeline.diasFobABl,
             diasBlASeguimiento2: productoConfig.timeline.diasBlASeguimiento2,
             diasSeguimiento2ACif: productoConfig.timeline.diasSeguimiento2ACif,
             diasCifARecibido: productoConfig.timeline.diasCifARecibido,
@@ -528,7 +544,11 @@ export class FollowUpsService {
     const campos = [
       timeline.diasCotizadoADescuento,
       timeline.diasDescuentoAComprado,
+      timeline.diasDescuentoAAprobacionCompra,
+      timeline.diasAprobacionCompraAComprado,
       timeline.diasCompradoAPagado,
+      timeline.diasPagadoAAprobacionPlanos,
+      timeline.diasAprobacionPlanosASeguimiento1,
       timeline.diasPagadoASeguimiento1,
       timeline.diasSeguimiento1AFob,
       timeline.diasFobABl,
