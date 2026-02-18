@@ -14,8 +14,10 @@ type EstadoProducto = {
   descripcion: string;
   cotizado: boolean;
   conDescuento: boolean;
+  aprobacionCompra: boolean;
   comprado: boolean;
   pagado: boolean;
+  aprobacionPlanos: boolean;
   primerSeguimiento: boolean;
   enFOB: boolean;
   cotizacionFleteInternacional: boolean;
@@ -69,8 +71,10 @@ type Stats = {
   porEstado: {
     cotizado: number;
     conDescuento: number;
+    aprobacionCompra: number;                // ← NUEVO
     comprado: number;
     pagado: number;
+    aprobacionPlanos: number;                // ← NUEVO
     primerSeguimiento: number;
     enFOB: number;
     cotizacionFleteInternacional: number;
@@ -92,26 +96,32 @@ type Stats = {
 const ESTADOS_ICONOS: Record<string, string> = {
   cotizado: "📋",
   conDescuento: "💰",
+  aprobacionCompra: "✅",                    // ← NUEVO
   comprado: "🛒",
   pagado: "💳",
+  aprobacionPlanos: "📐",                    // ← NUEVO
   primerSeguimiento: "📞",
   enFOB: "🚢",
+  cotizacionFleteInternacional: "📊",
   conBL: "📄",
-  segundoSeguimiento: "📞",
-  enCIF: "🌊",
+  segundoSeguimiento: "🚚",
+  enCIF: "🛃",
   recibido: "📦",
 };
 
 const ESTADOS_LABELS: Record<string, string> = {
   cotizado: "Cotizado",
   conDescuento: "Con Descuento",
+  aprobacionCompra: "Aprob. Compra",         // ← NUEVO
   comprado: "Comprado",
   pagado: "Pagado",
+  aprobacionPlanos: "Aprob. Planos",         // ← NUEVO
   primerSeguimiento: "1er Seguimiento",
-  enFOB: "En FOB",
-  conBL: "Con BL",
-  segundoSeguimiento: "2do Seguimiento",
-  enCIF: "En CIF",
+  enFOB: "En FOB / En CIF",
+  cotizacionFleteInternacional: "Cotización Flete Int.",
+  conBL: "Con BL / Póliza Seguros",
+  segundoSeguimiento: "2do Seg. / En Tránsito",
+  enCIF: "Proceso Aduana",
   recibido: "Recibido",
 };
 
@@ -170,18 +180,20 @@ const api = {
 
 const getEstadoActual = (producto: EstadoProducto): string => {
   if (producto.estadoActual) return producto.estadoActual;
-  
+
   // Orden inverso para encontrar el último estado completado
   const estados = [
     { key: "recibido", label: "recibido" },
     { key: "enCIF", label: "enCIF" },
     { key: "segundoSeguimiento", label: "segundoSeguimiento" },
     { key: "conBL", label: "conBL" },
-    { key: "cotizacionFleteInternacional", label: "cotizacionFleteInternacional" },  // ← NUEVO
+    { key: "cotizacionFleteInternacional", label: "cotizacionFleteInternacional" },
     { key: "enFOB", label: "enFOB" },
     { key: "primerSeguimiento", label: "primerSeguimiento" },
+    { key: "aprobacionPlanos", label: "aprobacionPlanos" },              // ← NUEVO
     { key: "pagado", label: "pagado" },
     { key: "comprado", label: "comprado" },
+    { key: "aprobacionCompra", label: "aprobacionCompra" },              // ← NUEVO
     { key: "conDescuento", label: "conDescuento" },
     { key: "cotizado", label: "cotizado" },
   ];
@@ -196,34 +208,38 @@ const getEstadoActual = (producto: EstadoProducto): string => {
 
 const calcularProgreso = (producto: EstadoProducto): number => {
   if (producto.progreso !== undefined) return producto.progreso;
-  
+
   const tipoCompra = producto.cotizacion?.tipoCompra || producto.tipoCompra || 'INTERNACIONAL';
-  
+
   if (tipoCompra === 'NACIONAL') {
     const estados = [
       producto.cotizado,
       producto.conDescuento,
+      producto.aprobacionCompra,              // ← NUEVO
       producto.comprado,
       producto.pagado,
       producto.recibido,
     ];
     const completados = estados.filter(Boolean).length;
-    return Math.round((completados / 5) * 100);
+    return Math.round((completados / 6) * 100);   // ← 6 estados ahora
   } else {
     const estados = [
       producto.cotizado,
       producto.conDescuento,
+      producto.aprobacionCompra,              // ← NUEVO
       producto.comprado,
       producto.pagado,
+      producto.aprobacionPlanos,              // ← NUEVO
       producto.primerSeguimiento,
       producto.enFOB,
+      producto.cotizacionFleteInternacional,
       producto.conBL,
       producto.segundoSeguimiento,
       producto.enCIF,
       producto.recibido,
     ];
     const completados = estados.filter(Boolean).length;
-    return Math.round((completados / 10) * 100);
+    return Math.round((completados / 13) * 100);   // ← 13 estados ahora
   }
 };
 
@@ -261,8 +277,10 @@ const calcularStats = (productos: EstadoProducto[]): Stats => {
     porEstado: {
       cotizado: 0,
       conDescuento: 0,
+      aprobacionCompra: 0,                   // ← NUEVO
       comprado: 0,
       pagado: 0,
+      aprobacionPlanos: 0,                   // ← NUEVO
       primerSeguimiento: 0,
       enFOB: 0,
       cotizacionFleteInternacional: 0,
@@ -415,21 +433,19 @@ export default function Shopping() {
             <div className="flex rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden">
               <button
                 onClick={() => setVerCompletados(false)}
-                className={`px-4 py-2 text-sm font-medium transition-colors ${
-                  !verCompletados
-                    ? "bg-blue-600 text-white"
-                    : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-                }`}
+                className={`px-4 py-2 text-sm font-medium transition-colors ${!verCompletados
+                  ? "bg-blue-600 text-white"
+                  : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                  }`}
               >
                 📋 En Proceso ({stats.enProceso})
               </button>
               <button
                 onClick={() => setVerCompletados(true)}
-                className={`px-4 py-2 text-sm font-medium transition-colors ${
-                  verCompletados
-                    ? "bg-green-600 text-white"
-                    : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-                }`}
+                className={`px-4 py-2 text-sm font-medium transition-colors ${verCompletados
+                  ? "bg-green-600 text-white"
+                  : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                  }`}
               >
                 ✅ Completados ({stats.completados})
               </button>
@@ -568,11 +584,10 @@ export default function Shopping() {
                     </span>
                   </div>
                   <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
-                    <span className={`rounded px-1 py-0.5 text-xs ${
-                      getTipoCompra(producto) === 'NACIONAL'
-                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                        : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                    }`}>
+                    <span className={`rounded px-1 py-0.5 text-xs ${getTipoCompra(producto) === 'NACIONAL'
+                      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                      : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                      }`}>
                       {getTipoCompra(producto) === 'NACIONAL' ? '🇭🇳' : '🌍'}
                     </span>
                     <span>{ESTADOS_ICONOS[getEstadoActual(producto)]} {ESTADOS_LABELS[getEstadoActual(producto)]}</span>
@@ -634,11 +649,10 @@ export default function Shopping() {
                 return (
                   <div
                     key={producto.id}
-                    className={`rounded-lg border p-4 transition-all hover:shadow-md ${
-                      progreso === 100
-                        ? "border-green-200 bg-green-50/50 dark:border-green-800 dark:bg-green-900/10"
-                        : "border-gray-200 hover:border-blue-300 dark:border-gray-700 dark:hover:border-blue-600"
-                    }`}
+                    className={`rounded-lg border p-4 transition-all hover:shadow-md ${progreso === 100
+                      ? "border-green-200 bg-green-50/50 dark:border-green-800 dark:bg-green-900/10"
+                      : "border-gray-200 hover:border-blue-300 dark:border-gray-700 dark:hover:border-blue-600"
+                      }`}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
@@ -653,11 +667,10 @@ export default function Shopping() {
                             </span>
                           )}
                           {/* Badge tipo compra */}
-                          <span className={`rounded px-2 py-0.5 text-xs font-medium ${
-                            tipoCompra === 'NACIONAL'
-                              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                              : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                          }`}>
+                          <span className={`rounded px-2 py-0.5 text-xs font-medium ${tipoCompra === 'NACIONAL'
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                            }`}>
                             {tipoCompra === 'NACIONAL' ? '🇭🇳 Nacional' : '🌍 Internacional'}
                           </span>
                           {/* Badge criticidad */}
@@ -672,7 +685,7 @@ export default function Shopping() {
                         <p className="mt-1 text-sm text-gray-600 dark:text-gray-400 line-clamp-1">
                           {producto.descripcion}
                         </p>
-                        
+
                         {/* Info adicional */}
                         <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-gray-500">
                           {producto.proveedor && (
@@ -733,15 +746,14 @@ export default function Shopping() {
                       </div>
                       <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
                         <div
-                          className={`h-full rounded-full transition-all ${
-                            progreso === 100
-                              ? "bg-green-600"
-                              : producto.nivelCriticidad === "ALTO"
+                          className={`h-full rounded-full transition-all ${progreso === 100
+                            ? "bg-green-600"
+                            : producto.nivelCriticidad === "ALTO"
                               ? "bg-red-600"
                               : producto.nivelCriticidad === "MEDIO"
-                              ? "bg-yellow-500"
-                              : "bg-green-600"
-                          }`}
+                                ? "bg-yellow-500"
+                                : "bg-green-600"
+                            }`}
                           style={{ width: `${progreso}%` }}
                         />
                       </div>

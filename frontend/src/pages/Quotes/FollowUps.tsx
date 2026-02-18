@@ -22,12 +22,16 @@ type Pais = {
 
 type TimelineConfig = {
   diasCotizadoADescuento?: number;
-  diasDescuentoAComprado?: number;
+  diasDescuentoAAprobacionCompra?: number;    // ← NUEVO
+  diasAprobacionCompraAComprado?: number;     // ← NUEVO
+  diasDescuentoAComprado?: number;            // mantener compatibilidad
   diasCompradoAPagado?: number;
-  diasPagadoASeguimiento1?: number;
+  diasPagadoAAprobacionPlanos?: number;       // ← NUEVO
+  diasAprobacionPlanosASeguimiento1?: number; // ← NUEVO
+  diasPagadoASeguimiento1?: number;           // mantener compatibilidad
   diasSeguimiento1AFob?: number;
-  diasFobACotizacionFlete: number;
-  diasCotizacionFleteABl: number;
+  diasFobACotizacionFlete?: number;
+  diasCotizacionFleteABl?: number;
   diasBlASeguimiento2?: number;
   diasSeguimiento2ACif?: number;
   diasCifARecibido?: number;
@@ -909,21 +913,21 @@ export default function FollowUps() {
 
     // CASO 1: Es un Link Público de Nextcloud (Lo que tienes en tu BD)
     if (precio.ComprobanteDescuento.startsWith('http')) {
-        let url = precio.ComprobanteDescuento;
-        
-        // Truco Nextcloud: Si queremos forzar descarga, agregamos "/download" al final
-        if (mode === 'attachment' && !url.endsWith('/download')) {
-            url = `${url.replace(/\/$/, '')}/download`;
-        }
+      let url = precio.ComprobanteDescuento;
 
-        window.open(url, '_blank');
-        return; // ¡Listo! No molestamos al backend
+      // Truco Nextcloud: Si queremos forzar descarga, agregamos "/download" al final
+      if (mode === 'attachment' && !url.endsWith('/download')) {
+        url = `${url.replace(/\/$/, '')}/download`;
+      }
+
+      window.open(url, '_blank');
+      return; // ¡Listo! No molestamos al backend
     }
 
     // CASO 2: Es solo un nombre de archivo (Fallback al Backend Proxy)
     // Esto se ejecuta solo si en la BD se guardó "archivo.pdf" en vez del link
     if (!cotizacionSeleccionada) return;
-    
+
     const toastId = toast.loading(mode === 'inline' ? "Buscando archivo..." : "Descargando...");
 
     try {
@@ -2027,19 +2031,21 @@ function TimelineModalContent({
     producto.estadoProducto?.medioTransporte || "TERRESTRE"
   );
   const [timeline, setTimeline] = useState<TimelineConfig>({
-  diasCotizadoADescuento: producto.timelineSugerido?.diasCotizadoADescuento || 2,
-  diasDescuentoAComprado: producto.timelineSugerido?.diasDescuentoAComprado || 3,
-  diasCompradoAPagado: producto.timelineSugerido?.diasCompradoAPagado || 5,
-  diasPagadoASeguimiento1: esNacional ? undefined : producto.timelineSugerido?.diasPagadoASeguimiento1,
-  diasSeguimiento1AFob: esNacional ? undefined : producto.timelineSugerido?.diasSeguimiento1AFob,
-  diasFobACotizacionFlete: esNacional ? undefined : (producto.timelineSugerido?.diasFobACotizacionFlete || 3),  // ← NUEVO
-  diasCotizacionFleteABl: esNacional ? undefined : (producto.timelineSugerido?.diasCotizacionFleteABl || 2),   // ← NUEVO
-  diasBlASeguimiento2: esNacional ? undefined : producto.timelineSugerido?.diasBlASeguimiento2,
-  diasSeguimiento2ACif: esNacional ? undefined : producto.timelineSugerido?.diasSeguimiento2ACif,
-  diasCifARecibido: esNacional
-    ? (producto.timelineSugerido?.diasCifARecibido || 3)
-    : (producto.timelineSugerido?.diasCifARecibido || 5),
-});
+    diasCotizadoADescuento: producto.timelineSugerido?.diasCotizadoADescuento || 2,
+    diasDescuentoAAprobacionCompra: producto.timelineSugerido?.diasDescuentoAAprobacionCompra || 2,         // ← NUEVO
+    diasAprobacionCompraAComprado: producto.timelineSugerido?.diasAprobacionCompraAComprado || 1,           // ← NUEVO
+    diasCompradoAPagado: producto.timelineSugerido?.diasCompradoAPagado || 5,
+    diasPagadoAAprobacionPlanos: esNacional ? undefined : (producto.timelineSugerido?.diasPagadoAAprobacionPlanos || 3),     // ← NUEVO
+    diasAprobacionPlanosASeguimiento1: esNacional ? undefined : (producto.timelineSugerido?.diasAprobacionPlanosASeguimiento1 || 2), // ← NUEVO
+    diasSeguimiento1AFob: esNacional ? undefined : producto.timelineSugerido?.diasSeguimiento1AFob,
+    diasFobACotizacionFlete: esNacional ? undefined : (producto.timelineSugerido?.diasFobACotizacionFlete || 3),
+    diasCotizacionFleteABl: esNacional ? undefined : (producto.timelineSugerido?.diasCotizacionFleteABl || 2),
+    diasBlASeguimiento2: esNacional ? undefined : producto.timelineSugerido?.diasBlASeguimiento2,
+    diasSeguimiento2ACif: esNacional ? undefined : producto.timelineSugerido?.diasSeguimiento2ACif,
+    diasCifARecibido: esNacional
+      ? (producto.timelineSugerido?.diasCifARecibido || 3)
+      : (producto.timelineSugerido?.diasCifARecibido || 5),
+  });
   const [notas, setNotas] = useState(producto.timelineSugerido?.notas || "");
 
   // NUEVOS ESTADOS para rechazo
@@ -2050,23 +2056,26 @@ function TimelineModalContent({
 
   const procesosNacional = [
     { key: "diasCotizadoADescuento", label: "Cotizado → Con Descuento" },
-    { key: "diasDescuentoAComprado", label: "Con Descuento → Comprado" },
+    { key: "diasDescuentoAAprobacionCompra", label: "Con Descuento → Aprob. Compra" },    // ← NUEVO
+    { key: "diasAprobacionCompraAComprado", label: "Aprob. Compra → Comprado" },          // ← NUEVO
     { key: "diasCompradoAPagado", label: "Comprado → Pagado" },
     { key: "diasCifARecibido", label: "Pagado → Recibido" },
   ];
 
   const procesosInternacional = [
-  { key: "diasCotizadoADescuento", label: "Cotizado → Con Descuento" },
-  { key: "diasDescuentoAComprado", label: "Con Descuento → Comprado" },
-  { key: "diasCompradoAPagado", label: "Comprado → Pagado" },
-  { key: "diasPagadoASeguimiento1", label: "Pagado → 1er Seguimiento" },
-  { key: "diasSeguimiento1AFob", label: "1er Seg. → En FOB / En CIF" },                         // ← RENOMBRADO
-  { key: "diasFobACotizacionFlete", label: "FOB/CIF → Cotización Flete Int." },                 // ← NUEVO
-  { key: "diasCotizacionFleteABl", label: "Cotización Flete → BL / Póliza Seguros" },           // ← NUEVO
-  { key: "diasBlASeguimiento2", label: "BL/Póliza → 2do Seg. / En Tránsito" },                  // ← RENOMBRADO
-  { key: "diasSeguimiento2ACif", label: "2do Seg./Tránsito → Proceso Aduana" },                 // ← RENOMBRADO
-  { key: "diasCifARecibido", label: "Proceso Aduana → Recibido" },                              // ← RENOMBRADO
-];
+    { key: "diasCotizadoADescuento", label: "Cotizado → Con Descuento" },
+    { key: "diasDescuentoAAprobacionCompra", label: "Con Descuento → Aprob. Compra" },              // ← NUEVO
+    { key: "diasAprobacionCompraAComprado", label: "Aprob. Compra → Comprado" },                    // ← NUEVO
+    { key: "diasCompradoAPagado", label: "Comprado → Pagado" },
+    { key: "diasPagadoAAprobacionPlanos", label: "Pagado → Aprob. Planos" },                        // ← NUEVO
+    { key: "diasAprobacionPlanosASeguimiento1", label: "Aprob. Planos → 1er Seguimiento" },         // ← NUEVO
+    { key: "diasSeguimiento1AFob", label: "1er Seg. → En FOB / En CIF" },
+    { key: "diasFobACotizacionFlete", label: "FOB/CIF → Cotización Flete Int." },
+    { key: "diasCotizacionFleteABl", label: "Cotización Flete → BL / Póliza Seguros" },
+    { key: "diasBlASeguimiento2", label: "BL/Póliza → 2do Seg. / En Tránsito" },
+    { key: "diasSeguimiento2ACif", label: "2do Seg./Tránsito → Proceso Aduana" },
+    { key: "diasCifARecibido", label: "Proceso Aduana → Recibido" },
+  ];
 
   const procesos = esNacional ? procesosNacional : procesosInternacional;
 

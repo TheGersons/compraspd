@@ -14,13 +14,13 @@ import {
   HttpStatus,
   Headers,
   Request,
-  Ip
+  Ip,
 } from '@nestjs/common';
 import {
   ApiTags,
   ApiBearerAuth,
   ApiOperation,
-  ApiResponse
+  ApiResponse,
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
@@ -34,7 +34,7 @@ import { ChangeTempPasswordDto } from './dto/change-temp-password.dto';
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
 
-  constructor(private readonly authService: AuthService) { }
+  constructor(private readonly authService: AuthService) {}
 
   /**
    * Login - Autenticación de usuario
@@ -48,11 +48,14 @@ export class AuthController {
   async login(
     @Body() dto: LoginDto,
     @Headers('user-agent') userAgent?: string,
-    @Ip() ip?: string
+    @Ip() ip?: string,
   ) {
     this.logger.log(`Intento de login: ${dto.email}`);
 
-    const usuario = await this.authService.validateUser(dto.email, dto.password);
+    const usuario = await this.authService.validateUser(
+      dto.email,
+      dto.password,
+    );
 
     // Detectar dispositivo/navegador
     const metadata = this.parseUserAgent(userAgent);
@@ -61,10 +64,12 @@ export class AuthController {
       ip,
       userAgent,
       dispositivo: metadata.dispositivo,
-      navegador: metadata.navegador
+      navegador: metadata.navegador,
     });
 
-    this.logger.log(`Login exitoso: ${usuario.email} - Rol: ${usuario.rol?.nombre}`);
+    this.logger.log(
+      `Login exitoso: ${usuario.email} - Rol: ${usuario.rol?.nombre}`,
+    );
 
     return result;
   }
@@ -148,10 +153,7 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Cerrar una sesión específica' })
   @ApiResponse({ status: 200, description: 'Sesión cerrada' })
-  async revokeSession(
-    @Param('sessionId') sessionId: string,
-    @Req() req: any
-  ) {
+  async revokeSession(@Param('sessionId') sessionId: string, @Req() req: any) {
     const userId = req.user?.sub;
     this.logger.log(`Usuario ${userId} cerrando sesión: ${sessionId}`);
 
@@ -173,7 +175,11 @@ export class AuthController {
 
     // Detectar dispositivo
     let dispositivo = 'web';
-    if (ua.includes('mobile') || ua.includes('android') || ua.includes('iphone')) {
+    if (
+      ua.includes('mobile') ||
+      ua.includes('android') ||
+      ua.includes('iphone')
+    ) {
       dispositivo = 'mobile';
     } else if (ua.includes('electron')) {
       dispositivo = 'desktop';
@@ -192,7 +198,11 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Cambiar contraseña del usuario actual' })
   async changePassword(@Body() dto: ChangePasswordDto, @Request() req: any) {
-    return this.authService.changePassword(req.user.sub, dto.currentPassword, dto.newPassword);
+    return this.authService.changePassword(
+      req.user.sub,
+      dto.currentPassword,
+      dto.newPassword,
+    );
   }
   @Post('reset-password')
   @ApiOperation({ summary: 'Solicitar restablecimiento de contraseña' })
@@ -203,6 +213,10 @@ export class AuthController {
   @Post('change-temp-password')
   @ApiOperation({ summary: 'Cambiar contraseña temporal por una nueva' })
   async changeTempPassword(@Body() dto: ChangeTempPasswordDto) {
-    return this.authService.changeTempPassword(dto.email, dto.tempPassword, dto.newPassword);
+    return this.authService.changeTempPassword(
+      dto.email,
+      dto.tempPassword,
+      dto.newPassword,
+    );
   }
 }

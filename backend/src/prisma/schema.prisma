@@ -284,17 +284,21 @@ model TimelineSKU {
   medioTransporte MedioTransporte @default(MARITIMO)
 
   // Timeline de días entre procesos (null = proceso no aplica para este SKU)
-  diasCotizadoADescuento  Int? // null si no pasa por descuento
-  diasDescuentoAComprado  Int?
-  diasCompradoAPagado     Int?
-  diasPagadoASeguimiento1 Int?
-  diasSeguimiento1AFob    Int? // null si no es importación
-  diasFobACotizacionFlete Int?
-  diasCotizacionFleteABl  Int?
-  diasFobABl              Int? // null si no es marítimo
-  diasBlASeguimiento2     Int?
-  diasSeguimiento2ACif    Int? // null si no es importación
-  diasCifARecibido        Int?
+  diasCotizadoADescuento            Int? // null si no pasa por descuento
+  diasDescuentoAAprobacionCompra    Int? // ← NUEVO
+  diasAprobacionCompraAComprado     Int? // ← NUEVO
+  diasDescuentoAComprado            Int? // mantener para compatibilidad
+  diasCompradoAPagado               Int?
+  diasPagadoAAprobacionPlanos       Int? // ← NUEVO
+  diasAprobacionPlanosASeguimiento1 Int? // ← NUEVO
+  diasPagadoASeguimiento1           Int? // mantener para compatibilidad
+  diasSeguimiento1AFob              Int? // null si no es importación
+  diasFobACotizacionFlete           Int?
+  diasCotizacionFleteABl            Int?
+  diasFobABl                        Int? // mantener para compatibilidad
+  diasBlASeguimiento2               Int?
+  diasSeguimiento2ACif              Int? // null si no es importación
+  diasCifARecibido                  Int?
 
   // Total calculado (solo suma los que no son null)
   diasTotalesEstimados Int
@@ -436,8 +440,10 @@ model EstadoProducto {
   // ========================================
   cotizado                     Boolean @default(false)
   conDescuento                 Boolean @default(false)
+  aprobacionCompra             Boolean @default(false)
   comprado                     Boolean @default(false)
   pagado                       Boolean @default(false)
+  aprobacionPlanos             Boolean @default(false)
   primerSeguimiento            Boolean @default(false)
   enFOB                        Boolean @default(false)
   cotizacionFleteInternacional Boolean @default(false)
@@ -451,8 +457,10 @@ model EstadoProducto {
   // ========================================
   fechaCotizado                     DateTime?
   fechaConDescuento                 DateTime?
+  fechaAprobacionCompra             DateTime?
   fechaComprado                     DateTime?
   fechaPagado                       DateTime?
+  fechaAprobacionPlanos             DateTime?
   fechaPrimerSeguimiento            DateTime?
   fechaEnFOB                        DateTime?
   fechaCotizacionFleteInternacional DateTime?
@@ -467,8 +475,10 @@ model EstadoProducto {
   // Estas se calculan automáticamente desde el timeline del SKU
   fechaLimiteCotizado                     DateTime?
   fechaLimiteConDescuento                 DateTime?
+  fechaLimiteAprobacionCompra             DateTime?
   fechaLimiteComprado                     DateTime?
   fechaLimitePagado                       DateTime?
+  fechaLimiteAprobacionPlanos             DateTime?
   fechaLimitePrimerSeguimiento            DateTime?
   fechaLimiteEnFOB                        DateTime?
   fechaLimiteCotizacionFleteInternacional DateTime?
@@ -504,8 +514,10 @@ model EstadoProducto {
 
   evidenciaCotizado                     String? @db.Text
   evidenciaConDescuento                 String? @db.Text
+  evidenciaAprobacionCompra             String? @db.Text
   evidenciaComprado                     String? @db.Text
   evidenciaPagado                       String? @db.Text
+  evidenciaAprobacionPlanos             String? @db.Text
   evidenciaPrimerSeguimiento            String? @db.Text
   evidenciaEnFOB                        String? @db.Text
   evidenciaCotizacionFleteInternacional String? @db.Text

@@ -42,11 +42,13 @@ export type EstadoProducto = {
   responsable?: string;
   observaciones?: string;
 
-  // 11 estados booleanos (ACTUALIZADO)
+  // 13 estados booleanos (ACTUALIZADO)
   cotizado: boolean;
   conDescuento: boolean;
+  aprobacionCompra: boolean;                         // ← NUEVO
   comprado: boolean;
   pagado: boolean;
+  aprobacionPlanos: boolean;                         // ← NUEVO
   primerSeguimiento: boolean;
   enFOB: boolean;
   cotizacionFleteInternacional: boolean;
@@ -55,11 +57,13 @@ export type EstadoProducto = {
   enCIF: boolean;
   recibido: boolean;
 
-  // Fechas reales (ACTUALIZADO - 11 fechas)
+  // Fechas reales (ACTUALIZADO - 13 fechas)
   fechaCotizado?: string | null;
   fechaConDescuento?: string | null;
+  fechaAprobacionCompra?: string | null;             // ← NUEVO
   fechaComprado?: string | null;
   fechaPagado?: string | null;
+  fechaAprobacionPlanos?: string | null;             // ← NUEVO
   fechaPrimerSeguimiento?: string | null;
   fechaEnFOB?: string | null;
   fechaCotizacionFleteInternacional?: string | null;
@@ -68,11 +72,13 @@ export type EstadoProducto = {
   fechaEnCIF?: string | null;
   fechaRecibido?: string | null;
 
-  // Fechas límite (ACTUALIZADO - 11 fechas)
+  // Fechas límite (ACTUALIZADO - 13 fechas)
   fechaLimiteCotizado?: string | null;
   fechaLimiteConDescuento?: string | null;
+  fechaLimiteAprobacionCompra?: string | null;
   fechaLimiteComprado?: string | null;
   fechaLimitePagado?: string | null;
+  fechaLimiteAprobacionPlanos?: string | null;
   fechaLimitePrimerSeguimiento?: string | null;
   fechaLimiteEnFOB?: string | null;
   fechaLimiteCotizacionFleteInternacional?: string | null;
@@ -81,11 +87,13 @@ export type EstadoProducto = {
   fechaLimiteEnCIF?: string | null;
   fechaLimiteRecibido?: string | null;
 
-  // Campos de Evidencia (ACTUALIZADO - 11 campos)
+  // Campos de Evidencia (ACTUALIZADO - 13 campos)
   evidenciaCotizado?: string | null;
   evidenciaConDescuento?: string | null;
+  evidenciaAprobacionCompra?: string | null;         // ← NUEVO
   evidenciaComprado?: string | null;
   evidenciaPagado?: string | null;
+  evidenciaAprobacionPlanos?: string | null;         // ← NUEVO
   evidenciaPrimerSeguimiento?: string | null;
   evidenciaEnFOB?: string | null;
   evidenciaCotizacionFleteInternacional?: string | null;
@@ -149,12 +157,14 @@ export type EstadoProducto = {
 const ESTADOS_LABELS: Record<string, string> = {
   cotizado: "Cotizado",
   conDescuento: "Con Descuento",
+  aprobacionCompra: "Aprob. Compra",                 // ← NUEVO
   comprado: "Comprado",
   pagado: "Pagado",
-  primerSeguimiento: "1er Seguimiento",
-  enFOB: "En FOB / En CIF",
+  aprobacionPlanos: "Aprob. Planos",                 // ← NUEVO
+  primerSeguimiento: "1er Seguimiento / Estado del producto",
+  enFOB: "Incoterm",
   cotizacionFleteInternacional: "Cotización Flete Int.",
-  conBL: "Con BL / Póliza Seguros",
+  conBL: "Documentos de importación",
   segundoSeguimiento: "2do Seg. / En Tránsito",
   enCIF: "Proceso Aduana",
   recibido: "Recibido",
@@ -174,12 +184,13 @@ const ESTADOS_ICONOS: Record<string, string> = {
   recibido: "📦",
 };
 
-// Mapeo para evidencias (ACTUALIZADO - 11 estados)
 const EVIDENCE_CONFIG: Record<string, { dbField: keyof EstadoProducto; storageType: string }> = {
   cotizado: { dbField: 'evidenciaCotizado', storageType: 'otros' },
   conDescuento: { dbField: 'evidenciaConDescuento', storageType: 'comprobantes_descuento' },
+  aprobacionCompra: { dbField: 'evidenciaAprobacionCompra', storageType: 'evidencia_aprobacionCompra' },          // ← NUEVO
   comprado: { dbField: 'evidenciaComprado', storageType: 'evidencia_comprado' },
   pagado: { dbField: 'evidenciaPagado', storageType: 'evidencia_pagado' },
+  aprobacionPlanos: { dbField: 'evidenciaAprobacionPlanos', storageType: 'evidencia_aprobacionPlanos' },          // ← NUEVO
   primerSeguimiento: { dbField: 'evidenciaPrimerSeguimiento', storageType: 'evidencia_primerSeguimiento' },
   enFOB: { dbField: 'evidenciaEnFOB', storageType: 'evidencia_enFOB' },
   cotizacionFleteInternacional: { dbField: 'evidenciaCotizacionFleteInternacional', storageType: 'evidencia_cotizacionFleteInternacional' },
@@ -189,13 +200,22 @@ const EVIDENCE_CONFIG: Record<string, { dbField: keyof EstadoProducto; storageTy
   recibido: { dbField: 'evidenciaRecibido', storageType: 'evidencia_recibido' }
 };
 
-const ESTADOS_NACIONAL = ['cotizado', 'conDescuento', 'comprado', 'pagado', 'recibido'];
+const ESTADOS_NACIONAL = [
+  'cotizado',
+  'conDescuento',
+  'aprobacionCompra',                                // ← NUEVO
+  'comprado',
+  'pagado',
+  'recibido'
+];
 const ESTADOS_INTERNACIONAL = [
-  'cotizado', 
-  'conDescuento', 
-  'comprado', 
-  'pagado', 
-  'primerSeguimiento', 
+  'cotizado',
+  'conDescuento',
+  'aprobacionCompra',                                // ← NUEVO
+  'comprado',
+  'pagado',
+  'aprobacionPlanos',                                // ← NUEVO
+  'primerSeguimiento',
   'enFOB',
   'cotizacionFleteInternacional',
   'conBL',
@@ -269,9 +289,9 @@ const api = {
     return response.json();
   },
 
-  async avanzarEstado(id: string, data: { 
-    observacion?: string; 
-    evidenciaUrl?: string; 
+  async avanzarEstado(id: string, data: {
+    observacion?: string;
+    evidenciaUrl?: string;
     noAplicaEvidencia?: boolean;
     tipoEntrega?: 'FOB' | 'CIF';
   }) {
@@ -432,7 +452,7 @@ export default function ShoppingFollowUps() {
   const [observacion, setObservacion] = useState("");
   const [archivoEvidencia, setArchivoEvidencia] = useState<File | null>(null);
   const [noAplicaEvidencia, setNoAplicaEvidencia] = useState(false);
-  
+
   // NUEVO: Estado para selección FOB/CIF
   const [tipoEntregaSeleccionado, setTipoEntregaSeleccionado] = useState<'FOB' | 'CIF' | null>(null);
 
@@ -643,8 +663,8 @@ export default function ShoppingFollowUps() {
             className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
           >
             <option value="">Todos los tipos</option>
-            <option value="NACIONAL">🇭🇳 Nacional (5 etapas)</option>
-            <option value="INTERNACIONAL">🌍 Internacional (11 etapas)</option>
+            <option value="NACIONAL">🇭🇳 Nacional (6 etapas)</option>
+            <option value="INTERNACIONAL">🌍 Internacional (13 etapas)</option>
           </select>
 
           {/* Filtro Criticidad */}
@@ -946,7 +966,7 @@ export default function ShoppingFollowUps() {
               </p>
 
               <div className="mt-6 space-y-4">
-                
+
                 {/* NUEVO: Selector FOB/CIF cuando el siguiente estado es enFOB */}
                 {requiereSeleccionFobCif && (
                   <div>
@@ -957,38 +977,36 @@ export default function ShoppingFollowUps() {
                       <button
                         type="button"
                         onClick={() => setTipoEntregaSeleccionado('FOB')}
-                        className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 p-4 transition-all ${
-                          tipoEntregaSeleccionado === 'FOB'
-                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
-                            : 'border-gray-200 hover:border-blue-300 dark:border-gray-600 dark:hover:border-blue-600'
-                        }`}
+                        className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 p-4 transition-all ${tipoEntregaSeleccionado === 'FOB'
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
+                          : 'border-gray-200 hover:border-blue-300 dark:border-gray-600 dark:hover:border-blue-600'
+                          }`}
                       >
                         <span className="text-3xl">🚢</span>
                         <span className="font-semibold text-gray-900 dark:text-white">FOB</span>
                         <span className="text-xs text-gray-500 dark:text-gray-400 text-center">
-                          Free On Board<br/>
+                          Free On Board<br />
                           <span className="text-blue-600 dark:text-blue-400">Requiere cotización de flete</span>
                         </span>
                       </button>
-                      
+
                       <button
                         type="button"
                         onClick={() => setTipoEntregaSeleccionado('CIF')}
-                        className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 p-4 transition-all ${
-                          tipoEntregaSeleccionado === 'CIF'
-                            ? 'border-green-500 bg-green-50 dark:bg-green-900/30'
-                            : 'border-gray-200 hover:border-green-300 dark:border-gray-600 dark:hover:border-green-600'
-                        }`}
+                        className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 p-4 transition-all ${tipoEntregaSeleccionado === 'CIF'
+                          ? 'border-green-500 bg-green-50 dark:bg-green-900/30'
+                          : 'border-gray-200 hover:border-green-300 dark:border-gray-600 dark:hover:border-green-600'
+                          }`}
                       >
                         <span className="text-3xl">📦</span>
                         <span className="font-semibold text-gray-900 dark:text-white">CIF</span>
                         <span className="text-xs text-gray-500 dark:text-gray-400 text-center">
-                          Cost, Insurance & Freight<br/>
+                          Cost, Insurance & Freight<br />
                           <span className="text-green-600 dark:text-green-400">Flete incluido en precio</span>
                         </span>
                       </button>
                     </div>
-                    
+
                     {tipoEntregaSeleccionado === 'CIF' && (
                       <div className="mt-3 rounded-lg bg-green-50 p-3 dark:bg-green-900/20">
                         <p className="text-sm text-green-700 dark:text-green-300">
@@ -1079,7 +1097,7 @@ export default function ShoppingFollowUps() {
                 <button
                   onClick={handleAvanzarEstado}
                   disabled={
-                    loadingAccion || 
+                    loadingAccion ||
                     (!archivoEvidencia && !noAplicaEvidencia) ||
                     (requiereSeleccionFobCif && !tipoEntregaSeleccionado)
                   }

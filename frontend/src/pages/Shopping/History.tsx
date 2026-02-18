@@ -13,8 +13,10 @@ type EstadoProducto = {
   descripcion: string;
   cotizado: boolean;
   conDescuento: boolean;
+  aprobacionCompra: boolean;                         // ← NUEVO
   comprado: boolean;
   pagado: boolean;
+  aprobacionPlanos: boolean;                         // ← NUEVO
   primerSeguimiento: boolean;
   enFOB: boolean;
   cotizacionFleteInternacional: boolean;
@@ -24,10 +26,13 @@ type EstadoProducto = {
   recibido: boolean;
   fechaCotizado?: string;
   fechaConDescuento?: string;
+  fechaAprobacionCompra?: string;                    // ← NUEVO
   fechaComprado?: string;
   fechaPagado?: string;
+  fechaAprobacionPlanos?: string;                    // ← NUEVO
   fechaPrimerSeguimiento?: string;
   fechaEnFOB?: string;
+  fechaCotizacionFleteInternacional?: string;
   fechaConBL?: string;
   fechaSegundoSeguimiento?: string;
   fechaEnCIF?: string;
@@ -116,14 +121,16 @@ const getAccionColor = (tipo: string): string => {
   const colores: Record<string, string> = {
     cotizado: "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400",
     conDescuento: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400",
+    aprobacionCompra: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400",    // ← NUEVO
     comprado: "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400",
     pagado: "bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400",
+    aprobacionPlanos: "bg-violet-100 text-violet-800 dark:bg-violet-900/20 dark:text-violet-400",        // ← NUEVO
     primerSeguimiento: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-400",
     enFOB: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/20 dark:text-cyan-400",
-    cotizacionFleteInternacional: "bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400",  // ← NUEVO
+    cotizacionFleteInternacional: "bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400",
     conBL: "bg-teal-100 text-teal-800 dark:bg-teal-900/20 dark:text-teal-400",
     segundoSeguimiento: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-400",
-    enCIF: "bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400",  // ← CAMBIADO (aduana)
+    enCIF: "bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400",
     recibido: "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400",
   };
   return colores[tipo] || "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300";
@@ -133,8 +140,10 @@ const getAccionIcon = (tipo: string): string => {
   const iconos: Record<string, string> = {
     cotizado: "📋",
     conDescuento: "💰",
+    aprobacionCompra: "✅",                  // ← NUEVO
     comprado: "🛒",
     pagado: "💳",
+    aprobacionPlanos: "📐",                  // ← NUEVO
     primerSeguimiento: "📞",
     enFOB: "🚢",
     cotizacionFleteInternacional: "📊",
@@ -150,8 +159,10 @@ const getAccionLabel = (tipo: string): string => {
   const labels: Record<string, string> = {
     cotizado: "Cotizado",
     conDescuento: "Con Descuento",
+    aprobacionCompra: "Aprob. Compra",       // ← NUEVO
     comprado: "Comprado",
     pagado: "Pagado",
+    aprobacionPlanos: "Aprob. Planos",       // ← NUEVO
     primerSeguimiento: "1er Seguimiento",
     enFOB: "En FOB / En CIF",
     cotizacionFleteInternacional: "Cotización Flete Int.",
@@ -168,11 +179,13 @@ const extractEventos = (producto: EstadoProducto): EventoTimeline[] => {
   const estados = [
     { key: 'cotizado', fecha: 'fechaCotizado' },
     { key: 'conDescuento', fecha: 'fechaConDescuento' },
+    { key: 'aprobacionCompra', fecha: 'fechaAprobacionCompra' },                             // ← NUEVO
     { key: 'comprado', fecha: 'fechaComprado' },
     { key: 'pagado', fecha: 'fechaPagado' },
+    { key: 'aprobacionPlanos', fecha: 'fechaAprobacionPlanos' },                             // ← NUEVO
     { key: 'primerSeguimiento', fecha: 'fechaPrimerSeguimiento' },
     { key: 'enFOB', fecha: 'fechaEnFOB' },
-    { key: 'cotizacionFleteInternacional', fecha: 'fechaCotizacionFleteInternacional' },  // ← NUEVO
+    { key: 'cotizacionFleteInternacional', fecha: 'fechaCotizacionFleteInternacional' },
     { key: 'conBL', fecha: 'fechaConBL' },
     { key: 'segundoSeguimiento', fecha: 'fechaSegundoSeguimiento' },
     { key: 'enCIF', fecha: 'fechaEnCIF' },
@@ -402,11 +415,10 @@ export default function History() {
             <div className="flex items-center gap-2 rounded-lg border border-gray-300 p-1 dark:border-gray-600">
               <button
                 onClick={() => setVista("table")}
-                className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                  vista === "table"
-                    ? "bg-blue-600 text-white"
-                    : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-                }`}
+                className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${vista === "table"
+                  ? "bg-blue-600 text-white"
+                  : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                  }`}
               >
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
@@ -420,11 +432,10 @@ export default function History() {
               </button>
               <button
                 onClick={() => setVista("timeline")}
-                className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                  vista === "timeline"
-                    ? "bg-blue-600 text-white"
-                    : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-                }`}
+                className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${vista === "timeline"
+                  ? "bg-blue-600 text-white"
+                  : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                  }`}
               >
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path

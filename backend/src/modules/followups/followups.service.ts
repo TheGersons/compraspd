@@ -556,10 +556,10 @@ export class FollowUpsService {
     let fechaActual = new Date(fechaInicio);
     const updates: any = {};
 
-    // Fecha límite cotizado (inicio)
+    // 1. Fecha límite cotizado (inicio)
     updates.fechaLimiteCotizado = new Date(fechaActual);
 
-    // Con descuento
+    // 2. Con descuento
     if (timeline.diasCotizadoADescuento) {
       fechaActual = this.agregarDias(
         fechaActual,
@@ -568,8 +568,25 @@ export class FollowUpsService {
       updates.fechaLimiteConDescuento = new Date(fechaActual).toISOString();
     }
 
-    // Comprado
-    if (timeline.diasDescuentoAComprado) {
+    // 3. Aprobación de Compra ← NUEVO
+    if (timeline.diasDescuentoAAprobacionCompra) {
+      fechaActual = this.agregarDias(
+        fechaActual,
+        timeline.diasDescuentoAAprobacionCompra,
+      );
+      updates.fechaLimiteAprobacionCompra = new Date(fechaActual).toISOString();
+    }
+
+    // 4. Comprado
+    if (timeline.diasAprobacionCompraAComprado) {
+      // Si tiene el nuevo flujo con aprobación de compra
+      fechaActual = this.agregarDias(
+        fechaActual,
+        timeline.diasAprobacionCompraAComprado,
+      );
+      updates.fechaLimiteComprado = new Date(fechaActual).toISOString();
+    } else if (timeline.diasDescuentoAComprado) {
+      // Fallback para compatibilidad con datos antiguos (sin aprobación de compra)
       fechaActual = this.agregarDias(
         fechaActual,
         timeline.diasDescuentoAComprado,
@@ -577,14 +594,33 @@ export class FollowUpsService {
       updates.fechaLimiteComprado = new Date(fechaActual).toISOString();
     }
 
-    // Pagado
+    // 5. Pagado
     if (timeline.diasCompradoAPagado) {
       fechaActual = this.agregarDias(fechaActual, timeline.diasCompradoAPagado);
       updates.fechaLimitePagado = new Date(fechaActual).toISOString();
     }
 
-    // 1er Seguimiento
-    if (timeline.diasPagadoASeguimiento1) {
+    // 6. Aprobación de Planos ← NUEVO
+    if (timeline.diasPagadoAAprobacionPlanos) {
+      fechaActual = this.agregarDias(
+        fechaActual,
+        timeline.diasPagadoAAprobacionPlanos,
+      );
+      updates.fechaLimiteAprobacionPlanos = new Date(fechaActual).toISOString();
+    }
+
+    // 7. 1er Seguimiento
+    if (timeline.diasAprobacionPlanosASeguimiento1) {
+      // Si tiene el nuevo flujo con aprobación de planos
+      fechaActual = this.agregarDias(
+        fechaActual,
+        timeline.diasAprobacionPlanosASeguimiento1,
+      );
+      updates.fechaLimitePrimerSeguimiento = new Date(
+        fechaActual,
+      ).toISOString();
+    } else if (timeline.diasPagadoASeguimiento1) {
+      // Fallback para compatibilidad con datos antiguos (sin aprobación de planos)
       fechaActual = this.agregarDias(
         fechaActual,
         timeline.diasPagadoASeguimiento1,
@@ -594,7 +630,7 @@ export class FollowUpsService {
       ).toISOString();
     }
 
-    // En FOB / En CIF
+    // 8. En FOB / En CIF
     if (timeline.diasSeguimiento1AFob) {
       fechaActual = this.agregarDias(
         fechaActual,
@@ -603,12 +639,7 @@ export class FollowUpsService {
       updates.fechaLimiteEnFOB = new Date(fechaActual).toISOString();
     }
 
-    console.log('timeline', timeline);
-    console.log('fechaActual', fechaActual);
-    console.log('updates', updates);
-    console.log('DiasFobACotizacionFlete', timeline.diasFobACotizacionFlete);
-
-    // Cotización Flete Internacional ← NUEVO
+    // 9. Cotización Flete Internacional
     if (timeline.diasFobACotizacionFlete) {
       fechaActual = this.agregarDias(
         fechaActual,
@@ -619,11 +650,7 @@ export class FollowUpsService {
       ).toISOString();
     }
 
-    console.log('fechaActual', fechaActual);
-    console.log('updates', updates);
-    console.log('DiascotizacionconfleteAbl', timeline.diasCotizacionFleteABl);
-
-    // Con BL / Póliza Seguros ← ACTUALIZADO
+    // 10. Con BL / Póliza Seguros
     if (timeline.diasCotizacionFleteABl) {
       fechaActual = this.agregarDias(
         fechaActual,
@@ -636,7 +663,7 @@ export class FollowUpsService {
       updates.fechaLimiteConBL = new Date(fechaActual).toISOString();
     }
 
-    // 2do Seguimiento / En Tránsito
+    // 11. 2do Seguimiento / En Tránsito
     if (timeline.diasBlASeguimiento2) {
       fechaActual = this.agregarDias(fechaActual, timeline.diasBlASeguimiento2);
       updates.fechaLimiteSegundoSeguimiento = new Date(
@@ -644,7 +671,7 @@ export class FollowUpsService {
       ).toISOString();
     }
 
-    // Proceso Aduana (antes En CIF)
+    // 12. Proceso Aduana (antes En CIF)
     if (timeline.diasSeguimiento2ACif) {
       fechaActual = this.agregarDias(
         fechaActual,
@@ -653,24 +680,16 @@ export class FollowUpsService {
       updates.fechaLimiteEnCIF = new Date(fechaActual).toISOString();
     }
 
-    // Recibido
+    // 13. Recibido
     if (timeline.diasCifARecibido) {
       fechaActual = this.agregarDias(fechaActual, timeline.diasCifARecibido);
       updates.fechaLimiteRecibido = new Date(fechaActual).toISOString();
     }
 
-    transaction.estadoProducto
-      .update({
-        where: { id: estadoProductoId },
-        data: updates,
-      })
-      .then((result) => {
-        console.log('EstadoProducto actualizado:', result);
-      })
-      .catch((error) => {
-        console.error('Error al actualizar estadoProducto:', error);
-        throw error;
-      });
+    await transaction.estadoProducto.update({
+      where: { id: estadoProductoId },
+      data: updates,
+    });
   }
 
   /**

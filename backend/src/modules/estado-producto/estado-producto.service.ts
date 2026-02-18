@@ -33,8 +33,10 @@ const ORDEN_ESTADOS: EstadoProceso[] = ESTADOS_INTERNACIONAL;
 const ESTADO_A_CAMPO_FECHA: Record<EstadoProceso, string> = {
   [EstadoProceso.COTIZADO]: 'fechaCotizado',
   [EstadoProceso.CON_DESCUENTO]: 'fechaConDescuento',
+  [EstadoProceso.APROBACION_COMPRA]: 'fechaAprobacionCompra',
   [EstadoProceso.COMPRADO]: 'fechaComprado',
   [EstadoProceso.PAGADO]: 'fechaPagado',
+  [EstadoProceso.APROBACION_PLANOS]: 'fechaAprobacionPlanos', // ← NUEVO
   [EstadoProceso.PRIMER_SEGUIMIENTO]: 'fechaPrimerSeguimiento',
   [EstadoProceso.EN_FOB]: 'fechaEnFOB',
   [EstadoProceso.COTIZACION_FLETE_INTERNACIONAL]:
@@ -289,8 +291,10 @@ export class EstadoProductoService {
   private readonly ESTADO_TO_FECHA_LIMITE_FIELD: Record<string, string> = {
     cotizado: 'fechaLimiteCotizado',
     conDescuento: 'fechaLimiteConDescuento',
+    aprobacionCompra: 'fechaLimiteAprobacionCompra',
     comprado: 'fechaLimiteComprado',
     pagado: 'fechaLimitePagado',
+    aprobacionPlanos: 'fechaLimiteAprobacionPlanos',
     primerSeguimiento: 'fechaLimitePrimerSeguimiento',
     enFOB: 'fechaLimiteEnFOB',
     conBL: 'fechaLimiteConBL',
@@ -1036,8 +1040,16 @@ export class EstadoProductoService {
         dias: timeline.diasCotizadoADescuento,
         campo: 'fechaLimiteConDescuento',
       },
+      {
+        dias: timeline.diasAprobacionCompra,
+        campo: 'fechaLimiteAprobacionCompra',
+      },
       { dias: timeline.diasDescuentoAComprado, campo: 'fechaLimiteComprado' },
       { dias: timeline.diasCompradoAPagado, campo: 'fechaLimitePagado' },
+      {
+        dias: timeline.diasAprobacionPlanos,
+        campo: 'fechaLimiteAprobacionPlanos',
+      },
       {
         dias: timeline.diasPagadoASeguimiento1,
         campo: 'fechaLimitePrimerSeguimiento',

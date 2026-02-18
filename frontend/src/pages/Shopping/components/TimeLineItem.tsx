@@ -49,11 +49,13 @@ const ESTADOS_NO_EDITABLES = ['cotizado', 'conDescuento'];
 const EVIDENCE_CONFIG: Record<string, { dbField: string; storageType: string }> = {
   cotizado: { dbField: 'evidenciaCotizado', storageType: 'otros' },
   conDescuento: { dbField: 'evidenciaConDescuento', storageType: 'comprobantes_descuento' },
+  aprobacionCompra: { dbField: 'evidenciaAprobacionCompra', storageType: 'evidencia_aprobacionCompra' },          // ← NUEVO
   comprado: { dbField: 'evidenciaComprado', storageType: 'evidencia_comprado' },
   pagado: { dbField: 'evidenciaPagado', storageType: 'evidencia_pagado' },
+  aprobacionPlanos: { dbField: 'evidenciaAprobacionPlanos', storageType: 'evidencia_aprobacionPlanos' },          // ← NUEVO
   primerSeguimiento: { dbField: 'evidenciaPrimerSeguimiento', storageType: 'evidencia_primerSeguimiento' },
   enFOB: { dbField: 'evidenciaEnFOB', storageType: 'evidencia_enFOB' },
-  cotizacionFleteInternacional: { dbField: 'evidenciaCotizacionFleteInternacional', storageType: 'evidencia_cotizacionFleteInternacional' },  // ← NUEVO
+  cotizacionFleteInternacional: { dbField: 'evidenciaCotizacionFleteInternacional', storageType: 'evidencia_cotizacionFleteInternacional' },
   conBL: { dbField: 'evidenciaConBL', storageType: 'evidencia_conBL' },
   segundoSeguimiento: { dbField: 'evidenciaSegundoSeguimiento', storageType: 'evidencia_segundoSeguimiento' },
   enCIF: { dbField: 'evidenciaEnCIF', storageType: 'evidencia_enCIF' },
@@ -128,7 +130,7 @@ export const TimelineItem = ({ item, producto, sku, onRefresh }: TimelineItemPro
       fechaActual.setDate(fechaActual.getDate() + 1);
       return fechaActual;
     }
-    
+
     // Si no hay fecha límite, usar hoy
     return new Date();
   };
@@ -140,7 +142,7 @@ export const TimelineItem = ({ item, producto, sku, onRefresh }: TimelineItemPro
     if (!producto.timeline) return undefined;
 
     const indexActual = producto.timeline.findIndex(t => t.estado === item.estado);
-    
+
     // Si hay un siguiente estado, su fecha límite es el máximo
     if (indexActual >= 0 && indexActual < producto.timeline.length - 1) {
       const siguienteEstado = producto.timeline[indexActual + 1];
@@ -204,7 +206,7 @@ export const TimelineItem = ({ item, producto, sku, onRefresh }: TimelineItemPro
 
       toast.success("Fecha límite actualizada", { id: toastId });
       setIsDatePopoverOpen(false);
-      
+
       // Refrescar datos si hay callback
       if (onRefresh) {
         onRefresh();
@@ -341,7 +343,7 @@ export const TimelineItem = ({ item, producto, sku, onRefresh }: TimelineItemPro
                       Ajustar límite: {item.label}
                     </p>
                     <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1">
-                      {fechaMaxima 
+                      {fechaMaxima
                         ? `Máximo: ${formatDate(fechaMaxima)}`
                         : 'Sin límite máximo'}
                     </p>
@@ -406,8 +408,8 @@ export const TimelineItem = ({ item, producto, sku, onRefresh }: TimelineItemPro
               <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
                 📎 Evidencia: {item.label}
               </h3>
-              <button 
-                onClick={() => setShowEvidenceModal(false)} 
+              <button
+                onClick={() => setShowEvidenceModal(false)}
                 className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
               >
                 <X size={18} />

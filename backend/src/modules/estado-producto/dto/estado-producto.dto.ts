@@ -17,8 +17,10 @@ import { Type } from 'class-transformer';
 export enum EstadoProceso {
   COTIZADO = 'cotizado',
   CON_DESCUENTO = 'conDescuento',
+  APROBACION_COMPRA = 'aprobacionCompra', // ← NUEVO
   COMPRADO = 'comprado',
   PAGADO = 'pagado',
+  APROBACION_PLANOS = 'aprobacionPlanos', // ← NUEVO
   PRIMER_SEGUIMIENTO = 'primerSeguimiento',
   EN_FOB = 'enFOB',
   COTIZACION_FLETE_INTERNACIONAL = 'cotizacionFleteInternacional',
@@ -45,8 +47,10 @@ export const ESTADOS_NACIONAL: EstadoProceso[] = [
 export const ESTADOS_INTERNACIONAL: EstadoProceso[] = [
   EstadoProceso.COTIZADO,
   EstadoProceso.CON_DESCUENTO,
+  EstadoProceso.APROBACION_COMPRA, // ← NUEVO
   EstadoProceso.COMPRADO,
   EstadoProceso.PAGADO,
+  EstadoProceso.APROBACION_PLANOS, // ← NUEVO
   EstadoProceso.PRIMER_SEGUIMIENTO,
   EstadoProceso.EN_FOB,
   EstadoProceso.COTIZACION_FLETE_INTERNACIONAL,
@@ -62,14 +66,16 @@ export const ESTADOS_INTERNACIONAL: EstadoProceso[] = [
 export const ESTADO_LABELS: Record<EstadoProceso, string> = {
   [EstadoProceso.COTIZADO]: 'Cotizado',
   [EstadoProceso.CON_DESCUENTO]: 'Con Descuento',
+  [EstadoProceso.APROBACION_COMPRA]: 'Aprobación de Compra', // ← NUEVO
   [EstadoProceso.COMPRADO]: 'Comprado',
   [EstadoProceso.PAGADO]: 'Pagado',
+  [EstadoProceso.APROBACION_PLANOS]: 'Aprobación de Planos', // ← NUEVO
   [EstadoProceso.PRIMER_SEGUIMIENTO]: '1er Seguimiento',
-  [EstadoProceso.EN_FOB]: 'En FOB / En CIF', // ← RENOMBRADO
-  [EstadoProceso.COTIZACION_FLETE_INTERNACIONAL]: 'Cotización Flete Int.', // ← NUEVO
-  [EstadoProceso.CON_BL]: 'Con BL / Póliza Seguros', // ← RENOMBRADO
-  [EstadoProceso.SEGUNDO_SEGUIMIENTO]: '2do Seg. / En Tránsito', // ← RENOMBRADO
-  [EstadoProceso.EN_CIF]: 'Proceso Aduana', // ← RENOMBRADO
+  [EstadoProceso.EN_FOB]: 'En FOB / En CIF',
+  [EstadoProceso.COTIZACION_FLETE_INTERNACIONAL]: 'Cotización Flete Int.',
+  [EstadoProceso.CON_BL]: 'Con BL / Póliza Seguros',
+  [EstadoProceso.SEGUNDO_SEGUIMIENTO]: '2do Seg. / En Tránsito',
+  [EstadoProceso.EN_CIF]: 'Proceso Aduana',
   [EstadoProceso.RECIBIDO]: 'Recibido',
 };
 
