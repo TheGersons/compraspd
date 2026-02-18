@@ -366,7 +366,7 @@ export class FollowUpsService {
     };
 
     // Procesar en transacción
-    const resultado = await this.prisma.$transaction(async (tx) => {
+    const resultado = await this.prisma.$transaction(async (transaction) => {
       const resultados: ResultadoConfiguracion[] = [];
 
       for (const productoConfig of dto.productos) {
@@ -374,7 +374,7 @@ export class FollowUpsService {
         const diasTotales = this.calcularDiasTotales(productoConfig.timeline);
 
         // 2. Crear o actualizar TimelineSKU
-        const timelineSKU = await tx.timelineSKU.upsert({
+        const timelineSKU = await transaction.timelineSKU.upsert({
           where: { sku: productoConfig.sku },
           create: {
             sku: productoConfig.sku,
@@ -436,7 +436,7 @@ export class FollowUpsService {
 
         // 4. Crear o actualizar EstadoProducto
         // ✅ Buscar primero
-        const estadoExistente = await tx.estadoProducto.findFirst({
+        const estadoExistente = await transaction.estadoProducto.findFirst({
           where: {
             cotizacionId: cotizacionId,
             sku: productoConfig.sku,
@@ -447,7 +447,7 @@ export class FollowUpsService {
 
         if (estadoExistente) {
           // Actualizar existente
-          estadoProducto = await tx.estadoProducto.update({
+          estadoProducto = await transaction.estadoProducto.update({
             where: { id: estadoExistente.id },
             data: {
               paisOrigenId: productoConfig.paisOrigenId,
@@ -456,7 +456,7 @@ export class FollowUpsService {
           });
         } else {
           // Crear nuevo
-          estadoProducto = await tx.estadoProducto.create({
+          estadoProducto = await transaction.estadoProducto.create({
             data: {
               cotizacionId: cotizacionId,
               cotizacionDetalleId: detalle.id,
@@ -474,7 +474,7 @@ export class FollowUpsService {
 
         // 5. Calcular y actualizar fechas límite
         await this.calcularYActualizarFechasLimite(
-          tx,
+          transaction,
           estadoProducto.id,
           timelineSKU,
           cotizacion.fechaSolicitud,
@@ -489,7 +489,7 @@ export class FollowUpsService {
 
       // 6. Asignar supervisor responsable si no tiene
       if (!cotizacion.supervisorResponsableId) {
-        await tx.cotizacion.update({
+        await transaction.cotizacion.update({
           where: { id: cotizacionId },
           data: {
             supervisorResponsableId: user.sub,
@@ -499,7 +499,7 @@ export class FollowUpsService {
       }
 
       // 7. Registrar en historial
-      await tx.historialCotizacion.create({
+      await transaction.historialCotizacion.create({
         data: {
           cotizacionId: cotizacionId,
           usuarioId: user.sub,
@@ -532,6 +532,8 @@ export class FollowUpsService {
       timeline.diasPagadoASeguimiento1,
       timeline.diasSeguimiento1AFob,
       timeline.diasFobABl,
+      timeline.diasFobACotizacionFlete,
+      timeline.diasCotizacionFleteABl,
       timeline.diasBlASeguimiento2,
       timeline.diasSeguimiento2ACif,
       timeline.diasCifARecibido,
@@ -546,7 +548,7 @@ export class FollowUpsService {
    * Calcula y actualiza fechas límite en EstadoProducto
    */
   private async calcularYActualizarFechasLimite(
-    tx: any,
+    transaction: any,
     estadoProductoId: string,
     timeline: any,
     fechaInicio: Date,
@@ -651,10 +653,15 @@ export class FollowUpsService {
       updates.fechaLimiteRecibido = new Date(fechaActual);
     }
 
-    await tx.estadoProducto.update({
-      where: { id: estadoProductoId },
-      data: updates,
-    });
+    transaction.estadoProducto
+      .update({
+        where: { id: estadoProductoId },
+        data: updates,
+      })
+      .catch((error) => {
+        console.error('Error al actualizar estadoProducto:', error);
+        throw error;
+      });
   }
 
   /**
