@@ -70,12 +70,12 @@ export const ESTADO_LABELS: Record<EstadoProceso, string> = {
   [EstadoProceso.COMPRADO]: 'Comprado',
   [EstadoProceso.PAGADO]: 'Pagado',
   [EstadoProceso.APROBACION_PLANOS]: 'Aprobación de Planos', // ← NUEVO
-  [EstadoProceso.PRIMER_SEGUIMIENTO]: '1er Seguimiento',
-  [EstadoProceso.EN_FOB]: 'En FOB / En CIF',
+  [EstadoProceso.PRIMER_SEGUIMIENTO]: '1er Seguimiento / Estado de producto',
+  [EstadoProceso.EN_FOB]: 'Incoterms',
   [EstadoProceso.COTIZACION_FLETE_INTERNACIONAL]: 'Cotización Flete Int.',
-  [EstadoProceso.CON_BL]: 'Con BL / Póliza Seguros',
+  [EstadoProceso.CON_BL]: 'Documentos de importación',
   [EstadoProceso.SEGUNDO_SEGUIMIENTO]: '2do Seg. / En Tránsito',
-  [EstadoProceso.EN_CIF]: 'Proceso Aduana',
+  [EstadoProceso.EN_CIF]: 'Proceso de aduana',
   [EstadoProceso.RECIBIDO]: 'Recibido',
 };
 
