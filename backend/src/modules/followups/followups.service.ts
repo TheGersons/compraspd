@@ -565,7 +565,7 @@ export class FollowUpsService {
         fechaActual,
         timeline.diasCotizadoADescuento,
       );
-      updates.fechaLimiteConDescuento = new Date(fechaActual);
+      updates.fechaLimiteConDescuento = new Date(fechaActual).toISOString();
     }
 
     // Comprado
@@ -574,13 +574,13 @@ export class FollowUpsService {
         fechaActual,
         timeline.diasDescuentoAComprado,
       );
-      updates.fechaLimiteComprado = new Date(fechaActual);
+      updates.fechaLimiteComprado = new Date(fechaActual).toISOString();
     }
 
     // Pagado
     if (timeline.diasCompradoAPagado) {
       fechaActual = this.agregarDias(fechaActual, timeline.diasCompradoAPagado);
-      updates.fechaLimitePagado = new Date(fechaActual);
+      updates.fechaLimitePagado = new Date(fechaActual).toISOString();
     }
 
     // 1er Seguimiento
@@ -589,7 +589,9 @@ export class FollowUpsService {
         fechaActual,
         timeline.diasPagadoASeguimiento1,
       );
-      updates.fechaLimitePrimerSeguimiento = new Date(fechaActual);
+      updates.fechaLimitePrimerSeguimiento = new Date(
+        fechaActual,
+      ).toISOString();
     }
 
     // En FOB / En CIF
@@ -598,7 +600,7 @@ export class FollowUpsService {
         fechaActual,
         timeline.diasSeguimiento1AFob,
       );
-      updates.fechaLimiteEnFOB = new Date(fechaActual);
+      updates.fechaLimiteEnFOB = new Date(fechaActual).toISOString();
     }
 
     console.log('timeline', timeline);
@@ -612,7 +614,9 @@ export class FollowUpsService {
         fechaActual,
         timeline.diasFobACotizacionFlete,
       );
-      updates.fechaLimiteCotizacionFleteInternacional = new Date(fechaActual);
+      updates.fechaLimiteCotizacionFleteInternacional = new Date(
+        fechaActual,
+      ).toISOString();
     }
 
     console.log('fechaActual', fechaActual);
@@ -625,17 +629,19 @@ export class FollowUpsService {
         fechaActual,
         timeline.diasCotizacionFleteABl,
       );
-      updates.fechaLimiteConBL = new Date(fechaActual);
+      updates.fechaLimiteConBL = new Date(fechaActual).toISOString();
     } else if (timeline.diasFobABl) {
       // Fallback para compatibilidad con datos antiguos
       fechaActual = this.agregarDias(fechaActual, timeline.diasFobABl);
-      updates.fechaLimiteConBL = new Date(fechaActual);
+      updates.fechaLimiteConBL = new Date(fechaActual).toISOString();
     }
 
     // 2do Seguimiento / En Tránsito
     if (timeline.diasBlASeguimiento2) {
       fechaActual = this.agregarDias(fechaActual, timeline.diasBlASeguimiento2);
-      updates.fechaLimiteSegundoSeguimiento = new Date(fechaActual);
+      updates.fechaLimiteSegundoSeguimiento = new Date(
+        fechaActual,
+      ).toISOString();
     }
 
     // Proceso Aduana (antes En CIF)
@@ -644,13 +650,13 @@ export class FollowUpsService {
         fechaActual,
         timeline.diasSeguimiento2ACif,
       );
-      updates.fechaLimiteEnCIF = new Date(fechaActual);
+      updates.fechaLimiteEnCIF = new Date(fechaActual).toISOString();
     }
 
     // Recibido
     if (timeline.diasCifARecibido) {
       fechaActual = this.agregarDias(fechaActual, timeline.diasCifARecibido);
-      updates.fechaLimiteRecibido = new Date(fechaActual);
+      updates.fechaLimiteRecibido = new Date(fechaActual).toISOString();
     }
 
     transaction.estadoProducto
