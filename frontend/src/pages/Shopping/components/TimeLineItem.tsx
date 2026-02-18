@@ -16,8 +16,8 @@ type TimelineItemData = {
   completado: boolean;
   fecha?: Date | string | null;
   fechaLimite?: Date | string | null;       // Fecha base (inmutable)
-  fechaReal?: Date | string | null;         // ← NUEVO: Fecha real (editable)
-  tieneFechaReal?: boolean;                 // ← NUEVO: Si este estado tiene fecha real
+  fechaReal?: Date | string | null;         // Fecha real (editable por supervisor)
+  tieneFechaReal?: boolean;                 // Si este estado tiene fecha real
   diasRetraso: number;
   enTiempo: boolean;
   evidencia?: string;
@@ -35,7 +35,7 @@ type EstadoProductoData = {
     id: string;
     tipoCompra: 'NACIONAL' | 'INTERNACIONAL';
   };
-  [key: string]: any; // Para campos de evidencia dinámicos
+  [key: string]: any;
 };
 
 // ============================================================================
@@ -44,17 +44,14 @@ type EstadoProductoData = {
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
-// Estados que NO se pueden editar
-const ESTADOS_NO_EDITABLES = ['cotizado', 'conDescuento'];
-
-// Mapeo para evidencias
+// Mapeo para evidencias (13 estados)
 const EVIDENCE_CONFIG: Record<string, { dbField: string; storageType: string }> = {
   cotizado: { dbField: 'evidenciaCotizado', storageType: 'otros' },
   conDescuento: { dbField: 'evidenciaConDescuento', storageType: 'comprobantes_descuento' },
-  aprobacionCompra: { dbField: 'evidenciaAprobacionCompra', storageType: 'evidencia_aprobacionCompra' },          // ← NUEVO
+  aprobacionCompra: { dbField: 'evidenciaAprobacionCompra', storageType: 'evidencia_aprobacionCompra' },
   comprado: { dbField: 'evidenciaComprado', storageType: 'evidencia_comprado' },
   pagado: { dbField: 'evidenciaPagado', storageType: 'evidencia_pagado' },
-  aprobacionPlanos: { dbField: 'evidenciaAprobacionPlanos', storageType: 'evidencia_aprobacionPlanos' },          // ← NUEVO
+  aprobacionPlanos: { dbField: 'evidenciaAprobacionPlanos', storageType: 'evidencia_aprobacionPlanos' },
   primerSeguimiento: { dbField: 'evidenciaPrimerSeguimiento', storageType: 'evidencia_primerSeguimiento' },
   enFOB: { dbField: 'evidenciaEnFOB', storageType: 'evidencia_enFOB' },
   cotizacionFleteInternacional: { dbField: 'evidenciaCotizacionFleteInternacional', storageType: 'evidencia_cotizacionFleteInternacional' },
@@ -63,6 +60,7 @@ const EVIDENCE_CONFIG: Record<string, { dbField: string; storageType: string }> 
   enCIF: { dbField: 'evidenciaEnCIF', storageType: 'evidencia_enCIF' },
   recibido: { dbField: 'evidenciaRecibido', storageType: 'evidencia_recibido' }
 };
+
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -86,7 +84,7 @@ interface TimelineItemProps {
   item: TimelineItemData;
   producto: EstadoProductoData;
   sku: string;
-  onRefresh?: () => void; // Callback para refrescar datos después de actualizar
+  onRefresh?: () => void;
 }
 
 export const TimelineItem = ({ item, producto, sku, onRefresh }: TimelineItemProps) => {
@@ -96,66 +94,60 @@ export const TimelineItem = ({ item, producto, sku, onRefresh }: TimelineItemPro
   const [isDatePopoverOpen, setIsDatePopoverOpen] = useState(false);
 
   // ============================================================================
-  // VALIDACIONES PARA EDICIÓN DE FECHA
+  // VALIDACIONES PARA EDICIÓN DE FECHA REAL
   // ============================================================================
 
   /**
-   * Determina si la fecha límite de este estado es editable
+   * Determina si la fecha REAL de este estado es editable.
+   * Solo estados con tieneFechaReal=true, no completados, no N/A
    */
-  /**
- * Ahora la fecha BASE nunca es editable.
- * Solo la fecha REAL es editable (si el estado la tiene y no está completado).
- */
   const esFechaRealEditable = (): boolean => {
-    // Solo estados que tienen fecha real
     if (!item.tieneFechaReal) return false;
-
-    // Si ya está completado, no se edita
     if (item.completado) return false;
-
-    // Si es "No Aplica", no se edita
     if (item.esNoAplica) return false;
-
     return true;
   };
 
   /**
-   * Calcula la fecha mínima permitida (fecha límite actual o fecha del estado anterior)
+   * Fecha mínima: hoy (no tiene sentido poner una fecha pasada como fecha real)
    */
-  /**
-  * Para la fecha real, la mínima es "hoy" (no tiene sentido poner fecha pasada)
-  */
   const calcularFechaMinima = (): Date | undefined => {
+    // La mínima es la fecha real actual (no puede poner una fecha menor)
+    if (item.fechaReal) {
+      const fecha = new Date(item.fechaReal);
+      fecha.setHours(0, 0, 0, 0);
+      return fecha;
+    }
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
     return hoy;
   };
-
-  /**
-   * Calcula la fecha máxima permitida (fecha límite del siguiente estado)
-   */
-  /**
-  * Sin límite máximo rígido para la fecha real - el supervisor sabe lo que hace
-  */
   const calcularFechaMaxima = (): Date | undefined => {
+    if (!producto.timeline) return undefined;
+    const indexActual = producto.timeline.findIndex(t => t.estado === item.estado);
+    if (indexActual >= 0 && indexActual < producto.timeline.length - 1) {
+      const siguienteEstado = producto.timeline[indexActual + 1];
+      // Usar fechaReal del siguiente si existe, sino fechaLimite
+      const siguienteFecha = siguienteEstado.fechaReal || siguienteEstado.fechaLimite;
+      if (siguienteFecha) {
+        return new Date(siguienteFecha);
+      }
+    }
     return undefined;
   };
+
 
   // ============================================================================
   // HANDLERS
   // ============================================================================
 
   /**
-   * Actualizar fecha límite
+   * Actualizar fecha real via endpoint
    */
-  /**
- * Actualizar fecha real (ya no fecha límite)
- */
   const handleUpdateFechaReal = async (newDate: Date | undefined) => {
     if (!newDate) return;
 
     const fechaMinima = calcularFechaMinima();
-
     if (fechaMinima && newDate < fechaMinima) {
       toast.error("La fecha no puede ser anterior a hoy");
       return;
@@ -200,6 +192,8 @@ export const TimelineItem = ({ item, producto, sku, onRefresh }: TimelineItemPro
       setLoadingDateUpdate(false);
     }
   };
+
+
 
   /**
    * Manejar acciones de evidencia (ver/descargar)
@@ -285,6 +279,23 @@ export const TimelineItem = ({ item, producto, sku, onRefresh }: TimelineItemPro
 
   const fechaRealEditable = esFechaRealEditable();
   const fechaMinima = calcularFechaMinima();
+  const fechaMaxima = calcularFechaMaxima();
+
+  // Calcular diferencia entre fecha base y fecha real
+  const calcularDiferencia = (): { dias: number; texto: string; color: string } | null => {
+    if (!item.tieneFechaReal || !item.fechaLimite || !item.fechaReal) return null;
+    const base = new Date(item.fechaLimite);
+    const real = new Date(item.fechaReal);
+    const diffDias = Math.round((real.getTime() - base.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDias === 0) return null;
+    return {
+      dias: diffDias,
+      texto: diffDias > 0 ? `+${diffDias}d` : `${diffDias}d`,
+      color: diffDias > 0 ? 'text-red-500 dark:text-red-400' : 'text-green-500 dark:text-green-400',
+    };
+  };
+
+  const diferencia = calcularDiferencia();
 
   return (
     <>
@@ -333,14 +344,17 @@ export const TimelineItem = ({ item, producto, sku, onRefresh }: TimelineItemPro
                     </p>
                     <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1">
                       Base original: {formatDate(item.fechaLimite)}
+                      {fechaMaxima && ` · Máximo: ${formatDate(fechaMaxima)}`}
                     </p>
                   </div>
                   <Calendar
                     mode="single"
                     selected={item.fechaReal ? new Date(item.fechaReal) : undefined}
+                    defaultMonth={item.fechaReal ? new Date(item.fechaReal) : undefined}
                     onSelect={handleUpdateFechaReal}
                     disabled={(date) => {
                       if (fechaMinima && date < fechaMinima) return true;
+                      if (fechaMaxima && date > fechaMaxima) return true;
                       return false;
                     }}
                     locale={es}
@@ -353,7 +367,7 @@ export const TimelineItem = ({ item, producto, sku, onRefresh }: TimelineItemPro
                 </PopoverContent>
               </Popover>
             ) : (
-              // VISTA ESTÁTICA: Solo texto
+              // VISTA ESTÁTICA: Solo texto, no editable
               <span className="flex items-center gap-1 text-blue-400 dark:text-blue-500 cursor-default">
                 <CalendarIcon size={14} />
                 🎯 Real: {formatDate(item.fechaReal)}
@@ -363,24 +377,10 @@ export const TimelineItem = ({ item, producto, sku, onRefresh }: TimelineItemPro
           )}
 
           {/* 4. Indicador de diferencia Base vs Real */}
-          {item.tieneFechaReal && item.fechaLimite && item.fechaReal && (
-            (() => {
-              const base = new Date(item.fechaLimite);
-              const real = new Date(item.fechaReal);
-              const diffDias = Math.round((real.getTime() - base.getTime()) / (1000 * 60 * 60 * 24));
-
-              if (diffDias === 0) return null;
-
-              return diffDias > 0 ? (
-                <span className="text-[10px] text-red-500 dark:text-red-400 font-medium">
-                  +{diffDias}d vs base
-                </span>
-              ) : (
-                <span className="text-[10px] text-green-500 dark:text-green-400 font-medium">
-                  {diffDias}d vs base
-                </span>
-              );
-            })()
+          {diferencia && (
+            <span className={`text-[10px] font-medium ${diferencia.color}`}>
+              {diferencia.texto} vs base
+            </span>
           )}
 
           {/* 5. Evidencia */}

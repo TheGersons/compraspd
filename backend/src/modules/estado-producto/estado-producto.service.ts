@@ -322,6 +322,7 @@ export class EstadoProductoService {
   private readonly ESTADOS_NACIONAL = [
     'cotizado',
     'conDescuento',
+    'aprobacionCompra', // ← FALTABA
     'comprado',
     'pagado',
     'recibido',
@@ -329,8 +330,10 @@ export class EstadoProductoService {
   private readonly ESTADOS_INTERNACIONAL = [
     'cotizado',
     'conDescuento',
+    'aprobacionCompra',
     'comprado',
     'pagado',
+    'aprobacionPlanos',
     'primerSeguimiento',
     'enFOB',
     'conFleteInternacional',
@@ -1204,7 +1207,41 @@ export class EstadoProductoService {
     // 5. Obtener la fecha real actual
     const fechaRealActual = producto[fechaRealField] as Date | null;
 
-    // 6. Ejecutar en transacción: actualizar fecha real + crear historial
+    // 6. Validar que la nueva fecha no sea menor a la fecha real actual
+    if (fechaRealActual && nuevaFechaReal < new Date(fechaRealActual)) {
+      throw new BadRequestException(
+        `La nueva fecha real no puede ser menor a la actual (${new Date(fechaRealActual).toISOString().split('T')[0]})`,
+      );
+    }
+
+    // 7. Validar contra la fecha real del siguiente estado
+    const indexActual = estadosAplicables.indexOf(estado);
+    if (indexActual >= 0 && indexActual < estadosAplicables.length - 1) {
+      const siguienteEstado = estadosAplicables[indexActual + 1];
+      const siguienteFechaRealField =
+        this.ESTADO_TO_FECHA_REAL_FIELD[siguienteEstado];
+
+      // El siguiente estado puede no tener fecha real (ej: cotizado, conDescuento)
+      // En ese caso no validamos contra él
+      if (siguienteFechaRealField) {
+        const siguienteFechaReal = producto[
+          siguienteFechaRealField
+        ] as Date | null;
+
+        if (
+          siguienteFechaReal &&
+          nuevaFechaReal > new Date(siguienteFechaReal)
+        ) {
+          const labelSiguiente =
+            ESTADO_LABELS[siguienteEstado] || siguienteEstado;
+          throw new BadRequestException(
+            `La nueva fecha real no puede ser mayor a la fecha real del siguiente estado "${labelSiguiente}" (${new Date(siguienteFechaReal).toISOString().split('T')[0]})`,
+          );
+        }
+      }
+    }
+
+    // 8. Ejecutar en transacción: actualizar fecha real + crear historial
     const resultado = await this.prisma.$transaction(async (tx) => {
       // Actualizar la fecha real en estado_producto
       await tx.estadoProducto.update({
