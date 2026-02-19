@@ -486,6 +486,60 @@ export class EstadoProductoService {
       fechaNueva: nuevaFechaLimite,
     };
   }
+  /**
+   * Verifica documentos requeridos de un estado antes de permitir avanzar
+   */
+  private async verificarDocumentosParaAvanzar(
+    estadoProductoId: string,
+    estado: string,
+  ): Promise<{ completo: boolean; faltantes: string[] }> {
+    // Obtener requeridos obligatorios
+    const requeridos = await this.prisma.documentoRequerido.findMany({
+      where: { estado, activo: true, obligatorio: true },
+    });
+
+    // Si no hay requeridos para este estado, está completo
+    if (requeridos.length === 0) {
+      return { completo: true, faltantes: [] };
+    }
+
+    // Obtener adjuntos
+    const adjuntos = await this.prisma.documentoAdjunto.findMany({
+      where: { estadoProductoId, estado },
+    });
+
+    const faltantes: string[] = [];
+
+    for (const req of requeridos) {
+      const tieneArchivo = adjuntos.some(
+        (a) => a.documentoRequeridoId === req.id && !a.noAplica,
+      );
+      const tieneNoAplica = adjuntos.some(
+        (a) => a.documentoRequeridoId === req.id && a.noAplica,
+      );
+
+      if (!tieneArchivo && !tieneNoAplica) {
+        faltantes.push(req.nombre);
+      }
+    }
+
+    // Si hay "no aplica", validar justificación
+    const hayNoAplica = adjuntos.some((a) => a.noAplica);
+    if (hayNoAplica) {
+      const justificacion = await this.prisma.justificacionNoAplica.findUnique({
+        where: {
+          estadoProductoId_estado: { estadoProductoId, estado },
+        },
+      });
+      if (!justificacion || !justificacion.justificacion.trim()) {
+        faltantes.push(
+          'Justificación requerida para documentos marcados "No aplica"',
+        );
+      }
+    }
+
+    return { completo: faltantes.length === 0, faltantes };
+  }
 
   /**
    * Avanzar al siguiente estado
@@ -511,6 +565,16 @@ export class EstadoProductoService {
     }
 
     const siguienteEstado = estadosAplicables[indexActual + 1];
+    const verificacion = await this.verificarDocumentosParaAvanzar(
+      id,
+      estadoActual,
+    );
+    if (!verificacion.completo) {
+      throw new BadRequestException(
+        `No se puede avanzar. Documentos pendientes en "${ESTADO_LABELS[estadoActual]}": ${verificacion.faltantes.join(', ')}`,
+      );
+    }
+
     const ahora = new Date();
 
     // Preparar datos de actualización

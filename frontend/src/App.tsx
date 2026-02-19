@@ -53,6 +53,7 @@ import { useState, useEffect } from "react";
 import Profile from "./pages/Profile/Profile";
 import ResetPassword from "./pages/AuthPages/ResetPass";
 import ChangePasswordRequired from "./pages/AuthPages/ChangePasswordRequired";
+import Documents from "./pages/Shopping/Documents";
 
 const SHOPPING_MANAGER_ROLES = ["ADMIN", "SUPERVISOR"];
 const QUOTES_SUPERVISOR_ROLES = ["SUPERVISOR", "ADMIN"];
@@ -215,6 +216,11 @@ export default function App() {
                     </ProtectedRoute>
                   }
                 />
+                <Route path="documents" element={
+                  <ProtectedRoute roles={STAFF_ROLES}>
+                    <Documents />
+                  </ProtectedRoute>
+                } />
               </Route>
 
               {/* Proyectos - Solo STAFF */}
@@ -261,10 +267,10 @@ export default function App() {
                 }
               />
               <Route
-                path="/profile" 
+                path="/profile"
                 element={
                   <Profile />
-                } 
+                }
               />
               <Route
                 path="/roles"

@@ -98,11 +98,11 @@ export class DocumentoService {
   // ===========================================================
 
   /**
-   * Obtener documentos adjuntos de un producto, agrupados por estado,
-   * cruzados con los requeridos para saber qué falta
+   * Obtener documentos de un producto, agrupados por estado,
+   * cruzados con requeridos + justificaciones de "no aplica"
    */
   async getDocumentosProducto(estadoProductoId: string) {
-    // 1. Obtener el estado producto para saber el tipo de compra
+    // 1. Obtener el estado producto
     const estadoProducto = await this.prisma.estadoProducto.findUnique({
       where: { id: estadoProductoId },
       include: {
@@ -114,13 +114,45 @@ export class DocumentoService {
       throw new NotFoundException('Estado de producto no encontrado');
     }
 
-    // 2. Obtener todos los requeridos activos
+    const tipoCompra = estadoProducto.cotizacion?.tipoCompra || 'INTERNACIONAL';
+
+    // 2. Determinar estados aplicables según tipo de compra
+    const estadosAplicables =
+      tipoCompra === 'NACIONAL'
+        ? [
+            'cotizado',
+            'conDescuento',
+            'aprobacionCompra',
+            'comprado',
+            'pagado',
+            'recibido',
+          ]
+        : [
+            'cotizado',
+            'conDescuento',
+            'aprobacionCompra',
+            'comprado',
+            'pagado',
+            'aprobacionPlanos',
+            'primerSeguimiento',
+            'enFOB',
+            'cotizacionFleteInternacional',
+            'conBL',
+            'segundoSeguimiento',
+            'enCIF',
+            'recibido',
+          ];
+
+    // 3. Obtener todos los requeridos activos
     const requeridos = await this.prisma.documentoRequerido.findMany({
-      where: { activo: true },
+      where: {
+        activo: true,
+        estado: { in: estadosAplicables },
+      },
       orderBy: [{ estado: 'asc' }, { orden: 'asc' }],
     });
 
-    // 3. Obtener todos los adjuntos de este producto
+    // 4. Obtener todos los adjuntos de este producto
     const adjuntos = await this.prisma.documentoAdjunto.findMany({
       where: { estadoProductoId },
       include: {
@@ -130,39 +162,64 @@ export class DocumentoService {
       orderBy: { creado: 'asc' },
     });
 
-    // 4. Construir la vista cruzada por estado
+    // 5. Obtener justificaciones de "no aplica"
+    const justificaciones = await this.prisma.justificacionNoAplica.findMany({
+      where: { estadoProductoId },
+      include: {
+        creadoPor: { select: { id: true, nombre: true } },
+      },
+    });
+
+    const justificacionMap: Record<string, any> = {};
+    for (const j of justificaciones) {
+      justificacionMap[j.estado] = j;
+    }
+
+    // 6. Construir vista por estado (solo estados que tienen requeridos)
     const resultado: Record<
       string,
       {
         estado: string;
-        noAplica: boolean;
+        estadoCompletado: boolean;
+        justificacionNoAplica: {
+          id: string;
+          justificacion: string;
+          creadoPor: any;
+        } | null;
         requeridos: {
           id: string;
           nombre: string;
           descripcion?: string;
           obligatorio: boolean;
+          noAplica: boolean;
           adjuntos: typeof adjuntos;
         }[];
-        extras: typeof adjuntos; // Documentos subidos sin requerimiento asociado
+        extras: typeof adjuntos;
       }
     > = {};
 
-    // Agrupar requeridos por estado
     for (const req of requeridos) {
       if (!resultado[req.estado]) {
-        // Determinar si está marcado "no aplica"
-        const noAplicaField = `noAplicaDocumentos${req.estado.charAt(0).toUpperCase() + req.estado.slice(1)}`;
+        // Determinar si este estado ya fue completado
+        const estadoCompletado = (estadoProducto as any)[req.estado] === true;
+
         resultado[req.estado] = {
           estado: req.estado,
-          noAplica: (estadoProducto as any)[noAplicaField] || false,
+          estadoCompletado,
+          justificacionNoAplica: justificacionMap[req.estado] || null,
           requeridos: [],
           extras: [],
         };
       }
 
-      // Adjuntos que cumplen este requerimiento
+      // Adjuntos de este requerimiento
       const adjuntosDelReq = adjuntos.filter(
         (a) => a.documentoRequeridoId === req.id,
+      );
+
+      // Verificar si hay un registro "noAplica" para este requerimiento
+      const tieneNoAplica = adjuntos.some(
+        (a) => a.documentoRequeridoId === req.id && a.noAplica,
       );
 
       resultado[req.estado].requeridos.push({
@@ -170,18 +227,20 @@ export class DocumentoService {
         nombre: req.nombre,
         descripcion: req.descripcion || undefined,
         obligatorio: req.obligatorio,
-        adjuntos: adjuntosDelReq,
+        noAplica: tieneNoAplica,
+        adjuntos: adjuntosDelReq.filter((a) => !a.noAplica),
       });
     }
 
-    // Agregar adjuntos "extras" (sin requerimiento asociado)
+    // Extras sin requerimiento
     for (const adj of adjuntos) {
-      if (!adj.documentoRequeridoId) {
+      if (!adj.documentoRequeridoId && !adj.noAplica) {
         if (!resultado[adj.estado]) {
-          const noAplicaField = `noAplicaDocumentos${adj.estado.charAt(0).toUpperCase() + adj.estado.slice(1)}`;
+          const estadoCompletado = (estadoProducto as any)[adj.estado] === true;
           resultado[adj.estado] = {
             estado: adj.estado,
-            noAplica: (estadoProducto as any)[noAplicaField] || false,
+            estadoCompletado,
+            justificacionNoAplica: justificacionMap[adj.estado] || null,
             requeridos: [],
             extras: [],
           };
@@ -189,6 +248,88 @@ export class DocumentoService {
         resultado[adj.estado].extras.push(adj);
       }
     }
+
+    return resultado;
+  }
+
+  /**
+   * Marcar un requerimiento específico como "No aplica" para un producto
+   */
+  async marcarDocumentoNoAplica(
+    estadoProductoId: string,
+    documentoRequeridoId: string,
+    estado: string,
+    noAplica: boolean,
+    userId: string,
+  ) {
+    if (noAplica) {
+      // Crear registro de "no aplica" en documento_adjunto
+      // Verificar si ya existe
+      const existente = await this.prisma.documentoAdjunto.findFirst({
+        where: {
+          estadoProductoId,
+          documentoRequeridoId,
+          noAplica: true,
+        },
+      });
+
+      if (!existente) {
+        await this.prisma.documentoAdjunto.create({
+          data: {
+            estadoProductoId,
+            documentoRequeridoId,
+            estado,
+            nombreDocumento: 'No aplica',
+            nombreArchivo: 'NO_APLICA',
+            urlArchivo: 'NO_APLICA',
+            noAplica: true,
+            subidoPorId: userId,
+          },
+        });
+      }
+    } else {
+      // Quitar el "no aplica"
+      await this.prisma.documentoAdjunto.deleteMany({
+        where: {
+          estadoProductoId,
+          documentoRequeridoId,
+          noAplica: true,
+        },
+      });
+    }
+
+    return {
+      message: noAplica ? 'Marcado como "No aplica"' : '"No aplica" removido',
+    };
+  }
+
+  /**
+   * Guardar o actualizar justificación de "no aplica" para un estado
+   */
+  async guardarJustificacion(
+    estadoProductoId: string,
+    estado: string,
+    justificacion: string,
+    userId: string,
+  ) {
+    const resultado = await this.prisma.justificacionNoAplica.upsert({
+      where: {
+        estadoProductoId_estado: {
+          estadoProductoId,
+          estado,
+        },
+      },
+      create: {
+        estadoProductoId,
+        estado,
+        justificacion,
+        creadoPorId: userId,
+      },
+      update: {
+        justificacion,
+        creadoPorId: userId,
+      },
+    });
 
     return resultado;
   }
@@ -284,6 +425,64 @@ export class DocumentoService {
 
     return {
       message: `"No aplica" ${noAplica ? 'activado' : 'desactivado'} para ${estado}`,
+    };
+  }
+  /**
+   * Verifica si todos los documentos requeridos de un estado están cumplidos
+   * Retorna { completo: boolean, faltantes: string[] }
+   */
+  async verificarDocumentosCompletos(
+    estadoProductoId: string,
+    estado: string,
+  ): Promise<{ completo: boolean; faltantes: string[] }> {
+    // Obtener requeridos obligatorios del estado
+    const requeridos = await this.prisma.documentoRequerido.findMany({
+      where: { estado, activo: true, obligatorio: true },
+    });
+
+    if (requeridos.length === 0) {
+      return { completo: true, faltantes: [] };
+    }
+
+    // Obtener adjuntos del producto para este estado
+    const adjuntos = await this.prisma.documentoAdjunto.findMany({
+      where: { estadoProductoId, estado },
+    });
+
+    const faltantes: string[] = [];
+
+    for (const req of requeridos) {
+      // Verificar si tiene archivo O está marcado como "no aplica"
+      const tieneArchivo = adjuntos.some(
+        (a) => a.documentoRequeridoId === req.id && !a.noAplica,
+      );
+      const tieneNoAplica = adjuntos.some(
+        (a) => a.documentoRequeridoId === req.id && a.noAplica,
+      );
+
+      if (!tieneArchivo && !tieneNoAplica) {
+        faltantes.push(req.nombre);
+      }
+    }
+
+    // Si hay documentos marcados como "no aplica", verificar que exista justificación
+    const hayNoAplica = adjuntos.some((a) => a.noAplica);
+    if (hayNoAplica) {
+      const justificacion = await this.prisma.justificacionNoAplica.findUnique({
+        where: {
+          estadoProductoId_estado: { estadoProductoId, estado },
+        },
+      });
+      if (!justificacion || !justificacion.justificacion.trim()) {
+        faltantes.push(
+          '⚠️ Justificación requerida para documentos "No aplica"',
+        );
+      }
+    }
+
+    return {
+      completo: faltantes.length === 0,
+      faltantes,
     };
   }
 }

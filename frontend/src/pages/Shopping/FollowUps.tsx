@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import PageMeta from "../../components/common/PageMeta";
 import { getToken } from "../../lib/api";
 import { useNotifications } from "../Notifications/context/NotificationContext";
@@ -821,6 +821,15 @@ export default function ShoppingFollowUps() {
                             {' '}{productoSeleccionado.medioTransporte}
                           </span>
                         )}
+                        <Button
+                          asChild
+                          size="lg"
+                          className="bg-[#4169E1] hover:bg-[#3154B8] text-white rounded-xl text-base font-semibold shadow-md transition-colors"
+                        >
+                          <Link to={`/shopping/documents?producto=${productoSeleccionado.id}`}>
+                            📄 Ver Documentos
+                          </Link>
+                        </Button>
                       </div>
                     </div>
                   </div>

@@ -36,6 +36,7 @@ export enum EstadoProceso {
 export const ESTADOS_NACIONAL: EstadoProceso[] = [
   EstadoProceso.COTIZADO,
   EstadoProceso.CON_DESCUENTO,
+  EstadoProceso.APROBACION_COMPRA,
   EstadoProceso.COMPRADO,
   EstadoProceso.PAGADO,
   EstadoProceso.RECIBIDO,

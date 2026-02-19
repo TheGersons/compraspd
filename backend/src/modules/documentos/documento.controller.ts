@@ -14,6 +14,7 @@ import {
   UploadedFile,
   Req,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -140,7 +141,7 @@ export class DocumentoController {
     return this.service.deleteDocumento(id, req.user.sub);
   }
 
-  @Patch('no-aplica')
+  /*  @Patch('no-aplica')
   @ApiOperation({ summary: 'Toggle "No aplica" documentos para un estado' })
   async toggleNoAplica(
     @Body()
@@ -152,5 +153,73 @@ export class DocumentoController {
       body.estado,
       body.noAplica,
     );
+  } */
+
+  /**
+   * PATCH /documentos/no-aplica-documento
+   * Marcar un requerimiento específico como "no aplica"
+   */
+  @Patch('no-aplica-documento')
+  @ApiOperation({ summary: 'Marcar documento requerido como "No aplica"' })
+  async toggleNoAplicaDocumento(
+    @Body()
+    body: {
+      estadoProductoId: string;
+      documentoRequeridoId: string;
+      estado: string;
+      noAplica: boolean;
+    },
+    @Req() req: any,
+  ) {
+    return this.service.marcarDocumentoNoAplica(
+      body.estadoProductoId,
+      body.documentoRequeridoId,
+      body.estado,
+      body.noAplica,
+      req.user.sub,
+    );
+  }
+
+  /**
+   * PATCH /documentos/justificacion
+   * Guardar justificación de "no aplica" para un estado
+   */
+  @Patch('justificacion')
+  @ApiOperation({
+    summary: 'Guardar justificación de "no aplica" para un estado',
+  })
+  async guardarJustificacion(
+    @Body()
+    body: {
+      estadoProductoId: string;
+      estado: string;
+      justificacion: string;
+    },
+    @Req() req: any,
+  ) {
+    if (!body.justificacion?.trim()) {
+      throw new BadRequestException('La justificación es requerida');
+    }
+    return this.service.guardarJustificacion(
+      body.estadoProductoId,
+      body.estado,
+      body.justificacion,
+      req.user.sub,
+    );
+  }
+
+  /**
+   * GET /documentos/verificar/:estadoProductoId/:estado
+   * Verificar si documentos están completos para avanzar
+   */
+  @Get('verificar/:estadoProductoId/:estado')
+  @ApiOperation({
+    summary: 'Verificar si documentos están completos para un estado',
+  })
+  async verificarDocumentos(
+    @Param('estadoProductoId') estadoProductoId: string,
+    @Param('estado') estado: string,
+  ) {
+    return this.service.verificarDocumentosCompletos(estadoProductoId, estado);
   }
 }

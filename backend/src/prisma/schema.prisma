@@ -168,16 +168,17 @@ model Usuario {
   rol          Rol          @relation(fields: [rolId], references: [id], onDelete: Restrict)
   departamento Departamento @relation(fields: [departamentoId], references: [id], onDelete: Restrict)
 
-  cotizaciones             Cotizacion[]           @relation("UsuarioSolicitante")
+  cotizaciones             Cotizacion[]            @relation("UsuarioSolicitante")
   seguimientos             Seguimiento[]
   mensajes                 Mensaje[]
   notificaciones           Notificacion[]
   participantesChat        ParticipantesChat[]
-  cotizacionesSupervisadas Cotizacion[]           @relation("SupervisorCotizacion")
+  cotizacionesSupervisadas Cotizacion[]            @relation("SupervisorCotizacion")
   historialCotizaciones    HistorialCotizacion[]
   sesiones                 Sesion[]
-  historialFechasCreadas   HistorialFechaLimite[] @relation("HistorialFechaCreadoPor")
-  documentosSubidos        DocumentoAdjunto[]     @relation("DocumentosSubidos")
+  historialFechasCreadas   HistorialFechaLimite[]  @relation("HistorialFechaCreadoPor")
+  documentosSubidos        DocumentoAdjunto[]      @relation("DocumentosSubidos")
+  justificacionesCreadoPor JustificacionNoAplica[] @relation("JustificacionesCreadoPor")
 
   @@index([email])
   @@index([rolId])
@@ -224,6 +225,7 @@ model DocumentoAdjunto {
   tamanoBytes          BigInt?  @map("tamano_bytes")
   subidoPorId          String   @map("subido_por") @db.Uuid
   creado               DateTime @default(now())
+  noAplica             Boolean  @default(false) @map("no_aplica")
 
   estadoProducto     EstadoProducto      @relation(fields: [estadoProductoId], references: [id], onDelete: Cascade)
   documentoRequerido DocumentoRequerido? @relation(fields: [documentoRequeridoId], references: [id], onDelete: SetNull)
@@ -234,6 +236,24 @@ model DocumentoAdjunto {
   @@index([estado])
   @@index([subidoPorId])
   @@map("documento_adjunto")
+}
+
+model JustificacionNoAplica {
+  id               String   @id @default(uuid()) @db.Uuid
+  estadoProductoId String   @map("estado_producto_id") @db.Uuid
+  estado           String   @db.VarChar(50)
+  justificacion    String   @db.Text
+  creadoPorId      String   @map("creado_por") @db.Uuid
+  creado           DateTime @default(now())
+  actualizado      DateTime @default(now()) @updatedAt
+
+  estadoProducto EstadoProducto @relation(fields: [estadoProductoId], references: [id], onDelete: Cascade)
+  creadoPor      Usuario        @relation("JustificacionesCreadoPor", fields: [creadoPorId], references: [id], onDelete: Restrict)
+
+  @@unique([estadoProductoId, estado])
+  @@index([estadoProductoId])
+  @@index([estado])
+  @@map("justificacion_no_aplica")
 }
 
 // ============================================
@@ -606,7 +626,8 @@ model EstadoProducto {
   tipoEntrega           String?            @map("tipo_entrega") @db.VarChar(10) // 'FOB' | 'CIF'
 
   // Documentos adjuntos
-  documentosAdjuntos DocumentoAdjunto[]
+  documentosAdjuntos      DocumentoAdjunto[]
+  justificacionesNoAplica JustificacionNoAplica[]
 
   // No aplica documentos por estado
   noAplicaDocumentosAprobacionCompra             Boolean                @default(false)
