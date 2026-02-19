@@ -46,20 +46,45 @@ type Producto = {
 // ============================================================================
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
+export const ORDEN_ESTADOS_KEYS = [
+    "aprobacionCompra",
+    "comprado",
+    "pagado",
+    "aprobacionPlanos",
+    "primerSeguimiento",
+    "enFOB",
+    "cotizacionFleteInternacional",
+    "conBL",
+    "segundoSeguimiento",
+    "enCIF",
+    "recibido"
+];
+
 const ESTADOS_LABELS: Record<string, string> = {
-    cotizado: "Cotizado", conDescuento: "Con Descuento",
-    aprobacionCompra: "Aprobación de Compra", comprado: "Comprado",
-    pagado: "Pagado", aprobacionPlanos: "Aprobación de Planos",
-    primerSeguimiento: "1er Seguimiento / Estado de producto",
-    enFOB: "Incoterms", cotizacionFleteInternacional: "Cotización Flete Int.",
-    conBL: "Documentos de importación", segundoSeguimiento: "2do Seg. / En Tránsito",
-    enCIF: "Proceso de aduana", recibido: "Recibido",
+    aprobacionCompra: "Aprobacion de compra",
+    comprado: "Comprado",
+    pagado: "Pagado",
+    aprobacionPlanos: "Aprobacion de planos",
+    primerSeguimiento: "1er seguimiento/estado de producto",
+    enFOB: "Incoterms",
+    cotizacionFleteInternacional: "Cotizacion de flete internacional",
+    conBL: "Documentos de importacion",
+    segundoSeguimiento: "2do seguimiento",
+    enCIF: "Proceso de aduana",
+    recibido: "Recibido",
 };
 const ESTADOS_ICONOS: Record<string, string> = {
-    cotizado: "📋", conDescuento: "💰", aprobacionCompra: "✅", comprado: "🛒",
-    pagado: "💳", aprobacionPlanos: "📐", primerSeguimiento: "📞", enFOB: "🚢",
-    cotizacionFleteInternacional: "📊", conBL: "📄", segundoSeguimiento: "🚚",
-    enCIF: "🛃", recibido: "📦",
+    aprobacionCompra: "✅",
+    comprado: "🛒",
+    pagado: "💳",
+    aprobacionPlanos: "📐",
+    primerSeguimiento: "📞",
+    enFOB: "🚢",
+    cotizacionFleteInternacional: "📊",
+    conBL: "📄",
+    segundoSeguimiento: "🚚",
+    enCIF: "🛃",
+    recibido: "📦",
 };
 
 // ============================================================================
@@ -375,7 +400,20 @@ export default function Documents() {
                                             {esSupervisorOAdmin && <button onClick={abrirConfig} className="mt-3 text-sm text-blue-600 hover:underline dark:text-blue-400">Configurar requerimientos →</button>}
                                         </div>
                                     ) : (
-                                        Object.entries(documentos).map(([estado, estadoDoc]) => {
+                                        [
+                                            "aprobacionCompra",
+                                            "comprado",
+                                            "pagado",
+                                            "aprobacionPlanos",
+                                            "primerSeguimiento",
+                                            "enFOB",
+                                            "cotizacionFleteInternacional",
+                                            "conBL",
+                                            "segundoSeguimiento",
+                                            "enCIF",
+                                            "recibido"
+                                        ].filter(estado => documentos[estado]).map((estado) => {
+                                            const estadoDoc = documentos[estado];
                                             const isExpanded = estadosExpandidos[estado] || false;
                                             const totalReq = estadoDoc.requeridos.filter((r) => r.obligatorio).length;
                                             const completadosReq = estadoDoc.requeridos.filter((r) => r.obligatorio && (r.adjuntos.length > 0 || r.noAplica)).length;
