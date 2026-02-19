@@ -291,8 +291,6 @@ const api = {
 
   async avanzarEstado(id: string, data: {
     observacion?: string;
-    evidenciaUrl?: string;
-    noAplicaEvidencia?: boolean;
     tipoEntrega?: 'FOB' | 'CIF';
   }) {
     const token = this.getToken();
@@ -315,68 +313,30 @@ const api = {
     return response.json();
   },
 
-  async uploadEvidencia(file: File, cotizacionId: string, sku: string, proveedor: string, estado: string) {
+  async verificarDocumentos(estadoProductoId: string, estado: string) {
     const token = this.getToken();
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('cotizacionId', cotizacionId);
-    formData.append('sku', sku);
-    formData.append('proveedorNombre', proveedor || 'sin-proveedor');
-    formData.append('tipo', `evidencia_${estado}`);
-
-    const response = await fetch(`${API_BASE_URL}/api/v1/storage/upload`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { Authorization: `Bearer ${token}` },
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Error al subir archivo');
-    }
-
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/documentos/verificar/${estadoProductoId}/${estado}`,
+      {
+        credentials: "include",
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+    if (!response.ok) return { completo: true, faltantes: [] }; // Si falla, no bloquear
     return response.json();
   },
 
-  async generateNoAplica() {
+  async getDocumentosProducto(estadoProductoId: string) {
     const token = this.getToken();
-    const response = await fetch(`${API_BASE_URL}/api/v1/storage/no-aplica`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    if (!response.ok) throw new Error('Error al generar comprobante');
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/documentos/producto/${estadoProductoId}`,
+      {
+        credentials: "include",
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+    if (!response.ok) return {};
     return response.json();
-  },
-
-  async downloadFile(params: {
-    cotizacionId: string;
-    sku: string;
-    proveedor: string;
-    filename: string;
-    mode: 'inline' | 'attachment';
-    tipo: string;
-  }) {
-    const token = getToken();
-    const query = new URLSearchParams({
-      cotizacionId: params.cotizacionId,
-      sku: params.sku,
-      proveedor: params.proveedor,
-      tipo: params.tipo,
-      filename: params.filename,
-      mode: params.mode
-    });
-
-    const response = await fetch(`${API_BASE_URL}/api/v1/storage/download?${query.toString()}`, {
-      method: 'GET',
-      credentials: "include",
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    if (!response.ok) throw new Error("Error al descargar archivo");
-    return response.blob();
   },
 };
 
@@ -450,13 +410,15 @@ export default function ShoppingFollowUps() {
   // UI States
   const [showAvanzarModal, setShowAvanzarModal] = useState(false);
   const [observacion, setObservacion] = useState("");
-  const [archivoEvidencia, setArchivoEvidencia] = useState<File | null>(null);
-  const [noAplicaEvidencia, setNoAplicaEvidencia] = useState(false);
+
+  // Verificación de documentos para avanzar
+  const [docVerificacion, setDocVerificacion] = useState<{ completo: boolean; faltantes: string[] } | null>(null);
+  const [loadingVerificacion, setLoadingVerificacion] = useState(false);
 
   // NUEVO: Estado para selección FOB/CIF
   const [tipoEntregaSeleccionado, setTipoEntregaSeleccionado] = useState<'FOB' | 'CIF' | null>(null);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null); // Se mantiene por si TimelineItem lo usa
 
   // Efectos
   useEffect(() => {
@@ -494,10 +456,30 @@ export default function ShoppingFollowUps() {
   const seleccionarProducto = async (id: string) => {
     try {
       setLoadingDetalle(true);
-      const [detalle, timelineData] = await Promise.all([
+      const [detalle, timelineData, documentosData] = await Promise.all([
         api.getEstadoProductoById(id),
-        api.getTimeline(id)
+        api.getTimeline(id),
+        api.getDocumentosProducto(id),
       ]);
+
+      // Enriquecer timeline items con info de documentos del sistema nuevo
+      if (timelineData?.timeline && documentosData) {
+        for (const item of timelineData.timeline) {
+          const estadoDocs = documentosData[item.estado];
+          if (estadoDocs && estadoDocs.requeridos?.length > 0) {
+            const totalReq = estadoDocs.requeridos.filter((r: any) => r.obligatorio).length;
+            const completados = estadoDocs.requeridos.filter(
+              (r: any) => r.obligatorio && (r.adjuntos?.length > 0 || r.noAplica)
+            ).length;
+            item.documentos = {
+              totalRequeridos: totalReq,
+              completados,
+              completo: totalReq > 0 ? completados >= totalReq : true,
+            };
+          }
+        }
+      }
+
       setProductoSeleccionado(detalle);
       setTimeline(timelineData);
     } catch (error) {
@@ -511,12 +493,6 @@ export default function ShoppingFollowUps() {
   const handleAvanzarEstado = async () => {
     if (!productoSeleccionado) return;
 
-    // Validar que tenga evidencia o "No aplica"
-    if (!archivoEvidencia && !noAplicaEvidencia) {
-      addNotification("warn", "Advertencia", "Debe subir un archivo de evidencia o marcar 'No aplica'");
-      return;
-    }
-
     // NUEVO: Validar selección FOB/CIF si es el estado enFOB
     if (productoSeleccionado.siguienteEstado === 'enFOB' && !tipoEntregaSeleccionado) {
       addNotification("warn", "Advertencia", "Debe seleccionar si es FOB o CIF");
@@ -525,25 +501,10 @@ export default function ShoppingFollowUps() {
 
     try {
       setLoadingAccion(true);
-      let evidenciaUrl: string | undefined;
 
-      // Subir archivo si existe
-      if (archivoEvidencia && productoSeleccionado.cotizacion) {
-        const uploadResult = await api.uploadEvidencia(
-          archivoEvidencia,
-          productoSeleccionado.cotizacion.id,
-          productoSeleccionado.sku,
-          productoSeleccionado.proveedor || 'sin-proveedor',
-          productoSeleccionado.siguienteEstado || 'estado'
-        );
-        evidenciaUrl = uploadResult.url || uploadResult.fileName;
-      }
-
-      // Avanzar estado (incluyendo tipoEntrega si aplica)
+      // Avanzar estado - el backend valida documentos automáticamente
       await api.avanzarEstado(productoSeleccionado.id, {
         observacion: observacion || undefined,
-        evidenciaUrl,
-        noAplicaEvidencia: noAplicaEvidencia && !archivoEvidencia,
         tipoEntrega: productoSeleccionado.siguienteEstado === 'enFOB' ? tipoEntregaSeleccionado || undefined : undefined
       });
 
@@ -552,9 +513,8 @@ export default function ShoppingFollowUps() {
       // Limpiar y recargar
       setShowAvanzarModal(false);
       setObservacion("");
-      setArchivoEvidencia(null);
-      setNoAplicaEvidencia(false);
       setTipoEntregaSeleccionado(null);
+      setDocVerificacion(null);
 
       await seleccionarProducto(productoSeleccionado.id);
       await cargarProductos();
@@ -566,12 +526,24 @@ export default function ShoppingFollowUps() {
     }
   };
 
-  const abrirModalAvanzar = () => {
+  const abrirModalAvanzar = async () => {
     setObservacion("");
-    setArchivoEvidencia(null);
-    setNoAplicaEvidencia(false);
     setTipoEntregaSeleccionado(null);
+    setDocVerificacion(null);
     setShowAvanzarModal(true);
+
+    // Verificar documentos del estado actual
+    if (productoSeleccionado?.estadoActual) {
+      setLoadingVerificacion(true);
+      try {
+        const result = await api.verificarDocumentos(productoSeleccionado.id, productoSeleccionado.estadoActual);
+        setDocVerificacion(result);
+      } catch {
+        setDocVerificacion({ completo: true, faltantes: [] }); // No bloquear si falla
+      } finally {
+        setLoadingVerificacion(false);
+      }
+    }
   };
 
   // Filtrar productos por búsqueda y estado de completado
@@ -1026,53 +998,47 @@ export default function ShoppingFollowUps() {
                   </div>
                 )}
 
-                {/* Subir evidencia */}
+                {/* Estado de documentos del estado actual */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Evidencia (archivo)
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Documentos del estado actual
                   </label>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".pdf,.png,.jpg,.jpeg,.gif,.webp"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        setArchivoEvidencia(file);
-                        setNoAplicaEvidencia(false);
-                      }
-                    }}
-                    className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm file:mr-4 file:rounded file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-                  />
-                  {archivoEvidencia && (
-                    <p className="mt-1 text-sm text-green-600 dark:text-green-400">
-                      ✓ Archivo seleccionado: {archivoEvidencia.name}
-                    </p>
+                  {loadingVerificacion ? (
+                    <div className="flex items-center gap-2 rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+                      <span className="text-sm text-gray-500">Verificando documentos...</span>
+                    </div>
+                  ) : docVerificacion ? (
+                    docVerificacion.completo ? (
+                      <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-900/20">
+                        <span className="text-green-600">✅</span>
+                        <span className="text-sm text-green-700 dark:text-green-300">Todos los documentos están completos</span>
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-900/20">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-red-600">⚠️</span>
+                          <span className="text-sm font-medium text-red-700 dark:text-red-300">Documentos pendientes:</span>
+                        </div>
+                        <ul className="ml-6 space-y-1">
+                          {docVerificacion.faltantes.map((f, i) => (
+                            <li key={i} className="text-xs text-red-600 dark:text-red-400">• {f}</li>
+                          ))}
+                        </ul>
+                        <Link
+                          to={`/shopping/documents?producto=${productoSeleccionado.id}`}
+                          className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
+                        >
+                          📄 Ir a Documentos para completarlos →
+                        </Link>
+                      </div>
+                    )
+                  ) : (
+                    <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800">
+                      <span className="text-sm text-gray-500">Sin requerimientos de documentos para este estado</span>
+                    </div>
                   )}
                 </div>
-
-                {/* O marcar No aplica */}
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-500">— o —</span>
-                </div>
-
-                <label className="flex items-center gap-3 rounded-lg border border-gray-300 p-3 cursor-pointer hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800">
-                  <input
-                    type="checkbox"
-                    checked={noAplicaEvidencia}
-                    onChange={(e) => {
-                      setNoAplicaEvidencia(e.target.checked);
-                      if (e.target.checked) {
-                        setArchivoEvidencia(null);
-                        if (fileInputRef.current) fileInputRef.current.value = '';
-                      }
-                    }}
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600"
-                  />
-                  <span className="text-sm text-gray-700 dark:text-gray-300">
-                    No aplica evidencia para este estado
-                  </span>
-                </label>
 
                 {/* Observación */}
                 <div>
@@ -1094,9 +1060,8 @@ export default function ShoppingFollowUps() {
                   onClick={() => {
                     setShowAvanzarModal(false);
                     setObservacion("");
-                    setArchivoEvidencia(null);
-                    setNoAplicaEvidencia(false);
                     setTipoEntregaSeleccionado(null);
+                    setDocVerificacion(null);
                   }}
                   disabled={loadingAccion}
                   className="flex-1 rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
@@ -1107,7 +1072,7 @@ export default function ShoppingFollowUps() {
                   onClick={handleAvanzarEstado}
                   disabled={
                     loadingAccion ||
-                    (!archivoEvidencia && !noAplicaEvidencia) ||
+                    (docVerificacion !== null && !docVerificacion.completo) ||
                     (requiereSeleccionFobCif && !tipoEntregaSeleccionado)
                   }
                   className="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 disabled:opacity-50"

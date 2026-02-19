@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Download, Eye, X, FileText, CalendarIcon } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Download, Eye, X, FileText, CalendarIcon, ExternalLink } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { es } from "date-fns/locale";
@@ -23,6 +24,12 @@ type TimelineItemData = {
   evidencia?: string;
   tieneEvidencia: boolean;
   esNoAplica: boolean;
+  // Documentos del sistema nuevo (opcional, para transición)
+  documentos?: {
+    totalRequeridos: number;
+    completados: number;
+    completo: boolean;
+  };
 };
 
 type EstadoProductoData = {
@@ -383,8 +390,24 @@ export const TimelineItem = ({ item, producto, sku, onRefresh }: TimelineItemPro
             </span>
           )}
 
-          {/* 5. Evidencia */}
-          {item.tieneEvidencia && (
+          {/* 5. Documentos del sistema nuevo */}
+          {item.documentos && item.documentos.totalRequeridos > 0 && (
+            <Link
+              to={`/shopping/documents?producto=${producto.id}`}
+              className={`group flex items-center gap-1 transition-all hover:underline ${item.documentos.completo
+                  ? 'text-green-600 dark:text-green-400'
+                  : 'text-yellow-600 dark:text-yellow-400'
+                }`}
+              title="Ver documentos de este estado"
+            >
+              <FileText size={14} className="group-hover:scale-110 transition-transform" />
+              📄 {item.documentos.completados}/{item.documentos.totalRequeridos} docs
+              <ExternalLink size={10} className="opacity-50" />
+            </Link>
+          )}
+
+          {/* 5b. Evidencia del sistema viejo (compatibilidad) */}
+          {!item.documentos && item.tieneEvidencia && (
             item.esNoAplica ? (
               <span className="text-gray-400 flex items-center gap-1">
                 ➖ N/A

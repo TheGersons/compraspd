@@ -356,14 +356,14 @@ export class DocumentoService {
 
     if (!ep) throw new NotFoundException('Estado de producto no encontrado');
 
-    // Subir archivo a Nextcloud
+    // Subir archivo a Nextcloud usando la misma lógica de StorageService
     const uploadResult = await this.storage.uploadFile(
       file,
       originalName,
       ep.cotizacion?.id || 'sin-cotizacion',
       ep.sku,
-      'documentos',
-      'otros',
+      ep.proveedor || 'sin-proveedor', // ← nombre real del proveedor
+      'otros' as any,
     );
 
     // Obtener extensión y tamaño
@@ -376,7 +376,7 @@ export class DocumentoService {
         documentoRequeridoId: dto.documentoRequeridoId || null,
         estado: dto.estado,
         nombreDocumento: dto.nombreDocumento,
-        nombreArchivo: uploadResult.fileName,
+        nombreArchivo: originalName, // ← nombre original del archivo
         urlArchivo: uploadResult.url || uploadResult.path,
         tipoArchivo: ext,
         tamanoBytes: BigInt(file.length),
@@ -408,25 +408,6 @@ export class DocumentoService {
     return { message: 'Documento eliminado correctamente' };
   }
 
-  /**
-   * Marcar/desmarcar "No aplica" documentos para un estado de un producto
-   */
-  async toggleNoAplicaDocumentos(
-    estadoProductoId: string,
-    estado: string,
-    noAplica: boolean,
-  ) {
-    const noAplicaField = `noAplicaDocumentos${estado.charAt(0).toUpperCase() + estado.slice(1)}`;
-
-    await this.prisma.estadoProducto.update({
-      where: { id: estadoProductoId },
-      data: { [noAplicaField]: noAplica },
-    });
-
-    return {
-      message: `"No aplica" ${noAplica ? 'activado' : 'desactivado'} para ${estado}`,
-    };
-  }
   /**
    * Verifica si todos los documentos requeridos de un estado están cumplidos
    * Retorna { completo: boolean, faltantes: string[] }
