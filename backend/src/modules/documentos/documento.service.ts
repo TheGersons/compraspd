@@ -249,7 +249,12 @@ export class DocumentoService {
       }
     }
 
-    return resultado;
+    // Serializar BigInt a Number para JSON
+    return JSON.parse(
+      JSON.stringify(resultado, (key, value) =>
+        typeof value === 'bigint' ? Number(value) : value,
+      ),
+    );
   }
 
   /**
@@ -356,38 +361,65 @@ export class DocumentoService {
 
     if (!ep) throw new NotFoundException('Estado de producto no encontrado');
 
-    // Subir archivo a Nextcloud usando la misma lógica de StorageService
-    const uploadResult = await this.storage.uploadFile(
-      file,
+    console.log('[DocumentoService] uploadDocumento:', {
+      estadoProductoId: dto.estadoProductoId,
+      cotizacionId: ep.cotizacion?.id || ep.cotizacionId,
+      sku: ep.sku,
+      proveedor: ep.proveedor,
       originalName,
-      ep.cotizacion?.id || 'sin-cotizacion',
-      ep.sku,
-      ep.proveedor || 'sin-proveedor', // ← nombre real del proveedor
-      'otros' as any,
-    );
+      fileSize: file.length,
+    });
 
-    // Obtener extensión y tamaño
+    // Subir archivo a Nextcloud
+    let uploadResult: { url: string; path: string; fileName: string };
+    try {
+      uploadResult = await this.storage.uploadFile(
+        file,
+        originalName,
+        ep.cotizacion?.id || ep.cotizacionId || 'sin-cotizacion',
+        ep.sku,
+        ep.proveedor || 'sin-proveedor',
+        'otros',
+      );
+      console.log('[DocumentoService] Upload exitoso:', uploadResult);
+    } catch (error) {
+      console.error('[DocumentoService] Error en storage.uploadFile:', error);
+      throw error;
+    }
+
+    // Obtener extensión
     const ext = originalName.split('.').pop()?.toLowerCase() || 'pdf';
 
     // Crear registro en BD
-    const documento = await this.prisma.documentoAdjunto.create({
-      data: {
-        estadoProductoId: dto.estadoProductoId,
-        documentoRequeridoId: dto.documentoRequeridoId || null,
-        estado: dto.estado,
-        nombreDocumento: dto.nombreDocumento,
-        nombreArchivo: originalName, // ← nombre original del archivo
-        urlArchivo: uploadResult.url || uploadResult.path,
-        tipoArchivo: ext,
-        tamanoBytes: BigInt(file.length),
-        subidoPorId: userId,
-      },
-      include: {
-        subidoPor: { select: { id: true, nombre: true } },
-      },
-    });
+    try {
+      const documento = await this.prisma.documentoAdjunto.create({
+        data: {
+          estadoProductoId: dto.estadoProductoId,
+          documentoRequeridoId: dto.documentoRequeridoId || null,
+          estado: dto.estado,
+          nombreDocumento: dto.nombreDocumento,
+          nombreArchivo: originalName,
+          urlArchivo: uploadResult.url || uploadResult.path,
+          tipoArchivo: ext,
+          tamanoBytes: file.length,
+          subidoPorId: userId,
+        },
+        include: {
+          subidoPor: { select: { id: true, nombre: true } },
+        },
+      });
 
-    return documento;
+      // Convertir BigInt a Number para serialización JSON
+      return {
+        ...documento,
+        tamanoBytes: documento.tamanoBytes
+          ? Number(documento.tamanoBytes)
+          : null,
+      };
+    } catch (error) {
+      console.error('[DocumentoService] Error al crear registro en BD:', error);
+      throw error;
+    }
   }
 
   /**
