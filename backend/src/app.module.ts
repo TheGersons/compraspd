@@ -30,10 +30,7 @@ import { TimelineSKUModule } from './modules/timeline-sku/timeline-sku.module';
 import { EstadoProductoModule } from './modules/estado-producto/estado-producto.module';
 import { StorageModule } from './modules/storage';
 import { MailModule } from './modules/Mail/mail.module';
-
-
-
-
+import { DocumentoModule } from './modules/documentos/documento.module';
 
 @Module({
   imports: [
@@ -64,10 +61,9 @@ import { MailModule } from './modules/Mail/mail.module';
     TimelineSKUModule,
     EstadoProductoModule,
     StorageModule,
-    MailModule
+    MailModule,
+    DocumentoModule,
   ],
-  providers: [
-    SessionCleanupService
-  ],
+  providers: [SessionCleanupService],
 })
-export class AppModule { }
+export class AppModule {}

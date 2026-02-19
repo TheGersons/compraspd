@@ -177,11 +177,63 @@ model Usuario {
   historialCotizaciones    HistorialCotizacion[]
   sesiones                 Sesion[]
   historialFechasCreadas   HistorialFechaLimite[] @relation("HistorialFechaCreadoPor")
+  documentosSubidos        DocumentoAdjunto[]     @relation("DocumentosSubidos")
 
   @@index([email])
   @@index([rolId])
   @@index([activo])
   @@map("usuario")
+}
+
+// ============================================
+// DOCUMENTOS REQUERIDOS POR ESTADO (CONFIG GLOBAL)
+// ============================================
+
+model DocumentoRequerido {
+  id          String   @id @default(uuid()) @db.Uuid
+  estado      String   @db.VarChar(50) // "comprado", "pagado", etc.
+  nombre      String   @db.VarChar(150) // "Orden de Compra"
+  descripcion String?  @db.Text
+  obligatorio Boolean  @default(true)
+  orden       Int      @default(0)
+  activo      Boolean  @default(true)
+  creado      DateTime @default(now())
+  actualizado DateTime @default(now()) @updatedAt
+
+  documentosAdjuntos DocumentoAdjunto[]
+
+  @@unique([estado, nombre])
+  @@index([estado])
+  @@index([activo])
+  @@map("documento_requerido")
+}
+
+// ============================================
+// DOCUMENTOS ADJUNTOS (ARCHIVOS REALES)
+// ============================================
+
+model DocumentoAdjunto {
+  id                   String   @id @default(uuid()) @db.Uuid
+  estadoProductoId     String   @map("estado_producto_id") @db.Uuid
+  documentoRequeridoId String?  @map("documento_requerido_id") @db.Uuid
+  estado               String   @db.VarChar(50)
+  nombreDocumento      String   @map("nombre_documento") @db.VarChar(255)
+  nombreArchivo        String   @map("nombre_archivo") @db.VarChar(255)
+  urlArchivo           String   @map("url_archivo") @db.Text
+  tipoArchivo          String?  @map("tipo_archivo") @db.VarChar(50)
+  tamanoBytes          BigInt?  @map("tamano_bytes")
+  subidoPorId          String   @map("subido_por") @db.Uuid
+  creado               DateTime @default(now())
+
+  estadoProducto     EstadoProducto      @relation(fields: [estadoProductoId], references: [id], onDelete: Cascade)
+  documentoRequerido DocumentoRequerido? @relation(fields: [documentoRequeridoId], references: [id], onDelete: SetNull)
+  subidoPor          Usuario             @relation("DocumentosSubidos", fields: [subidoPorId], references: [id], onDelete: Restrict)
+
+  @@index([estadoProductoId])
+  @@index([documentoRequeridoId])
+  @@index([estado])
+  @@index([subidoPorId])
+  @@map("documento_adjunto")
 }
 
 // ============================================
@@ -544,16 +596,32 @@ model EstadoProducto {
   evidenciaRecibido                     String? @db.Text
 
   // Relaciones
-  proyecto              Proyecto?              @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
-  cotizacion            Cotizacion?            @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
-  cotizacionDetalle     CotizacionDetalle?     @relation(fields: [cotizacionDetalleId], references: [id], onDelete: Cascade)
-  compra                Compra?                @relation(fields: [compraId], references: [id], onDelete: Cascade)
-  compraDetalle         CompraDetalle?         @relation(fields: [compraDetalleId], references: [id], onDelete: Cascade)
-  aprobadoPorSupervisor Boolean                @default(false) @map("aprobado_por_supervisor")
-  fechaAprobacion       DateTime?              @map("fecha_aprobacion")
-  tipoEntrega           String?                @map("tipo_entrega") @db.VarChar(10) // 'FOB' | 'CIF'
+  proyecto              Proyecto?          @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  cotizacion            Cotizacion?        @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  cotizacionDetalle     CotizacionDetalle? @relation(fields: [cotizacionDetalleId], references: [id], onDelete: Cascade)
+  compra                Compra?            @relation(fields: [compraId], references: [id], onDelete: Cascade)
+  compraDetalle         CompraDetalle?     @relation(fields: [compraDetalleId], references: [id], onDelete: Cascade)
+  aprobadoPorSupervisor Boolean            @default(false) @map("aprobado_por_supervisor")
+  fechaAprobacion       DateTime?          @map("fecha_aprobacion")
+  tipoEntrega           String?            @map("tipo_entrega") @db.VarChar(10) // 'FOB' | 'CIF'
+
+  // Documentos adjuntos
+  documentosAdjuntos DocumentoAdjunto[]
+
+  // No aplica documentos por estado
+  noAplicaDocumentosAprobacionCompra             Boolean                @default(false)
+  noAplicaDocumentosComprado                     Boolean                @default(false)
+  noAplicaDocumentosPagado                       Boolean                @default(false)
+  noAplicaDocumentosAprobacionPlanos             Boolean                @default(false)
+  noAplicaDocumentosPrimerSeguimiento            Boolean                @default(false)
+  noAplicaDocumentosEnFOB                        Boolean                @default(false)
+  noAplicaDocumentosCotizacionFleteInternacional Boolean                @default(false)
+  noAplicaDocumentosConBL                        Boolean                @default(false)
+  noAplicaDocumentosSegundoSeguimiento           Boolean                @default(false)
+  noAplicaDocumentosEnCIF                        Boolean                @default(false)
+  noAplicaDocumentosRecibido                     Boolean                @default(false)
   // Relación con historial
-  historialFechas       HistorialFechaLimite[]
+  historialFechas                                HistorialFechaLimite[]
 
   @@index([proyectoId])
   @@index([cotizacionId])
