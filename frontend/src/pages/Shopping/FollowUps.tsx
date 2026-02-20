@@ -4,7 +4,7 @@ import PageMeta from "../../components/common/PageMeta";
 import { getToken } from "../../lib/api";
 import { useNotifications } from "../Notifications/context/NotificationContext";
 import toast from "react-hot-toast";
-import { Download, Eye, X, FileText, CalendarIcon } from "lucide-react";
+import { Download, Eye, X, FileText, CalendarIcon, MoreVertical, UserCheck, Users } from "lucide-react";
 
 import { PopoverTrigger, PopoverContent, Popover } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -41,6 +41,7 @@ export type EstadoProducto = {
   proveedor?: string;
   responsable?: string;
   observaciones?: string;
+  responsableSeguimiento?: { id: string; nombre: string; email?: string } | null;
 
   // 13 estados booleanos (ACTUALIZADO)
   cotizado: boolean;
@@ -338,6 +339,24 @@ const api = {
     if (!response.ok) return {};
     return response.json();
   },
+  async getSupervisores() {
+    const token = getToken();
+    const response = await fetch(`${API_BASE_URL}/api/v1/estado-productos/supervisores`, {
+      credentials: "include", headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) return [];
+    return response.json();
+  },
+  async asignarResponsable(id: string, responsableId: string | null) {
+    const token = getToken();
+    const response = await fetch(`${API_BASE_URL}/api/v1/estado-productos/${id}/asignar-responsable`, {
+      method: "PATCH", credentials: "include",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ responsableId }),
+    });
+    if (!response.ok) { const e = await response.json(); throw new Error(e.message || "Error"); }
+    return response.json();
+  },
 };
 
 // ============================================================================
@@ -418,11 +437,25 @@ export default function ShoppingFollowUps() {
   // NUEVO: Estado para selección FOB/CIF
   const [tipoEntregaSeleccionado, setTipoEntregaSeleccionado] = useState<string | null>(null);
 
+  // Responsables / Supervisores
+  const [supervisores, setSupervisores] = useState<{ id: string; nombre: string; email: string; rol: { nombre: string } }[]>([]);
+  const [filtroResponsables, setFiltroResponsables] = useState<string[]>([]);
+  const [showResponsableDropdown, setShowResponsableDropdown] = useState(false);
+  const [menuAbierto, setMenuAbierto] = useState<string | null>(null); // id del producto con menú abierto
+
   const fileInputRef = useRef<HTMLInputElement>(null); // Se mantiene por si TimelineItem lo usa
+
+  // Cerrar dropdowns al hacer click fuera
+  useEffect(() => {
+    const handleClickOutside = () => { setMenuAbierto(null); setShowResponsableDropdown(false); };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
 
   // Efectos
   useEffect(() => {
     cargarProductos();
+    api.getSupervisores().then(setSupervisores).catch(() => { });
   }, [filtroNivel, filtroTipoCompra]);
 
   useEffect(() => {
@@ -547,7 +580,7 @@ export default function ShoppingFollowUps() {
     }
   };
 
-  // Filtrar productos por búsqueda y estado de completado
+  // Filtrar productos por búsqueda, estado y responsable
   const productosFiltrados = productos.filter(p => {
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -557,6 +590,12 @@ export default function ShoppingFollowUps() {
         p.proveedor?.toLowerCase().includes(query)
       );
       if (!matchQuery) return false;
+    }
+
+    // Filtro por responsable
+    if (filtroResponsables.length > 0) {
+      const respId = p.responsableSeguimiento?.id;
+      if (!respId || !filtroResponsables.includes(respId)) return false;
     }
 
     const estaCompletado = p.progreso === 100;
@@ -569,6 +608,15 @@ export default function ShoppingFollowUps() {
 
   const totalPendientes = productos.filter(p => p.progreso !== 100).length;
   const totalCompletados = productos.filter(p => p.progreso === 100).length;
+
+  const handleAsignarResponsable = async (productoId: string, responsableId: string | null) => {
+    try {
+      await api.asignarResponsable(productoId, responsableId);
+      toast.success(responsableId ? "Responsable asignado" : "Responsable removido");
+      setMenuAbierto(null);
+      await cargarProductos();
+    } catch (e: any) { toast.error(e.message); }
+  };
 
   // Determinar si el siguiente estado requiere selección FOB/CIF
   const requiereSeleccionFobCif = productoSeleccionado?.siguienteEstado === 'enFOB';
@@ -651,6 +699,55 @@ export default function ShoppingFollowUps() {
             <option value="MEDIO">🟡 Medio</option>
             <option value="ALTO">🔴 Alto</option>
           </select>
+
+          {/* Filtro por Responsable */}
+          <div className="relative">
+            <button
+              onClick={() => setShowResponsableDropdown(!showResponsableDropdown)}
+              className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm transition-colors ${filtroResponsables.length > 0
+                  ? "border-blue-400 bg-blue-50 text-blue-700 dark:border-blue-600 dark:bg-blue-900/20 dark:text-blue-300"
+                  : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
+                }`}
+            >
+              <Users size={14} />
+              {filtroResponsables.length === 0 ? "Todos los encargados" : `${filtroResponsables.length} seleccionado${filtroResponsables.length > 1 ? 's' : ''}`}
+            </button>
+            {showResponsableDropdown && (
+              <div className="absolute top-full left-0 z-50 mt-1 w-64 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
+                <div className="max-h-60 overflow-y-auto p-2">
+                  <button
+                    onClick={() => { setFiltroResponsables([]); setShowResponsableDropdown(false); }}
+                    className={`w-full rounded-md px-3 py-2 text-left text-sm transition-colors ${filtroResponsables.length === 0
+                        ? "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
+                        : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
+                      }`}
+                  >
+                    👥 Ver todos
+                  </button>
+                  <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
+                  {supervisores.map(sup => {
+                    const isChecked = filtroResponsables.includes(sup.id);
+                    return (
+                      <label key={sup.id} className="flex items-center gap-2 rounded-md px-3 py-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {
+                            setFiltroResponsables(prev =>
+                              isChecked ? prev.filter(id => id !== sup.id) : [...prev, sup.id]
+                            );
+                          }}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-gray-900 dark:text-white">{sup.nombre}</span>
+                        <span className="ml-auto text-xs text-gray-400">{sup.rol.nombre}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Layout principal */}
@@ -716,13 +813,58 @@ export default function ShoppingFollowUps() {
                               </span>
                             </div>
                           </div>
-                          <div className="text-right">
+                          <div className="text-right flex flex-col items-end gap-1">
                             <span className={`text-lg font-bold ${producto.progreso === 100
                               ? 'text-green-600 dark:text-green-400'
                               : 'text-gray-900 dark:text-white'
                               }`}>
                               {producto.progreso}%
                             </span>
+                            {/* Responsable badge + menú */}
+                            <div className="relative">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setMenuAbierto(menuAbierto === producto.id ? null : producto.id); }}
+                                className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                title="Asignar responsable"
+                              >
+                                {producto.responsableSeguimiento ? (
+                                  <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                                    <UserCheck size={10} />
+                                    {producto.responsableSeguimiento.nombre.split(' ')[0]}
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-400"><MoreVertical size={12} /></span>
+                                )}
+                              </button>
+                              {menuAbierto === producto.id && (
+                                <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900"
+                                  onClick={(e) => e.stopPropagation()}>
+                                  <div className="p-1.5">
+                                    <p className="px-2 py-1 text-[10px] font-semibold text-gray-400 uppercase">Asignar a:</p>
+                                    {supervisores.map(sup => (
+                                      <button key={sup.id}
+                                        onClick={() => handleAsignarResponsable(producto.id, sup.id)}
+                                        className={`w-full rounded-md px-2 py-1.5 text-left text-xs transition-colors ${producto.responsableSeguimiento?.id === sup.id
+                                            ? "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
+                                            : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
+                                          }`}>
+                                        {sup.nombre}
+                                      </button>
+                                    ))}
+                                    {producto.responsableSeguimiento && (
+                                      <>
+                                        <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
+                                        <button
+                                          onClick={() => handleAsignarResponsable(producto.id, null)}
+                                          className="w-full rounded-md px-2 py-1.5 text-left text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
+                                          Quitar responsable
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
                         {/* Barra de progreso */}

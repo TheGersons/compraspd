@@ -71,7 +71,7 @@ const api = {
     },
     async getCotizacion(id: string) {
         const token = this.token();
-        const r = await fetch(`${API}/api/v1/cotizaciones/${id}`, {
+        const r = await fetch(`${API}/api/v1/quotations/${id}`, {
             credentials: "include", headers: { Authorization: `Bearer ${token}` },
         });
         if (!r.ok) throw new Error("Error al cargar cotización");

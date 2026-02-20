@@ -307,6 +307,20 @@ export class ListEstadoProductoQueryDto {
   @IsNumber()
   @Min(1)
   pageSize?: number;
+
+  @ApiPropertyOptional({
+    description: 'Filtrar por responsable de seguimiento',
+  })
+  @IsOptional()
+  @IsString()
+  responsableIds?: string;
+
+  @ApiPropertyOptional({
+    description: 'Filtrar por productos sin asignar responsable',
+  })
+  @IsOptional()
+  @IsString()
+  sinAsignar?: string;
 }
 
 export class AprobarProductoDto {

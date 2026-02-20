@@ -180,6 +180,7 @@ model Usuario {
   documentosSubidos        DocumentoAdjunto[]      @relation("DocumentosSubidos")
   justificacionesCreadoPor JustificacionNoAplica[] @relation("JustificacionesCreadoPor")
   aprobacionesCompra       EstadoProducto[]        @relation("AprobadorCompra")
+  seguimientosAsignados    EstadoProducto[]        @relation("ResponsableSeguimiento")
 
   @@index([email])
   @@index([rolId])
@@ -617,18 +618,20 @@ model EstadoProducto {
   evidenciaRecibido                     String? @db.Text
 
   // Relaciones
-  proyecto              Proyecto?          @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
-  cotizacion            Cotizacion?        @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
-  cotizacionDetalle     CotizacionDetalle? @relation(fields: [cotizacionDetalleId], references: [id], onDelete: Cascade)
-  compra                Compra?            @relation(fields: [compraId], references: [id], onDelete: Cascade)
-  compraDetalle         CompraDetalle?     @relation(fields: [compraDetalleId], references: [id], onDelete: Cascade)
-  aprobadoPorSupervisor Boolean            @default(false) @map("aprobado_por_supervisor")
-  fechaAprobacion       DateTime?          @map("fecha_aprobacion")
-  tipoEntrega           String?            @map("tipo_entrega") @db.VarChar(20) // Incoterms: EXW, FOB, FCA, CIF, CIP, CPT, CPR, DAP, DDP
-  aprobadoCompra        Boolean            @default(false) @map("aprobado_compra")
-  aprobadoCompraPorId   String?            @map("aprobado_compra_por_id") @db.Uuid
-  fechaAprobadoCompra   DateTime?          @map("fecha_aprobado_compra")
-  aprobadoCompraPor     Usuario?           @relation("AprobadorCompra", fields: [aprobadoCompraPorId], references: [id], onDelete: SetNull)
+  proyecto                 Proyecto?          @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  cotizacion               Cotizacion?        @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  cotizacionDetalle        CotizacionDetalle? @relation(fields: [cotizacionDetalleId], references: [id], onDelete: Cascade)
+  compra                   Compra?            @relation(fields: [compraId], references: [id], onDelete: Cascade)
+  compraDetalle            CompraDetalle?     @relation(fields: [compraDetalleId], references: [id], onDelete: Cascade)
+  aprobadoPorSupervisor    Boolean            @default(false) @map("aprobado_por_supervisor")
+  fechaAprobacion          DateTime?          @map("fecha_aprobacion")
+  tipoEntrega              String?            @map("tipo_entrega") @db.VarChar(20) // Incoterms: EXW, FOB, FCA, CIF, CIP, CPT, CPR, DAP, DDP
+  aprobadoCompra           Boolean            @default(false) @map("aprobado_compra")
+  aprobadoCompraPorId      String?            @map("aprobado_compra_por_id") @db.Uuid
+  fechaAprobadoCompra      DateTime?          @map("fecha_aprobado_compra")
+  aprobadoCompraPor        Usuario?           @relation("AprobadorCompra", fields: [aprobadoCompraPorId], references: [id], onDelete: SetNull)
+  responsableSeguimientoId String?            @map("responsable_seguimiento_id") @db.Uuid
+  responsableSeguimiento   Usuario?           @relation("ResponsableSeguimiento", fields: [responsableSeguimientoId], references: [id], onDelete: SetNull)
 
   // Documentos adjuntos
   documentosAdjuntos      DocumentoAdjunto[]

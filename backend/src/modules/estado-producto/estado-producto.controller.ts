@@ -297,6 +297,40 @@ export class EstadoProductoController {
     return this.service.getMisProductos(req.user);
   }
 
+  @Get('supervisores')
+  @ApiOperation({
+    summary: 'Listar supervisores disponibles como responsables',
+  })
+  async getSupervisores() {
+    return this.service.getSupervisores();
+  }
+
+  @Patch(':id/asignar-responsable')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Asignar responsable de seguimiento' })
+  @ApiParam({ name: 'id', description: 'ID del estado de producto' })
+  asignarResponsable(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { responsableId: string | null },
+    @CurrentUser() user: UserJwt,
+  ) {
+    return this.service.asignarResponsable(id, body.responsableId, user);
+  }
+
+  @Patch('asignar-responsable-masivo')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Asignar responsable a múltiples productos' })
+  asignarResponsableMasivo(
+    @Body() body: { ids: string[]; responsableId: string | null },
+    @CurrentUser() user: UserJwt,
+  ) {
+    return this.service.asignarResponsableMasivo(
+      body.ids,
+      body.responsableId,
+      user,
+    );
+  }
+
   /**
    * PATCH /estado-productos/:id/update-fecha-limite
    * Actualiza la fecha límite de un estado específico

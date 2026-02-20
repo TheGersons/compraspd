@@ -162,6 +162,20 @@ export class EstadoProductoService {
       };
     }
 
+    // Filtrar por responsable de seguimiento
+    if (filters.responsableIds) {
+      const ids = Array.isArray(filters.responsableIds)
+        ? filters.responsableIds
+        : filters.responsableIds.split(',').filter(Boolean);
+      if (ids.length > 0) {
+        where.responsableSeguimientoId = { in: ids };
+      }
+    }
+    // Filtrar sin asignar
+    if (filters.sinAsignar === 'true') {
+      where.responsableSeguimientoId = null;
+    }
+
     const [total, items] = await this.prisma.$transaction([
       this.prisma.estadoProducto.count({ where }),
       this.prisma.estadoProducto.findMany({
@@ -188,6 +202,9 @@ export class EstadoProductoService {
             },
           },
           paisOrigen: { select: { nombre: true } },
+          responsableSeguimiento: {
+            select: { id: true, nombre: true, email: true },
+          },
         },
         orderBy: [{ criticidad: 'desc' }, { actualizado: 'desc' }],
         skip,
@@ -727,6 +744,99 @@ export class EstadoProductoService {
     });
 
     return { message: 'Aprobación revocada', id };
+  }
+
+  /**
+   * Asignar responsable de seguimiento a un producto
+   */
+  async asignarResponsable(
+    id: string,
+    responsableId: string | null,
+    user: UserJwt,
+  ) {
+    if (!this.isSupervisorOrAdmin(user)) {
+      throw new ForbiddenException(
+        'Solo supervisores/admin pueden asignar responsables',
+      );
+    }
+
+    const ep = await this.prisma.estadoProducto.findUnique({ where: { id } });
+    if (!ep) throw new NotFoundException('Producto no encontrado');
+
+    // Validar que el responsable existe si se proporciona
+    if (responsableId) {
+      const responsable = await this.prisma.usuario.findUnique({
+        where: { id: responsableId },
+        include: { rol: true },
+      });
+      if (!responsable) throw new NotFoundException('Usuario no encontrado');
+    }
+
+    const updated = await this.prisma.estadoProducto.update({
+      where: { id },
+      data: { responsableSeguimientoId: responsableId } as any,
+      include: {
+        responsableSeguimiento: {
+          select: { id: true, nombre: true, email: true },
+        },
+      },
+    });
+
+    return {
+      message: responsableId ? 'Responsable asignado' : 'Responsable removido',
+      id,
+      responsableSeguimiento: (updated as any).responsableSeguimiento,
+    };
+  }
+
+  /**
+   * Asignar responsable a múltiples productos
+   */
+  async asignarResponsableMasivo(
+    ids: string[],
+    responsableId: string | null,
+    user: UserJwt,
+  ) {
+    if (!this.isSupervisorOrAdmin(user)) {
+      throw new ForbiddenException(
+        'Solo supervisores/admin pueden asignar responsables',
+      );
+    }
+
+    await this.prisma.estadoProducto.updateMany({
+      where: { id: { in: ids } },
+      data: { responsableSeguimientoId: responsableId } as any,
+    });
+
+    return {
+      message: `Responsable ${responsableId ? 'asignado' : 'removido'} de ${ids.length} productos`,
+    };
+  }
+
+  /**
+   * Listar supervisores/admins disponibles como responsables
+   */
+  async getSupervisores() {
+    return this.prisma.usuario.findMany({
+      where: {
+        activo: true,
+        rol: {
+          nombre: { in: ['SUPERVISOR', 'ADMIN'] },
+        },
+      },
+      select: {
+        id: true,
+        nombre: true,
+        email: true,
+        rol: { select: { nombre: true } },
+        _count: {
+          select: {
+            seguimientosAsignados: true,
+          },
+        },
+      },
+      orderBy: { nombre: 'asc' },
+    });
   }
 
   /**
