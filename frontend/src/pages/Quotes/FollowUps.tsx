@@ -965,24 +965,21 @@ export default function FollowUps() {
   // COMPONENTE: Modal para Agregar Precio
   // AGREGAR ANTES DEL RETURN PRINCIPAL DEL COMPONENTE
   // ============================================================================
-
   const ModalAgregarPrecio = () => {
     const [formData, setFormData] = useState({
       proveedorId: "",
-      precio: ""
+      precio: "",
     });
 
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-
       if (!formData.proveedorId || !formData.precio) {
         addNotification("warn", "Advertencia", "Completa los campos requeridos");
         return;
       }
-
       agregarPrecio({
         proveedorId: formData.proveedorId,
-        precio: parseFloat(formData.precio)
+        precio: parseFloat(formData.precio),
       });
     };
 
@@ -990,85 +987,44 @@ export default function FollowUps() {
 
     return (
       <div className="fixed inset-0 z-5000 flex items-center justify-center bg-black/50 p-4">
-        <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
-          {/* Header */}
-          <div className="mb-6 flex items-center justify-between sticky top-0 bg-white dark:bg-gray-900 pb-4">
+        <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
+          <div className="mb-6 flex items-center justify-between">
             <div>
-              <h3 className="text-xl font-semibold text-gray-800 dark:text-white/90">
-                Agregar Precio
-              </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                {productoParaPrecio.descripcionProducto}
-              </p>
+              <h3 className="text-xl font-semibold text-gray-800 dark:text-white/90">Agregar Precio</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">{productoParaPrecio.descripcionProducto}</p>
             </div>
-            <button
-              onClick={() => {
-                setShowPrecioModal(false);
-                setProductoParaPrecio(null);
-              }}
-              className="rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-800"
-            >
-              ✕
-            </button>
+            <button onClick={() => { setShowPrecioModal(false); setProductoParaPrecio(null); }}
+              className="rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-800">✕</button>
           </div>
-
-          {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Proveedor */}
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Proveedor <span className="text-red-500">*</span>
               </label>
-              <select
-                required
-                value={formData.proveedorId}
+              <select required value={formData.proveedorId}
                 onChange={(e) => setFormData({ ...formData, proveedorId: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-              >
+                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white">
                 <option value="">Seleccionar proveedor</option>
-                {proveedores.map(prov => (
+                {(Array.isArray(proveedores) ? proveedores : []).map(prov => (
                   <option key={prov.id} value={prov.id}>
                     {prov.nombre} {prov.rtn ? `(RTN: ${prov.rtn})` : ""}
                   </option>
                 ))}
               </select>
             </div>
-
-            {/* Precio Normal */}
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Precio <span className="text-red-500">*</span>
               </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                required
-                value={formData.precio}
+              <input type="number" step="0.01" min="0" required value={formData.precio}
                 onChange={(e) => setFormData({ ...formData, precio: e.target.value })}
                 className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                placeholder="0.00"
-              />
+                placeholder="0.00" />
             </div>
-
-            {/* Botones */}
             <div className="flex justify-end gap-3 pt-4">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowPrecioModal(false);
-                  setProductoParaPrecio(null);
-                }}
-                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-              >
-                Agregar Precio
-              </button>
+              <button type="button" onClick={() => { setShowPrecioModal(false); setProductoParaPrecio(null); }}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300">Cancelar</button>
+              <button type="submit" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">Agregar Precio</button>
             </div>
           </form>
         </div>
