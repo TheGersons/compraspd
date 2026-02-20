@@ -969,9 +969,7 @@ export default function FollowUps() {
   const ModalAgregarPrecio = () => {
     const [formData, setFormData] = useState({
       proveedorId: "",
-      precio: "",                    // ← Campo principal
-      precioDescuento: "",           // ← Precio con descuento
-      comprobanteDescuento: ""       // ← Comprobante del descuento
+      precio: ""
     });
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -984,9 +982,7 @@ export default function FollowUps() {
 
       agregarPrecio({
         proveedorId: formData.proveedorId,
-        precio: parseFloat(formData.precio),
-        precioDescuento: formData.precioDescuento ? parseFloat(formData.precioDescuento) : undefined,
-        comprobanteDescuento: formData.comprobanteDescuento || undefined
+        precio: parseFloat(formData.precio)
       });
     };
 
@@ -1052,39 +1048,6 @@ export default function FollowUps() {
                 onChange={(e) => setFormData({ ...formData, precio: e.target.value })}
                 className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                 placeholder="0.00"
-              />
-            </div>
-
-            {/* Precio con Descuento (Opcional) */}
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Precio con Descuento (opcional)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={formData.precioDescuento}
-                onChange={(e) => setFormData({ ...formData, precioDescuento: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                placeholder="0.00"
-              />
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">
-                Si aplica un descuento, ingrese el precio final después del descuento
-              </p>
-            </div>
-
-            {/* Comprobante de Descuento */}
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Comprobante de Descuento
-              </label>
-              <input
-                type="text"
-                value={formData.comprobanteDescuento}
-                onChange={(e) => setFormData({ ...formData, comprobanteDescuento: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                placeholder="Número de factura, orden, etc."
               />
             </div>
 
