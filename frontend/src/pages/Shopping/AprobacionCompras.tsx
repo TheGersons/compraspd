@@ -63,7 +63,7 @@ const api = {
     async getCotizaciones(params?: Record<string, string>) {
         const token = this.token();
         const qs = new URLSearchParams(params).toString();
-        const r = await fetch(`${API}/api/v1/cotizaciones?${qs}`, {
+        const r = await fetch(`${API}/api/v1/quotations?${qs}`, {
             credentials: "include", headers: { Authorization: `Bearer ${token}` },
         });
         if (!r.ok) throw new Error("Error al cargar cotizaciones");
@@ -71,7 +71,7 @@ const api = {
     },
     async getCotizacion(id: string) {
         const token = this.token();
-        const r = await fetch(`${API}/api/v1/cotizaciones/${id}`, {
+        const r = await fetch(`${API}/api/v1/quotations/${id}`, {
             credentials: "include", headers: { Authorization: `Bearer ${token}` },
         });
         if (!r.ok) throw new Error("Error al cargar cotización");

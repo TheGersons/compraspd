@@ -2,7 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
-  NotFoundException
+  NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateQuotationDto } from './dto/create-quotation.dto';
@@ -28,7 +28,7 @@ const ALLOWED_TRANSITIONS: Record<QuotationStatus, QuotationStatus[]> = {
  */
 @Injectable()
 export class QuotationsService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
    * Crea una cotización nueva con sus items
@@ -38,21 +38,23 @@ export class QuotationsService {
    * - proyectoId debe existir (si se proporciona)
    */
   /**
-  * Crea una cotización nueva con sus items
-  * Ahora también crea el chat automáticamente
-  */
+   * Crea una cotización nueva con sus items
+   * Ahora también crea el chat automáticamente
+   */
   async create(dto: CreateQuotationDto, user: UserJwt) {
     const { items, ...quotationData } = dto;
 
     // Validar items
     if (!items || items.length === 0) {
-      throw new BadRequestException('Debes incluir al menos 1 ítem en la cotización');
+      throw new BadRequestException(
+        'Debes incluir al menos 1 ítem en la cotización',
+      );
     }
 
     // Validar que el tipo existe
     const tipo = await this.prisma.tipo.findUnique({
       where: { id: dto.tipoId },
-      include: { area: true }
+      include: { area: true },
     });
     if (!tipo) {
       throw new NotFoundException(`Tipo con ID ${dto.tipoId} no encontrado`);
@@ -61,7 +63,7 @@ export class QuotationsService {
     // Validar proyecto si se proporciona
     if (dto.proyectoId) {
       const proyecto = await this.prisma.proyecto.findUnique({
-        where: { id: dto.proyectoId }
+        where: { id: dto.proyectoId },
       });
       if (!proyecto || !proyecto.estado) {
         throw new NotFoundException('Proyecto no encontrado o inactivo');
@@ -77,9 +79,9 @@ export class QuotationsService {
             create: {
               userId: quotationData.solicitanteId,
               ultimoLeido: new Date(),
-            }
-          }
-        }
+            },
+          },
+        },
       });
 
       // 2. Crear cotización con el chatId
@@ -98,13 +100,13 @@ export class QuotationsService {
           chatId: chat.id, // ← Asociar el chat
 
           detalles: {
-            create: items.map(item => ({
+            create: items.map((item) => ({
               descripcionProducto: item.descripcionProducto,
               cantidad: item.cantidad,
               tipoUnidad: item.tipoUnidad,
               notas: item.notas || null,
-            }))
-          }
+            })),
+          },
         },
         include: {
           detalles: true,
@@ -114,16 +116,16 @@ export class QuotationsService {
               nombre: true,
               email: true,
               departamento: {
-                select: { nombre: true }
-              }
-            }
+                select: { nombre: true },
+              },
+            },
           },
           tipo: {
-            include: { area: true }
+            include: { area: true },
           },
           proyecto: true,
           chat: true, // ← Incluir chat en respuesta
-        }
+        },
       });
 
       return cotizacion;
@@ -140,7 +142,7 @@ export class QuotationsService {
 
     const [total, items] = await this.prisma.$transaction([
       this.prisma.cotizacion.count({
-        where: { solicitanteId: user.sub }
+        where: { solicitanteId: user.sub },
       }),
       this.prisma.cotizacion.findMany({
         where: { solicitanteId: user.sub },
@@ -149,8 +151,8 @@ export class QuotationsService {
           tipo: { include: { area: true } },
           proyecto: true,
           solicitante: {
-            select: { nombre: true, email: true }
-          }
+            select: { nombre: true, email: true },
+          },
         },
         orderBy: { fechaSolicitud: 'desc' },
         skip,
@@ -162,7 +164,7 @@ export class QuotationsService {
       page,
       pageSize,
       total,
-      items
+      items,
     };
   }
 
@@ -171,9 +173,9 @@ export class QuotationsService {
    * Valida permisos: solo el solicitante o supervisores pueden verla
    */
   /**
- * Obtiene una cotización por ID
- * Si es supervisor/admin y no está en el chat, lo agrega automáticamente
- */
+   * Obtiene una cotización por ID
+   * Si es supervisor/admin y no está en el chat, lo agrega automáticamente
+   */
   async getById(id: string, user: UserJwt) {
     const cotizacion = await this.prisma.cotizacion.findUnique({
       where: { id },
@@ -182,29 +184,42 @@ export class QuotationsService {
           include: {
             precios: {
               include: {
-                proveedor: true
-              }
-            }
-          }
+                proveedor: true,
+              },
+            },
+            preciosOfertas: {
+              include: {
+                proveedor: {
+                  select: {
+                    id: true,
+                    nombre: true,
+                  },
+                },
+              },
+              orderBy: {
+                precio: 'asc',
+              },
+            },
+          },
         },
         solicitante: {
           select: {
             id: true,
             nombre: true,
             email: true,
-            departamento: { select: { nombre: true } }
-          }
+            departamento: { select: { nombre: true } },
+          },
         },
         tipo: { include: { area: true } },
         proyecto: true,
         chat: {
           include: {
             participantes: {
-              select: { userId: true }
-            }
-          }
-        }
-      }
+              select: { userId: true },
+            },
+          },
+        },
+      },
     });
 
     if (!cotizacion) {
@@ -216,26 +231,30 @@ export class QuotationsService {
     const isSupervisor = this.isSupervisorOrAdmin(user);
 
     if (!isOwner && !isSupervisor) {
-      throw new ForbiddenException('No tienes permiso para ver esta cotización');
+      throw new ForbiddenException(
+        'No tienes permiso para ver esta cotización',
+      );
     }
 
     // Si es supervisor y hay chat, verificar si está como participante
     if (isSupervisor && cotizacion.chatId) {
       const yaEsParticipante = cotizacion.chat?.participantes.some(
-        p => p.userId === user.sub
+        (p) => p.userId === user.sub,
       );
 
       if (!yaEsParticipante) {
         // Agregar supervisor al chat
-        await this.prisma.participantesChat.create({
-          data: {
-            chatId: cotizacion.chatId,
-            userId: user.sub,
-            ultimoLeido: new Date(),
-          }
-        }).catch(() => {
-          // Ignorar si ya existe (por race condition)
-        });
+        await this.prisma.participantesChat
+          .create({
+            data: {
+              chatId: cotizacion.chatId,
+              userId: user.sub,
+              ultimoLeido: new Date(),
+            },
+          })
+          .catch(() => {
+            // Ignorar si ya existe (por race condition)
+          });
       }
     }
 
@@ -250,7 +269,7 @@ export class QuotationsService {
    */
   async update(id: string, dto: UpdateQuotationDto, user: UserJwt) {
     const current = await this.prisma.cotizacion.findUnique({
-      where: { id }
+      where: { id },
     });
 
     if (!current) {
@@ -267,14 +286,14 @@ export class QuotationsService {
 
     if (!canEdit) {
       throw new ForbiddenException(
-        'No puedes editar esta cotización en su estado actual'
+        'No puedes editar esta cotización en su estado actual',
       );
     }
 
     // Validar tipoId si se proporciona
     if (dto.tipoId && dto.tipoId !== current.tipoId) {
       const tipo = await this.prisma.tipo.findUnique({
-        where: { id: dto.tipoId }
+        where: { id: dto.tipoId },
       });
       if (!tipo) {
         throw new NotFoundException('Tipo no encontrado');
@@ -284,7 +303,7 @@ export class QuotationsService {
     // Validar proyectoId si se proporciona
     if (dto.proyectoId && dto.proyectoId !== current.proyectoId) {
       const proyecto = await this.prisma.proyecto.findUnique({
-        where: { id: dto.proyectoId }
+        where: { id: dto.proyectoId },
       });
       if (!proyecto || !proyecto.estado) {
         throw new NotFoundException('Proyecto no encontrado o inactivo');
@@ -298,8 +317,12 @@ export class QuotationsService {
         nombreCotizacion: dto.nombreCotizacion ?? current.nombreCotizacion,
         tipoCompra: dto.tipoCompra ?? current.tipoCompra,
         lugarEntrega: dto.lugarEntrega ?? current.lugarEntrega,
-        fechaLimite: dto.fechaLimite ? new Date(dto.fechaLimite) : current.fechaLimite,
-        fechaEstimada: dto.fechaEstimada ? new Date(dto.fechaEstimada) : current.fechaEstimada,
+        fechaLimite: dto.fechaLimite
+          ? new Date(dto.fechaLimite)
+          : current.fechaLimite,
+        fechaEstimada: dto.fechaEstimada
+          ? new Date(dto.fechaEstimada)
+          : current.fechaEstimada,
         comentarios: dto.comentarios ?? current.comentarios,
         tipoId: dto.tipoId ?? current.tipoId,
         proyectoId: dto.proyectoId ?? current.proyectoId,
@@ -308,7 +331,7 @@ export class QuotationsService {
         detalles: true,
         tipo: { include: { area: true } },
         proyecto: true,
-      }
+      },
     });
   }
 
@@ -318,7 +341,7 @@ export class QuotationsService {
    */
   async changeStatus(id: string, nuevoEstado: QuotationStatus, user: UserJwt) {
     const current = await this.prisma.cotizacion.findUnique({
-      where: { id }
+      where: { id },
     });
 
     if (!current) {
@@ -331,7 +354,7 @@ export class QuotationsService {
 
     if (!transicionesPermitidas.includes(nuevoEstado)) {
       throw new BadRequestException(
-        `Transición no permitida: ${estadoActual} → ${nuevoEstado}`
+        `Transición no permitida: ${estadoActual} → ${nuevoEstado}`,
       );
     }
 
@@ -349,7 +372,7 @@ export class QuotationsService {
       // Solo supervisores/admin pueden aprobar/rechazar/revisar
       if (!isSupervisor) {
         throw new ForbiddenException(
-          'Solo supervisores pueden cambiar a este estado'
+          'Solo supervisores pueden cambiar a este estado',
         );
       }
     }
@@ -361,7 +384,7 @@ export class QuotationsService {
         detalles: true,
         solicitante: { select: { nombre: true, email: true } },
         tipo: { include: { area: true } },
-      }
+      },
     });
   }
 
@@ -377,10 +400,12 @@ export class QuotationsService {
       proyectoId?: string;
       page?: number;
       pageSize?: number;
-    }
+    },
   ) {
     if (!this.isSupervisorOrAdmin(user)) {
-      throw new ForbiddenException('No tienes permiso para ver todas las cotizaciones');
+      throw new ForbiddenException(
+        'No tienes permiso para ver todas las cotizaciones',
+      );
     }
 
     const page = filters?.page || 1;
@@ -403,8 +428,8 @@ export class QuotationsService {
             select: {
               nombre: true,
               email: true,
-              departamento: { select: { nombre: true } }
-            }
+              departamento: { select: { nombre: true } },
+            },
           },
           tipo: { include: { area: true } },
           proyecto: true,
@@ -438,7 +463,7 @@ export class QuotationsService {
   async getMyCotizaciones(user: UserJwt) {
     const cotizaciones = await this.prisma.cotizacion.findMany({
       where: {
-        solicitanteId: user.sub
+        solicitanteId: user.sub,
       },
       include: {
         solicitante: {
@@ -447,23 +472,23 @@ export class QuotationsService {
             nombre: true,
             email: true,
             departamento: {
-              select: { nombre: true }
-            }
-          }
+              select: { nombre: true },
+            },
+          },
         },
         supervisorResponsable: {
           select: {
             id: true,
             nombre: true,
-            email: true
-          }
+            email: true,
+          },
         },
         proyecto: {
           select: {
             id: true,
             nombre: true,
-            criticidad: true
-          }
+            criticidad: true,
+          },
         },
         tipo: {
           select: {
@@ -472,10 +497,10 @@ export class QuotationsService {
             area: {
               select: {
                 id: true,
-                nombreArea: true
-              }
-            }
-          }
+                nombreArea: true,
+              },
+            },
+          },
         },
         detalles: {
           select: {
@@ -483,8 +508,8 @@ export class QuotationsService {
             sku: true,
             descripcionProducto: true,
             cantidad: true,
-            tipoUnidad: true
-          }
+            tipoUnidad: true,
+          },
         },
         estadosProductos: {
           select: {
@@ -495,25 +520,26 @@ export class QuotationsService {
             nivelCriticidad: true,
             diasRetrasoActual: true,
             paisOrigen: {
-              select: { nombre: true }
+              select: { nombre: true },
             },
-            medioTransporte: true
-          }
-        }
+            medioTransporte: true,
+          },
+        },
       },
-      orderBy: { fechaSolicitud: 'desc' }
+      orderBy: { fechaSolicitud: 'desc' },
     });
 
     // Calcular estadísticas de aprobación por cotización
-    return cotizaciones.map(cot => {
+    return cotizaciones.map((cot) => {
       const totalProductos = cot.detalles.length;
       const productosAprobados = cot.estadosProductos.filter(
-        ep => ep.aprobadoPorSupervisor
+        (ep) => ep.aprobadoPorSupervisor,
       ).length;
       const productosPendientes = totalProductos - productosAprobados;
-      const porcentajeAprobado = totalProductos > 0
-        ? Math.round((productosAprobados / totalProductos) * 100)
-        : 0;
+      const porcentajeAprobado =
+        totalProductos > 0
+          ? Math.round((productosAprobados / totalProductos) * 100)
+          : 0;
 
       return {
         id: cot.id,
@@ -547,9 +573,9 @@ export class QuotationsService {
     });
   }
   /**
- * Crea un chat para una cotización existente que no tiene uno
- * Evita duplicados verificando si ya existe
- */
+   * Crea un chat para una cotización existente que no tiene uno
+   * Evita duplicados verificando si ya existe
+   */
   async ensureChat(cotizacionId: string, user: UserJwt) {
     const cotizacion = await this.prisma.cotizacion.findUnique({
       where: { id: cotizacionId },
@@ -558,7 +584,7 @@ export class QuotationsService {
         chatId: true,
         solicitanteId: true,
         supervisorResponsableId: true,
-      }
+      },
     });
 
     if (!cotizacion) {
@@ -573,11 +599,11 @@ export class QuotationsService {
           participantes: {
             include: {
               usuario: {
-                select: { id: true, nombre: true, email: true }
-              }
-            }
-          }
-        }
+                select: { id: true, nombre: true, email: true },
+              },
+            },
+          },
+        },
       });
     }
 
@@ -592,18 +618,18 @@ export class QuotationsService {
       const chat = await tx.chat.create({
         data: {
           participantes: {
-            create: participantes.map(userId => ({
+            create: participantes.map((userId) => ({
               userId,
               ultimoLeido: new Date(),
-            }))
-          }
-        }
+            })),
+          },
+        },
       });
 
       // Asociar a cotización
       await tx.cotizacion.update({
         where: { id: cotizacionId },
-        data: { chatId: chat.id }
+        data: { chatId: chat.id },
       });
 
       return tx.chat.findUnique({
@@ -612,23 +638,23 @@ export class QuotationsService {
           participantes: {
             include: {
               usuario: {
-                select: { id: true, nombre: true, email: true }
-              }
-            }
-          }
-        }
+                select: { id: true, nombre: true, email: true },
+              },
+            },
+          },
+        },
       });
     });
   }
 
   /**
-    * Elimina una cotización y limpia sus datos asociados
-    */
+   * Elimina una cotización y limpia sus datos asociados
+   */
   async delete(id: string, user: UserJwt) {
     // 1. Obtener datos para limpieza (Chat ID)
     const cotizacion = await this.prisma.cotizacion.findUnique({
       where: { id },
-      select: { chatId: true }
+      select: { chatId: true },
     });
 
     if (!cotizacion) {
@@ -640,14 +666,16 @@ export class QuotationsService {
       // PASO A: Borrar la cotización
       // Esto borrará en cascada: Detalles, Estados, Historial, Notificaciones
       await tx.cotizacion.delete({
-        where: { id }
+        where: { id },
       });
 
       // PASO B: Borrar el Chat huérfano manualmente (si existe)
       if (cotizacion.chatId) {
-        await tx.chat.delete({
-          where: { id: cotizacion.chatId }
-        }).catch(e => console.warn('Chat no encontrado o ya borrado', e));
+        await tx.chat
+          .delete({
+            where: { id: cotizacion.chatId },
+          })
+          .catch((e) => console.warn('Chat no encontrado o ya borrado', e));
       }
 
       return { message: 'Cotización eliminada correctamente' };
