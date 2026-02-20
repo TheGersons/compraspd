@@ -259,6 +259,34 @@ export class EstadoProductoController {
     return this.service.aprobarProducto(id, dto, user);
   }
 
+  @Patch(':id/aprobar-compra')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Aprobar compra de un producto',
+    description:
+      'Marca la compra como aprobada (independiente del avance de estado)',
+  })
+  @ApiParam({ name: 'id', description: 'ID del estado de producto' })
+  aprobarCompra(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: UserJwt,
+  ) {
+    return this.service.aprobarCompra(id, user);
+  }
+
+  @Patch(':id/revocar-aprobacion-compra')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Revocar aprobación de compra',
+  })
+  @ApiParam({ name: 'id', description: 'ID del estado de producto' })
+  revocarAprobacionCompra(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: UserJwt,
+  ) {
+    return this.service.revocarAprobacionCompra(id, user);
+  }
+
   /**
    * Obtener mis productos (para solicitantes)
    * Permite al usuario ver el estado de compra de sus productos aprobados

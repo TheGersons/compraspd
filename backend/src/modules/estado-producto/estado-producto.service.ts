@@ -493,13 +493,29 @@ export class EstadoProductoService {
     estadoProductoId: string,
     estado: string,
   ): Promise<{ completo: boolean; faltantes: string[] }> {
+    const faltantes: string[] = [];
+
+    // ========================================
+    // Validación especial: aprobacionCompra requiere aprobación + documentos
+    // ========================================
+    if (estado === 'aprobacionCompra') {
+      const ep = await this.prisma.estadoProducto.findUnique({
+        where: { id: estadoProductoId },
+      });
+      if (ep && !(ep as any).aprobadoCompra) {
+        faltantes.push(
+          'Aprobación de compra pendiente (debe aprobarse en la vista de Aprobación de Compras)',
+        );
+      }
+    }
+
     // Obtener requeridos obligatorios
     const requeridos = await this.prisma.documentoRequerido.findMany({
       where: { estado, activo: true, obligatorio: true },
     });
 
-    // Si no hay requeridos para este estado, está completo
-    if (requeridos.length === 0) {
+    // Si no hay requeridos y no hay faltantes de aprobación, está completo
+    if (requeridos.length === 0 && faltantes.length === 0) {
       return { completo: true, faltantes: [] };
     }
 
@@ -507,8 +523,6 @@ export class EstadoProductoService {
     const adjuntos = await this.prisma.documentoAdjunto.findMany({
       where: { estadoProductoId, estado },
     });
-
-    const faltantes: string[] = [];
 
     for (const req of requeridos) {
       const tieneArchivo = adjuntos.some(
@@ -599,11 +613,14 @@ export class EstadoProductoService {
     if (siguienteEstado === EstadoProceso.EN_FOB && dto.tipoEntrega) {
       updateData.tipoEntrega = dto.tipoEntrega;
 
-      // Si es CIF, auto-completar cotizacionFleteInternacional
-      if (dto.tipoEntrega === 'CIF' && tipoCompra === 'INTERNACIONAL') {
+      // Si el incoterm incluye flete, auto-completar cotizacionFleteInternacional
+      if (
+        this.INCOTERMS_SKIP_FLETE.includes(dto.tipoEntrega) &&
+        tipoCompra === 'INTERNACIONAL'
+      ) {
         updateData[EstadoProceso.COTIZACION_FLETE_INTERNACIONAL] = true;
         updateData.fechaCotizacionFleteInternacional = ahora;
-        updateData.evidenciaCotizacionFleteInternacional = `AUTO_CIF_${ahora.getTime()}`;
+        updateData.evidenciaCotizacionFleteInternacional = `AUTO_${dto.tipoEntrega}_${ahora.getTime()}`;
       }
     }
 
@@ -634,9 +651,84 @@ export class EstadoProductoService {
       estadoNuevo: siguienteEstado,
       tipoEntrega: dto.tipoEntrega,
       autoCompletado:
-        dto.tipoEntrega === 'CIF' ? ['cotizacionFleteInternacional'] : [],
+        dto.tipoEntrega && this.INCOTERMS_SKIP_FLETE.includes(dto.tipoEntrega)
+          ? ['cotizacionFleteInternacional']
+          : [],
     };
   }
+
+  // ========================================
+  // INCOTERMS QUE SALTAN cotizacionFleteInternacional
+  // ========================================
+  private readonly INCOTERMS_SKIP_FLETE = [
+    'CIF',
+    'CIP',
+    'CPT',
+    'CPR',
+    'DAP',
+    'DDP',
+  ];
+  private readonly INCOTERMS_FULL_PROCESS = ['EXW', 'FOB', 'FCA'];
+
+  /**
+   * Aprobar compra de un producto (desde vista Aprobación de Compras)
+   * Esto es independiente del avance de estado
+   */
+  async aprobarCompra(id: string, user: UserJwt) {
+    if (!this.isSupervisorOrAdmin(user)) {
+      throw new ForbiddenException(
+        'Solo supervisores/admin pueden aprobar compras',
+      );
+    }
+
+    const estado = await this.prisma.estadoProducto.findUnique({
+      where: { id },
+    });
+
+    if (!estado) throw new NotFoundException('Producto no encontrado');
+
+    if ((estado as any).aprobadoCompra) {
+      throw new BadRequestException('Esta compra ya fue aprobada');
+    }
+
+    const updated = await this.prisma.estadoProducto.update({
+      where: { id },
+      data: {
+        aprobadoCompra: true,
+        aprobadoCompraPorId: user.sub,
+        fechaAprobadoCompra: new Date(),
+      } as any,
+    });
+
+    return {
+      message: 'Compra aprobada correctamente',
+      id,
+      aprobadoCompra: true,
+    };
+  }
+
+  /**
+   * Revocar aprobación de compra
+   */
+  async revocarAprobacionCompra(id: string, user: UserJwt) {
+    if (!this.isSupervisorOrAdmin(user)) {
+      throw new ForbiddenException(
+        'Solo supervisores/admin pueden revocar aprobaciones',
+      );
+    }
+
+    await this.prisma.estadoProducto.update({
+      where: { id },
+      data: {
+        aprobadoCompra: false,
+        aprobadoCompraPorId: null,
+        fechaAprobadoCompra: null,
+      } as any,
+    });
+
+    return { message: 'Aprobación revocada', id };
+  }
+
   /**
    * Cambiar a un estado específico
    * Valida que sea un estado aplicable según el tipo de compra

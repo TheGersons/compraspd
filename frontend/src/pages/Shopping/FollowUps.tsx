@@ -291,7 +291,7 @@ const api = {
 
   async avanzarEstado(id: string, data: {
     observacion?: string;
-    tipoEntrega?: 'FOB' | 'CIF';
+    tipoEntrega?: 'FOB' | 'CIF' | 'EXW' | 'FCA' | 'CIP' | 'CPT' | 'CPR' | 'DAP' | 'DDP' | string;
   }) {
     const token = this.getToken();
     const response = await fetch(
@@ -416,7 +416,7 @@ export default function ShoppingFollowUps() {
   const [loadingVerificacion, setLoadingVerificacion] = useState(false);
 
   // NUEVO: Estado para selección FOB/CIF
-  const [tipoEntregaSeleccionado, setTipoEntregaSeleccionado] = useState<'FOB' | 'CIF' | null>(null);
+  const [tipoEntregaSeleccionado, setTipoEntregaSeleccionado] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null); // Se mantiene por si TimelineItem lo usa
 
@@ -953,46 +953,52 @@ export default function ShoppingFollowUps() {
                 {requiereSeleccionFobCif && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Tipo de Entrega <span className="text-red-500">*</span>
+                      Incoterm <span className="text-red-500">*</span>
                     </label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setTipoEntregaSeleccionado('FOB')}
-                        className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 p-4 transition-all ${tipoEntregaSeleccionado === 'FOB'
-                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
-                          : 'border-gray-200 hover:border-blue-300 dark:border-gray-600 dark:hover:border-blue-600'
-                          }`}
-                      >
-                        <span className="text-3xl">🚢</span>
-                        <span className="font-semibold text-gray-900 dark:text-white">FOB</span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400 text-center">
-                          Free On Board<br />
-                          <span className="text-blue-600 dark:text-blue-400">Requiere cotización de flete</span>
-                        </span>
-                      </button>
 
-                      <button
-                        type="button"
-                        onClick={() => setTipoEntregaSeleccionado('CIF')}
-                        className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 p-4 transition-all ${tipoEntregaSeleccionado === 'CIF'
-                          ? 'border-green-500 bg-green-50 dark:bg-green-900/30'
-                          : 'border-gray-200 hover:border-green-300 dark:border-gray-600 dark:hover:border-green-600'
-                          }`}
-                      >
-                        <span className="text-3xl">📦</span>
-                        <span className="font-semibold text-gray-900 dark:text-white">CIF</span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400 text-center">
-                          Cost, Insurance & Freight<br />
-                          <span className="text-green-600 dark:text-green-400">Flete incluido en precio</span>
-                        </span>
-                      </button>
+                    {/* Grupo: Requiere cotización de flete */}
+                    <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mb-1.5">🚢 Requieren cotización de flete internacional</p>
+                    <div className="grid grid-cols-3 gap-2 mb-3">
+                      {[
+                        { key: 'EXW', label: 'Ex Works', desc: 'En fábrica' },
+                        { key: 'FOB', label: 'Free On Board', desc: 'Libre a bordo' },
+                        { key: 'FCA', label: 'Free Carrier', desc: 'Libre transportista' },
+                      ].map(inc => (
+                        <button key={inc.key} type="button" onClick={() => setTipoEntregaSeleccionado(inc.key)}
+                          className={`flex flex-col items-center gap-1 rounded-lg border-2 p-3 transition-all text-center ${tipoEntregaSeleccionado === inc.key
+                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
+                            : 'border-gray-200 hover:border-blue-300 dark:border-gray-600'}`}>
+                          <span className="text-sm font-bold text-gray-900 dark:text-white">{inc.key}</span>
+                          <span className="text-[10px] text-gray-500 leading-tight">{inc.desc}</span>
+                        </button>
+                      ))}
                     </div>
 
-                    {tipoEntregaSeleccionado === 'CIF' && (
+                    {/* Grupo: Flete incluido */}
+                    <p className="text-xs font-medium text-green-600 dark:text-green-400 mb-1.5">📦 Flete incluido (se salta cotización de flete)</p>
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+                      {[
+                        { key: 'CIF', desc: 'Cost, Insurance & Freight' },
+                        { key: 'CIP', desc: 'Carriage & Insurance Paid' },
+                        { key: 'CPT', desc: 'Carriage Paid To' },
+                        { key: 'CPR', desc: 'Carriage Paid Return' },
+                        { key: 'DAP', desc: 'Delivered At Place' },
+                        { key: 'DDP', desc: 'Delivered Duty Paid' },
+                      ].map(inc => (
+                        <button key={inc.key} type="button" onClick={() => setTipoEntregaSeleccionado(inc.key)}
+                          className={`flex flex-col items-center gap-1 rounded-lg border-2 p-2.5 transition-all text-center ${tipoEntregaSeleccionado === inc.key
+                            ? 'border-green-500 bg-green-50 dark:bg-green-900/30'
+                            : 'border-gray-200 hover:border-green-300 dark:border-gray-600'}`}>
+                          <span className="text-sm font-bold text-gray-900 dark:text-white">{inc.key}</span>
+                          <span className="text-[9px] text-gray-500 leading-tight">{inc.desc}</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    {tipoEntregaSeleccionado && ['CIF', 'CIP', 'CPT', 'CPR', 'DAP', 'DDP'].includes(tipoEntregaSeleccionado) && (
                       <div className="mt-3 rounded-lg bg-green-50 p-3 dark:bg-green-900/20">
                         <p className="text-sm text-green-700 dark:text-green-300">
-                          ✓ Al seleccionar CIF, el estado "Cotización Flete Int." se marcará automáticamente como completado.
+                          ✓ Con {tipoEntregaSeleccionado}, el estado "Cotización Flete Int." se marcará automáticamente como completado.
                         </p>
                       </div>
                     )}

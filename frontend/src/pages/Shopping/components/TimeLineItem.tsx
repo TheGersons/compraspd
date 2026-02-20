@@ -395,8 +395,8 @@ export const TimelineItem = ({ item, producto, sku, onRefresh }: TimelineItemPro
             <Link
               to={`/shopping/documents?producto=${producto.id}`}
               className={`group flex items-center gap-1 transition-all hover:underline ${item.documentos.completo
-                  ? 'text-green-600 dark:text-green-400'
-                  : 'text-yellow-600 dark:text-yellow-400'
+                ? 'text-green-600 dark:text-green-400'
+                : 'text-yellow-600 dark:text-yellow-400'
                 }`}
               title="Ver documentos de este estado"
             >
