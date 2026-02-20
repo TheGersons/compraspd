@@ -117,6 +117,14 @@ export class EstadoProductoController {
     return this.service.getByProyecto(proyectoId, user);
   }
 
+  @Get('supervisores')
+  @ApiOperation({
+    summary: 'Listar supervisores disponibles como responsables',
+  })
+  async getSupervisores() {
+    return this.service.getSupervisores();
+  }
+
   @Get(':id')
   @ApiOperation({
     summary: 'Obtener estado de producto por ID',
@@ -295,14 +303,6 @@ export class EstadoProductoController {
   @ApiOperation({ summary: 'Obtener mis productos en compra (solicitante)' })
   async getMisProductos(@Request() req: any) {
     return this.service.getMisProductos(req.user);
-  }
-
-  @Get('supervisores')
-  @ApiOperation({
-    summary: 'Listar supervisores disponibles como responsables',
-  })
-  async getSupervisores() {
-    return this.service.getSupervisores();
   }
 
   @Patch(':id/asignar-responsable')

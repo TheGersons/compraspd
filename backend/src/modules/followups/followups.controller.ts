@@ -7,9 +7,15 @@ import {
   Body,
   Query,
   UseGuards,
-  ParseUUIDPipe
+  ParseUUIDPipe,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { FollowUpsService } from './followups.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -20,14 +26,14 @@ type UserJwt = { sub: string; role?: string };
 
 /**
  * Controller para gestión de seguimiento de cotizaciones (FollowUps)
- * 
+ *
  * Funcionalidades:
  * - Listar cotizaciones pendientes
  * - Configurar timeline de productos
  * - Aprobar/desaprobar productos
  * - Ver historial de cambios
  * - Gestionar asignación de supervisores
- * 
+ *
  * Solo accesible para usuarios con rol Supervisor
  */
 @ApiTags('FollowUps - Seguimiento de Cotizaciones')
@@ -35,7 +41,7 @@ type UserJwt = { sub: string; role?: string };
 @UseGuards(JwtAuthGuard)
 @Controller('api/v1/followups')
 export class FollowUpsController {
-  constructor(private readonly followupsService: FollowUpsService) { }
+  constructor(private readonly followupsService: FollowUpsService) {}
 
   /**
    * GET /api/v1/followups
@@ -44,13 +50,36 @@ export class FollowUpsController {
   @Get()
   @ApiOperation({
     summary: 'Listar cotizaciones pendientes',
-    description: 'Obtiene lista de cotizaciones que requieren configuración o aprobación. Solo para supervisores.'
+    description:
+      'Obtiene lista de cotizaciones que requieren configuración o aprobación. Solo para supervisores.',
   })
-  @ApiQuery({ name: 'estado', required: false, description: 'Filtrar por estado' })
-  @ApiQuery({ name: 'proyectoId', required: false, description: 'Filtrar por proyecto' })
-  @ApiQuery({ name: 'search', required: false, description: 'Buscar por nombre o solicitante' })
-  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Página (default: 1)' })
-  @ApiQuery({ name: 'pageSize', required: false, type: Number, description: 'Tamaño página (default: 20, max: 100)' })
+  @ApiQuery({
+    name: 'estado',
+    required: false,
+    description: 'Filtrar por estado',
+  })
+  @ApiQuery({
+    name: 'proyectoId',
+    required: false,
+    description: 'Filtrar por proyecto',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Buscar por nombre o solicitante',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Página (default: 1)',
+  })
+  @ApiQuery({
+    name: 'pageSize',
+    required: false,
+    type: Number,
+    description: 'Tamaño página (default: 20, max: 100)',
+  })
   @ApiResponse({ status: 200, description: 'Lista obtenida exitosamente' })
   @ApiResponse({ status: 403, description: 'Solo supervisores pueden acceder' })
   listCotizacionesPendientes(
@@ -59,14 +88,14 @@ export class FollowUpsController {
     @Query('proyectoId') proyectoId?: string,
     @Query('search') search?: string,
     @Query('page') page?: string,
-    @Query('pageSize') pageSize?: string
+    @Query('pageSize') pageSize?: string,
   ) {
     return this.followupsService.listCotizacionesPendientes(user, {
       estado,
       proyectoId,
       search,
       page: page ? parseInt(page) : undefined,
-      pageSize: pageSize ? parseInt(pageSize) : undefined
+      pageSize: pageSize ? parseInt(pageSize) : undefined,
     });
   }
 
@@ -77,7 +106,7 @@ export class FollowUpsController {
   @Get('estadisticas')
   @ApiOperation({
     summary: 'Estadísticas de supervisor',
-    description: 'Obtiene contadores y estadísticas para el dashboard'
+    description: 'Obtiene contadores y estadísticas para el dashboard',
   })
   @ApiResponse({ status: 200, description: 'Estadísticas obtenidas' })
   getEstadisticas(@CurrentUser() user: UserJwt) {
@@ -91,7 +120,8 @@ export class FollowUpsController {
   @Get('supervisores')
   @ApiOperation({
     summary: 'Listar supervisores',
-    description: 'Obtiene lista de supervisores activos con su carga de trabajo'
+    description:
+      'Obtiene lista de supervisores activos con su carga de trabajo',
   })
   @ApiResponse({ status: 200, description: 'Lista obtenida' })
   getSupervisores() {
@@ -105,13 +135,14 @@ export class FollowUpsController {
   @Get(':id')
   @ApiOperation({
     summary: 'Detalle de cotización',
-    description: 'Obtiene cotización completa con productos, timeline sugerido y chat'
+    description:
+      'Obtiene cotización completa con productos, timeline sugerido y chat',
   })
   @ApiResponse({ status: 200, description: 'Cotización obtenida' })
   @ApiResponse({ status: 404, description: 'Cotización no encontrada' })
   getCotizacionDetalle(
     @CurrentUser() user: UserJwt,
-    @Param('id', ParseUUIDPipe) id: string
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.followupsService.getCotizacionDetalle(id, user);
   }
@@ -123,13 +154,17 @@ export class FollowUpsController {
   @Get(':id/historial')
   @ApiOperation({
     summary: 'Historial de cambios',
-    description: 'Obtiene log completo de cambios realizados en la cotización'
+    description: 'Obtiene log completo de cambios realizados en la cotización',
   })
-  @ApiQuery({ name: 'accion', required: false, description: 'Filtrar por tipo de acción' })
+  @ApiQuery({
+    name: 'accion',
+    required: false,
+    description: 'Filtrar por tipo de acción',
+  })
   @ApiResponse({ status: 200, description: 'Historial obtenido' })
   getHistorial(
     @Param('id', ParseUUIDPipe) id: string,
-    @Query('accion') accion?: string
+    @Query('accion') accion?: string,
   ) {
     return this.followupsService.getHistorial(id, { accion });
   }
@@ -141,16 +176,23 @@ export class FollowUpsController {
   @Post(':id/configurar')
   @ApiOperation({
     summary: 'Configurar timeline',
-    description: 'Configura días de timeline, país y transporte para cada producto'
+    description:
+      'Configura días de timeline, país y transporte para cada producto',
   })
-  @ApiResponse({ status: 200, description: 'Timeline configurado exitosamente' })
+  @ApiResponse({
+    status: 200,
+    description: 'Timeline configurado exitosamente',
+  })
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
-  @ApiResponse({ status: 403, description: 'Solo supervisores pueden configurar' })
+  @ApiResponse({
+    status: 403,
+    description: 'Solo supervisores pueden configurar',
+  })
   @ApiResponse({ status: 404, description: 'Cotización no encontrada' })
   configurarTimeline(
     @CurrentUser() user: UserJwt,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: ConfigurarCotizacionDto
+    @Body() dto: ConfigurarCotizacionDto,
   ) {
     return this.followupsService.configurarTimeline(id, dto, user);
   }
@@ -162,15 +204,18 @@ export class FollowUpsController {
   @Post(':id/aprobar')
   @ApiOperation({
     summary: 'Aprobar productos',
-    description: 'Aprueba o desaprueba productos de forma individual o masiva'
+    description: 'Aprueba o desaprueba productos de forma individual o masiva',
   })
   @ApiResponse({ status: 200, description: 'Aprobaciones actualizadas' })
-  @ApiResponse({ status: 400, description: 'Producto no pertenece a la cotización' })
+  @ApiResponse({
+    status: 400,
+    description: 'Producto no pertenece a la cotización',
+  })
   @ApiResponse({ status: 403, description: 'Solo supervisores pueden aprobar' })
   aprobarProductos(
     @CurrentUser() user: UserJwt,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: AprobarProductosDto
+    @Body() dto: AprobarProductosDto,
   ) {
     return this.followupsService.aprobarProductos(id, dto, user);
   }
@@ -182,35 +227,44 @@ export class FollowUpsController {
   @Patch(':id/supervisor')
   @ApiOperation({
     summary: 'Reasignar supervisor',
-    description: 'Cambia el supervisor responsable de la cotización'
+    description: 'Cambia el supervisor responsable de la cotización',
   })
   @ApiResponse({ status: 200, description: 'Supervisor reasignado' })
   @ApiResponse({ status: 400, description: 'Usuario no es supervisor' })
-  @ApiResponse({ status: 403, description: 'Solo supervisores pueden reasignar' })
+  @ApiResponse({
+    status: 403,
+    description: 'Solo supervisores pueden reasignar',
+  })
   reasignarSupervisor(
     @CurrentUser() user: UserJwt,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body('supervisorId', ParseUUIDPipe) supervisorId: string
+    @Body('supervisorId', ParseUUIDPipe) supervisorId: string,
   ) {
     return this.followupsService.reasignarSupervisor(id, supervisorId, user);
   }
 
   /**
- * POST /api/v1/followups/:id/rechazar
- * Rechaza un producto individual con motivo
- */
+   * POST /api/v1/followups/:id/rechazar
+   * Rechaza un producto individual con motivo
+   */
   @Post(':id/rechazar')
   @ApiOperation({
     summary: 'Rechazar producto',
-    description: 'Rechaza un producto individual con un motivo obligatorio'
+    description: 'Rechaza un producto individual con un motivo obligatorio',
   })
   @ApiResponse({ status: 200, description: 'Producto rechazado exitosamente' })
-  @ApiResponse({ status: 400, description: 'Motivo inválido o producto no encontrado' })
-  @ApiResponse({ status: 403, description: 'Solo supervisores pueden rechazar' })
+  @ApiResponse({
+    status: 400,
+    description: 'Motivo inválido o producto no encontrado',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Solo supervisores pueden rechazar',
+  })
   rechazarProducto(
     @CurrentUser() user: UserJwt,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: { estadoProductoId: string; motivoRechazo: string }
+    @Body() dto: { estadoProductoId: string; motivoRechazo: string },
   ) {
     return this.followupsService.rechazarProducto(id, dto, user);
   }

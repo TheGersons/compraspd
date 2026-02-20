@@ -705,8 +705,8 @@ export default function ShoppingFollowUps() {
             <button
               onClick={() => setShowResponsableDropdown(!showResponsableDropdown)}
               className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm transition-colors ${filtroResponsables.length > 0
-                  ? "border-blue-400 bg-blue-50 text-blue-700 dark:border-blue-600 dark:bg-blue-900/20 dark:text-blue-300"
-                  : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
+                ? "border-blue-400 bg-blue-50 text-blue-700 dark:border-blue-600 dark:bg-blue-900/20 dark:text-blue-300"
+                : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
                 }`}
             >
               <Users size={14} />
@@ -718,8 +718,8 @@ export default function ShoppingFollowUps() {
                   <button
                     onClick={() => { setFiltroResponsables([]); setShowResponsableDropdown(false); }}
                     className={`w-full rounded-md px-3 py-2 text-left text-sm transition-colors ${filtroResponsables.length === 0
-                        ? "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
-                        : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
+                      ? "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
+                      : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
                       }`}
                   >
                     👥 Ver todos
@@ -822,9 +822,10 @@ export default function ShoppingFollowUps() {
                             </span>
                             {/* Responsable badge + menú */}
                             <div className="relative">
-                              <button
+                              <div
+                                role="button"
                                 onClick={(e) => { e.stopPropagation(); setMenuAbierto(menuAbierto === producto.id ? null : producto.id); }}
-                                className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
                                 title="Asignar responsable"
                               >
                                 {producto.responsableSeguimiento ? (
@@ -835,7 +836,7 @@ export default function ShoppingFollowUps() {
                                 ) : (
                                   <span className="text-gray-400"><MoreVertical size={12} /></span>
                                 )}
-                              </button>
+                              </div>
                               {menuAbierto === producto.id && (
                                 <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900"
                                   onClick={(e) => e.stopPropagation()}>
@@ -845,8 +846,8 @@ export default function ShoppingFollowUps() {
                                       <button key={sup.id}
                                         onClick={() => handleAsignarResponsable(producto.id, sup.id)}
                                         className={`w-full rounded-md px-2 py-1.5 text-left text-xs transition-colors ${producto.responsableSeguimiento?.id === sup.id
-                                            ? "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
-                                            : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
+                                          ? "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
+                                          : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
                                           }`}>
                                         {sup.nombre}
                                       </button>
