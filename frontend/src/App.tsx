@@ -54,6 +54,8 @@ import Profile from "./pages/Profile/Profile";
 import ResetPassword from "./pages/AuthPages/ResetPass";
 import ChangePasswordRequired from "./pages/AuthPages/ChangePasswordRequired";
 import Documents from "./pages/Shopping/Documents";
+import Proveedores from "./pages/Proveedores/Proveedores";
+import AprobacionCompras from "./pages/Shopping/AprobacionCompras";
 
 const SHOPPING_MANAGER_ROLES = ["ADMIN", "SUPERVISOR"];
 const QUOTES_SUPERVISOR_ROLES = ["SUPERVISOR", "ADMIN"];
@@ -221,7 +223,22 @@ export default function App() {
                     <Documents />
                   </ProtectedRoute>
                 } />
+                <Route path="aprobacion" element={
+                  <ProtectedRoute roles={STAFF_ROLES}>
+                    <AprobacionCompras />
+                  </ProtectedRoute>
+                } />
               </Route>
+
+              {/* PROVEEDORES - Solo STAFF */}
+              <Route
+                path="/providers"
+                element={
+                  <ProtectedRoute roles={STAFF_ROLES}>
+                    <Proveedores />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Proyectos - Solo STAFF */}
               <Route

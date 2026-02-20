@@ -229,7 +229,19 @@ export default function Documents() {
     };
     const seleccionarProducto = async (producto: Producto) => {
         setProductoSeleccionado(producto); setLoadingDocs(true);
-        try { const docs = await api.getDocumentosProducto(producto.id); setDocumentos(docs); const primerEstado = Object.keys(docs)[0]; if (primerEstado) setEstadosExpandidos({ [primerEstado]: true }); }
+        try {
+            const docs = await api.getDocumentosProducto(producto.id);
+            setDocumentos(docs);
+            // Expandir el primer estado NO completado (siguiendo el orden del proceso)
+            const primerPendiente = ORDEN_ESTADOS_KEYS.find(
+                (key) => docs[key] && !docs[key].estadoCompletado
+            );
+            // Si todos están completos o no hay pendiente, expandir el último con datos
+            const estadoAExpandir = primerPendiente
+                || [...ORDEN_ESTADOS_KEYS].reverse().find((key) => docs[key])
+                || Object.keys(docs)[0];
+            if (estadoAExpandir) setEstadosExpandidos({ [estadoAExpandir]: true });
+        }
         catch (error) { addNotification("danger", "Error", "Error al cargar documentos"); }
         finally { setLoadingDocs(false); }
     };

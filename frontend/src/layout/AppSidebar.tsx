@@ -3,7 +3,8 @@ import { Link, useLocation } from "react-router-dom";
 import {
   ShoppingCart, /*, User*/
   User,
-  UtilityPole
+  UtilityPole,
+  Building2
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
@@ -63,10 +64,16 @@ const navItems: NavItem[] = [
     subItems: [
       { name: "Resumen", path: "/shopping", pro: false },
       { name: "Seguimiento", path: "/shopping/follow-ups", pro: false },
+      { name: "Aprobación de Compras", path: "/shopping/aprobacion", pro: false },
       { name: "Documentos", path: "/shopping/documents", pro: false },
-      { name: "Asignación", path: "/shopping/assignment", pro: false, roles: ["SUPERVISOR", "ADMIN"] },
       { name: "Historial", path: "/shopping/history", pro: false },
     ],
+  },
+  {
+    icon: <Building2 />,
+    name: "Proveedores",
+    roles: ["ADMIN", "SUPERVISOR"],
+    path: "/providers",
   },
   {
     icon: <UtilityPole />,

@@ -1,86 +1,103 @@
-import { 
-  Body, 
-  Controller, 
-  Get, 
-  Param, 
-  Patch, 
+import {
+  Controller,
+  Get,
   Post,
+  Patch,
+  Delete,
+  Param,
+  Body,
   Query,
   UseGuards,
-  ParseUUIDPipe,
-  ParseBoolPipe
+  Req,
+  ForbiddenException,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiQuery } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
-import { CreateProveedorDto } from './dto/create-proveedor.dto';
-import { UpdateProveedorDto } from './dto/update-proveedor.dto';
+import { AuthGuard } from '@nestjs/passport';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { ProveedoresService } from './proveedores.service';
+import { PrismaService } from '../../../prisma/prisma.service';
 
 @ApiTags('Proveedores')
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
 @Controller('api/v1/proveedores')
+@UseGuards(AuthGuard('jwt'))
 export class ProveedoresController {
-  constructor(private readonly proveedoresService: ProveedoresService) {}
+  constructor(
+    private readonly service: ProveedoresService,
+    private readonly prisma: PrismaService,
+  ) {}
+
+  private async verificarPermisos(userId: string) {
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id: userId },
+      include: { rol: true },
+    });
+    const rol = usuario?.rol.nombre.toLowerCase() || '';
+    if (!rol.includes('admin') && !rol.includes('supervisor')) {
+      throw new ForbiddenException(
+        'Solo ADMIN y SUPERVISOR pueden realizar esta acción',
+      );
+    }
+  }
 
   @Get()
-  @ApiOperation({ summary: 'Listar proveedores con filtros' })
-  @ApiQuery({ name: 'activo', required: false, type: Boolean })
-  @ApiQuery({ name: 'search', required: false, type: String })
-  @ApiResponse({ status: 200, description: 'Lista de proveedores obtenida' })
-  list(
-    @Query('activo', new ParseBoolPipe({ optional: true })) activo?: boolean,
-    @Query('search') search?: string
+  @ApiOperation({ summary: 'Listar proveedores' })
+  async findAll(
+    @Query()
+    query: {
+      search?: string;
+      activo?: string;
+      page?: string;
+      pageSize?: string;
+    },
   ) {
-    return this.proveedoresService.listProveedores({ activo, search });
+    return this.service.findAll(query);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Obtener proveedor por ID' })
-  @ApiResponse({ status: 200, description: 'Proveedor encontrado' })
-  @ApiResponse({ status: 404, description: 'Proveedor no encontrado' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.proveedoresService.findById(id);
-  }
-
-  @Get(':id/stats')
-  @ApiOperation({ summary: 'Obtener estadísticas del proveedor' })
-  @ApiResponse({ status: 200, description: 'Estadísticas obtenidas' })
-  @ApiResponse({ status: 404, description: 'Proveedor no encontrado' })
-  getStats(@Param('id', ParseUUIDPipe) id: string) {
-    return this.proveedoresService.getStats(id);
+  async findOne(@Param('id') id: string) {
+    return this.service.findOne(id);
   }
 
   @Post()
-  @ApiOperation({ summary: 'Crear nuevo proveedor' })
-  @ApiResponse({ status: 201, description: 'Proveedor creado exitosamente' })
-  @ApiResponse({ status: 409, description: 'RTN o email duplicado' })
-  create(@Body() dto: CreateProveedorDto) {
-    return this.proveedoresService.create(dto);
+  @ApiOperation({ summary: 'Crear proveedor' })
+  async create(
+    @Body()
+    dto: {
+      nombre: string;
+      rtn?: string;
+      email?: string;
+      telefono?: string;
+      direccion?: string;
+    },
+    @Req() req: any,
+  ) {
+    await this.verificarPermisos(req.user.sub);
+    return this.service.create(dto);
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Actualizar proveedor' })
-  @ApiResponse({ status: 200, description: 'Proveedor actualizado exitosamente' })
-  @ApiResponse({ status: 404, description: 'Proveedor no encontrado' })
-  update(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: UpdateProveedorDto
+  async update(
+    @Param('id') id: string,
+    @Body()
+    dto: {
+      nombre?: string;
+      rtn?: string;
+      email?: string;
+      telefono?: string;
+      direccion?: string;
+      activo?: boolean;
+    },
+    @Req() req: any,
   ) {
-    return this.proveedoresService.update(id, dto);
+    await this.verificarPermisos(req.user.sub);
+    return this.service.update(id, dto);
   }
 
-  @Patch(':id/deactivate')
-  @ApiOperation({ summary: 'Desactivar proveedor' })
-  @ApiResponse({ status: 200, description: 'Proveedor desactivado exitosamente' })
-  deactivate(@Param('id', ParseUUIDPipe) id: string) {
-    return this.proveedoresService.deactivate(id);
-  }
-
-  @Patch(':id/activate')
-  @ApiOperation({ summary: 'Activar proveedor' })
-  @ApiResponse({ status: 200, description: 'Proveedor activado exitosamente' })
-  activate(@Param('id', ParseUUIDPipe) id: string) {
-    return this.proveedoresService.activate(id);
+  @Delete(':id')
+  @ApiOperation({ summary: 'Eliminar/desactivar proveedor' })
+  async remove(@Param('id') id: string, @Req() req: any) {
+    await this.verificarPermisos(req.user.sub);
+    return this.service.remove(id);
   }
 }

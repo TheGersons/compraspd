@@ -1,239 +1,142 @@
-import { 
-  BadRequestException, 
-  Injectable, 
+import {
+  Injectable,
   NotFoundException,
-  ConflictException 
+  ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { CreateProveedorDto } from './dto/create-proveedor.dto';
-import { UpdateProveedorDto } from './dto/update-proveedor.dto';
-
-
-
 
 @Injectable()
 export class ProveedoresService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  /**
-   * Listar proveedores con filtros
-   */
-  async listProveedores(params?: { activo?: boolean; search?: string }) {
+  async findAll(query?: {
+    search?: string;
+    activo?: string;
+    page?: string;
+    pageSize?: string;
+  }) {
+    const page = parseInt(query?.page || '1');
+    const pageSize = parseInt(query?.pageSize || '50');
+    const skip = (page - 1) * pageSize;
+
     const where: any = {};
-
-    if (typeof params?.activo === 'boolean') {
-      where.activo = params.activo;
+    if (query?.activo !== undefined && query.activo !== '') {
+      where.activo = query.activo === 'true';
     }
-
-    if (params?.search) {
+    if (query?.search) {
       where.OR = [
-        { nombre: { contains: params.search, mode: 'insensitive' } },
-        { email: { contains: params.search, mode: 'insensitive' } },
-        { rtn: { contains: params.search, mode: 'insensitive' } }
+        { nombre: { contains: query.search, mode: 'insensitive' } },
+        { email: { contains: query.search, mode: 'insensitive' } },
+        { rtn: { contains: query.search, mode: 'insensitive' } },
       ];
     }
 
-    return this.prisma.proveedor.findMany({
-      where,
-      select: {
-        id: true,
-        nombre: true,
-        rtn: true,
-        email: true,
-        telefono: true,
-        direccion: true,
-        activo: true,
-        creado: true,
-        _count: {
-          select: {
-            precios: true, // Ofertas enviadas
-            compraDetalles: true // Compras realizadas
-          }
-        }
-      },
-      orderBy: { nombre: 'asc' }
-    });
+    const [items, total] = await Promise.all([
+      this.prisma.proveedor.findMany({
+        where,
+        orderBy: { nombre: 'asc' },
+        skip,
+        take: pageSize,
+        include: {
+          _count: {
+            select: {
+              precios: true,
+              compraDetalles: true,
+            },
+          },
+        },
+      }),
+      this.prisma.proveedor.count({ where }),
+    ]);
+
+    return {
+      items,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+    };
   }
 
-  /**
-   * Obtener proveedor por ID
-   */
-  async findById(id: string) {
+  async findOne(id: string) {
     const proveedor = await this.prisma.proveedor.findUnique({
       where: { id },
       include: {
         _count: {
           select: {
             precios: true,
-            compraDetalles: true
-          }
-        }
-      }
+            compraDetalles: true,
+          },
+        },
+      },
     });
-
-    if (!proveedor) {
-      throw new NotFoundException('Proveedor no encontrado');
-    }
-
+    if (!proveedor) throw new NotFoundException('Proveedor no encontrado');
     return proveedor;
   }
 
-  /**
-   * Crear nuevo proveedor
-   */
-  async create(data: CreateProveedorDto) {
-    // Validar que el RTN no exista (si se proporciona)
-    if (data.rtn) {
-      const exists = await this.prisma.proveedor.findFirst({
-        where: { rtn: data.rtn }
-      });
-
-      if (exists) {
-        throw new ConflictException('Ya existe un proveedor con ese RTN');
-      }
-    }
-
-    // Validar que el email no exista (si se proporciona)
-    if (data.email) {
-      const exists = await this.prisma.proveedor.findFirst({
-        where: { email: data.email }
-      });
-
-      if (exists) {
-        throw new ConflictException('Ya existe un proveedor con ese email');
-      }
-    }
-
-    return this.prisma.proveedor.create({
-      data: {
-        nombre: data.nombre,
-        rtn: data.rtn,
-        email: data.email,
-        telefono: data.telefono,
-        direccion: data.direccion,
-        activo: true
-      },
-      select: {
-        id: true,
-        nombre: true,
-        rtn: true,
-        email: true,
-        telefono: true,
-        direccion: true,
-        activo: true,
-        creado: true
-      }
+  async create(dto: {
+    nombre: string;
+    rtn?: string;
+    email?: string;
+    telefono?: string;
+    direccion?: string;
+  }) {
+    // Verificar duplicado
+    const existente = await this.prisma.proveedor.findUnique({
+      where: { nombre: dto.nombre },
     });
+    if (existente)
+      throw new ConflictException(
+        `Ya existe un proveedor con el nombre "${dto.nombre}"`,
+      );
+
+    return this.prisma.proveedor.create({ data: dto });
   }
 
-  /**
-   * Actualizar proveedor
-   */
-  async update(id: string, data: UpdateProveedorDto) {
-    await this.ensureExists(id);
-
-    // Validar RTN único si se actualiza
-    if (data.rtn) {
-      const exists = await this.prisma.proveedor.findFirst({
-        where: {
-          rtn: data.rtn,
-          id: { not: id }
-        }
-      });
-
-      if (exists) {
-        throw new ConflictException('Ya existe un proveedor con ese RTN');
-      }
-    }
-
-    // Validar email único si se actualiza
-    if (data.email) {
-      const exists = await this.prisma.proveedor.findFirst({
-        where: {
-          email: data.email,
-          id: { not: id }
-        }
-      });
-
-      if (exists) {
-        throw new ConflictException('Ya existe un proveedor con ese email');
-      }
-    }
-
-    return this.prisma.proveedor.update({
-      where: { id },
-      data: {
-        nombre: data.nombre,
-        rtn: data.rtn,
-        email: data.email,
-        telefono: data.telefono,
-        direccion: data.direccion,
-        activo: data.activo
-      },
-      select: {
-        id: true,
-        nombre: true,
-        rtn: true,
-        email: true,
-        telefono: true,
-        direccion: true,
-        activo: true
-      }
-    });
-  }
-
-  /**
-   * Desactivar proveedor
-   */
-  async deactivate(id: string) {
-    await this.ensureExists(id);
-
-    return this.prisma.proveedor.update({
-      where: { id },
-      data: { activo: false }
-    });
-  }
-
-  /**
-   * Activar proveedor
-   */
-  async activate(id: string) {
-    await this.ensureExists(id);
-
-    return this.prisma.proveedor.update({
-      where: { id },
-      data: { activo: true }
-    });
-  }
-
-  /**
-   * Obtener estadísticas del proveedor
-   */
-  async getStats(id: string) {
-    await this.ensureExists(id);
-
-    const [totalOfertas, totalCompras] = await Promise.all([
-      this.prisma.precios.count({
-        where: { proveedorId: id }
-      }),
-      this.prisma.compraDetalle.count({
-        where: { proveedorId: id }
-      })
-    ]);
-
-    return {
-      totalOfertas,
-      totalCompras
-    };
-  }
-
-  /**
-   * Método privado: Verificar que el proveedor existe
-   */
-  private async ensureExists(id: string) {
+  async update(
+    id: string,
+    dto: {
+      nombre?: string;
+      rtn?: string;
+      email?: string;
+      telefono?: string;
+      direccion?: string;
+      activo?: boolean;
+    },
+  ) {
     const proveedor = await this.prisma.proveedor.findUnique({ where: { id } });
-    if (!proveedor) {
-      throw new NotFoundException('Proveedor no encontrado');
+    if (!proveedor) throw new NotFoundException('Proveedor no encontrado');
+
+    // Verificar nombre duplicado si cambió
+    if (dto.nombre && dto.nombre !== proveedor.nombre) {
+      const existente = await this.prisma.proveedor.findUnique({
+        where: { nombre: dto.nombre },
+      });
+      if (existente)
+        throw new ConflictException(
+          `Ya existe un proveedor con el nombre "${dto.nombre}"`,
+        );
     }
+
+    return this.prisma.proveedor.update({ where: { id }, data: dto });
+  }
+
+  async remove(id: string) {
+    const proveedor = await this.prisma.proveedor.findUnique({
+      where: { id },
+      include: { _count: { select: { precios: true, compraDetalles: true } } },
+    });
+    if (!proveedor) throw new NotFoundException('Proveedor no encontrado');
+
+    // Si tiene relaciones, soft delete
+    if (proveedor._count.precios > 0 || proveedor._count.compraDetalles > 0) {
+      return this.prisma.proveedor.update({
+        where: { id },
+        data: { activo: false },
+      });
+    }
+
+    // Si no tiene relaciones, eliminar
+    return this.prisma.proveedor.delete({ where: { id } });
   }
 }
