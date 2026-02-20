@@ -17,6 +17,7 @@ interface Proyecto {
   estado: boolean;
   creado: string;
   actualizado: string;
+  area?: { id: string; nombreArea: string; tipo: string };
   _count: {
     cotizaciones: number;
   };
@@ -210,31 +211,28 @@ export default function Projects() {
             <div className="flex gap-2">
               <button
                 onClick={() => setFilterEstado(undefined)}
-                className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                  filterEstado === undefined
+                className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${filterEstado === undefined
                     ? "bg-blue-500 text-white"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-                }`}
+                  }`}
               >
                 Todos
               </button>
               <button
                 onClick={() => setFilterEstado(true)}
-                className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                  filterEstado === true
+                className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${filterEstado === true
                     ? "bg-blue-500 text-white"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-                }`}
+                  }`}
               >
                 Activos
               </button>
               <button
                 onClick={() => setFilterEstado(false)}
-                className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                  filterEstado === false
+                className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${filterEstado === false
                     ? "bg-blue-500 text-white"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-                }`}
+                  }`}
               >
                 Cerrados
               </button>
@@ -282,11 +280,10 @@ export default function Projects() {
                     </p>
                   </div>
                   <span
-                    className={`ml-2 flex-shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                      proyecto.estado
+                    className={`ml-2 flex-shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${proyecto.estado
                         ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
                         : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-400"
-                    }`}
+                      }`}
                   >
                     {proyecto.estado ? "Activo" : "Cerrado"}
                   </span>
@@ -294,6 +291,12 @@ export default function Projects() {
 
                 {/* Stats */}
                 <div className="mb-4 flex items-center gap-4 border-t border-gray-200 pt-3 dark:border-gray-700">
+                  <div>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Área</p>
+                    <span className="inline-block rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                      {proyecto.area?.nombreArea || "Sin área"}
+                    </span>
+                  </div>
                   <div>
                     <p className="text-xs text-gray-600 dark:text-gray-400">Criticidad</p>
                     <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${getCriticidadColor(proyecto.criticidad)}`}>

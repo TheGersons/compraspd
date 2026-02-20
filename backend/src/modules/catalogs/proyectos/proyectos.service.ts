@@ -1,14 +1,12 @@
-import { 
-  BadRequestException, 
-  Injectable, 
+import {
+  BadRequestException,
+  Injectable,
   NotFoundException,
-  ConflictException 
+  ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateProyectoDto } from './dto/create-proyecto.dto';
 import { UpdateProyectoDto } from './dto/update-proyecto.dto';
-
-
 
 @Injectable()
 export class ProyectosService {
@@ -27,7 +25,7 @@ export class ProyectosService {
     if (params?.search) {
       where.OR = [
         { nombre: { contains: params.search, mode: 'insensitive' } },
-        { descripcion: { contains: params.search, mode: 'insensitive' } }
+        { descripcion: { contains: params.search, mode: 'insensitive' } },
       ];
     }
 
@@ -37,17 +35,19 @@ export class ProyectosService {
         id: true,
         nombre: true,
         descripcion: true,
-        criticidad: true, // ← AGREGADO
+        criticidad: true,
         estado: true,
         creado: true,
         actualizado: true,
+        areaId: true,
+        area: { select: { id: true, nombreArea: true, tipo: true } },
         _count: {
           select: {
-            cotizaciones: true // Contar cotizaciones del proyecto
-          }
-        }
+            cotizaciones: true,
+          },
+        },
       },
-      orderBy: { creado: 'desc' }
+      orderBy: { creado: 'desc' },
     });
   }
 
@@ -68,17 +68,17 @@ export class ProyectosService {
               select: {
                 id: true,
                 nombre: true,
-                email: true
-              }
-            }
+                email: true,
+              },
+            },
           },
           orderBy: { fechaSolicitud: 'desc' },
-          take: 10 // Últimas 10 cotizaciones
+          take: 10, // Últimas 10 cotizaciones
         },
         _count: {
-          select: { cotizaciones: true }
-        }
-      }
+          select: { cotizaciones: true },
+        },
+      },
     });
 
     if (!proyecto) {
@@ -97,9 +97,9 @@ export class ProyectosService {
       where: {
         nombre: {
           equals: data.nombre,
-          mode: 'insensitive'
-        }
-      }
+          mode: 'insensitive',
+        },
+      },
     });
 
     if (exists) {
@@ -107,7 +107,10 @@ export class ProyectosService {
     }
 
     // Validar criticidad (1-10)
-    if (data.criticidad !== undefined && (data.criticidad < 1 || data.criticidad > 10)) {
+    if (
+      data.criticidad !== undefined &&
+      (data.criticidad < 1 || data.criticidad > 10)
+    ) {
       throw new BadRequestException('La criticidad debe estar entre 1 y 10');
     }
 
@@ -115,17 +118,20 @@ export class ProyectosService {
       data: {
         nombre: data.nombre,
         descripcion: data.descripcion,
-        criticidad: data.criticidad ?? 5, // ← AGREGADO con default 5
-        estado: true
+        criticidad: data.criticidad ?? 5,
+        areaId: (data as any).areaId || null,
+        estado: true,
       },
       select: {
         id: true,
         nombre: true,
         descripcion: true,
-        criticidad: true, // ← AGREGADO
+        criticidad: true,
         estado: true,
-        creado: true
-      }
+        creado: true,
+        areaId: true,
+        area: { select: { id: true, nombreArea: true, tipo: true } },
+      },
     });
   }
 
@@ -141,10 +147,10 @@ export class ProyectosService {
         where: {
           nombre: {
             equals: data.nombre,
-            mode: 'insensitive'
+            mode: 'insensitive',
           },
-          id: { not: id }
-        }
+          id: { not: id },
+        },
       });
 
       if (exists) {
@@ -153,7 +159,10 @@ export class ProyectosService {
     }
 
     // Validar criticidad si se proporciona
-    if (data.criticidad !== undefined && (data.criticidad < 1 || data.criticidad > 10)) {
+    if (
+      data.criticidad !== undefined &&
+      (data.criticidad < 1 || data.criticidad > 10)
+    ) {
       throw new BadRequestException('La criticidad debe estar entre 1 y 10');
     }
 
@@ -162,17 +171,21 @@ export class ProyectosService {
       data: {
         nombre: data.nombre,
         descripcion: data.descripcion,
-        criticidad: data.criticidad, // ← AGREGADO
-        estado: data.estado
+        criticidad: data.criticidad,
+        areaId:
+          (data as any).areaId !== undefined ? (data as any).areaId : undefined,
+        estado: data.estado,
       },
       select: {
         id: true,
         nombre: true,
         descripcion: true,
-        criticidad: true, // ← AGREGADO
+        criticidad: true,
         estado: true,
-        actualizado: true
-      }
+        actualizado: true,
+        areaId: true,
+        area: { select: { id: true, nombreArea: true, tipo: true } },
+      },
     });
   }
 
@@ -184,7 +197,7 @@ export class ProyectosService {
 
     return this.prisma.proyecto.update({
       where: { id },
-      data: { estado: false }
+      data: { estado: false },
     });
   }
 
@@ -196,7 +209,7 @@ export class ProyectosService {
 
     return this.prisma.proyecto.update({
       where: { id },
-      data: { estado: true }
+      data: { estado: true },
     });
   }
 
@@ -211,20 +224,20 @@ export class ProyectosService {
       where: { id },
       include: {
         _count: {
-          select: { cotizaciones: true }
-        }
-      }
+          select: { cotizaciones: true },
+        },
+      },
     });
 
     if (proyecto!._count.cotizaciones > 0) {
       throw new BadRequestException(
-        `No se puede eliminar el proyecto porque tiene ${proyecto!._count.cotizaciones} cotización(es) asociada(s). Ciérrelo en su lugar.`
+        `No se puede eliminar el proyecto porque tiene ${proyecto!._count.cotizaciones} cotización(es) asociada(s). Ciérrelo en su lugar.`,
       );
     }
 
     // Eliminar proyecto
     await this.prisma.proyecto.delete({
-      where: { id }
+      where: { id },
     });
 
     return { message: 'Proyecto eliminado exitosamente' };
@@ -239,7 +252,7 @@ export class ProyectosService {
     const cotizaciones = await this.prisma.cotizacion.groupBy({
       by: ['estado'],
       where: { proyectoId: id },
-      _count: true
+      _count: true,
     });
 
     const stats = {
@@ -247,10 +260,10 @@ export class ProyectosService {
       enviadas: 0,
       enProceso: 0,
       aprobadas: 0,
-      canceladas: 0
+      canceladas: 0,
     };
 
-    cotizaciones.forEach(group => {
+    cotizaciones.forEach((group) => {
       stats.totalCotizaciones += group._count;
       switch (group.estado) {
         case 'ENVIADA':

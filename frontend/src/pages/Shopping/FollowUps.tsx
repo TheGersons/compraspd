@@ -4,7 +4,7 @@ import PageMeta from "../../components/common/PageMeta";
 import { getToken } from "../../lib/api";
 import { useNotifications } from "../Notifications/context/NotificationContext";
 import toast from "react-hot-toast";
-import { Download, Eye, X, FileText, CalendarIcon, MoreVertical, UserCheck, Users } from "lucide-react";
+import { Download, Eye, X, FileText, CalendarIcon, MoreVertical, UserCheck, Users, ChevronDown } from "lucide-react";
 
 import { PopoverTrigger, PopoverContent, Popover } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -703,14 +703,17 @@ export default function ShoppingFollowUps() {
           {/* Filtro por Responsable */}
           <div className="relative">
             <button
-              onClick={() => setShowResponsableDropdown(!showResponsableDropdown)}
+              onClick={(e) => { e.stopPropagation(); setShowResponsableDropdown(!showResponsableDropdown); }}
               className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm transition-colors ${filtroResponsables.length > 0
                 ? "border-blue-400 bg-blue-50 text-blue-700 dark:border-blue-600 dark:bg-blue-900/20 dark:text-blue-300"
                 : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
                 }`}
             >
+              {/*flecha hacia abajo*/}
+
               <Users size={14} />
               {filtroResponsables.length === 0 ? "Todos los encargados" : `${filtroResponsables.length} seleccionado${filtroResponsables.length > 1 ? 's' : ''}`}
+              <ChevronDown size={14} />
             </button>
             {showResponsableDropdown && (
               <div className="absolute top-full left-0 z-50 mt-1 w-64 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">

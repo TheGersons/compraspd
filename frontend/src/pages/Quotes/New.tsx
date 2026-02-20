@@ -55,6 +55,14 @@ interface Proyecto {
   nombre: string;
   descripcion: string;
   estado: boolean;
+  areaId?: string;
+  area?: { id: string; nombreArea: string };
+}
+
+interface AreaCategoria {
+  id: string;
+  nombreArea: string;
+  tipo: string;
 }
 
 // ============================================================================
@@ -138,6 +146,26 @@ const api = {
 
     return response.json();
   },
+
+  async getAreas(): Promise<AreaCategoria[]> {
+    const token = await getToken();
+    const response = await fetch(`${API_BASE_URL}/api/v1/areas`, {
+      credentials: "include", headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) return [];
+    return response.json();
+  },
+
+  async crearProyecto(data: { nombre: string; areaId: string }): Promise<Proyecto> {
+    const token = await getToken();
+    const response = await fetch(`${API_BASE_URL}/api/v1/proyectos`, {
+      method: "POST", credentials: "include",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ ...data, criticidad: 5 }),
+    });
+    if (!response.ok) { const e = await response.json(); throw new Error(e.message || "Error al crear proyecto"); }
+    return response.json();
+  },
 };
 
 // ============================================================================
@@ -174,6 +202,13 @@ export default function New() {
   const [tipos, setTipos] = useState<Tipo[]>([]);
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [proyectos, setProyectos] = useState<Proyecto[]>([]);
+  const [areas, setAreas] = useState<AreaCategoria[]>([]);
+
+  // Modal crear proyecto
+  const [showNuevoProyecto, setShowNuevoProyecto] = useState(false);
+  const [nuevoProyectoNombre, setNuevoProyectoNombre] = useState("");
+  const [nuevoProyectoAreaId, setNuevoProyectoAreaId] = useState("");
+  const [creandoProyecto, setCreandoProyecto] = useState(false);
 
   // Estados de carga y errores
   const [loading, setLoading] = useState(false);
@@ -203,10 +238,11 @@ export default function New() {
       setIsLoading(true);
       setLoadingCatalogos(true);
       setError(null);
-      const [tiposResult, usuariosResult, proyectosResult] = await Promise.allSettled([
+      const [tiposResult, usuariosResult, proyectosResult, areasResult] = await Promise.allSettled([
         api.getTipos(),
         api.getUsuarios(),
         api.getProyectos(),
+        api.getAreas(),
       ]);
       // 1. Manejar Tipos (CON VALIDACIÓN DE NULOS EXTRA)
       if (tiposResult.status === 'fulfilled') {
@@ -236,6 +272,11 @@ export default function New() {
       } else {
         console.warn("⚠️ Error cargando Proyectos:", proyectosResult.reason);
         setProyectos([]);
+      }
+
+      // 4. Manejar Áreas
+      if (areasResult.status === 'fulfilled') {
+        setAreas(areasResult.value || []);
       }
 
       // Obtener usuario actual del endpoint /auth/me
@@ -485,23 +526,51 @@ export default function New() {
               </select>
             </div>
 
-            {/* Proyecto */}
+            {/* Proyecto - Filtrado por área del tipo seleccionado */}
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Proyecto <span className="text-rose-500">*</span>
               </label>
-              <select
-                value={proyectoId}
-                onChange={(e) => setProyectoId(e.target.value.length < 5 ? null : e.target.value)}
-                className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-2.5 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
-              >
-                <option value="">Seleccione un proyecto</option>
-                {proyectos.map((proyecto) => (
-                  <option key={proyecto.id} value={proyecto.id}>
-                    {proyecto.nombre}
-                  </option>
-                ))}
-              </select>
+              <div className="flex gap-2">
+                <select
+                  value={proyectoId}
+                  onChange={(e) => setProyectoId(e.target.value.length < 5 ? null : e.target.value)}
+                  className="flex-1 rounded-lg border-2 border-gray-300 bg-white px-4 py-2.5 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+                >
+                  <option value="">Seleccione un proyecto</option>
+                  {(() => {
+                    const tipoSeleccionado = tipos.find(t => t.id === tipoId);
+                    const areaTipo = tipoSeleccionado?.area?.nombreArea?.toLowerCase();
+                    const proyectosFiltrados = areaTipo
+                      ? proyectos.filter(p => p.area?.nombreArea?.toLowerCase() === areaTipo)
+                      : proyectos;
+                    return proyectosFiltrados.map((proyecto) => (
+                      <option key={proyecto.id} value={proyecto.id}>
+                        {proyecto.nombre} {proyecto.area ? `(${proyecto.area.nombreArea})` : ''}
+                      </option>
+                    ));
+                  })()}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const tipoSeleccionado = tipos.find(t => t.id === tipoId);
+                    setNuevoProyectoAreaId(tipoSeleccionado?.area?.id || '');
+                    setNuevoProyectoNombre('');
+                    setShowNuevoProyecto(true);
+                  }}
+                  className="rounded-lg border-2 border-dashed border-gray-300 px-3 py-2.5 text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors dark:border-gray-600 dark:text-gray-400"
+                  title="Crear nuevo proyecto"
+                >
+                  +
+                </button>
+              </div>
+              {tipoId && (() => {
+                const tipoSeleccionado = tipos.find(t => t.id === tipoId);
+                return tipoSeleccionado?.area ? (
+                  <p className="mt-1 text-xs text-gray-500">Mostrando proyectos de: {tipoSeleccionado.area.nombreArea}</p>
+                ) : null;
+              })()}
             </div>
 
             {/* Solicitante - Combobox con búsqueda */}
@@ -781,6 +850,59 @@ export default function New() {
           </button>
         </div>
       </form>
+
+      {/* Modal Crear Proyecto Rápido */}
+      {showNuevoProyecto && (
+        <div className="fixed inset-0 z-[5000] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white shadow-xl dark:bg-gray-900">
+            <div className="flex items-center justify-between border-b border-gray-200 p-4 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Nuevo Proyecto</h3>
+              <button onClick={() => setShowNuevoProyecto(false)} className="text-gray-400 hover:text-red-500">✕</button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre *</label>
+                <input type="text" value={nuevoProyectoNombre}
+                  onChange={(e) => setNuevoProyectoNombre(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                  placeholder="Nombre del proyecto" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Área *</label>
+                <select value={nuevoProyectoAreaId}
+                  onChange={(e) => setNuevoProyectoAreaId(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white">
+                  <option value="">Seleccione un área</option>
+                  {areas.map(a => (
+                    <option key={a.id} value={a.id}>{a.nombreArea}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 border-t border-gray-200 p-4 dark:border-gray-700">
+              <button onClick={() => setShowNuevoProyecto(false)}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 dark:border-gray-600 dark:text-gray-300">Cancelar</button>
+              <button
+                disabled={creandoProyecto || !nuevoProyectoNombre.trim() || !nuevoProyectoAreaId}
+                onClick={async () => {
+                  setCreandoProyecto(true);
+                  try {
+                    const nuevo = await api.crearProyecto({ nombre: nuevoProyectoNombre.trim(), areaId: nuevoProyectoAreaId });
+                    setProyectos(prev => [...prev, { ...nuevo, estado: true }]);
+                    setProyectoId(nuevo.id);
+                    setShowNuevoProyecto(false);
+                    addNotification("success", "Proyecto creado", `"${nuevo.nombre}" creado exitosamente`);
+                  } catch (e: any) {
+                    addNotification("danger", "Error", e.message);
+                  } finally { setCreandoProyecto(false); }
+                }}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+                {creandoProyecto ? "Creando..." : "Crear"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

@@ -97,7 +97,7 @@ export class QuotationsService {
           solicitanteId: quotationData.solicitanteId,
           tipoId: dto.tipoId,
           proyectoId: dto.proyectoId || null,
-          chatId: chat.id, // ← Asociar el chat
+          chatId: chat.id,
 
           detalles: {
             create: items.map((item) => ({
@@ -124,9 +124,29 @@ export class QuotationsService {
             include: { area: true },
           },
           proyecto: true,
-          chat: true, // ← Incluir chat en respuesta
+          chat: true,
         },
       });
+
+      // 3. Enviar notas de cada item como mensajes al chat
+      const itemsConNotas = items.filter(
+        (item, i) => item.notas && item.notas.trim().length > 0,
+      );
+      if (itemsConNotas.length > 0 && chat.id) {
+        const mensajes = itemsConNotas.map((item, i) => {
+          const detalle = cotizacion.detalles.find(
+            (d) => d.descripcionProducto === item.descripcionProducto,
+          );
+          const skuLabel = detalle?.sku || `Item ${i + 1}`;
+          return {
+            chatId: chat.id,
+            emisorId: quotationData.solicitanteId,
+            contenido: `📋 Detalles para ${skuLabel} - ${item.descripcionProducto}:\n${item.notas}`,
+            tipoMensaje: 'TEXTO',
+          };
+        });
+        await tx.mensaje.createMany({ data: mensajes });
+      }
 
       return cotizacion;
     });
@@ -185,19 +205,6 @@ export class QuotationsService {
             precios: {
               include: {
                 proveedor: true,
-              },
-            },
-            preciosOfertas: {
-              include: {
-                proveedor: {
-                  select: {
-                    id: true,
-                    nombre: true,
-                  },
-                },
-              },
-              orderBy: {
-                precio: 'asc',
               },
             },
           },

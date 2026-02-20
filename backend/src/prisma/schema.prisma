@@ -19,11 +19,12 @@ datasource db {
 // ============================================
 
 model Area {
-  id         String   @id @default(uuid()) @db.Uuid
-  nombreArea String   @unique @map("nombre_area")
+  id         String     @id @default(uuid()) @db.Uuid
+  nombreArea String     @unique @map("nombre_area")
   tipo       String // "proyectos" | "comercial" | "tecnica" | "operativa"
   icono      String?
-  creado     DateTime @default(now())
+  creado     DateTime   @default(now())
+  proyectos  Proyecto[]
 
   tipos Tipo[]
 
@@ -75,6 +76,9 @@ model Proyecto {
   estado      Boolean  @default(true)
   creado      DateTime @default(now())
   actualizado DateTime @default(now()) @updatedAt
+  areaId      String?  @map("area_id") @db.Uuid
+
+  area Area? @relation(fields: [areaId], references: [id], onDelete: SetNull)
 
   cotizaciones     Cotizacion[]
   estadosProductos EstadoProducto[]

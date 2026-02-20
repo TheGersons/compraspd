@@ -15,8 +15,16 @@ interface Proyecto {
   descripcion: string | null;
   criticidad: number;
   estado: boolean;
+  areaId?: string;
+  area?: { id: string; nombreArea: string };
   creado: string;
   actualizado: string;
+}
+
+interface Area {
+  id: string;
+  nombreArea: string;
+  tipo: string;
 }
 
 // ============================================================================
@@ -46,16 +54,16 @@ const api = {
       credentials: "include",
       body: JSON.stringify(data),
     });
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.message || "Error al crear proyecto");
     }
-    
+
     return response.json();
   },
 
-  async actualizarProyecto(id: string, data: { nombre?: string; descripcion?: string }) {
+  async actualizarProyecto(id: string, data: { nombre?: string; descripcion?: string; areaId?: string }) {
     const response = await fetch(`${API_BASE_URL}/api/v1/proyectos/${id}`, {
       method: "PATCH",
       headers: {
@@ -65,12 +73,20 @@ const api = {
       credentials: "include",
       body: JSON.stringify(data),
     });
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.message || "Error al actualizar proyecto");
     }
-    
+
+    return response.json();
+  },
+
+  async getAreas(): Promise<Area[]> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/areas`, {
+      credentials: "include", headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) return [];
     return response.json();
   },
 };
@@ -88,6 +104,8 @@ export default function NewProject() {
   // Estado del formulario
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
+  const [areaId, setAreaId] = useState("");
+  const [areas, setAreas] = useState<Area[]>([]);
 
   // Estados de carga
   const [loading, setLoading] = useState(false);
@@ -95,6 +113,7 @@ export default function NewProject() {
 
   // Cargar proyecto si es edición
   useEffect(() => {
+    api.getAreas().then(setAreas);
     if (isEditing) {
       cargarProyecto();
     }
@@ -106,6 +125,7 @@ export default function NewProject() {
       const proyecto = await api.getProyecto(id!);
       setNombre(proyecto.nombre);
       setDescripcion(proyecto.descripcion || "");
+      setAreaId(proyecto.areaId || "");
     } catch (error: any) {
       console.error("Error al cargar proyecto:", error);
       addNotification("danger", "Error", error.message, { priority: "high" });
@@ -140,6 +160,7 @@ export default function NewProject() {
       const payload = {
         nombre: nombre.trim(),
         descripcion: descripcion.trim() || "",
+        areaId: areaId || undefined,
       };
 
       if (isEditing) {
@@ -191,7 +212,7 @@ export default function NewProject() {
 
   return (
     <>
-      <PageMeta  description={isEditing ? "Editar Proyecto" : "Nuevo Proyecto"} title={isEditing ? "Editar Proyecto" : "Nuevo Proyecto"} />
+      <PageMeta description={isEditing ? "Editar Proyecto" : "Nuevo Proyecto"} title={isEditing ? "Editar Proyecto" : "Nuevo Proyecto"} />
 
       <div className="mx-auto max-w-3xl">
         {/* Header */}
@@ -259,6 +280,23 @@ export default function NewProject() {
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   {descripcion.length}/1000 caracteres
                 </p>
+              </div>
+
+              {/* Área */}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Área <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={areaId}
+                  onChange={(e) => setAreaId(e.target.value)}
+                  className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-2.5 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+                >
+                  <option value="">Seleccione un área</option>
+                  {areas.map(a => (
+                    <option key={a.id} value={a.id}>{a.nombreArea}</option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
