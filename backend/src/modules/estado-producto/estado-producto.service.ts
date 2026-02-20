@@ -567,11 +567,11 @@ export class EstadoProductoService {
     const siguienteEstado = estadosAplicables[indexActual + 1];
     const verificacion = await this.verificarDocumentosParaAvanzar(
       id,
-      estadoActual,
+      siguienteEstado,
     );
     if (!verificacion.completo) {
       throw new BadRequestException(
-        `No se puede avanzar. Documentos pendientes en "${ESTADO_LABELS[estadoActual]}": ${verificacion.faltantes.join(', ')}`,
+        `No se puede avanzar. Documentos pendientes en "${ESTADO_LABELS[siguienteEstado]}": ${verificacion.faltantes.join(', ')}`,
       );
     }
 

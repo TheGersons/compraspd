@@ -532,11 +532,12 @@ export default function ShoppingFollowUps() {
     setDocVerificacion(null);
     setShowAvanzarModal(true);
 
-    // Verificar documentos del estado actual
-    if (productoSeleccionado?.estadoActual) {
+    // Verificar documentos del SIGUIENTE estado (al que se va a avanzar)
+    const estadoAVerificar = productoSeleccionado?.siguienteEstado || productoSeleccionado?.estadoActual;
+    if (estadoAVerificar) {
       setLoadingVerificacion(true);
       try {
-        const result = await api.verificarDocumentos(productoSeleccionado.id, productoSeleccionado.estadoActual);
+        const result = await api.verificarDocumentos(productoSeleccionado.id, estadoAVerificar);
         setDocVerificacion(result);
       } catch {
         setDocVerificacion({ completo: true, faltantes: [] }); // No bloquear si falla
