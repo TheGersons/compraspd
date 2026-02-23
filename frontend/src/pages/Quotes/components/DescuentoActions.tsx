@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { getToken } from '../../../lib/api';
+import Button from '@/components/ui/button/Button';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -26,13 +27,13 @@ type Props = {
   onNotification: (type: 'success' | 'danger' | 'warn', title: string, message: string) => void;
 };
 
-export default function DescuentoActions({ 
-  precio, 
-  productoId, 
-  cotizacionId, 
-  sku, 
+export default function DescuentoActions({
+  precio,
+  productoId,
+  cotizacionId,
+  sku,
   onUpdate,
-  onNotification 
+  onNotification
 }: Props) {
   const [loading, setLoading] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -49,14 +50,14 @@ export default function DescuentoActions({
     setLoading(true);
     try {
       const token = getToken();
-      
+
       // 1. Generar comprobante NO_APLICA
       const noAplicaRes = await fetch(`${API_BASE_URL}/api/v1/storage/no-aplica`, {
         method: 'POST',
         credentials: 'include',
         headers: { Authorization: `Bearer ${token}` },
       });
-      
+
       if (!noAplicaRes.ok) throw new Error('Error al generar comprobante');
       const { comprobante } = await noAplicaRes.json();
 
@@ -87,7 +88,7 @@ export default function DescuentoActions({
       if (!resultadoRes.ok) throw new Error('Error al registrar resultado');
 
       onNotification('success', 'Éxito', 'Marcado como "No aplica descuento"');
-      onUpdate();
+      setTimeout(() => onUpdate(), 100);
     } catch (error) {
       console.error('Error:', error);
       onNotification('danger', 'Error', 'No se pudo procesar la solicitud');
@@ -139,7 +140,7 @@ export default function DescuentoActions({
 
       onNotification('success', 'Éxito', 'Comprobante subido correctamente');
       setShowUploadModal(false);
-      onUpdate();
+      setTimeout(() => onUpdate(), 100);
     } catch (error: any) {
       console.error('Error:', error);
       onNotification('danger', 'Error', error.message || 'No se pudo subir el archivo');
@@ -152,6 +153,11 @@ export default function DescuentoActions({
   const handleResultadoDescuento = async () => {
     if (!precioDescuento || parseFloat(precioDescuento) <= 0) {
       onNotification('warn', 'Advertencia', 'Ingresa un precio válido');
+      return;
+    }
+
+    if (parseFloat(precioDescuento) > Number(precio.precio)) {
+      onNotification('warn', 'Advertencia', 'El precio final no puede ser mayor al precio original');
       return;
     }
 
@@ -173,9 +179,9 @@ export default function DescuentoActions({
 
       const data = await response.json();
       onNotification('success', 'Éxito', data.aprobado ? 'Descuento aprobado' : 'Descuento denegado');
-      setShowResultModal(false);
       setPrecioDescuento('');
-      onUpdate();
+      setShowResultModal(false);
+      setTimeout(() => onUpdate(), 100);
     } catch (error) {
       console.error('Error:', error);
       onNotification('danger', 'Error', 'No se pudo registrar el resultado');
@@ -213,16 +219,18 @@ export default function DescuentoActions({
           <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-0.5 text-xs text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
             ⏳ Pendiente resultado
           </span>
-          <button
+          <Button
             onClick={() => {
               setPrecioDescuento(String(precio.precio));
               setShowResultModal(true);
             }}
+            variant="danger"
+            size="sm"
             disabled={loading}
             className="rounded px-2 py-0.5 text-xs font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
           >
-            Agregar resultado
-          </button>
+            Agregar Precio Final
+          </Button>
         </div>
 
         {/* Modal resultado */}

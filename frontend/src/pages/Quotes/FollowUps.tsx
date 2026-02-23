@@ -448,6 +448,7 @@ export default function FollowUps() {
   const [loadingChat, setLoadingChat] = useState(false);
   const [sendingMessage, setSendingMessage] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const [notasAbiertas, setNotasAbiertas] = useState<string | null>(null);
   const { user, isLoading } = useAuth();
   if (isLoading) {
     return (
@@ -1422,14 +1423,28 @@ export default function FollowUps() {
                                         <tr key={producto.id} className="group hover:bg-gray-50 dark:hover:bg-gray-700/30">
                                           {/* Producto */}
                                           <td className="py-4">
-                                            <div className="font-medium text-gray-900 dark:text-white">
-                                              {producto.descripcionProducto}
+                                            <div className="flex items-center gap-1.5">
+                                              <span className="font-medium text-gray-900 dark:text-white">
+                                                {producto.descripcionProducto}
+                                              </span>
+                                              {producto.notas && (
+                                                <div className="relative">
+                                                  <button onClick={() => setNotasAbiertas(notasAbiertas === producto.id ? null : producto.id)}
+                                                    className="text-blue-500 hover:text-blue-700 dark:text-blue-400 text-sm" title="Ver notas">
+                                                    📋
+                                                  </button>
+                                                  {notasAbiertas === producto.id && (
+                                                    <div className="absolute left-0 top-full z-50 mt-1 w-72 rounded-lg border border-gray-200 bg-white p-3 shadow-lg dark:border-gray-700 dark:bg-gray-900">
+                                                      <div className="flex justify-between items-center mb-1">
+                                                        <p className="text-xs font-semibold text-gray-500">Notas:</p>
+                                                        <button onClick={() => setNotasAbiertas(null)} className="text-xs text-gray-400 hover:text-red-500">✕</button>
+                                                      </div>
+                                                      <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{producto.notas}</p>
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              )}
                                             </div>
-                                            {producto.notas && (
-                                              <div className="mt-1 rounded bg-blue-50 px-2 py-1 text-xs text-blue-700 dark:bg-blue-900/20 dark:text-blue-300">
-                                                📋 {producto.notas}
-                                              </div>
-                                            )}
                                           </td>
 
                                           {/* Cantidad */}

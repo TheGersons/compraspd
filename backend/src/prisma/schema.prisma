@@ -72,7 +72,7 @@ model Proyecto {
   id          String   @id @default(uuid()) @db.Uuid
   nombre      String   @unique
   descripcion String?
-  criticidad  Int      @default(5) // 1-10, donde 10 es más crítico
+  criticidad  Int      @default(5)
   estado      Boolean  @default(true)
   creado      DateTime @default(now())
   actualizado DateTime @default(now()) @updatedAt
