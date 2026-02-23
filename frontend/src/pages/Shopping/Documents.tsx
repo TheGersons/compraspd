@@ -38,7 +38,8 @@ type Producto = {
     id: string; sku: string; descripcion: string; proveedor?: string;
     tipoCompra: "NACIONAL" | "INTERNACIONAL"; estadoActual?: string;
     progreso?: number; nivelCriticidad: string;
-    cotizacion?: { id: string; nombreCotizacion: string; tipoCompra: "NACIONAL" | "INTERNACIONAL" };
+    cotizacionId?: string;
+    cotizacion?: { id?: string; nombreCotizacion: string; tipoCompra: "NACIONAL" | "INTERNACIONAL" };
 };
 
 // ============================================================================
@@ -213,6 +214,18 @@ export default function Documents() {
     const [justificacionEstado, setJustificacionEstado] = useState<string | null>(null);
     const [justificacionTexto, setJustificacionTexto] = useState("");
 
+    // Vista agrupada por cotización
+    const [vistaAgrupada, setVistaAgrupada] = useState(true);
+    const [grupoExpandido, setGrupoExpandido] = useState<string | null>(null);
+
+    // Upload masivo (mismo documento para múltiples productos)
+    const [showUploadMasivoModal, setShowUploadMasivoModal] = useState(false);
+    const [uploadMasivoConfig, setUploadMasivoConfig] = useState<{ estado: string; requeridoId?: string; requeridoNombre: string } | null>(null);
+    const [productosParaUpload, setProductosParaUpload] = useState<string[]>([]);
+    const [cotizacionParaUpload, setCotizacionParaUpload] = useState<string | null>(null);
+    const [uploadingMasivo, setUploadingMasivo] = useState(false);
+    const fileMasivoRef = useRef<HTMLInputElement>(null);
+
     useEffect(() => { cargarProductos(); }, [filtroTipoCompra]);
     useEffect(() => {
         const productoId = searchParams.get("producto");
@@ -300,6 +313,47 @@ export default function Documents() {
         if (!searchQuery) return true; const q = searchQuery.toLowerCase();
         return p.sku.toLowerCase().includes(q) || p.descripcion.toLowerCase().includes(q) || p.proveedor?.toLowerCase().includes(q);
     });
+
+    // Agrupar por cotización
+    const productosAgrupados = productosFiltrados.reduce((acc, p) => {
+        const key = p.cotizacionId || p.cotizacion?.id || 'sin-cotizacion';
+        if (!acc[key]) acc[key] = { cotizacionId: key, nombre: p.cotizacion?.nombreCotizacion || 'Sin cotización', tipoCompra: p.cotizacion?.tipoCompra || p.tipoCompra, productos: [] };
+        acc[key].productos.push(p);
+        return acc;
+    }, {} as Record<string, { cotizacionId: string; nombre: string; tipoCompra: string; productos: Producto[] }>);
+    const gruposOrdenados = Object.values(productosAgrupados).sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+    // Upload masivo: subir mismo archivo a múltiples productos
+    const handleUploadMasivo = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !uploadMasivoConfig || productosParaUpload.length === 0) return;
+        setUploadingMasivo(true);
+        const toastId = toast.loading(`Subiendo a ${productosParaUpload.length} producto(s)...`);
+        let exitosos = 0, fallidos = 0;
+        for (const prodId of productosParaUpload) {
+            try {
+                await api.uploadDocumento(file, { estadoProductoId: prodId, documentoRequeridoId: uploadMasivoConfig.requeridoId, estado: uploadMasivoConfig.estado, nombreDocumento: uploadMasivoConfig.requeridoNombre });
+                exitosos++;
+            } catch { fallidos++; }
+        }
+        toast.success(`${exitosos} subidos${fallidos > 0 ? `, ${fallidos} fallidos` : ''}`, { id: toastId });
+        setShowUploadMasivoModal(false);
+        setUploadingMasivo(false);
+        if (fileMasivoRef.current) fileMasivoRef.current.value = "";
+        if (productoSeleccionado) await recargarDocumentos();
+    };
+
+    const abrirUploadMasivo = (cotizacionId: string, estado: string, requeridoId?: string, requeridoNombre?: string) => {
+        const grupo = productosAgrupados[cotizacionId];
+        if (!grupo) {
+            toast.error("No se encontró el grupo de cotización");
+            return;
+        }
+        setCotizacionParaUpload(cotizacionId);
+        setUploadMasivoConfig({ estado, requeridoId, requeridoNombre: requeridoNombre || "Documento" });
+        setProductosParaUpload(grupo.productos.map(p => p.id));
+        setShowUploadMasivoModal(true);
+    };
     const calcularCompletitud = (docs: Record<string, EstadoDocumentos>) => {
         let total = 0, completados = 0;
         Object.values(docs).forEach((ed) => { ed.requeridos.forEach((req) => { if (req.obligatorio) { total++; if (req.adjuntos.length > 0 || req.noAplica) completados++; } }); });
@@ -349,7 +403,13 @@ export default function Documents() {
                     <div className="lg:col-span-1">
                         <div className="rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
                             <div className="border-b border-gray-200 p-4 dark:border-gray-700">
-                                <h3 className="font-semibold text-gray-900 dark:text-white">📦 Productos ({productosFiltrados.length})</h3>
+                                <div className="flex items-center justify-between">
+                                    <h3 className="font-semibold text-gray-900 dark:text-white">📦 Productos ({productosFiltrados.length})</h3>
+                                    <button onClick={() => setVistaAgrupada(!vistaAgrupada)}
+                                        className={`rounded-md px-2 py-1 text-xs font-medium transition-colors ${vistaAgrupada ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400"}`}>
+                                        {vistaAgrupada ? "📁 Agrupado" : "📄 Individual"}
+                                    </button>
+                                </div>
                             </div>
                             <div className="max-h-[650px] overflow-y-auto">
                                 {loading ? (
@@ -358,26 +418,56 @@ export default function Documents() {
                                     <div className="p-6 text-center text-gray-500 dark:text-gray-400">No hay productos disponibles</div>
                                 ) : (
                                     <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                                        {productosFiltrados.map((producto) => (
-                                            <button key={producto.id} onClick={() => seleccionarProducto(producto)}
-                                                className={`w-full p-4 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${productoSeleccionado?.id === producto.id ? "bg-blue-50 dark:bg-blue-900/20" : ""}`}>
-                                                <div className="flex items-start justify-between gap-2">
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="font-mono text-sm font-medium text-gray-900 dark:text-white">{producto.sku}</span>
-                                                            <span className={`rounded-full px-1.5 py-0.5 text-xs font-medium ${getCriticidadBg(producto.nivelCriticidad)}`}>{getCriticidadBadge(producto.nivelCriticidad)}</span>
-                                                        </div>
-                                                        <p className="mt-1 truncate text-sm text-gray-600 dark:text-gray-400">{producto.descripcion}</p>
-                                                        <div className="mt-2 flex items-center gap-2">
-                                                            <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${(producto.cotizacion?.tipoCompra || producto.tipoCompra) === "NACIONAL" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"}`}>
-                                                                {(producto.cotizacion?.tipoCompra || producto.tipoCompra) === "NACIONAL" ? "🇭🇳 Nacional" : "🌍 Internacional"}
-                                                            </span>
-                                                            {producto.estadoActual && <span className="text-xs text-gray-500">{ESTADOS_ICONOS[producto.estadoActual]} {ESTADOS_LABELS[producto.estadoActual]}</span>}
+                                        {vistaAgrupada ? (
+                                            gruposOrdenados.map((grupo) => (
+                                                <div key={grupo.cotizacionId || 'sin'}>
+                                                    <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-50 dark:bg-gray-800/50 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                                                        onClick={() => setGrupoExpandido(grupoExpandido === grupo.cotizacionId ? null : grupo.cotizacionId)}>
+                                                        <span className="text-xs">{grupoExpandido === grupo.cotizacionId ? '▼' : '▶'}</span>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{grupo.nombre}</p>
+                                                            <p className="text-[10px] text-gray-500">{grupo.productos.length} producto(s) • {grupo.tipoCompra}</p>
                                                         </div>
                                                     </div>
+                                                    {grupoExpandido === grupo.cotizacionId && grupo.productos.map((producto) => (
+                                                        <button key={producto.id} onClick={() => seleccionarProducto(producto)}
+                                                            className={`w-full p-3 pl-8 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 border-l-2 ${productoSeleccionado?.id === producto.id ? "bg-blue-50 dark:bg-blue-900/20 border-l-blue-600" : "border-l-transparent"}`}>
+                                                            <div className="flex items-center justify-between gap-2">
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="font-mono text-xs font-medium text-gray-900 dark:text-white">{producto.sku}</span>
+                                                                        <span className={`rounded-full px-1 py-0.5 text-[10px] font-medium ${getCriticidadBg(producto.nivelCriticidad)}`}>{getCriticidadBadge(producto.nivelCriticidad)}</span>
+                                                                    </div>
+                                                                    <p className="text-[10px] text-gray-500 truncate">{producto.descripcion}</p>
+                                                                    {producto.estadoActual && <p className="text-[10px] text-gray-400 mt-0.5">{ESTADOS_ICONOS[producto.estadoActual]} {ESTADOS_LABELS[producto.estadoActual]}</p>}
+                                                                </div>
+                                                            </div>
+                                                        </button>
+                                                    ))}
                                                 </div>
-                                            </button>
-                                        ))}
+                                            ))
+                                        ) : (
+                                            productosFiltrados.map((producto) => (
+                                                <button key={producto.id} onClick={() => seleccionarProducto(producto)}
+                                                    className={`w-full p-4 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${productoSeleccionado?.id === producto.id ? "bg-blue-50 dark:bg-blue-900/20" : ""}`}>
+                                                    <div className="flex items-start justify-between gap-2">
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-mono text-sm font-medium text-gray-900 dark:text-white">{producto.sku}</span>
+                                                                <span className={`rounded-full px-1.5 py-0.5 text-xs font-medium ${getCriticidadBg(producto.nivelCriticidad)}`}>{getCriticidadBadge(producto.nivelCriticidad)}</span>
+                                                            </div>
+                                                            <p className="mt-1 truncate text-sm text-gray-600 dark:text-gray-400">{producto.descripcion}</p>
+                                                            <div className="mt-2 flex items-center gap-2">
+                                                                <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${(producto.cotizacion?.tipoCompra || producto.tipoCompra) === "NACIONAL" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"}`}>
+                                                                    {(producto.cotizacion?.tipoCompra || producto.tipoCompra) === "NACIONAL" ? "🇭🇳 Nacional" : "🌍 Internacional"}
+                                                                </span>
+                                                                {producto.estadoActual && <span className="text-xs text-gray-500">{ESTADOS_ICONOS[producto.estadoActual]} {ESTADOS_LABELS[producto.estadoActual]}</span>}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                            ))
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -510,7 +600,11 @@ export default function Documents() {
                                                                     {/* Acciones: Subir / No aplica */}
                                                                     {esEditable && !req.noAplica && (
                                                                         <div className="flex items-center gap-4">
-                                                                            <button onClick={() => triggerUpload(estado, req.id, req.nombre)} className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 transition-colors"><Upload size={12} /> Subir archivo</button>
+                                                                            <button onClick={() => triggerUpload(estado, req.id, req.nombre)} className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 transition-colors"><Upload size={12} /> Subir</button>
+                                                                            {(productoSeleccionado?.cotizacionId || productoSeleccionado?.cotizacion?.id) && (
+                                                                                <button onClick={() => abrirUploadMasivo(productoSeleccionado!.cotizacionId || productoSeleccionado!.cotizacion!.id!, estado, req.id, req.nombre)}
+                                                                                    className="inline-flex items-center gap-1.5 text-xs text-purple-600 hover:text-purple-700 dark:text-purple-400 transition-colors"><Upload size={12} /> Subir a grupo</button>
+                                                                            )}
                                                                             {req.adjuntos.length === 0 && <button onClick={() => handleToggleNoAplicaDoc(estado, req.id, true)} className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-colors"><Ban size={12} /> No aplica</button>}
                                                                         </div>
                                                                     )}
@@ -679,6 +773,56 @@ export default function Documents() {
                         <div className="border-t border-gray-200 p-4 dark:border-gray-700">
                             <button onClick={() => setShowConfigModal(false)}
                                 className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800">Cerrar</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Input oculto para upload masivo */}
+            <input ref={fileMasivoRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp" onChange={handleUploadMasivo} className="hidden" />
+
+            {/* Modal Upload Masivo */}
+            {showUploadMasivoModal && uploadMasivoConfig && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4">
+                    <div className="w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-xl bg-white p-6 dark:bg-gray-900">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">📎 Subir documento a múltiples productos</h3>
+                            <button onClick={() => setShowUploadMasivoModal(false)} className="text-gray-400 hover:text-red-500">✕</button>
+                        </div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                            Documento: <strong>{uploadMasivoConfig.requeridoNombre}</strong> · Estado: <strong>{ESTADOS_LABELS[uploadMasivoConfig.estado] || uploadMasivoConfig.estado}</strong>
+                        </p>
+                        <p className="text-xs text-gray-500 mb-4">Selecciona los productos a los que se aplicará el mismo documento:</p>
+
+                        <div className="space-y-2 mb-4 max-h-48 overflow-y-auto">
+                            {(() => {
+                                const grupo = cotizacionParaUpload ? productosAgrupados[cotizacionParaUpload] : null;
+                                return (grupo?.productos || []).map(p => {
+                                    const sel = productosParaUpload.includes(p.id);
+                                    return (
+                                        <label key={p.id} className={`flex items-center gap-3 rounded-lg border p-2.5 cursor-pointer transition-colors ${sel ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700'}`}>
+                                            <input type="checkbox" checked={sel}
+                                                onChange={() => setProductosParaUpload(prev => sel ? prev.filter(id => id !== p.id) : [...prev, p.id])}
+                                                className="rounded border-gray-300 text-blue-600" />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium text-gray-900 dark:text-white">{p.sku}</p>
+                                                <p className="text-xs text-gray-500 truncate">{p.descripcion}</p>
+                                            </div>
+                                        </label>
+                                    );
+                                });
+                            })()}
+                        </div>
+                        <div className="flex gap-2 mb-4">
+                            <button onClick={() => { const g = cotizacionParaUpload ? productosAgrupados[cotizacionParaUpload] : null; setProductosParaUpload((g?.productos || []).map(p => p.id)); }} className="text-xs text-blue-600 hover:underline">Todos</button>
+                            <button onClick={() => setProductosParaUpload([])} className="text-xs text-gray-500 hover:underline">Ninguno</button>
+                        </div>
+                        <div className="flex justify-end gap-3">
+                            <button onClick={() => setShowUploadMasivoModal(false)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 dark:border-gray-600 dark:text-gray-300">Cancelar</button>
+                            <button onClick={() => fileMasivoRef.current?.click()} disabled={uploadingMasivo || productosParaUpload.length === 0}
+                                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+                                {uploadingMasivo ? "Subiendo..." : `Seleccionar archivo (${productosParaUpload.length} productos)`}
+                            </button>
                         </div>
                     </div>
                 </div>
