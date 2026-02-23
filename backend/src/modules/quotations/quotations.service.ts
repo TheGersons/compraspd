@@ -287,7 +287,18 @@ export class QuotationsService {
     const isOwner = current.solicitanteId === user.sub;
     const isSupervisor = this.isSupervisorOrAdmin(user);
 
+    // Si solo se está actualizando el nombre, permitir en cualquier estado para supervisores
+    const soloNombre =
+      dto.nombreCotizacion &&
+      !dto.tipoCompra &&
+      !dto.lugarEntrega &&
+      !dto.fechaLimite &&
+      !dto.fechaEstimada &&
+      !dto.tipoId &&
+      !dto.proyectoId;
+
     const canEdit =
+      (soloNombre && isSupervisor) ||
       (isOwner && current.estado === 'ENVIADA') ||
       (isSupervisor && ['ENVIADA', 'EN_REVISION'].includes(current.estado));
 

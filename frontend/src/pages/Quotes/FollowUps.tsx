@@ -411,6 +411,18 @@ const api = {
     // Retornamos el Blob para que el frontend cree la URL temporal
     return response.blob();
   },
+
+  async actualizarNombreCotizacion(id: string, nombreCotizacion: string) {
+    const token = getToken();
+    const response = await fetch(`${API_BASE_URL}/api/v1/quotations/${id}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ nombreCotizacion }),
+    });
+    if (!response.ok) throw new Error("Error al actualizar nombre");
+    return response.json();
+  },
 };
 
 // ============================================================================
@@ -463,6 +475,10 @@ export default function FollowUps() {
   // Estados de historial
   const [historial, setHistorial] = useState<HistorialCambio[]>([]);
   const [showHistorial, setShowHistorial] = useState(false);
+
+  // Editar nombre de cotización
+  const [editandoNombre, setEditandoNombre] = useState(false);
+  const [nombreEditado, setNombreEditado] = useState("");
 
   // Vista activa en panel derecho
   const [vistaActiva, setVistaActiva] = useState<"detalle" | "chat" | "historial" | "precios">("detalle");
@@ -1211,9 +1227,36 @@ export default function FollowUps() {
               <div className="rounded-lg border-2 border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
                 <div className="mb-4 flex items-start justify-between">
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {cotizacionSeleccionada.nombreCotizacion}
-                    </h2>
+                    {editandoNombre ? (
+                      <div className="flex items-center gap-2">
+                        <input type="text" value={nombreEditado}
+                          onChange={(e) => setNombreEditado(e.target.value)}
+                          onKeyDown={async (e) => {
+                            if (e.key === 'Enter' && nombreEditado.trim()) {
+                              try {
+                                await api.actualizarNombreCotizacion(cotizacionSeleccionada.id, nombreEditado.trim());
+                                setCotizacionSeleccionada({ ...cotizacionSeleccionada, nombreCotizacion: nombreEditado.trim() });
+                                setCotizaciones(prev => prev.map(c => c.id === cotizacionSeleccionada.id ? { ...c, nombreCotizacion: nombreEditado.trim() } : c));
+                                setEditandoNombre(false);
+                                toast.success("Nombre actualizado");
+                              } catch { toast.error("Error al actualizar"); }
+                            }
+                            if (e.key === 'Escape') setEditandoNombre(false);
+                          }}
+                          autoFocus
+                          className="text-2xl font-bold border-b-2 border-blue-500 bg-transparent text-gray-900 dark:text-white outline-none"
+                        />
+                        <button onClick={() => setEditandoNombre(false)} className="text-xs text-gray-400 hover:text-red-500">✕</button>
+                      </div>
+                    ) : (
+                      <h2 className="text-2xl font-bold text-gray-900 dark:text-white cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                        onClick={() => { setNombreEditado(cotizacionSeleccionada.nombreCotizacion); setEditandoNombre(true); }}
+                        title="Click para editar nombre"
+                      >
+                        {cotizacionSeleccionada.nombreCotizacion}
+                        <span className="ml-2 text-xs text-gray-400">✏️</span>
+                      </h2>
+                    )}
                     <div className="mt-2 flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
                       <span className="flex items-center gap-1">
                         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1337,6 +1380,13 @@ export default function FollowUps() {
                       {/* TAB 1: DETALLE DE PRODUCTOS */}
                       {vistaActiva === "detalle" && (
                         <div className="space-y-4">
+                          {/* Comentarios generales de la cotización */}
+                          {(cotizacionSeleccionada as any).comentarios && (
+                            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20">
+                              <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">💬 Comentarios de la solicitud:</p>
+                              <p className="text-sm text-amber-800 dark:text-amber-300">{(cotizacionSeleccionada as any).comentarios}</p>
+                            </div>
+                          )}
                           {cotizacionSeleccionada.detalles && cotizacionSeleccionada.detalles.length > 0 ? (
                             <>
                               {/* Tabla de productos */}
@@ -1375,7 +1425,11 @@ export default function FollowUps() {
                                             <div className="font-medium text-gray-900 dark:text-white">
                                               {producto.descripcionProducto}
                                             </div>
-
+                                            {producto.notas && (
+                                              <div className="mt-1 rounded bg-blue-50 px-2 py-1 text-xs text-blue-700 dark:bg-blue-900/20 dark:text-blue-300">
+                                                📋 {producto.notas}
+                                              </div>
+                                            )}
                                           </td>
 
                                           {/* Cantidad */}
