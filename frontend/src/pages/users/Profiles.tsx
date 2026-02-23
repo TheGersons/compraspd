@@ -123,12 +123,12 @@ const api = {
 // SUB-COMPONENTS
 // ============================================================================
 
-const UserCard = React.memo(({ 
-  user, 
-  onEdit, 
-  onDelete 
-}: { 
-  user: User; 
+const UserCard = React.memo(({
+  user,
+  onEdit,
+  onDelete
+}: {
+  user: User;
   onEdit: (user: User) => void;
   onDelete: (userId: string) => void;
 }) => (
@@ -139,11 +139,10 @@ const UserCard = React.memo(({
           <h4 className="font-semibold text-gray-800 dark:text-white/90 truncate">
             {user.nombre}
           </h4>
-          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-            user.activo 
-              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-              : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400'
-          }`}>
+          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${user.activo
+            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+            : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400'
+            }`}>
             {user.activo ? 'Activo' : 'Inactivo'}
           </span>
         </div>
@@ -179,14 +178,14 @@ const UserCard = React.memo(({
   </div>
 ));
 
-const UserModal = ({ 
-  isOpen, 
-  onClose, 
-  user, 
+const UserModal = ({
+  isOpen,
+  onClose,
+  user,
   onSave,
   roles,
-  departments 
-}: { 
+  departments
+}: {
   isOpen: boolean;
   onClose: () => void;
   user: User | null;
@@ -233,7 +232,7 @@ const UserModal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div className="fixed inset-0 z-5000 flex items-center justify-center bg-black/50 p-4">
       <div className="w-full max-w-2xl rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900 max-h-[90vh] overflow-y-auto">
         <div className="mb-6 flex items-center justify-between">
           <h3 className="text-xl font-semibold text-gray-800 dark:text-white/90">
@@ -365,12 +364,12 @@ const UserModal = ({
   );
 };
 
-const DeleteConfirmModal = ({ 
-  isOpen, 
-  onClose, 
-  onConfirm, 
-  userName 
-}: { 
+const DeleteConfirmModal = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  userName
+}: {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
@@ -418,7 +417,7 @@ export default function Profiles() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   // Estados de UI
   const [searchQuery, setSearchQuery] = useState("");
   const [filterActive, setFilterActive] = useState<'all' | 'active' | 'inactive'>('all');
@@ -472,7 +471,7 @@ export default function Profiles() {
           departamentoId: data.departamentoId || undefined,
           activo: data.activo,
         };
-        
+
         await api.updateUser(selectedUser.id, updateData);
         addNotification("success", "Éxito", "Usuario actualizado correctamente");
       } else {
@@ -485,11 +484,11 @@ export default function Profiles() {
           addNotification("danger", "Error", "Rol y Departamento son requeridos");
           return;
         }
-        
+
         await api.createUser(data);
         addNotification("success", "Éxito", "Usuario creado correctamente");
       }
-      
+
       setIsModalOpen(false);
       setSelectedUser(null);
       await loadInitialData(); // Recargar lista
@@ -506,7 +505,7 @@ export default function Profiles() {
 
   const handleDeleteConfirm = async () => {
     if (!userToDelete) return;
-    
+
     try {
       await api.deactivateUser(userToDelete.id);
       addNotification("success", "Éxito", "Usuario desactivado correctamente");
@@ -521,16 +520,16 @@ export default function Profiles() {
 
   // Filtrar usuarios
   const filteredUsers = users.filter(user => {
-    const matchesSearch = 
+    const matchesSearch =
       user.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.rol.nombre.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesActiveFilter = 
+
+    const matchesActiveFilter =
       filterActive === 'all' ||
       (filterActive === 'active' && user.activo) ||
       (filterActive === 'inactive' && !user.activo);
-    
+
     return matchesSearch && matchesActiveFilter;
   });
 
@@ -549,7 +548,7 @@ export default function Profiles() {
         description="Administra los usuarios del sistema de compras"
       />
       <PageBreadcrumb pageTitle="Gestión de Usuarios" />
-      
+
       <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] lg:p-6">
         {/* Header */}
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -581,31 +580,28 @@ export default function Profiles() {
           <div className="flex gap-2">
             <button
               onClick={() => setFilterActive('all')}
-              className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                filterActive === 'all'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
-              }`}
+              className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${filterActive === 'all'
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                }`}
             >
               Todos
             </button>
             <button
               onClick={() => setFilterActive('active')}
-              className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                filterActive === 'active'
-                  ? 'bg-green-500 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
-              }`}
+              className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${filterActive === 'active'
+                ? 'bg-green-500 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                }`}
             >
               Activos
             </button>
             <button
               onClick={() => setFilterActive('inactive')}
-              className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                filterActive === 'inactive'
-                  ? 'bg-gray-500 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
-              }`}
+              className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${filterActive === 'inactive'
+                ? 'bg-gray-500 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                }`}
             >
               Inactivos
             </button>

@@ -774,7 +774,7 @@ export default function FollowUps() {
         toast.error('No cuentas con los permisos necesarios');
         return;
       }
-      setProveedores(data || []);
+      setProveedores(data.items || data || []);
     } catch (error) {
       console.error("Error al cargar proveedores:", error);
       addNotification("danger", "Error", "Error al cargar proveedores");

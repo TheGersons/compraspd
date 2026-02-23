@@ -33,6 +33,7 @@ interface Tipo {
   area: {
     id: string;
     nombreArea: string;
+    tipo: string;
   };
 }
 
@@ -56,7 +57,7 @@ interface Proyecto {
   descripcion: string;
   estado: boolean;
   areaId?: string;
-  area?: { id: string; nombreArea: string };
+  area?: { id: string; nombreArea: string; tipo: string };
 }
 
 interface AreaCategoria {
@@ -540,9 +541,9 @@ export default function New() {
                   <option value="">Seleccione un proyecto</option>
                   {(() => {
                     const tipoSeleccionado = tipos.find(t => t.id === tipoId);
-                    const areaTipo = tipoSeleccionado?.area?.nombreArea?.toLowerCase();
-                    const proyectosFiltrados = areaTipo
-                      ? proyectos.filter(p => p.area?.nombreArea?.toLowerCase() === areaTipo)
+                    const areaNombre = tipoSeleccionado?.area?.nombreArea?.toLowerCase();
+                    const proyectosFiltrados = areaNombre
+                      ? proyectos.filter(p => p.area?.nombreArea?.toLowerCase() === areaNombre)
                       : proyectos;
                     return proyectosFiltrados.map((proyecto) => (
                       <option key={proyecto.id} value={proyecto.id}>
@@ -888,7 +889,9 @@ export default function New() {
                   setCreandoProyecto(true);
                   try {
                     const nuevo = await api.crearProyecto({ nombre: nuevoProyectoNombre.trim(), areaId: nuevoProyectoAreaId });
-                    setProyectos(prev => [...prev, { ...nuevo, estado: true }]);
+                    // Recargar proyectos para tener el area incluida
+                    const proyectosActualizados = await api.getProyectos();
+                    setProyectos((proyectosActualizados || []).filter((p: any) => p.estado));
                     setProyectoId(nuevo.id);
                     setShowNuevoProyecto(false);
                     addNotification("success", "Proyecto creado", `"${nuevo.nombre}" creado exitosamente`);
