@@ -674,6 +674,58 @@ export class EstadoProductoService {
     };
   }
 
+  /**
+   * Avanzar estado masivo - múltiples productos a la vez
+   * Cada producto avanza a su propio siguiente estado
+   */
+  async avanzarEstadoMasivo(
+    ids: string[],
+    dto: AvanzarEstadoDto,
+    user: UserJwt,
+  ) {
+    if (!this.isSupervisorOrAdmin(user)) {
+      throw new ForbiddenException(
+        'Solo supervisores/admin pueden avanzar estados',
+      );
+    }
+
+    const resultados: {
+      id: string;
+      sku: string;
+      ok: boolean;
+      mensaje: string;
+    }[] = [];
+
+    for (const id of ids) {
+      try {
+        const result = await this.avanzarEstado(id, dto, user);
+        resultados.push({
+          id,
+          sku: '',
+          ok: true,
+          mensaje: `${result.estadoAnterior} → ${result.estadoNuevo}`,
+        });
+      } catch (error: any) {
+        resultados.push({
+          id,
+          sku: '',
+          ok: false,
+          mensaje: error.message || 'Error desconocido',
+        });
+      }
+    }
+
+    const exitosos = resultados.filter((r) => r.ok).length;
+    const fallidos = resultados.filter((r) => !r.ok).length;
+
+    return {
+      message: `Avance masivo: ${exitosos} exitosos, ${fallidos} con error`,
+      exitosos,
+      fallidos,
+      resultados,
+    };
+  }
+
   // ========================================
   // INCOTERMS QUE SALTAN cotizacionFleteInternacional
   // ========================================

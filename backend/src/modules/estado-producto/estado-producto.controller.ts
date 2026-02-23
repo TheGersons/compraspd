@@ -317,6 +317,23 @@ export class EstadoProductoController {
     return this.service.asignarResponsable(id, body.responsableId, user);
   }
 
+  @Patch('avanzar-masivo')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Avanzar estado de múltiples productos',
+    description: 'Avanza al siguiente estado para cada producto del array',
+  })
+  avanzarEstadoMasivo(
+    @Body() body: { ids: string[]; observacion?: string; tipoEntrega?: string },
+    @CurrentUser() user: UserJwt,
+  ) {
+    return this.service.avanzarEstadoMasivo(
+      body.ids,
+      { observacion: body.observacion, tipoEntrega: body.tipoEntrega } as any,
+      user,
+    );
+  }
+
   @Patch('asignar-responsable-masivo')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Asignar responsable a múltiples productos' })

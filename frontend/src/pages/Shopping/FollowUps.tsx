@@ -357,6 +357,18 @@ const api = {
     if (!response.ok) { const e = await response.json(); throw new Error(e.message || "Error"); }
     return response.json();
   },
+
+  async avanzarEstadoMasivo(ids: string[], data: { observacion?: string; tipoEntrega?: string }) {
+    const token = getToken();
+    const response = await fetch(`${API_BASE_URL}/api/v1/estado-productos/avanzar-masivo`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ ids, ...data }),
+    });
+    if (!response.ok) { const e = await response.json(); throw new Error(e.message || "Error al avanzar masivo"); }
+    return response.json();
+  },
 };
 
 // ============================================================================
@@ -442,6 +454,17 @@ export default function ShoppingFollowUps() {
   const [filtroResponsables, setFiltroResponsables] = useState<string[]>([]);
   const [showResponsableDropdown, setShowResponsableDropdown] = useState(false);
   const [menuAbierto, setMenuAbierto] = useState<string | null>(null); // id del producto con menú abierto
+
+  // Vista agrupada por cotización
+  const [vistaAgrupada, setVistaAgrupada] = useState(true);
+  const [grupoExpandido, setGrupoExpandido] = useState<string | null>(null);
+
+  // Avance masivo
+  const [showAvanceMasivoModal, setShowAvanceMasivoModal] = useState(false);
+  const [productosParaAvance, setProductosParaAvance] = useState<string[]>([]);
+  const [cotizacionParaAvance, setCotizacionParaAvance] = useState<string | null>(null);
+  const [loadingAvanceMasivo, setLoadingAvanceMasivo] = useState(false);
+  const [observacionMasiva, setObservacionMasiva] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null); // Se mantiene por si TimelineItem lo usa
 
@@ -618,6 +641,58 @@ export default function ShoppingFollowUps() {
     } catch (e: any) { toast.error(e.message); }
   };
 
+  // Agrupar productos por cotización
+  const productosAgrupados = productosFiltrados.reduce((acc, p) => {
+    const key = p.cotizacion?.id || 'sin-cotizacion';
+    if (!acc[key]) {
+      acc[key] = {
+        cotizacionId: p.cotizacion?.id || '',
+        nombre: p.cotizacion?.nombreCotizacion || 'Sin cotización',
+        tipoCompra: p.cotizacion?.tipoCompra || p.tipoCompra,
+        productos: [],
+      };
+    }
+    acc[key].productos.push(p);
+    return acc;
+  }, {} as Record<string, { cotizacionId: string; nombre: string; tipoCompra: string; productos: EstadoProducto[] }>);
+
+  const gruposOrdenados = Object.values(productosAgrupados).sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+  // Abrir modal de avance masivo para un grupo de cotización
+  const abrirAvanceMasivo = (cotizacionId: string, productosDelGrupo: EstadoProducto[]) => {
+    const elegibles = productosDelGrupo.filter(p => p.progreso < 100 && p.siguienteEstado);
+    if (elegibles.length === 0) {
+      toast.error("No hay productos elegibles para avanzar en este grupo");
+      return;
+    }
+    setCotizacionParaAvance(cotizacionId);
+    setProductosParaAvance(elegibles.map(p => p.id));
+    setObservacionMasiva("");
+    setShowAvanceMasivoModal(true);
+  };
+
+  const handleAvanceMasivo = async () => {
+    if (productosParaAvance.length === 0) return;
+    try {
+      setLoadingAvanceMasivo(true);
+      const result = await api.avanzarEstadoMasivo(productosParaAvance, {
+        observacion: observacionMasiva || undefined,
+      });
+      toast.success(`${result.exitosos} productos avanzados${result.fallidos > 0 ? `, ${result.fallidos} con errores` : ''}`);
+      if (result.fallidos > 0) {
+        const errores = result.resultados.filter((r: any) => !r.ok);
+        errores.forEach((e: any) => toast.error(e.mensaje, { duration: 5000 }));
+      }
+      setShowAvanceMasivoModal(false);
+      await cargarProductos();
+      if (productoSeleccionado) await seleccionarProducto(productoSeleccionado.id);
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setLoadingAvanceMasivo(false);
+    }
+  };
+
   // Determinar si el siguiente estado requiere selección FOB/CIF
   const requiereSeleccionFobCif = productoSeleccionado?.siguienteEstado === 'enFOB';
 
@@ -759,9 +834,21 @@ export default function ShoppingFollowUps() {
           <div className="lg:col-span-1">
             <div className="rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
               <div className="border-b border-gray-200 p-4 dark:border-gray-700">
-                <h3 className="font-semibold text-gray-900 dark:text-white">
-                  {verCompletados ? "✅ Completados" : "📋 En Proceso"} ({productosFiltrados.length})
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-gray-900 dark:text-white">
+                    {verCompletados ? "✅ Completados" : "📋 En Proceso"} ({productosFiltrados.length})
+                  </h3>
+                  <button
+                    onClick={() => setVistaAgrupada(!vistaAgrupada)}
+                    className={`rounded-md px-2 py-1 text-xs font-medium transition-colors ${vistaAgrupada
+                      ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                      : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400"
+                      }`}
+                    title={vistaAgrupada ? "Vista individual" : "Agrupar por cotización"}
+                  >
+                    {vistaAgrupada ? "📁 Agrupado" : "📄 Individual"}
+                  </button>
+                </div>
               </div>
 
               <div className="max-h-[600px] overflow-y-auto">
@@ -777,116 +864,171 @@ export default function ShoppingFollowUps() {
                   </div>
                 ) : (
                   <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {productosFiltrados.map((producto) => (
-                      <button
-                        key={producto.id}
-                        onClick={() => seleccionarProducto(producto.id)}
-                        className={`w-full p-4 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${productoSeleccionado?.id === producto.id
-                          ? "bg-blue-50 dark:bg-blue-900/20"
-                          : ""
-                          }`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono text-sm font-medium text-gray-900 dark:text-white">
-                                {producto.sku}
-                              </span>
-                              <span className={`rounded-full px-1.5 py-0.5 text-xs font-medium ${getCriticidadBg(producto.nivelCriticidad)}`}>
-                                {getCriticidadBadge(producto.nivelCriticidad)}
-                              </span>
+                    {vistaAgrupada ? (
+                      /* ===== VISTA AGRUPADA POR COTIZACIÓN ===== */
+                      gruposOrdenados.map((grupo) => (
+                        <div key={grupo.cotizacionId || 'sin'}>
+                          {/* Header del grupo */}
+                          <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-50 dark:bg-gray-800/50 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                            onClick={() => setGrupoExpandido(grupoExpandido === grupo.cotizacionId ? null : grupo.cotizacionId)}>
+                            <span className="text-xs">{grupoExpandido === grupo.cotizacionId ? '▼' : '▶'}</span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{grupo.nombre}</p>
+                              <p className="text-[10px] text-gray-500">{grupo.productos.length} producto(s) • {grupo.tipoCompra}</p>
                             </div>
-                            <p className="mt-1 truncate text-sm text-gray-600 dark:text-gray-400">
-                              {producto.descripcion}
-                            </p>
-                            <div className="mt-2 flex items-center gap-2">
-                              {producto.progreso === 100 && (
-                                <span className="rounded px-1.5 py-0.5 text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                                  ✅ Completado
-                                </span>
-                              )}
-                              <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${producto.tipoCompra === 'NACIONAL'
-                                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                                }`}>
-                                {producto.tipoCompra === 'NACIONAL' ? '🇭🇳 Nacional' : '🌍 Internacional'}
-                              </span>
-                              <span className="text-xs text-gray-500 dark:text-gray-500">
-                                {ESTADOS_ICONOS[producto.estadoActual || 'cotizado']} {ESTADOS_LABELS[producto.estadoActual || 'cotizado']}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="text-right flex flex-col items-end gap-1">
-                            <span className={`text-lg font-bold ${producto.progreso === 100
-                              ? 'text-green-600 dark:text-green-400'
-                              : 'text-gray-900 dark:text-white'
-                              }`}>
-                              {producto.progreso}%
-                            </span>
-                            {/* Responsable badge + menú */}
-                            <div className="relative">
-                              <div
-                                role="button"
-                                onClick={(e) => { e.stopPropagation(); setMenuAbierto(menuAbierto === producto.id ? null : producto.id); }}
-                                className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
-                                title="Asignar responsable"
+                            {grupo.productos.some(p => p.progreso < 100 && p.siguienteEstado) && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); abrirAvanceMasivo(grupo.cotizacionId, grupo.productos); }}
+                                className="rounded-md bg-blue-600 px-2 py-1 text-[10px] font-medium text-white hover:bg-blue-700 whitespace-nowrap"
+                                title="Avanzar todos los productos de esta cotización"
                               >
-                                {producto.responsableSeguimiento ? (
-                                  <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
-                                    <UserCheck size={10} />
-                                    {producto.responsableSeguimiento.nombre.split(' ')[0]}
+                                ▶ Avanzar grupo
+                              </button>
+                            )}
+                          </div>
+                          {/* Productos del grupo */}
+                          {grupoExpandido === grupo.cotizacionId && grupo.productos.map((producto) => (
+                            <button
+                              key={producto.id}
+                              onClick={() => seleccionarProducto(producto.id)}
+                              className={`w-full p-3 pl-8 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 border-l-2 ${productoSeleccionado?.id === producto.id
+                                ? "bg-blue-50 dark:bg-blue-900/20 border-l-blue-600"
+                                : "border-l-transparent"
+                                }`}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-medium text-gray-900 dark:text-white truncate">{producto.sku}</p>
+                                  <p className="text-[10px] text-gray-500 truncate">{producto.descripcion}</p>
+                                  <p className="text-[10px] text-gray-400 mt-0.5">
+                                    {ESTADOS_ICONOS[producto.estadoActual || 'cotizado']} {ESTADOS_LABELS[producto.estadoActual || 'cotizado']}
+                                  </p>
+                                </div>
+                                <span className={`text-sm font-bold ${producto.progreso === 100 ? 'text-green-600' : 'text-gray-900 dark:text-white'}`}>
+                                  {producto.progreso}%
+                                </span>
+                              </div>
+                              <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+                                <div className={`h-full rounded-full ${producto.progreso === 100 ? "bg-green-600" : "bg-blue-600"}`}
+                                  style={{ width: `${producto.progreso}%` }} />
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      ))
+                    ) : (
+                      /* ===== VISTA INDIVIDUAL (ORIGINAL) ===== */
+                      productosFiltrados.map((producto) => (
+                        <button
+                          key={producto.id}
+                          onClick={() => seleccionarProducto(producto.id)}
+                          className={`w-full p-4 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${productoSeleccionado?.id === producto.id
+                            ? "bg-blue-50 dark:bg-blue-900/20"
+                            : ""
+                            }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-sm font-medium text-gray-900 dark:text-white">
+                                  {producto.sku}
+                                </span>
+                                <span className={`rounded-full px-1.5 py-0.5 text-xs font-medium ${getCriticidadBg(producto.nivelCriticidad)}`}>
+                                  {getCriticidadBadge(producto.nivelCriticidad)}
+                                </span>
+                              </div>
+                              <p className="mt-1 truncate text-sm text-gray-600 dark:text-gray-400">
+                                {producto.descripcion}
+                              </p>
+                              <div className="mt-2 flex items-center gap-2">
+                                {producto.progreso === 100 && (
+                                  <span className="rounded px-1.5 py-0.5 text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                    ✅ Completado
                                   </span>
-                                ) : (
-                                  <span className="text-gray-400"><MoreVertical size={12} /></span>
+                                )}
+                                <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${producto.tipoCompra === 'NACIONAL'
+                                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                  : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                                  }`}>
+                                  {producto.tipoCompra === 'NACIONAL' ? '🇭🇳 Nacional' : '🌍 Internacional'}
+                                </span>
+                                <span className="text-xs text-gray-500 dark:text-gray-500">
+                                  {ESTADOS_ICONOS[producto.estadoActual || 'cotizado']} {ESTADOS_LABELS[producto.estadoActual || 'cotizado']}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="text-right flex flex-col items-end gap-1">
+                              <span className={`text-lg font-bold ${producto.progreso === 100
+                                ? 'text-green-600 dark:text-green-400'
+                                : 'text-gray-900 dark:text-white'
+                                }`}>
+                                {producto.progreso}%
+                              </span>
+                              {/* Responsable badge + menú */}
+                              <div className="relative">
+                                <div
+                                  role="button"
+                                  onClick={(e) => { e.stopPropagation(); setMenuAbierto(menuAbierto === producto.id ? null : producto.id); }}
+                                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                                  title="Asignar responsable"
+                                >
+                                  {producto.responsableSeguimiento ? (
+                                    <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                                      <UserCheck size={10} />
+                                      {producto.responsableSeguimiento.nombre.split(' ')[0]}
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-400"><MoreVertical size={12} /></span>
+                                  )}
+                                </div>
+                                {menuAbierto === producto.id && (
+                                  <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900"
+                                    onClick={(e) => e.stopPropagation()}>
+                                    <div className="p-1.5">
+                                      <p className="px-2 py-1 text-[10px] font-semibold text-gray-400 uppercase">Asignar a:</p>
+                                      {supervisores.map(sup => (
+                                        <button key={sup.id}
+                                          onClick={() => handleAsignarResponsable(producto.id, sup.id)}
+                                          className={`w-full rounded-md px-2 py-1.5 text-left text-xs transition-colors ${producto.responsableSeguimiento?.id === sup.id
+                                            ? "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
+                                            : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
+                                            }`}>
+                                          {sup.nombre}
+                                        </button>
+                                      ))}
+                                      {producto.responsableSeguimiento && (
+                                        <>
+                                          <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
+                                          <button
+                                            onClick={() => handleAsignarResponsable(producto.id, null)}
+                                            className="w-full rounded-md px-2 py-1.5 text-left text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
+                                            Quitar responsable
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
                                 )}
                               </div>
-                              {menuAbierto === producto.id && (
-                                <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900"
-                                  onClick={(e) => e.stopPropagation()}>
-                                  <div className="p-1.5">
-                                    <p className="px-2 py-1 text-[10px] font-semibold text-gray-400 uppercase">Asignar a:</p>
-                                    {supervisores.map(sup => (
-                                      <button key={sup.id}
-                                        onClick={() => handleAsignarResponsable(producto.id, sup.id)}
-                                        className={`w-full rounded-md px-2 py-1.5 text-left text-xs transition-colors ${producto.responsableSeguimiento?.id === sup.id
-                                          ? "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
-                                          : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
-                                          }`}>
-                                        {sup.nombre}
-                                      </button>
-                                    ))}
-                                    {producto.responsableSeguimiento && (
-                                      <>
-                                        <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
-                                        <button
-                                          onClick={() => handleAsignarResponsable(producto.id, null)}
-                                          className="w-full rounded-md px-2 py-1.5 text-left text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
-                                          Quitar responsable
-                                        </button>
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
                             </div>
                           </div>
-                        </div>
-                        {/* Barra de progreso */}
-                        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-                          <div
-                            className={`h-full rounded-full transition-all ${producto.progreso === 100
-                              ? "bg-green-600"
-                              : producto.nivelCriticidad === "ALTO"
-                                ? "bg-red-600"
-                                : producto.nivelCriticidad === "MEDIO"
-                                  ? "bg-yellow-500"
-                                  : "bg-green-600"
-                              }`}
-                            style={{ width: `${producto.progreso}%` }}
-                          />
-                        </div>
-                      </button>
-                    ))}
+                          {/* Barra de progreso */}
+                          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+                            <div
+                              className={`h-full rounded-full transition-all ${producto.progreso === 100
+                                ? "bg-green-600"
+                                : producto.nivelCriticidad === "ALTO"
+                                  ? "bg-red-600"
+                                  : producto.nivelCriticidad === "MEDIO"
+                                    ? "bg-yellow-500"
+                                    : "bg-green-600"
+                                }`}
+                              style={{ width: `${producto.progreso}%` }}
+                            />
+                          </div>
+                        </button>
+                      ))
+                    )}
                   </div>
                 )}
               </div>
@@ -1244,6 +1386,76 @@ export default function ShoppingFollowUps() {
           </div>
         )}
       </div>
+
+      {/* Modal Avance Masivo */}
+      {showAvanceMasivoModal && cotizacionParaAvance && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-xl bg-white p-6 dark:bg-gray-900">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">▶ Avanzar productos en grupo</h3>
+              <button onClick={() => setShowAvanceMasivoModal(false)} className="text-gray-400 hover:text-red-500">✕</button>
+            </div>
+
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Selecciona qué productos avanzarán al siguiente estado:
+            </p>
+
+            {/* Lista de productos elegibles */}
+            <div className="space-y-2 mb-4 max-h-60 overflow-y-auto">
+              {(() => {
+                const grupo = Object.values(productosAgrupados).find(g => g.cotizacionId === cotizacionParaAvance);
+                const elegibles = grupo?.productos.filter(p => p.progreso < 100 && p.siguienteEstado) || [];
+                return elegibles.map(p => {
+                  const isSelected = productosParaAvance.includes(p.id);
+                  return (
+                    <label key={p.id} className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${isSelected ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-600' : 'border-gray-200 dark:border-gray-700'}`}>
+                      <input type="checkbox" checked={isSelected}
+                        onChange={() => setProductosParaAvance(prev => isSelected ? prev.filter(id => id !== p.id) : [...prev, p.id])}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">{p.sku} — {p.descripcion}</p>
+                        <p className="text-xs text-gray-500">
+                          {ESTADOS_LABELS[p.estadoActual || 'cotizado']} → {ESTADOS_LABELS[p.siguienteEstado || ''] || 'Siguiente'}
+                        </p>
+                      </div>
+                      <span className="text-xs font-bold text-gray-600 dark:text-gray-400">{p.progreso}%</span>
+                    </label>
+                  );
+                });
+              })()}
+            </div>
+
+            {/* Seleccionar todos */}
+            <div className="flex gap-2 mb-4">
+              <button onClick={() => {
+                const grupo = Object.values(productosAgrupados).find(g => g.cotizacionId === cotizacionParaAvance);
+                const elegibles = grupo?.productos.filter(p => p.progreso < 100 && p.siguienteEstado) || [];
+                setProductosParaAvance(elegibles.map(p => p.id));
+              }} className="text-xs text-blue-600 hover:underline">Seleccionar todos</button>
+              <button onClick={() => setProductosParaAvance([])} className="text-xs text-gray-500 hover:underline">Deseleccionar todos</button>
+            </div>
+
+            {/* Observación opcional */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Observación (opcional)</label>
+              <input type="text" value={observacionMasiva} onChange={(e) => setObservacionMasiva(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                placeholder="Ej: Lote completo avanzado a comprado" />
+            </div>
+
+            {/* Botones */}
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setShowAvanceMasivoModal(false)}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 dark:border-gray-600 dark:text-gray-300">Cancelar</button>
+              <button onClick={handleAvanceMasivo}
+                disabled={loadingAvanceMasivo || productosParaAvance.length === 0}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+                {loadingAvanceMasivo ? "Avanzando..." : `Avanzar ${productosParaAvance.length} producto(s)`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
