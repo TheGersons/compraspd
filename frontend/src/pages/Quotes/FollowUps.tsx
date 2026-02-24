@@ -1438,10 +1438,10 @@ export default function FollowUps() {
                                                     {notasAbiertas === producto.id && (
                                                       <div className="absolute left-0 top-full z-50 mt-1 w-72 rounded-lg border border-gray-200 bg-white p-3 shadow-lg dark:border-gray-700 dark:bg-gray-900">
                                                         <div className="flex justify-between items-center mb-1">
-                                                          <p className="text-xs font-semibold text-gray-500">Notas:</p>
+                                                          <p className="text-xs font-semibold text-gray-500 whitespace-pre-wrap break-words max-w-[300px]">Notas:</p>
                                                           <button onClick={() => setNotasAbiertas(null)} className="text-xs text-gray-400 hover:text-red-500">✕</button>
                                                         </div>
-                                                        <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{producto.notas}</p>
+                                                        <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap max-w-[300px] break-words">{producto.notas}</p>
                                                       </div>
                                                     )}
                                                   </div>
