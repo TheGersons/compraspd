@@ -205,6 +205,21 @@ export class EstadoProductoService {
           responsableSeguimiento: {
             select: { id: true, nombre: true, email: true },
           },
+          cotizacionDetalle: {
+            select: {
+              id: true,
+              preciosId: true,
+              precios: {
+                select: {
+                  id: true,
+                  precio: true,
+                  precioDescuento: true,
+                  ComprobanteDescuento: true,
+                  proveedor: { select: { id: true, nombre: true } },
+                },
+              },
+            },
+          },
         },
         orderBy: [{ criticidad: 'desc' }, { actualizado: 'desc' }],
         skip,
@@ -224,6 +239,7 @@ export class EstadoProductoService {
         estadosAplicables: this.getEstadosAplicables(
           item.cotizacion?.tipoCompra,
         ),
+        precioSeleccionado: (item as any).cotizacionDetalle?.precios || null,
       })),
     };
   }
@@ -1517,6 +1533,7 @@ export class EstadoProductoService {
 
   /**
    * Verificar si todos los productos de la cotización están aprobados
+   * y actualizar el estado de la cotización correspondientemente
    */
   private async verificarAprobacionCompleta(cotizacionId: string) {
     const productos = await this.prisma.estadoProducto.findMany({
@@ -1526,12 +1543,26 @@ export class EstadoProductoService {
     const todosAprobados = productos.every((p) => p.aprobadoPorSupervisor);
     const algunoAprobado = productos.some((p) => p.aprobadoPorSupervisor);
 
+    // Determinar estado de cotización
+    let estadoCotizacion: string | undefined;
+    if (todosAprobados) {
+      estadoCotizacion = 'APROBADA_COMPLETA';
+    } else if (algunoAprobado) {
+      estadoCotizacion = 'APROBADA_PARCIAL';
+    }
+    // Si ninguno está aprobado, no cambiar el estado (puede estar EN_REVISION, ENVIADA, etc.)
+
+    const updateData: any = {
+      todosProductosAprobados: todosAprobados,
+      aprobadaParcialmente: algunoAprobado && !todosAprobados,
+    };
+    if (estadoCotizacion) {
+      updateData.estado = estadoCotizacion;
+    }
+
     await this.prisma.cotizacion.update({
       where: { id: cotizacionId },
-      data: {
-        todosProductosAprobados: todosAprobados,
-        aprobadaParcialmente: algunoAprobado && !todosAprobados,
-      },
+      data: updateData,
     });
   }
 
