@@ -329,11 +329,19 @@ export default function Documents() {
         if (!file || !uploadMasivoConfig || productosParaUpload.length === 0) return;
         setUploadingMasivo(true);
         const toastId = toast.loading(`Subiendo a ${productosParaUpload.length} producto(s)...`);
+
+        // Leer archivo una sola vez como ArrayBuffer
+        const buffer = await file.arrayBuffer();
         let exitosos = 0, fallidos = 0;
+
+        // Subir secuencialmente para evitar race conditions
         for (const prodId of productosParaUpload) {
             try {
-                await api.uploadDocumento(file, { estadoProductoId: prodId, documentoRequeridoId: uploadMasivoConfig.requeridoId, estado: uploadMasivoConfig.estado, nombreDocumento: uploadMasivoConfig.requeridoNombre });
+                // Crear un File nuevo desde el buffer para cada request
+                const fileCopy = new File([buffer], file.name, { type: file.type });
+                await api.uploadDocumento(fileCopy, { estadoProductoId: prodId, documentoRequeridoId: uploadMasivoConfig.requeridoId, estado: uploadMasivoConfig.estado, nombreDocumento: uploadMasivoConfig.requeridoNombre });
                 exitosos++;
+                toast.loading(`Subido ${exitosos}/${productosParaUpload.length}...`, { id: toastId });
             } catch { fallidos++; }
         }
         toast.success(`${exitosos} subidos${fallidos > 0 ? `, ${fallidos} fallidos` : ''}`, { id: toastId });

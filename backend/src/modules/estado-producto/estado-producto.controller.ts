@@ -267,6 +267,18 @@ export class EstadoProductoController {
     return this.service.aprobarProducto(id, dto, user);
   }
 
+  @Patch(':id/datos')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Actualizar SKU y/o descripción del producto' })
+  @ApiParam({ name: 'id', description: 'ID del estado de producto' })
+  actualizarDatos(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { sku?: string; descripcion?: string },
+    @CurrentUser() user: UserJwt,
+  ) {
+    return this.service.actualizarDatos(id, body, user);
+  }
+
   @Patch(':id/aprobar-compra')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

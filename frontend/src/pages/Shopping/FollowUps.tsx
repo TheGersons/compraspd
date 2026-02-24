@@ -118,6 +118,7 @@ export type EstadoProducto = {
   estadoGeneral: string;
 
   // Relaciones
+  cotizacionId?: string;
   proyecto?: {
     id: string;
     nombre: string;
@@ -465,6 +466,8 @@ export default function ShoppingFollowUps() {
   const [cotizacionParaAvance, setCotizacionParaAvance] = useState<string | null>(null);
   const [loadingAvanceMasivo, setLoadingAvanceMasivo] = useState(false);
   const [observacionMasiva, setObservacionMasiva] = useState("");
+  const [verificacionMasiva, setVerificacionMasiva] = useState<Record<string, { completo: boolean; faltantes: string[] }>>({});
+  const [loadingVerificacionMasiva, setLoadingVerificacionMasiva] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null); // Se mantiene por si TimelineItem lo usa
 
@@ -500,7 +503,17 @@ export default function ShoppingFollowUps() {
       if (filtroTipoCompra) filters.tipoCompra = filtroTipoCompra;
 
       const data = await api.getEstadosProductos(filters);
-      setProductos(data.items || []);
+      // Enriquecer con siguienteEstado calculado si no viene del backend
+      const items = (data.items || []).map((p: EstadoProducto) => {
+        if (!p.siguienteEstado && p.estadoActual && p.estadosAplicables) {
+          const idx = p.estadosAplicables.indexOf(p.estadoActual);
+          if (idx >= 0 && idx < p.estadosAplicables.length - 1) {
+            p.siguienteEstado = p.estadosAplicables[idx + 1];
+          }
+        }
+        return p;
+      });
+      setProductos(items);
     } catch (error) {
       console.error("Error al cargar productos:", error);
       addNotification("danger", "Error", "Error al cargar productos");
@@ -643,10 +656,10 @@ export default function ShoppingFollowUps() {
 
   // Agrupar productos por cotización
   const productosAgrupados = productosFiltrados.reduce((acc, p) => {
-    const key = p.cotizacion?.id || 'sin-cotizacion';
+    const key = p.cotizacionId || p.cotizacion?.id || 'sin-cotizacion';
     if (!acc[key]) {
       acc[key] = {
-        cotizacionId: p.cotizacion?.id || '',
+        cotizacionId: key,
         nombre: p.cotizacion?.nombreCotizacion || 'Sin cotización',
         tipoCompra: p.cotizacion?.tipoCompra || p.tipoCompra,
         productos: [],
@@ -659,7 +672,7 @@ export default function ShoppingFollowUps() {
   const gruposOrdenados = Object.values(productosAgrupados).sort((a, b) => a.nombre.localeCompare(b.nombre));
 
   // Abrir modal de avance masivo para un grupo de cotización
-  const abrirAvanceMasivo = (cotizacionId: string, productosDelGrupo: EstadoProducto[]) => {
+  const abrirAvanceMasivo = async (cotizacionId: string, productosDelGrupo: EstadoProducto[]) => {
     const elegibles = productosDelGrupo.filter(p => p.progreso < 100 && p.siguienteEstado);
     if (elegibles.length === 0) {
       toast.error("No hay productos elegibles para avanzar en este grupo");
@@ -668,11 +681,47 @@ export default function ShoppingFollowUps() {
     setCotizacionParaAvance(cotizacionId);
     setProductosParaAvance(elegibles.map(p => p.id));
     setObservacionMasiva("");
+    setVerificacionMasiva({});
     setShowAvanceMasivoModal(true);
+
+    // Verificar documentos para cada producto elegible
+    setLoadingVerificacionMasiva(true);
+    const verificaciones: Record<string, { completo: boolean; faltantes: string[] }> = {};
+    for (const p of elegibles) {
+      try {
+        const result = await api.verificarDocumentos(p.id, p.siguienteEstado || '');
+        verificaciones[p.id] = result;
+      } catch {
+        verificaciones[p.id] = { completo: true, faltantes: [] };
+      }
+    }
+    setVerificacionMasiva(verificaciones);
+    setLoadingVerificacionMasiva(false);
+  };
+
+  // Obtener productos elegibles agrupados por estado actual
+  const getElegiblesPorEstado = () => {
+    const grupo = Object.values(productosAgrupados).find(g => g.cotizacionId === cotizacionParaAvance);
+    const elegibles = grupo?.productos.filter(p => p.progreso < 100 && p.siguienteEstado) || [];
+    const porEstado: Record<string, EstadoProducto[]> = {};
+    for (const p of elegibles) {
+      const key = p.estadoActual || 'desconocido';
+      if (!porEstado[key]) porEstado[key] = [];
+      porEstado[key].push(p);
+    }
+    return porEstado;
   };
 
   const handleAvanceMasivo = async () => {
     if (productosParaAvance.length === 0) return;
+
+    // Verificar que todos los seleccionados tienen documentos completos
+    const conDocsFaltantes = productosParaAvance.filter(id => verificacionMasiva[id] && !verificacionMasiva[id].completo);
+    if (conDocsFaltantes.length > 0) {
+      toast.error(`${conDocsFaltantes.length} producto(s) tienen documentos pendientes. Desmarque los que faltan o suba los documentos.`);
+      return;
+    }
+
     try {
       setLoadingAvanceMasivo(true);
       const result = await api.avanzarEstadoMasivo(productosParaAvance, {
@@ -1397,40 +1446,90 @@ export default function ShoppingFollowUps() {
             </div>
 
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Selecciona qué productos avanzarán al siguiente estado:
+              Los productos están agrupados por su estado actual. Seleccioná cuáles avanzar:
             </p>
 
-            {/* Lista de productos elegibles */}
-            <div className="space-y-2 mb-4 max-h-60 overflow-y-auto">
-              {(() => {
-                const grupo = Object.values(productosAgrupados).find(g => g.cotizacionId === cotizacionParaAvance);
-                const elegibles = grupo?.productos.filter(p => p.progreso < 100 && p.siguienteEstado) || [];
-                return elegibles.map(p => {
-                  const isSelected = productosParaAvance.includes(p.id);
-                  return (
-                    <label key={p.id} className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${isSelected ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-600' : 'border-gray-200 dark:border-gray-700'}`}>
-                      <input type="checkbox" checked={isSelected}
-                        onChange={() => setProductosParaAvance(prev => isSelected ? prev.filter(id => id !== p.id) : [...prev, p.id])}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">{p.sku} — {p.descripcion}</p>
-                        <p className="text-xs text-gray-500">
-                          {ESTADOS_LABELS[p.estadoActual || 'cotizado']} → {ESTADOS_LABELS[p.siguienteEstado || ''] || 'Siguiente'}
-                        </p>
-                      </div>
-                      <span className="text-xs font-bold text-gray-600 dark:text-gray-400">{p.progreso}%</span>
-                    </label>
-                  );
-                });
-              })()}
+            {loadingVerificacionMasiva && (
+              <div className="flex items-center gap-2 mb-4 text-sm text-blue-600">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+                Verificando documentos...
+              </div>
+            )}
+
+            {/* Productos agrupados por estado actual */}
+            <div className="space-y-4 mb-4 max-h-60 overflow-y-auto">
+              {Object.entries(getElegiblesPorEstado()).map(([estadoActual, prods]) => {
+                const todosSeleccionados = prods.every(p => productosParaAvance.includes(p.id));
+                const siguienteLabel = ESTADOS_LABELS[prods[0]?.siguienteEstado || ''] || 'Siguiente';
+                return (
+                  <div key={estadoActual} className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                    {/* Header del sub-grupo por estado */}
+                    <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-800/50 px-3 py-2">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={todosSeleccionados}
+                          onChange={() => {
+                            if (todosSeleccionados) {
+                              setProductosParaAvance(prev => prev.filter(id => !prods.some(p => p.id === id)));
+                            } else {
+                              setProductosParaAvance(prev => [...new Set([...prev, ...prods.map(p => p.id)])]);
+                            }
+                          }}
+                          className="rounded border-gray-300 text-blue-600" />
+                        <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                          {ESTADOS_ICONOS[estadoActual]} {ESTADOS_LABELS[estadoActual] || estadoActual}
+                        </span>
+                      </label>
+                      <span className="text-[10px] text-gray-500 bg-gray-200 dark:bg-gray-700 rounded-full px-2 py-0.5">
+                        → {siguienteLabel} ({prods.length})
+                      </span>
+                    </div>
+                    {/* Productos del sub-grupo */}
+                    <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                      {prods.map(p => {
+                        const isSelected = productosParaAvance.includes(p.id);
+                        const verif = verificacionMasiva[p.id];
+                        const docsFaltantes = verif && !verif.completo;
+                        return (
+                          <label key={p.id} className={`flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors ${isSelected ? 'bg-blue-50 dark:bg-blue-900/10' : ''} ${docsFaltantes ? 'opacity-80' : ''}`}>
+                            <input type="checkbox" checked={isSelected}
+                              onChange={() => setProductosParaAvance(prev => isSelected ? prev.filter(id => id !== p.id) : [...prev, p.id])}
+                              className="rounded border-gray-300 text-blue-600" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900 dark:text-white">{p.sku} — <span className="font-normal text-gray-600 dark:text-gray-400">{p.descripcion}</span></p>
+                              {docsFaltantes && (
+                                <p className="text-[10px] text-red-500 mt-0.5">⚠️ Docs faltantes: {verif.faltantes.join(', ')}</p>
+                              )}
+                              {verif && verif.completo && (
+                                <p className="text-[10px] text-green-600 mt-0.5">✅ Documentos completos</p>
+                              )}
+                            </div>
+                            <span className="text-xs font-bold text-gray-500">{p.progreso}%</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
-            {/* Seleccionar todos */}
+            {/* Resumen de selección */}
+            {(() => {
+              const selConFaltantes = productosParaAvance.filter(id => verificacionMasiva[id] && !verificacionMasiva[id].completo);
+              return selConFaltantes.length > 0 && (
+                <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-900/20">
+                  <p className="text-xs text-red-700 dark:text-red-400">
+                    ⚠️ {selConFaltantes.length} producto(s) seleccionado(s) tienen documentos pendientes. No podrán avanzar hasta completarlos.
+                  </p>
+                </div>
+              );
+            })()}
+
+            {/* Seleccionar todos / ninguno */}
             <div className="flex gap-2 mb-4">
               <button onClick={() => {
-                const grupo = Object.values(productosAgrupados).find(g => g.cotizacionId === cotizacionParaAvance);
-                const elegibles = grupo?.productos.filter(p => p.progreso < 100 && p.siguienteEstado) || [];
-                setProductosParaAvance(elegibles.map(p => p.id));
+                const todos = Object.values(getElegiblesPorEstado()).flat().map(p => p.id);
+                setProductosParaAvance(todos);
               }} className="text-xs text-blue-600 hover:underline">Seleccionar todos</button>
               <button onClick={() => setProductosParaAvance([])} className="text-xs text-gray-500 hover:underline">Deseleccionar todos</button>
             </div>
@@ -1448,7 +1547,7 @@ export default function ShoppingFollowUps() {
               <button onClick={() => setShowAvanceMasivoModal(false)}
                 className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 dark:border-gray-600 dark:text-gray-300">Cancelar</button>
               <button onClick={handleAvanceMasivo}
-                disabled={loadingAvanceMasivo || productosParaAvance.length === 0}
+                disabled={loadingAvanceMasivo || productosParaAvance.length === 0 || loadingVerificacionMasiva}
                 className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
                 {loadingAvanceMasivo ? "Avanzando..." : `Avanzar ${productosParaAvance.length} producto(s)`}
               </button>

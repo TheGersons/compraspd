@@ -740,6 +740,36 @@ export class EstadoProductoService {
   private readonly INCOTERMS_FULL_PROCESS = ['EXW', 'FOB', 'FCA'];
 
   /**
+   * Actualizar SKU y/o descripción de un estado de producto
+   */
+  async actualizarDatos(
+    id: string,
+    data: { sku?: string; descripcion?: string },
+    user: UserJwt,
+  ) {
+    if (!this.isSupervisorOrAdmin(user)) {
+      throw new ForbiddenException(
+        'Solo supervisores/admin pueden editar datos',
+      );
+    }
+
+    const estado = await this.prisma.estadoProducto.findUnique({
+      where: { id },
+    });
+    if (!estado) throw new NotFoundException('Producto no encontrado');
+
+    const updateData: any = { actualizado: new Date() };
+    if (data.sku?.trim()) updateData.sku = data.sku.trim();
+    if (data.descripcion?.trim())
+      updateData.descripcion = data.descripcion.trim();
+
+    return this.prisma.estadoProducto.update({
+      where: { id },
+      data: updateData,
+    });
+  }
+
+  /**
    * Aprobar compra de un producto (desde vista Aprobación de Compras)
    * Esto es independiente del avance de estado
    */
