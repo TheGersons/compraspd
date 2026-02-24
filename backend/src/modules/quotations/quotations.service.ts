@@ -207,6 +207,12 @@ export class QuotationsService {
                 proveedor: true,
               },
             },
+            preciosOfertas: {
+              include: {
+                proveedor: true,
+              },
+              orderBy: { fechaConsulta: 'desc' },
+            },
           },
         },
         solicitante: {

@@ -499,53 +499,58 @@ export default function AprobacionCompras() {
                                                                 <p className="text-xs text-gray-500">{det.cantidad} {det.tipoUnidad}</p>
                                                             </div>
 
-                                                            {det.preciosOfertas && det.preciosOfertas.length > 0 ? (
-                                                                <div className="space-y-1.5">
-                                                                    {det.preciosOfertas.map((oferta) => {
-                                                                        const esSeleccionado = det.preciosId === oferta.id;
-                                                                        const precioNum = typeof oferta.precio === 'string' ? parseFloat(oferta.precio) : oferta.precio;
-                                                                        const descNum = oferta.precioDescuento ? (typeof oferta.precioDescuento === 'string' ? parseFloat(oferta.precioDescuento as string) : oferta.precioDescuento) : undefined;
-                                                                        const descPct = calcDescuento(precioNum, descNum);
-                                                                        return (
-                                                                            <div key={oferta.id}
-                                                                                className={`flex items-center justify-between rounded-lg border p-2.5 text-sm ${esSeleccionado
-                                                                                    ? "border-green-400 bg-green-50 dark:border-green-600 dark:bg-green-900/20"
-                                                                                    : "border-gray-100 bg-gray-50 dark:border-gray-700 dark:bg-gray-800"}`}>
-                                                                                <div className="flex items-center gap-2">
-                                                                                    {esSeleccionado && <CheckCircle2 size={14} className="text-green-600" />}
-                                                                                    <Building2 size={14} className="text-gray-400" />
-                                                                                    <span className={`font-medium ${esSeleccionado ? "text-green-700 dark:text-green-400" : "text-gray-700 dark:text-gray-300"}`}>
-                                                                                        {oferta.proveedor?.nombre}
-                                                                                    </span>
-                                                                                    {esSeleccionado && (
-                                                                                        <span className="rounded bg-green-200 px-1.5 py-0.5 text-[10px] font-bold text-green-800 dark:bg-green-800 dark:text-green-200">SELECCIONADO</span>
-                                                                                    )}
-                                                                                </div>
-                                                                                <div className="flex items-center gap-4">
-                                                                                    <div className="text-right">
-                                                                                        <p className="font-semibold text-gray-900 dark:text-white">{formatCurrency(precioNum)}</p>
-                                                                                        {descNum && (
-                                                                                            <p className="text-xs text-green-600">Desc: {formatCurrency(descNum)} {descPct && <span>(-{descPct}%)</span>}</p>
+                                                            {(() => {
+                                                                const ofertas = det.preciosOfertas || [];
+                                                                // Fallback: si no hay ofertas pero hay precio seleccionado, mostrarlo
+                                                                const listaOfertas = ofertas.length > 0 ? ofertas : (det.precios ? [det.precios] : []);
+                                                                return listaOfertas.length > 0 ? (
+                                                                    <div className="space-y-1.5">
+                                                                        {listaOfertas.map((oferta) => {
+                                                                            const esSeleccionado = det.preciosId === oferta.id;
+                                                                            const precioNum = typeof oferta.precio === 'string' ? parseFloat(oferta.precio) : oferta.precio;
+                                                                            const descNum = oferta.precioDescuento ? (typeof oferta.precioDescuento === 'string' ? parseFloat(oferta.precioDescuento as string) : oferta.precioDescuento) : undefined;
+                                                                            const descPct = calcDescuento(precioNum, descNum);
+                                                                            return (
+                                                                                <div key={oferta.id}
+                                                                                    className={`flex items-center justify-between rounded-lg border p-2.5 text-sm ${esSeleccionado
+                                                                                        ? "border-green-400 bg-green-50 dark:border-green-600 dark:bg-green-900/20"
+                                                                                        : "border-gray-100 bg-gray-50 dark:border-gray-700 dark:bg-gray-800"}`}>
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        {esSeleccionado && <CheckCircle2 size={14} className="text-green-600" />}
+                                                                                        <Building2 size={14} className="text-gray-400" />
+                                                                                        <span className={`font-medium ${esSeleccionado ? "text-green-700 dark:text-green-400" : "text-gray-700 dark:text-gray-300"}`}>
+                                                                                            {oferta.proveedor?.nombre || "Sin proveedor"}
+                                                                                        </span>
+                                                                                        {esSeleccionado && (
+                                                                                            <span className="rounded bg-green-200 px-1.5 py-0.5 text-[10px] font-bold text-green-800 dark:bg-green-800 dark:text-green-200">SELECCIONADO</span>
                                                                                         )}
                                                                                     </div>
-                                                                                    {oferta.ComprobanteDescuento && (
-                                                                                        <button onClick={() => {
-                                                                                            const url = oferta.ComprobanteDescuento!;
-                                                                                            if (url.startsWith("http")) window.open(url, "_blank");
-                                                                                            else window.open(`${API}/api/v1/storage/file?path=${encodeURIComponent(url)}`, "_blank");
-                                                                                        }}
-                                                                                            className="rounded-md p-1 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors" title="Ver comprobante">
-                                                                                            <Eye size={14} />
-                                                                                        </button>
-                                                                                    )}
+                                                                                    <div className="flex items-center gap-4">
+                                                                                        <div className="text-right">
+                                                                                            <p className="font-semibold text-gray-900 dark:text-white">{formatCurrency(descNum || precioNum)}</p>
+                                                                                            {descNum && descNum !== precioNum && (
+                                                                                                <p className="text-xs text-green-600">Original: <span className="line-through">{formatCurrency(precioNum)}</span> {descPct && <span>(-{descPct}%)</span>}</p>
+                                                                                            )}
+                                                                                        </div>
+                                                                                        {oferta.ComprobanteDescuento && (
+                                                                                            <button onClick={() => {
+                                                                                                const url = oferta.ComprobanteDescuento!;
+                                                                                                if (url.startsWith("http")) window.open(url, "_blank");
+                                                                                                else window.open(`${API}/api/v1/storage/file?path=${encodeURIComponent(url)}`, "_blank");
+                                                                                            }}
+                                                                                                className="rounded-md p-1 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors" title="Ver comprobante">
+                                                                                                <Eye size={14} />
+                                                                                            </button>
+                                                                                        )}
+                                                                                    </div>
                                                                                 </div>
-                                                                            </div>
-                                                                        );
-                                                                    })}
-                                                                </div>
-                                                            ) : (
-                                                                <p className="text-xs italic text-gray-400">Sin ofertas registradas</p>
-                                                            )}
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                ) : (
+                                                                    <p className="text-xs italic text-gray-400">Sin ofertas registradas</p>
+                                                                );
+                                                            })()}
                                                         </div>
                                                     ))}
                                                 </div>
