@@ -392,6 +392,17 @@ const api = {
     if (!response.ok) { const e = await response.json(); throw new Error(e.message || "Error al actualizar nombre"); }
     return response.json();
   },
+
+  async asignarResponsableMasivo(ids: string[], responsableId: string | null) {
+    const token = getToken();
+    const response = await fetch(`${API_BASE_URL}/api/v1/estado-productos/asignar-responsable-masivo`, {
+      method: "PATCH", credentials: "include",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ ids, responsableId }),
+    });
+    if (!response.ok) { const e = await response.json(); throw new Error(e.message || "Error al asignar"); }
+    return response.json();
+  },
 };
 
 // ============================================================================
@@ -496,12 +507,13 @@ export default function ShoppingFollowUps() {
   const [skuEditado, setSkuEditado] = useState("");
   const [editandoCotizacion, setEditandoCotizacion] = useState<string | null>(null);
   const [nombreCotEditado, setNombreCotEditado] = useState("");
+  const [menuGrupoAbierto, setMenuGrupoAbierto] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null); // Se mantiene por si TimelineItem lo usa
 
   // Cerrar dropdowns al hacer click fuera
   useEffect(() => {
-    const handleClickOutside = () => { setMenuAbierto(null); setShowResponsableDropdown(false); };
+    const handleClickOutside = () => { setMenuAbierto(null); setShowResponsableDropdown(false); setMenuGrupoAbierto(null); };
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
@@ -775,7 +787,7 @@ export default function ShoppingFollowUps() {
     if (!skuEditado.trim()) return;
     try {
       await api.actualizarSku(productoId, skuEditado.trim());
-      toast.success("Nombre actualizado");
+      toast.success("SKU actualizado");
       setEditandoSku(null);
       await cargarProductos();
     } catch (e: any) { toast.error(e.message); }
@@ -787,6 +799,18 @@ export default function ShoppingFollowUps() {
       await api.actualizarNombreCotizacion(cotizacionId, nombreCotEditado.trim());
       toast.success("Nombre actualizado");
       setEditandoCotizacion(null);
+      await cargarProductos();
+    } catch (e: any) { toast.error(e.message); }
+  };
+
+  const handleAsignarResponsableGrupo = async (cotizacionId: string, responsableId: string | null) => {
+    const grupo = productosAgrupados[cotizacionId];
+    if (!grupo) return;
+    const ids = grupo.productos.map(p => p.id);
+    try {
+      await api.asignarResponsableMasivo(ids, responsableId);
+      toast.success(responsableId ? `Responsable asignado a ${ids.length} productos` : `Responsable removido de ${ids.length} productos`);
+      setMenuGrupoAbierto(null);
       await cargarProductos();
     } catch (e: any) { toast.error(e.message); }
   };
@@ -1001,6 +1025,34 @@ export default function ShoppingFollowUps() {
                                 ▶ Avanzar grupo
                               </button>
                             )}
+                            {/* Menú asignar responsable al grupo */}
+                            <div className="relative" onClick={(e) => e.stopPropagation()}>
+                              <button onClick={() => setMenuGrupoAbierto(menuGrupoAbierto === grupo.cotizacionId ? null : grupo.cotizacionId)}
+                                className="rounded-md p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300 transition-colors"
+                                title="Asignar responsable al grupo">
+                                <MoreVertical size={14} />
+                              </button>
+                              {menuGrupoAbierto === grupo.cotizacionId && (
+                                <div className="absolute right-0 top-full z-50 mt-1 w-52 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
+                                  <div className="p-1.5">
+                                    <p className="px-2 py-1 text-[10px] font-semibold text-gray-400 uppercase">Asignar a todo el grupo:</p>
+                                    {supervisores.map(sup => (
+                                      <button key={sup.id}
+                                        onClick={() => handleAsignarResponsableGrupo(grupo.cotizacionId, sup.id)}
+                                        className="w-full rounded-md px-2 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800 transition-colors">
+                                        {sup.nombre}
+                                      </button>
+                                    ))}
+                                    <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
+                                    <button
+                                      onClick={() => handleAsignarResponsableGrupo(grupo.cotizacionId, null)}
+                                      className="w-full rounded-md px-2 py-1.5 text-left text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
+                                      Quitar responsable de todos
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                           </div>
                           {/* Productos del grupo */}
                           {grupoExpandido === grupo.cotizacionId && grupo.productos.map((producto) => (
@@ -1036,6 +1088,43 @@ export default function ShoppingFollowUps() {
                               <span className={`text-sm font-bold ${producto.progreso === 100 ? 'text-green-600' : 'text-gray-900 dark:text-white'}`}>
                                 {producto.progreso}%
                               </span>
+                              {/* Responsable individual */}
+                              <div className="relative" onClick={(e) => e.stopPropagation()}>
+                                <button onClick={() => setMenuAbierto(menuAbierto === producto.id ? null : producto.id)}
+                                  className="rounded p-0.5 text-gray-400 hover:text-blue-500 transition-colors" title="Asignar responsable">
+                                  {producto.responsableSeguimiento ? (
+                                    <span className="flex items-center gap-0.5 text-[10px] text-blue-600 dark:text-blue-400">
+                                      <UserCheck size={10} />{producto.responsableSeguimiento.nombre.split(' ')[0]}
+                                    </span>
+                                  ) : <MoreVertical size={12} />}
+                                </button>
+                                {menuAbierto === producto.id && (
+                                  <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
+                                    <div className="p-1.5">
+                                      <p className="px-2 py-1 text-[10px] font-semibold text-gray-400 uppercase">Asignar a:</p>
+                                      {supervisores.map(sup => (
+                                        <button key={sup.id}
+                                          onClick={() => handleAsignarResponsable(producto.id, sup.id)}
+                                          className={`w-full rounded-md px-2 py-1.5 text-left text-xs transition-colors ${producto.responsableSeguimiento?.id === sup.id
+                                            ? "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
+                                            : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
+                                            }`}>
+                                          {sup.nombre}
+                                        </button>
+                                      ))}
+                                      {producto.responsableSeguimiento && (
+                                        <>
+                                          <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
+                                          <button onClick={() => handleAsignarResponsable(producto.id, null)}
+                                            className="w-full rounded-md px-2 py-1.5 text-left text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
+                                            Quitar responsable
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           ))}
                         </div>

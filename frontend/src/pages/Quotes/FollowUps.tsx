@@ -803,10 +803,11 @@ export default function FollowUps() {
       const data = await api.getPreciosByDetalle(detalleId);
       setPreciosPorProducto(prev => ({
         ...prev,
-        [detalleId]: data || []
+        [detalleId]: Array.isArray(data) ? data : []
       }));
     } catch (error) {
       console.error("Error al cargar precios:", error);
+      // No limpiar los precios existentes en caso de error
     }
   };
 
@@ -1057,75 +1058,36 @@ export default function FollowUps() {
     <>
       <PageMeta description="Seguimiento de cotizaciones" title="Seguimiento de Cotizaciones" />
 
-      <div className="flex h-[calc(100vh-4rem)] gap-4">
-        {/* ========================================
+      <div className="max-w-full">
+        <div className="flex w-full h-[calc(100vh-4rem)] gap-4">
+          {/* ========================================
             PANEL IZQUIERDO - LISTA DE COTIZACIONES
         ======================================== */}
-        <div className="w-96 flex flex-col gap-4">
-          {/* Header */}
-          <div className="rounded-lg border-2 border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Seguimientos
-            </h1>
-            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-              Cotizaciones pendientes de aprobación
-            </p>
-          </div>
+          <div className="flex flex-col gap-4">
+            {/* Header */}
+            <div className="rounded-lg border-2 border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                Seguimientos
+              </h1>
+              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                Cotizaciones pendientes de aprobación
+              </p>
+            </div>
 
-          {/* Filtros */}
-          <div className="rounded-lg border-2 border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-            {/* Buscador */}
-            <div className="relative mb-3">
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && cargarCotizaciones()}
-                placeholder="Buscar cotización o solicitante..."
-                className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 pl-10 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
-              />
-              <svg
-                className="absolute left-3 top-2.5 h-5 w-5 text-gray-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            {/* Filtros */}
+            <div className="rounded-lg border-2 border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+              {/* Buscador */}
+              <div className="relative mb-3">
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && cargarCotizaciones()}
+                  placeholder="Buscar cotización o solicitante..."
+                  className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 pl-10 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
                 />
-              </svg>
-            </div>
-
-            {/* Filtro por estado */}
-            <div className="flex gap-2">
-              {["TODOS", "PENDIENTE", "EN_CONFIGURACION", "APROBADA_PARCIAL"].map((estado) => (
-                <button
-                  key={estado}
-                  onClick={() => setEstadoFiltro(estado)}
-                  className={`flex-1 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${estadoFiltro === estado
-                    ? "bg-blue-600 text-white dark:bg-blue-500"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-                    }`}
-                >
-                  {estado === "TODOS" ? "Todos" : getEstadoLabel(estado).split(" ")[0]}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Lista de cotizaciones */}
-          <div className="flex-1 overflow-y-auto rounded-lg border-2 border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-            {loading ? (
-              <div className="flex h-full items-center justify-center">
-                <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
-              </div>
-            ) : filteredCotizaciones.length === 0 ? (
-              <div className="flex h-full flex-col items-center justify-center p-8 text-center">
                 <svg
-                  className="mb-4 h-16 w-16 text-gray-400"
+                  className="absolute left-3 top-2.5 h-5 w-5 text-gray-400"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -1134,854 +1096,895 @@ export default function FollowUps() {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                   />
                 </svg>
-                <p className="text-gray-600 dark:text-gray-400">
-                  No hay cotizaciones {estadoFiltro !== "TODOS" && "con este estado"}
-                </p>
               </div>
-            ) : (
-              <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredCotizaciones.map((cot) => (
+
+              {/* Filtro por estado */}
+              <div className="flex gap-2">
+                {["TODOS", "PENDIENTE", "EN_CONFIGURACION", "APROBADA_PARCIAL"].map((estado) => (
                   <button
-                    key={cot.id}
-                    onClick={() => seleccionarCotizacion(cot)}
-                    className={`w-full p-4 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50 ${cotizacionSeleccionada?.id === cot.id
-                      ? "bg-blue-50 dark:bg-blue-900/20"
-                      : ""
+                    key={estado}
+                    onClick={() => setEstadoFiltro(estado)}
+                    className={`flex-1 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${estadoFiltro === estado
+                      ? "bg-blue-600 text-white dark:bg-blue-500"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                       }`}
                   >
-                    {/* Estado y progreso */}
-                    <div className="mb-2 flex items-center justify-between">
-                      <span
-                        className={`rounded-full px-2 py-1 text-xs font-medium ${getEstadoBadgeColor(
-                          cot.estado
-                        )}`}
-                      >
-                        {getEstadoLabel(cot.estado)}
-                      </span>
-                      <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                        {cot.porcentajeAprobado || 0}%
-                      </span>
-                    </div>
-
-                    {/* Nombre */}
-                    <h3 className="mb-1 font-semibold text-gray-900 dark:text-white">
-                      {cot.nombreCotizacion}
-                    </h3>
-
-                    {/* Solicitante */}
-                    <p className="mb-2 text-sm text-gray-600 dark:text-gray-400">
-                      {cot.solicitante.nombre}
-                      {cot.solicitante.departamento && (
-                        <span className="text-gray-500"> • {cot.solicitante.departamento.nombre}</span>
-                      )}
-                    </p>
-
-                    {/* Estadísticas */}
-                    <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400">
-                      <span className="flex items-center gap-1">
-                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                          />
-                        </svg>
-                        {cot.totalProductos} productos
-                      </span>
-                      <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
-                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M5 13l4 4L19 7"
-                          />
-                        </svg>
-                        {cot.productosAprobados} aprobados
-                      </span>
-                    </div>
-
-                    {/* Progreso visual */}
-                    <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-                      <div
-                        className="h-full rounded-full bg-blue-600 transition-all dark:bg-blue-500"
-                        style={{ width: `${cot.porcentajeAprobado || 0}%` }}
-                      />
-                    </div>
+                    {estado === "TODOS" ? "Todos" : getEstadoLabel(estado).split(" ")[0]}
                   </button>
                 ))}
+              </div>
+            </div>
+
+            {/* Lista de cotizaciones */}
+            <div className="flex-1 overflow-y-auto rounded-lg border-2 border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+              {loading ? (
+                <div className="flex h-full items-center justify-center">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+                </div>
+              ) : filteredCotizaciones.length === 0 ? (
+                <div className="flex h-full flex-col items-center justify-center p-8 text-center">
+                  <svg
+                    className="mb-4 h-16 w-16 text-gray-400"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                  <p className="text-gray-600 dark:text-gray-400">
+                    No hay cotizaciones {estadoFiltro !== "TODOS" && "con este estado"}
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {filteredCotizaciones.map((cot) => (
+                    <button
+                      key={cot.id}
+                      onClick={() => seleccionarCotizacion(cot)}
+                      className={`w-full p-4 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50 ${cotizacionSeleccionada?.id === cot.id
+                        ? "bg-blue-50 dark:bg-blue-900/20"
+                        : ""
+                        }`}
+                    >
+                      {/* Estado y progreso */}
+                      <div className="mb-2 flex items-center justify-between">
+                        <span
+                          className={`rounded-full px-2 py-1 text-xs font-medium ${getEstadoBadgeColor(
+                            cot.estado
+                          )}`}
+                        >
+                          {getEstadoLabel(cot.estado)}
+                        </span>
+                        <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                          {cot.porcentajeAprobado || 0}%
+                        </span>
+                      </div>
+
+                      {/* Nombre */}
+                      <h3 className="mb-1 font-semibold text-gray-900 dark:text-white">
+                        {cot.nombreCotizacion}
+                      </h3>
+
+                      {/* Solicitante */}
+                      <p className="mb-2 text-sm text-gray-600 dark:text-gray-400">
+                        {cot.solicitante.nombre}
+                        {cot.solicitante.departamento && (
+                          <span className="text-gray-500"> • {cot.solicitante.departamento.nombre}</span>
+                        )}
+                      </p>
+
+                      {/* Estadísticas */}
+                      <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400">
+                        <span className="flex items-center gap-1">
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                            />
+                          </svg>
+                          {cot.totalProductos} productos
+                        </span>
+                        <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M5 13l4 4L19 7"
+                            />
+                          </svg>
+                          {cot.productosAprobados} aprobados
+                        </span>
+                      </div>
+
+                      {/* Progreso visual */}
+                      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+                        <div
+                          className="h-full rounded-full bg-blue-600 transition-all dark:bg-blue-500"
+                          style={{ width: `${cot.porcentajeAprobado || 0}%` }}
+                        />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          {/* ========================================
+            PANEL DERECHO - DETALLE / CHAT / HISTORIAL
+        ======================================== */}
+          <div className="flex-1 flex flex-col gap-4">
+            {cotizacionSeleccionada ? (
+              <>
+                {/* Header con información general */}
+                <div className="rounded-lg border-2 border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
+                  <div className="mb-4 flex items-start justify-between">
+                    <div>
+                      {editandoNombre ? (
+                        <div className="flex items-center gap-2">
+                          <input type="text" value={nombreEditado}
+                            onChange={(e) => setNombreEditado(e.target.value)}
+                            onKeyDown={async (e) => {
+                              if (e.key === 'Enter' && nombreEditado.trim()) {
+                                try {
+                                  await api.actualizarNombreCotizacion(cotizacionSeleccionada.id, nombreEditado.trim());
+                                  setCotizacionSeleccionada({ ...cotizacionSeleccionada, nombreCotizacion: nombreEditado.trim() });
+                                  setCotizaciones(prev => prev.map(c => c.id === cotizacionSeleccionada.id ? { ...c, nombreCotizacion: nombreEditado.trim() } : c));
+                                  setEditandoNombre(false);
+                                  toast.success("Nombre actualizado");
+                                } catch { toast.error("Error al actualizar"); }
+                              }
+                              if (e.key === 'Escape') setEditandoNombre(false);
+                            }}
+                            autoFocus
+                            className="text-2xl font-bold border-b-2 border-blue-500 bg-transparent text-gray-900 dark:text-white outline-none"
+                          />
+                          <button onClick={() => setEditandoNombre(false)} className="text-xs text-gray-400 hover:text-red-500">✕</button>
+                        </div>
+                      ) : (
+                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                          onClick={() => { setNombreEditado(cotizacionSeleccionada.nombreCotizacion); setEditandoNombre(true); }}
+                          title="Click para editar nombre"
+                        >
+                          {cotizacionSeleccionada.nombreCotizacion}
+                          <span className="ml-2 text-xs text-gray-400">✏️</span>
+                        </h2>
+                      )}
+                      <div className="mt-2 flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+                        <span className="flex items-center gap-1">
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                          {cotizacionSeleccionada.solicitante.nombre}
+                        </span>
+                        {cotizacionSeleccionada.proyecto && (
+                          <span className="flex items-center gap-1">
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                            </svg>
+                            {cotizacionSeleccionada.proyecto.nombre}
+                          </span>
+                        )}
+                        <span className="flex items-center gap-1">
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          Límite: {formatFecha(cotizacionSeleccionada.fechaLimite)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* ACCIONES DEL HEADER: Estado y Botón Eliminar */}
+                    <div className="flex flex-col items-end gap-2">
+                      <span className={`rounded-full px-3 py-1.5 text-sm font-medium ${getEstadoBadgeColor(cotizacionSeleccionada.estado)}`}>
+                        {getEstadoLabel(cotizacionSeleccionada.estado)}
+                      </span>
+
+                      {/* Botón de eliminar cotización */}
+                      <button
+                        onClick={eliminarCotizacionActual}
+                        className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
+                        title="Eliminar cotización permanentemente"
+                      >
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Eliminar
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Progreso */}
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1">
+                      <div className="mb-2 flex items-center justify-between text-sm">
+                        <span className="font-medium text-gray-700 dark:text-gray-300">
+                          Progreso de aprobación
+                        </span>
+                        <span className="font-semibold text-gray-900 dark:text-white">
+                          {cotizacionSeleccionada.productosAprobados} / {cotizacionSeleccionada.totalProductos}
+                        </span>
+                      </div>
+                      <div className="h-3 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all dark:from-blue-600 dark:to-blue-700"
+                          style={{ width: `${cotizacionSeleccionada.porcentajeAprobado || 0}%` }}
+                        />
+                      </div>
+                    </div>
+                    <span className="text-2xl font-bold text-gray-900 dark:text-white">
+                      {cotizacionSeleccionada.porcentajeAprobado || 0}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* Tabs */}
+                <div className="rounded-lg border-2 border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+                  <div className="flex border-b border-gray-200 dark:border-gray-700">
+                    <button
+                      onClick={() => setVistaActiva("detalle")}
+                      className={`flex-1 px-6 py-3 text-sm font-medium transition-colors ${vistaActiva === "detalle"
+                        ? "border-b-2 border-blue-600 text-blue-600 dark:border-blue-500 dark:text-blue-500"
+                        : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
+                        }`}
+                    >
+                      📋 Detalle de Productos
+                    </button>
+                    <button
+                      onClick={() => setVistaActiva("chat")}
+                      className={`flex-1 px-6 py-3 text-sm font-medium transition-colors ${vistaActiva === "chat"
+                        ? "border-b-2 border-blue-600 text-blue-600 dark:border-blue-500 dark:text-blue-500"
+                        : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
+                        }`}
+                    >
+                      💬 Chat
+                    </button>
+                    <button
+                      onClick={() => {
+                        setVistaActiva("historial");
+                        if (!showHistorial) cargarHistorial();
+                      }}
+                      className={`flex-1 px-6 py-3 text-sm font-medium transition-colors ${vistaActiva === "historial"
+                        ? "border-b-2 border-blue-600 text-blue-600 dark:border-blue-500 dark:text-blue-500"
+                        : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
+                        }`}
+                    >
+                      📜 Historial
+                    </button>
+                    <button
+                      onClick={() => setVistaActiva("precios")}
+                      className={`flex-1 px-6 py-3 text-sm font-medium transition-colors ${vistaActiva === "precios"
+                        ? "border-b-2 border-blue-600 text-blue-600 dark:border-blue-500 dark:text-blue-500"
+                        : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
+                        }`}
+                    >
+                      💰 Precios
+                    </button>
+                  </div>
+
+                  {/* Contenido según tab activo */}
+                  <div className="p-6">
+                    {loadingDetalle ? (
+                      <div className="flex h-64 items-center justify-center">
+                        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+                      </div>
+                    ) : (
+                      <>
+                        {/* TAB 1: DETALLE DE PRODUCTOS */}
+                        {vistaActiva === "detalle" && (
+                          <div className="space-y-4">
+                            {/* Comentarios generales de la cotización */}
+                            {(cotizacionSeleccionada as any).comentarios && (
+                              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20">
+                                <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">💬 Comentarios de la solicitud:</p>
+                                <p className="text-sm text-amber-800 dark:text-amber-300">{(cotizacionSeleccionada as any).comentarios}</p>
+                              </div>
+                            )}
+                            {cotizacionSeleccionada.detalles && cotizacionSeleccionada.detalles.length > 0 ? (
+                              <>
+                                {/* Tabla de productos */}
+                                <div className="overflow-x-auto">
+                                  <table className="w-full">
+                                    <thead>
+                                      <tr className="border-b border-gray-200 dark:border-gray-700">
+                                        <th className="pb-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                          Producto
+                                        </th>
+                                        <th className="pb-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                          Cantidad
+                                        </th>
+                                        <th className="pb-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                          País / Transporte
+                                        </th>
+                                        <th className="pb-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                          Timeline
+                                        </th>
+                                        <th className="pb-3 text-center text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                          Aprobado
+                                        </th>
+                                        <th className="pb-3 text-right text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                          Acciones
+                                        </th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                      {cotizacionSeleccionada.detalles
+                                        // 🔴 FILTRO: Ocultar rechazados
+                                        .filter(p => !p.estadoProducto?.rechazado)
+                                        .map((producto) => (
+                                          <tr key={producto.id} className="group hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                                            {/* Producto */}
+                                            <td className="py-4">
+                                              <div className="flex items-center gap-1.5">
+                                                <span className="font-medium text-gray-900 dark:text-white">
+                                                  {producto.descripcionProducto}
+                                                </span>
+                                                {producto.notas && (
+                                                  <div className="relative">
+                                                    <button onClick={() => setNotasAbiertas(notasAbiertas === producto.id ? null : producto.id)}
+                                                      className="text-blue-500 hover:text-blue-700 dark:text-blue-400 text-sm" title="Ver notas">
+                                                      📋
+                                                    </button>
+                                                    {notasAbiertas === producto.id && (
+                                                      <div className="absolute left-0 top-full z-50 mt-1 w-72 rounded-lg border border-gray-200 bg-white p-3 shadow-lg dark:border-gray-700 dark:bg-gray-900">
+                                                        <div className="flex justify-between items-center mb-1">
+                                                          <p className="text-xs font-semibold text-gray-500">Notas:</p>
+                                                          <button onClick={() => setNotasAbiertas(null)} className="text-xs text-gray-400 hover:text-red-500">✕</button>
+                                                        </div>
+                                                        <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{producto.notas}</p>
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                )}
+                                              </div>
+                                            </td>
+
+                                            {/* Cantidad */}
+                                            <td className="py-4 text-sm text-gray-700 dark:text-gray-300">
+                                              {producto.cantidad} {producto.tipoUnidad.toLowerCase()}
+                                            </td>
+
+                                            {/* País / Transporte */}
+                                            <td className="py-4">
+                                              {producto.estadoProducto?.paisOrigen ? (
+                                                <div className="text-sm">
+                                                  <div className="font-medium text-gray-900 dark:text-white">
+                                                    {producto.estadoProducto.paisOrigen.nombre}
+                                                  </div>
+                                                  <div className="text-gray-600 dark:text-gray-400">
+                                                    {producto.estadoProducto.medioTransporte === "MARITIMO" && "🚢 Marítimo"}
+                                                    {producto.estadoProducto.medioTransporte === "TERRESTRE" && "🚚 Terrestre"}
+                                                    {producto.estadoProducto.medioTransporte === "AEREO" && "✈️ Aéreo"}
+                                                  </div>
+                                                </div>
+                                              ) : (
+                                                <span className="text-sm text-gray-400 dark:text-gray-500">
+                                                  No configurado
+                                                </span>
+                                              )}
+                                            </td>
+
+                                            {/* Timeline */}
+                                            <td className="py-4 text-sm">
+                                              {producto.timelineSugerido ? (
+                                                <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                                                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                  </svg>
+                                                  {producto.timelineSugerido.diasTotalesEstimados} días
+                                                </span>
+                                              ) : (
+                                                <span className="text-gray-400 dark:text-gray-500">
+                                                  Sin timeline
+                                                </span>
+                                              )}
+                                            </td>
+
+                                            {/* Aprobado */}
+                                            <td className="py-4 text-center">
+                                              {producto.estadoProducto ? (
+                                                <input
+                                                  type="checkbox"
+                                                  checked={producto.estadoProducto.aprobadoPorSupervisor}
+                                                  onChange={(e) =>
+                                                    toggleAprobarProductoConValidacion(
+                                                      producto.estadoProducto!.id,
+                                                      e.target.checked
+                                                    )
+                                                  }
+                                                  className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                                                />
+                                              ) : (
+                                                <span className="text-gray-400">N/A</span>
+                                              )}
+                                            </td>
+
+                                            {/* Acciones */}
+                                            <td className="py-4 text-right">
+                                              <button
+                                                onClick={() => configurarProducto(producto)}
+                                                className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                                              >
+                                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                </svg>
+                                                Configurar
+                                              </button>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+
+                                {/* Botón aprobar todos */}
+                                {cotizacionSeleccionada.productosPendientes > 0 && (
+                                  <div className="flex justify-end">
+                                    <button
+                                      onClick={() => {
+                                        // 🔴 CORRECCIÓN: Filtrar rechazados para no aprobarlos
+                                        const pendientes = cotizacionSeleccionada.detalles!
+                                          .filter(p =>
+                                            p.estadoProducto &&
+                                            !p.estadoProducto.aprobadoPorSupervisor &&
+                                            !p.estadoProducto.rechazado // <-- Validación crítica
+                                          )
+                                          .map(p => ({ estadoProductoId: p.estadoProducto!.id, aprobado: true }));
+
+                                        if (pendientes.length > 0) {
+                                          api.aprobarProductos(cotizacionSeleccionada.id, pendientes)
+                                            .then(() => {
+                                              addNotification("success", "Todos los productos aprobados", "Todos los productos han sido aprobados exitosamente");
+                                              seleccionarCotizacion(cotizacionSeleccionada);
+                                              cargarCotizaciones();
+                                            })
+                                            .catch(() => addNotification("danger", "Error al aprobar productos", "Error al aprobar productos"));
+                                        }
+                                      }}
+                                      className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600"
+                                    >
+                                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                      </svg>
+                                      Aprobar Todos ({cotizacionSeleccionada.productosPendientes})
+                                    </button>
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              <div className="flex h-64 flex-col items-center justify-center text-center">
+                                <svg className="mb-4 h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                                </svg>
+                                <p className="text-gray-600 dark:text-gray-400">
+                                  No hay productos en esta cotización
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {/* TAB 2: CHAT */}
+                        {vistaActiva === "chat" && (
+                          <div className="flex h-[350px] flex-col">
+                            {/* Mensajes */}
+                            <div className="flex-1 overflow-y-auto space-y-4 mb-4">
+                              {loadingChat ? (
+                                <div className="flex h-full items-center justify-center">
+                                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+                                </div>
+                              ) : mensajes.length === 0 ? (
+                                <div className="flex h-full flex-col items-center justify-center text-center">
+                                  <svg className="mb-4 h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                  </svg>
+                                  <p className="text-gray-600 dark:text-gray-400">
+                                    No hay mensajes. ¡Sé el primero en escribir!
+                                  </p>
+                                </div>
+                              ) : (
+                                <>
+                                  {mensajes.map((mensaje) => {
+                                    const esPropio = mensaje.emisor.id === currentUserId;
+                                    return (
+                                      <div
+                                        key={mensaje.id}
+                                        className={`flex ${esPropio ? "justify-end" : "justify-start"}`}
+                                      >
+                                        <div className={`max-w-[70%] ${esPropio ? "items-end" : "items-start"} flex flex-col`}>
+                                          {/* Nombre del emisor */}
+                                          {!esPropio && (
+                                            <span className="mb-1 text-xs font-medium text-gray-600 dark:text-gray-400">
+                                              {mensaje.emisor.nombre}
+                                            </span>
+                                          )}
+
+                                          {/* Burbuja del mensaje */}
+                                          <div
+                                            className={`rounded-2xl px-4 py-2 ${esPropio
+                                              ? "bg-blue-600 text-white dark:bg-blue-500"
+                                              : "bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white"
+                                              }`}
+                                          >
+                                            <p className="text-sm whitespace-pre-wrap break-words max-w-[500px]">
+                                              {mensaje.contenido}
+                                            </p>
+                                          </div>
+
+                                          {/* Fecha */}
+                                          <span className="mt-1 text-xs text-gray-500 dark:text-gray-500">
+                                            {formatFecha(mensaje.creado)}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                  <div ref={chatEndRef} />
+                                </>
+                              )}
+                            </div>
+
+                            {/* Input para enviar mensaje */}
+                            <div className="flex gap-2 border-t border-gray-200 pt-4 dark:border-gray-700">
+                              <input
+                                type="text"
+                                value={nuevoMensaje}
+                                onChange={(e) => setNuevoMensaje(e.target.value)}
+                                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && enviarMensaje()}
+                                placeholder="Escribe un mensaje..."
+                                disabled={sendingMessage}
+                                className="flex-1 rounded-lg border-2 border-gray-300 bg-white px-4 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+                              />
+                              <button
+                                onClick={enviarMensaje}
+                                disabled={!nuevoMensaje.trim() || sendingMessage}
+                                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600"
+                              >
+                                {sendingMessage ? (
+                                  <>
+                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                                    Enviando...
+                                  </>
+                                ) : (
+                                  <>
+                                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                    </svg>
+                                    Enviar
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Tab 3: Historial */}
+                        {vistaActiva === "historial" && (
+                          <Historial cambios={historial} />
+                        )}
+                        {vistaActiva === "precios" && (
+                          <div className="space-y-4">
+                            {loadingPrecios ? (
+                              <div className="flex h-32 items-center justify-center">
+                                <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+                              </div>
+                            ) : !cotizacionSeleccionada?.detalles || cotizacionSeleccionada.detalles.length === 0 ? (
+                              <div className="rounded-lg border-2 border-dashed border-gray-300 p-8 text-center dark:border-gray-700">
+                                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
+                                  💰
+                                </div>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">
+                                  No hay productos en esta cotización
+                                </p>
+                              </div>
+                            ) : (
+                              <div className="space-y-6">
+                                {cotizacionSeleccionada.detalles
+                                  // 🔴 FILTRO: Ocultar rechazados en lista de precios
+                                  .filter(p => !p.estadoProducto?.rechazado)
+                                  .map((producto) => {
+                                    const precios = preciosPorProducto[producto.id] || [];
+                                    const tienePrecio = precios.length > 0;
+                                    const precioSeleccionado = precios.find(p => p.seleccionado);
+
+                                    return (
+                                      <div
+                                        key={producto.id}
+                                        className="rounded-lg border border-gray-200 p-4 dark:border-gray-700"
+                                      >
+                                        {/* Header del producto */}
+                                        <div className="mb-4 flex items-start justify-between">
+                                          <div className="flex-1">
+                                            <div className="flex items-center gap-2">
+                                              <h4 className="font-semibold text-gray-900 dark:text-white">
+                                                {producto.sku}
+                                              </h4>
+                                              {!tienePrecio && (
+                                                <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
+                                                  Sin precio
+                                                </span>
+                                              )}
+                                              {tienePrecio && !precioSeleccionado && (
+                                                <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                                                  Sin seleccionar
+                                                </span>
+                                              )}
+                                              {precioSeleccionado && (
+                                                <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                                  ✓ Precio seleccionado
+                                                </span>
+                                              )}
+                                            </div>
+                                            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                                              {producto.descripcionProducto}
+                                            </p>
+                                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">
+                                              Cantidad: {producto.cantidad} {producto.tipoUnidad.toLowerCase()}
+                                            </p>
+                                          </div>
+                                          <button
+                                            onClick={() => abrirModalPrecio(producto)}
+                                            className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+                                          >
+                                            + Agregar Precio
+                                          </button>
+                                        </div>
+
+                                        {/* Lista de precios */}
+                                        {precios.length > 0 ? (
+                                          <div className="space-y-2">
+                                            {precios.filter(p => p && p.proveedor).map((precio) => (
+                                              <div
+                                                key={precio.id}
+                                                className={`rounded-lg border p-3 transition-colors ${precio.seleccionado
+                                                  ? "border-green-500 bg-green-50 dark:border-green-600 dark:bg-green-900/20"
+                                                  : "border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+                                                  }`}
+                                              >
+                                                <div className="flex items-start justify-between">
+                                                  <div className="flex items-start gap-3 flex-1">
+                                                    {/* Radio button */}
+                                                    <input
+                                                      type="radio"
+                                                      name={`precio-${producto.id}`}
+                                                      checked={precio.seleccionado}
+                                                      onChange={() => seleccionarPrecio(precio.id, producto.id)}
+                                                      className="mt-1 h-4 w-4 text-blue-600"
+                                                    />
+
+                                                    {/* Info del precio */}
+                                                    <div className="flex-1">
+                                                      <div className="flex items-center gap-2">
+                                                        <span className="font-semibold text-gray-900 dark:text-white">
+                                                          {precio.proveedor?.nombre || 'Sin proveedor'}
+                                                        </span>
+                                                        {precio.proveedor?.rtn && (
+                                                          <span className="text-xs text-gray-500">
+                                                            RTN: {precio.proveedor.rtn}
+                                                          </span>
+                                                        )}
+                                                      </div>
+
+                                                      <div className="mt-1 flex flex-wrap items-center gap-4 text-sm">
+                                                        {/* Mostrar precio con descuento si existe, sino el precio normal */}
+                                                        <span className="font-medium text-gray-900 dark:text-white">
+                                                          L. {Number(precio.precioDescuento || precio.precio).toFixed(2)}
+                                                        </span>
+
+                                                        {/* Si hay descuento, mostrar el precio original tachado */}
+                                                        {precio.precioDescuento != null && Number(precio.precioDescuento) !== Number(precio.precio) && (
+                                                          <span className="text-gray-500 line-through">
+                                                            L. {Number(precio.precio).toFixed(2)}
+                                                          </span>
+                                                        )}
+                                                      </div>
+
+                                                      <p className="mt-1 text-xs text-gray-400 dark:text-gray-600">
+                                                        Agregado: {new Date(precio.creado).toLocaleDateString("es-HN")}
+                                                      </p>
+
+                                                      {/* Acciones de descuento */}
+                                                      <DescuentoActions
+                                                        precio={precio}
+                                                        productoId={producto.id}
+                                                        cotizacionId={cotizacionSeleccionada!.id}
+                                                        sku={producto.sku}
+                                                        onUpdate={() => cargarPreciosProducto(producto.id)}
+                                                        onNotification={addNotification}
+
+                                                      />
+                                                    </div>
+                                                  </div>
+
+                                                  {/* Botones de acción */}
+                                                  <div className="ml-2 flex items-center gap-1">
+                                                    {/* Botones de Archivo (Solo si hay comprobante) */}
+                                                    {precio.ComprobanteDescuento && (
+                                                      <>
+                                                        <button
+                                                          onClick={() => manejarArchivo(precio, producto.sku, 'inline')}
+                                                          className="rounded-lg p-1.5 text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
+                                                          title="Ver comprobante"
+                                                        >
+                                                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                          </svg>
+                                                        </button>
+
+                                                        <button
+                                                          onClick={() => manejarArchivo(precio, producto.sku, 'attachment')}
+                                                          className="rounded-lg p-1.5 text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+                                                          title="Descargar comprobante"
+                                                        >
+                                                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                                          </svg>
+                                                        </button>
+
+                                                        {/* Separador vertical pequeño */}
+                                                        <div className="mx-1 h-4 w-px bg-gray-300 dark:bg-gray-600"></div>
+                                                      </>
+                                                    )}
+
+                                                    {/* Botones de Acción (Seleccionar/Eliminar) */}
+                                                    {precio.seleccionado ? (
+                                                      <button
+                                                        onClick={() => deseleccionarPrecio(precio.id, producto.id)}
+                                                        className="rounded-lg px-2 py-1 text-xs font-medium text-orange-600 hover:bg-orange-50 dark:text-orange-400 dark:hover:bg-orange-900/20"
+                                                        title="Deseleccionar precio"
+                                                      >
+                                                        Deseleccionar
+                                                      </button>
+                                                    ) : (
+                                                      <button
+                                                        onClick={() => eliminarPrecio(precio.id, producto.id)}
+                                                        className="rounded-lg p-1.5 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                                                        title="Eliminar precio"
+                                                      >
+                                                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                        </svg>
+                                                      </button>
+                                                    )}
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <div className="rounded-lg border-2 border-dashed border-gray-300 p-4 text-center dark:border-gray-700">
+                                            <p className="text-sm text-gray-500 dark:text-gray-500">
+                                              No hay precios agregados. Agrega al menos uno para poder aprobar este producto.
+                                            </p>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* AGREGAR ESTE COMPONENTE AL FINAL, ANTES DEL CIERRE DEL RETURN PRINCIPAL */}
+                        <ModalAgregarPrecio />
+                      </>
+                    )}
+                  </div>
+                </div>
+              </>
+            ) : (
+              // Estado vacío cuando no hay cotización seleccionada
+              <div className="flex h-full items-center justify-center rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700">
+                <div className="text-center">
+                  <svg
+                    className="mx-auto mb-4 h-24 w-24 text-gray-400"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                  <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
+                    Selecciona una cotización
+                  </h3>
+                  <p className="text-gray-600 dark:text-gray-400">
+                    Haz clic en una cotización de la lista para ver sus detalles
+                  </p>
+                </div>
               </div>
             )}
           </div>
         </div>
+
         {/* ========================================
-            PANEL DERECHO - DETALLE / CHAT / HISTORIAL
-        ======================================== */}
-        <div className="flex-1 flex flex-col gap-4">
-          {cotizacionSeleccionada ? (
-            <>
-              {/* Header con información general */}
-              <div className="rounded-lg border-2 border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
-                <div className="mb-4 flex items-start justify-between">
-                  <div>
-                    {editandoNombre ? (
-                      <div className="flex items-center gap-2">
-                        <input type="text" value={nombreEditado}
-                          onChange={(e) => setNombreEditado(e.target.value)}
-                          onKeyDown={async (e) => {
-                            if (e.key === 'Enter' && nombreEditado.trim()) {
-                              try {
-                                await api.actualizarNombreCotizacion(cotizacionSeleccionada.id, nombreEditado.trim());
-                                setCotizacionSeleccionada({ ...cotizacionSeleccionada, nombreCotizacion: nombreEditado.trim() });
-                                setCotizaciones(prev => prev.map(c => c.id === cotizacionSeleccionada.id ? { ...c, nombreCotizacion: nombreEditado.trim() } : c));
-                                setEditandoNombre(false);
-                                toast.success("Nombre actualizado");
-                              } catch { toast.error("Error al actualizar"); }
-                            }
-                            if (e.key === 'Escape') setEditandoNombre(false);
-                          }}
-                          autoFocus
-                          className="text-2xl font-bold border-b-2 border-blue-500 bg-transparent text-gray-900 dark:text-white outline-none"
-                        />
-                        <button onClick={() => setEditandoNombre(false)} className="text-xs text-gray-400 hover:text-red-500">✕</button>
-                      </div>
-                    ) : (
-                      <h2 className="text-2xl font-bold text-gray-900 dark:text-white cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                        onClick={() => { setNombreEditado(cotizacionSeleccionada.nombreCotizacion); setEditandoNombre(true); }}
-                        title="Click para editar nombre"
-                      >
-                        {cotizacionSeleccionada.nombreCotizacion}
-                        <span className="ml-2 text-xs text-gray-400">✏️</span>
-                      </h2>
-                    )}
-                    <div className="mt-2 flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-                      <span className="flex items-center gap-1">
-                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                        {cotizacionSeleccionada.solicitante.nombre}
-                      </span>
-                      {cotizacionSeleccionada.proyecto && (
-                        <span className="flex items-center gap-1">
-                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                          </svg>
-                          {cotizacionSeleccionada.proyecto.nombre}
-                        </span>
-                      )}
-                      <span className="flex items-center gap-1">
-                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        Límite: {formatFecha(cotizacionSeleccionada.fechaLimite)}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* ACCIONES DEL HEADER: Estado y Botón Eliminar */}
-                  <div className="flex flex-col items-end gap-2">
-                    <span className={`rounded-full px-3 py-1.5 text-sm font-medium ${getEstadoBadgeColor(cotizacionSeleccionada.estado)}`}>
-                      {getEstadoLabel(cotizacionSeleccionada.estado)}
-                    </span>
-
-                    {/* Botón de eliminar cotización */}
-                    <button
-                      onClick={eliminarCotizacionActual}
-                      className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
-                      title="Eliminar cotización permanentemente"
-                    >
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                      Eliminar
-                    </button>
-                  </div>
-                </div>
-
-                {/* Progreso */}
-                <div className="flex items-center gap-4">
-                  <div className="flex-1">
-                    <div className="mb-2 flex items-center justify-between text-sm">
-                      <span className="font-medium text-gray-700 dark:text-gray-300">
-                        Progreso de aprobación
-                      </span>
-                      <span className="font-semibold text-gray-900 dark:text-white">
-                        {cotizacionSeleccionada.productosAprobados} / {cotizacionSeleccionada.totalProductos}
-                      </span>
-                    </div>
-                    <div className="h-3 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all dark:from-blue-600 dark:to-blue-700"
-                        style={{ width: `${cotizacionSeleccionada.porcentajeAprobado || 0}%` }}
-                      />
-                    </div>
-                  </div>
-                  <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {cotizacionSeleccionada.porcentajeAprobado || 0}%
-                  </span>
-                </div>
-              </div>
-
-              {/* Tabs */}
-              <div className="rounded-lg border-2 border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-                <div className="flex border-b border-gray-200 dark:border-gray-700">
-                  <button
-                    onClick={() => setVistaActiva("detalle")}
-                    className={`flex-1 px-6 py-3 text-sm font-medium transition-colors ${vistaActiva === "detalle"
-                      ? "border-b-2 border-blue-600 text-blue-600 dark:border-blue-500 dark:text-blue-500"
-                      : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
-                      }`}
-                  >
-                    📋 Detalle de Productos
-                  </button>
-                  <button
-                    onClick={() => setVistaActiva("chat")}
-                    className={`flex-1 px-6 py-3 text-sm font-medium transition-colors ${vistaActiva === "chat"
-                      ? "border-b-2 border-blue-600 text-blue-600 dark:border-blue-500 dark:text-blue-500"
-                      : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
-                      }`}
-                  >
-                    💬 Chat
-                  </button>
-                  <button
-                    onClick={() => {
-                      setVistaActiva("historial");
-                      if (!showHistorial) cargarHistorial();
-                    }}
-                    className={`flex-1 px-6 py-3 text-sm font-medium transition-colors ${vistaActiva === "historial"
-                      ? "border-b-2 border-blue-600 text-blue-600 dark:border-blue-500 dark:text-blue-500"
-                      : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
-                      }`}
-                  >
-                    📜 Historial
-                  </button>
-                  <button
-                    onClick={() => setVistaActiva("precios")}
-                    className={`flex-1 px-6 py-3 text-sm font-medium transition-colors ${vistaActiva === "precios"
-                      ? "border-b-2 border-blue-600 text-blue-600 dark:border-blue-500 dark:text-blue-500"
-                      : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
-                      }`}
-                  >
-                    💰 Precios
-                  </button>
-                </div>
-
-                {/* Contenido según tab activo */}
-                <div className="p-6">
-                  {loadingDetalle ? (
-                    <div className="flex h-64 items-center justify-center">
-                      <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
-                    </div>
-                  ) : (
-                    <>
-                      {/* TAB 1: DETALLE DE PRODUCTOS */}
-                      {vistaActiva === "detalle" && (
-                        <div className="space-y-4">
-                          {/* Comentarios generales de la cotización */}
-                          {(cotizacionSeleccionada as any).comentarios && (
-                            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20">
-                              <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">💬 Comentarios de la solicitud:</p>
-                              <p className="text-sm text-amber-800 dark:text-amber-300">{(cotizacionSeleccionada as any).comentarios}</p>
-                            </div>
-                          )}
-                          {cotizacionSeleccionada.detalles && cotizacionSeleccionada.detalles.length > 0 ? (
-                            <>
-                              {/* Tabla de productos */}
-                              <div className="overflow-x-auto">
-                                <table className="w-full">
-                                  <thead>
-                                    <tr className="border-b border-gray-200 dark:border-gray-700">
-                                      <th className="pb-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">
-                                        Producto
-                                      </th>
-                                      <th className="pb-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">
-                                        Cantidad
-                                      </th>
-                                      <th className="pb-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">
-                                        País / Transporte
-                                      </th>
-                                      <th className="pb-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">
-                                        Timeline
-                                      </th>
-                                      <th className="pb-3 text-center text-sm font-semibold text-gray-700 dark:text-gray-300">
-                                        Aprobado
-                                      </th>
-                                      <th className="pb-3 text-right text-sm font-semibold text-gray-700 dark:text-gray-300">
-                                        Acciones
-                                      </th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                    {cotizacionSeleccionada.detalles
-                                      // 🔴 FILTRO: Ocultar rechazados
-                                      .filter(p => !p.estadoProducto?.rechazado)
-                                      .map((producto) => (
-                                        <tr key={producto.id} className="group hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                                          {/* Producto */}
-                                          <td className="py-4">
-                                            <div className="flex items-center gap-1.5">
-                                              <span className="font-medium text-gray-900 dark:text-white">
-                                                {producto.descripcionProducto}
-                                              </span>
-                                              {producto.notas && (
-                                                <div className="relative">
-                                                  <button onClick={() => setNotasAbiertas(notasAbiertas === producto.id ? null : producto.id)}
-                                                    className="text-blue-500 hover:text-blue-700 dark:text-blue-400 text-sm" title="Ver notas">
-                                                    📋
-                                                  </button>
-                                                  {notasAbiertas === producto.id && (
-                                                    <div className="absolute left-0 top-full z-50 mt-1 w-72 rounded-lg border border-gray-200 bg-white p-3 shadow-lg dark:border-gray-700 dark:bg-gray-900">
-                                                      <div className="flex justify-between items-center mb-1">
-                                                        <p className="text-xs font-semibold text-gray-500">Notas:</p>
-                                                        <button onClick={() => setNotasAbiertas(null)} className="text-xs text-gray-400 hover:text-red-500">✕</button>
-                                                      </div>
-                                                      <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{producto.notas}</p>
-                                                    </div>
-                                                  )}
-                                                </div>
-                                              )}
-                                            </div>
-                                          </td>
-
-                                          {/* Cantidad */}
-                                          <td className="py-4 text-sm text-gray-700 dark:text-gray-300">
-                                            {producto.cantidad} {producto.tipoUnidad.toLowerCase()}
-                                          </td>
-
-                                          {/* País / Transporte */}
-                                          <td className="py-4">
-                                            {producto.estadoProducto?.paisOrigen ? (
-                                              <div className="text-sm">
-                                                <div className="font-medium text-gray-900 dark:text-white">
-                                                  {producto.estadoProducto.paisOrigen.nombre}
-                                                </div>
-                                                <div className="text-gray-600 dark:text-gray-400">
-                                                  {producto.estadoProducto.medioTransporte === "MARITIMO" && "🚢 Marítimo"}
-                                                  {producto.estadoProducto.medioTransporte === "TERRESTRE" && "🚚 Terrestre"}
-                                                  {producto.estadoProducto.medioTransporte === "AEREO" && "✈️ Aéreo"}
-                                                </div>
-                                              </div>
-                                            ) : (
-                                              <span className="text-sm text-gray-400 dark:text-gray-500">
-                                                No configurado
-                                              </span>
-                                            )}
-                                          </td>
-
-                                          {/* Timeline */}
-                                          <td className="py-4 text-sm">
-                                            {producto.timelineSugerido ? (
-                                              <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                                                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                </svg>
-                                                {producto.timelineSugerido.diasTotalesEstimados} días
-                                              </span>
-                                            ) : (
-                                              <span className="text-gray-400 dark:text-gray-500">
-                                                Sin timeline
-                                              </span>
-                                            )}
-                                          </td>
-
-                                          {/* Aprobado */}
-                                          <td className="py-4 text-center">
-                                            {producto.estadoProducto ? (
-                                              <input
-                                                type="checkbox"
-                                                checked={producto.estadoProducto.aprobadoPorSupervisor}
-                                                onChange={(e) =>
-                                                  toggleAprobarProductoConValidacion(
-                                                    producto.estadoProducto!.id,
-                                                    e.target.checked
-                                                  )
-                                                }
-                                                className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                                              />
-                                            ) : (
-                                              <span className="text-gray-400">N/A</span>
-                                            )}
-                                          </td>
-
-                                          {/* Acciones */}
-                                          <td className="py-4 text-right">
-                                            <button
-                                              onClick={() => configurarProducto(producto)}
-                                              className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
-                                            >
-                                              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                              </svg>
-                                              Configurar
-                                            </button>
-                                          </td>
-                                        </tr>
-                                      ))}
-                                  </tbody>
-                                </table>
-                              </div>
-
-                              {/* Botón aprobar todos */}
-                              {cotizacionSeleccionada.productosPendientes > 0 && (
-                                <div className="flex justify-end">
-                                  <button
-                                    onClick={() => {
-                                      // 🔴 CORRECCIÓN: Filtrar rechazados para no aprobarlos
-                                      const pendientes = cotizacionSeleccionada.detalles!
-                                        .filter(p =>
-                                          p.estadoProducto &&
-                                          !p.estadoProducto.aprobadoPorSupervisor &&
-                                          !p.estadoProducto.rechazado // <-- Validación crítica
-                                        )
-                                        .map(p => ({ estadoProductoId: p.estadoProducto!.id, aprobado: true }));
-
-                                      if (pendientes.length > 0) {
-                                        api.aprobarProductos(cotizacionSeleccionada.id, pendientes)
-                                          .then(() => {
-                                            addNotification("success", "Todos los productos aprobados", "Todos los productos han sido aprobados exitosamente");
-                                            seleccionarCotizacion(cotizacionSeleccionada);
-                                            cargarCotizaciones();
-                                          })
-                                          .catch(() => addNotification("danger", "Error al aprobar productos", "Error al aprobar productos"));
-                                      }
-                                    }}
-                                    className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600"
-                                  >
-                                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    Aprobar Todos ({cotizacionSeleccionada.productosPendientes})
-                                  </button>
-                                </div>
-                              )}
-                            </>
-                          ) : (
-                            <div className="flex h-64 flex-col items-center justify-center text-center">
-                              <svg className="mb-4 h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                              </svg>
-                              <p className="text-gray-600 dark:text-gray-400">
-                                No hay productos en esta cotización
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      {/* TAB 2: CHAT */}
-                      {vistaActiva === "chat" && (
-                        <div className="flex h-[350px] flex-col">
-                          {/* Mensajes */}
-                          <div className="flex-1 overflow-y-auto space-y-4 mb-4">
-                            {loadingChat ? (
-                              <div className="flex h-full items-center justify-center">
-                                <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
-                              </div>
-                            ) : mensajes.length === 0 ? (
-                              <div className="flex h-full flex-col items-center justify-center text-center">
-                                <svg className="mb-4 h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                                </svg>
-                                <p className="text-gray-600 dark:text-gray-400">
-                                  No hay mensajes. ¡Sé el primero en escribir!
-                                </p>
-                              </div>
-                            ) : (
-                              <>
-                                {mensajes.map((mensaje) => {
-                                  const esPropio = mensaje.emisor.id === currentUserId;
-                                  return (
-                                    <div
-                                      key={mensaje.id}
-                                      className={`flex ${esPropio ? "justify-end" : "justify-start"}`}
-                                    >
-                                      <div className={`max-w-[70%] ${esPropio ? "items-end" : "items-start"} flex flex-col`}>
-                                        {/* Nombre del emisor */}
-                                        {!esPropio && (
-                                          <span className="mb-1 text-xs font-medium text-gray-600 dark:text-gray-400">
-                                            {mensaje.emisor.nombre}
-                                          </span>
-                                        )}
-
-                                        {/* Burbuja del mensaje */}
-                                        <div
-                                          className={`rounded-2xl px-4 py-2 ${esPropio
-                                            ? "bg-blue-600 text-white dark:bg-blue-500"
-                                            : "bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white"
-                                            }`}
-                                        >
-                                          <p className="text-sm whitespace-pre-wrap break-words">
-                                            {mensaje.contenido}
-                                          </p>
-                                        </div>
-
-                                        {/* Fecha */}
-                                        <span className="mt-1 text-xs text-gray-500 dark:text-gray-500">
-                                          {formatFecha(mensaje.creado)}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                                <div ref={chatEndRef} />
-                              </>
-                            )}
-                          </div>
-
-                          {/* Input para enviar mensaje */}
-                          <div className="flex gap-2 border-t border-gray-200 pt-4 dark:border-gray-700">
-                            <input
-                              type="text"
-                              value={nuevoMensaje}
-                              onChange={(e) => setNuevoMensaje(e.target.value)}
-                              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && enviarMensaje()}
-                              placeholder="Escribe un mensaje..."
-                              disabled={sendingMessage}
-                              className="flex-1 rounded-lg border-2 border-gray-300 bg-white px-4 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
-                            />
-                            <button
-                              onClick={enviarMensaje}
-                              disabled={!nuevoMensaje.trim() || sendingMessage}
-                              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600"
-                            >
-                              {sendingMessage ? (
-                                <>
-                                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-                                  Enviando...
-                                </>
-                              ) : (
-                                <>
-                                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                                  </svg>
-                                  Enviar
-                                </>
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Tab 3: Historial */}
-                      {vistaActiva === "historial" && (
-                        <Historial cambios={historial} />
-                      )}
-                      {vistaActiva === "precios" && (
-                        <div className="space-y-4">
-                          {loadingPrecios ? (
-                            <div className="flex h-32 items-center justify-center">
-                              <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
-                            </div>
-                          ) : !cotizacionSeleccionada?.detalles || cotizacionSeleccionada.detalles.length === 0 ? (
-                            <div className="rounded-lg border-2 border-dashed border-gray-300 p-8 text-center dark:border-gray-700">
-                              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
-                                💰
-                              </div>
-                              <p className="text-sm text-gray-600 dark:text-gray-400">
-                                No hay productos en esta cotización
-                              </p>
-                            </div>
-                          ) : (
-                            <div className="space-y-6">
-                              {cotizacionSeleccionada.detalles
-                                // 🔴 FILTRO: Ocultar rechazados en lista de precios
-                                .filter(p => !p.estadoProducto?.rechazado)
-                                .map((producto) => {
-                                  const precios = preciosPorProducto[producto.id] || [];
-                                  const tienePrecio = precios.length > 0;
-                                  const precioSeleccionado = precios.find(p => p.seleccionado);
-
-                                  return (
-                                    <div
-                                      key={producto.id}
-                                      className="rounded-lg border border-gray-200 p-4 dark:border-gray-700"
-                                    >
-                                      {/* Header del producto */}
-                                      <div className="mb-4 flex items-start justify-between">
-                                        <div className="flex-1">
-                                          <div className="flex items-center gap-2">
-                                            <h4 className="font-semibold text-gray-900 dark:text-white">
-                                              {producto.sku}
-                                            </h4>
-                                            {!tienePrecio && (
-                                              <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
-                                                Sin precio
-                                              </span>
-                                            )}
-                                            {tienePrecio && !precioSeleccionado && (
-                                              <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
-                                                Sin seleccionar
-                                              </span>
-                                            )}
-                                            {precioSeleccionado && (
-                                              <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                                                ✓ Precio seleccionado
-                                              </span>
-                                            )}
-                                          </div>
-                                          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                                            {producto.descripcionProducto}
-                                          </p>
-                                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">
-                                            Cantidad: {producto.cantidad} {producto.tipoUnidad.toLowerCase()}
-                                          </p>
-                                        </div>
-                                        <button
-                                          onClick={() => abrirModalPrecio(producto)}
-                                          className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
-                                        >
-                                          + Agregar Precio
-                                        </button>
-                                      </div>
-
-                                      {/* Lista de precios */}
-                                      {precios.length > 0 ? (
-                                        <div className="space-y-2">
-                                          {precios.map((precio) => (
-                                            <div
-                                              key={precio.id}
-                                              className={`rounded-lg border p-3 transition-colors ${precio.seleccionado
-                                                ? "border-green-500 bg-green-50 dark:border-green-600 dark:bg-green-900/20"
-                                                : "border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
-                                                }`}
-                                            >
-                                              <div className="flex items-start justify-between">
-                                                <div className="flex items-start gap-3 flex-1">
-                                                  {/* Radio button */}
-                                                  <input
-                                                    type="radio"
-                                                    name={`precio-${producto.id}`}
-                                                    checked={precio.seleccionado}
-                                                    onChange={() => seleccionarPrecio(precio.id, producto.id)}
-                                                    className="mt-1 h-4 w-4 text-blue-600"
-                                                  />
-
-                                                  {/* Info del precio */}
-                                                  <div className="flex-1">
-                                                    <div className="flex items-center gap-2">
-                                                      <span className="font-semibold text-gray-900 dark:text-white">
-                                                        {precio.proveedor.nombre}
-                                                      </span>
-                                                      {precio.proveedor.rtn && (
-                                                        <span className="text-xs text-gray-500">
-                                                          RTN: {precio.proveedor.rtn}
-                                                        </span>
-                                                      )}
-                                                    </div>
-
-                                                    <div className="mt-1 flex flex-wrap items-center gap-4 text-sm">
-                                                      {/* Mostrar precio con descuento si existe, sino el precio normal */}
-                                                      <span className="font-medium text-gray-900 dark:text-white">
-                                                        L. {Number(precio.precioDescuento || precio.precio).toFixed(2)}
-                                                      </span>
-
-                                                      {/* Si hay descuento, mostrar el precio original tachado */}
-                                                      {precio.precioDescuento && (
-                                                        <span className="text-gray-500 line-through">
-                                                          L. {Number(precio.precio).toFixed(2)}
-                                                        </span>
-                                                      )}
-                                                    </div>
-
-                                                    <p className="mt-1 text-xs text-gray-400 dark:text-gray-600">
-                                                      Agregado: {new Date(precio.creado).toLocaleDateString("es-HN")}
-                                                    </p>
-
-                                                    {/* Acciones de descuento */}
-                                                    <DescuentoActions
-                                                      precio={precio}
-                                                      productoId={producto.id}
-                                                      cotizacionId={cotizacionSeleccionada!.id}
-                                                      sku={producto.sku}
-                                                      onUpdate={() => cargarPreciosProducto(producto.id)}
-                                                      onNotification={addNotification}
-
-                                                    />
-                                                  </div>
-                                                </div>
-
-                                                {/* Botones de acción */}
-                                                <div className="ml-2 flex items-center gap-1">
-                                                  {/* Botones de Archivo (Solo si hay comprobante) */}
-                                                  {precio.ComprobanteDescuento && (
-                                                    <>
-                                                      <button
-                                                        onClick={() => manejarArchivo(precio, producto.sku, 'inline')}
-                                                        className="rounded-lg p-1.5 text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
-                                                        title="Ver comprobante"
-                                                      >
-                                                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                        </svg>
-                                                      </button>
-
-                                                      <button
-                                                        onClick={() => manejarArchivo(precio, producto.sku, 'attachment')}
-                                                        className="rounded-lg p-1.5 text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
-                                                        title="Descargar comprobante"
-                                                      >
-                                                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                                        </svg>
-                                                      </button>
-
-                                                      {/* Separador vertical pequeño */}
-                                                      <div className="mx-1 h-4 w-px bg-gray-300 dark:bg-gray-600"></div>
-                                                    </>
-                                                  )}
-
-                                                  {/* Botones de Acción (Seleccionar/Eliminar) */}
-                                                  {precio.seleccionado ? (
-                                                    <button
-                                                      onClick={() => deseleccionarPrecio(precio.id, producto.id)}
-                                                      className="rounded-lg px-2 py-1 text-xs font-medium text-orange-600 hover:bg-orange-50 dark:text-orange-400 dark:hover:bg-orange-900/20"
-                                                      title="Deseleccionar precio"
-                                                    >
-                                                      Deseleccionar
-                                                    </button>
-                                                  ) : (
-                                                    <button
-                                                      onClick={() => eliminarPrecio(precio.id, producto.id)}
-                                                      className="rounded-lg p-1.5 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
-                                                      title="Eliminar precio"
-                                                    >
-                                                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                      </svg>
-                                                    </button>
-                                                  )}
-                                                </div>
-                                              </div>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      ) : (
-                                        <div className="rounded-lg border-2 border-dashed border-gray-300 p-4 text-center dark:border-gray-700">
-                                          <p className="text-sm text-gray-500 dark:text-gray-500">
-                                            No hay precios agregados. Agrega al menos uno para poder aprobar este producto.
-                                          </p>
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* AGREGAR ESTE COMPONENTE AL FINAL, ANTES DEL CIERRE DEL RETURN PRINCIPAL */}
-                      <ModalAgregarPrecio />
-                    </>
-                  )}
-                </div>
-              </div>
-            </>
-          ) : (
-            // Estado vacío cuando no hay cotización seleccionada
-            <div className="flex h-full items-center justify-center rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700">
-              <div className="text-center">
-                <svg
-                  className="mx-auto mb-4 h-24 w-24 text-gray-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
-                </svg>
-                <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
-                  Selecciona una cotización
-                </h3>
-                <p className="text-gray-600 dark:text-gray-400">
-                  Haz clic en una cotización de la lista para ver sus detalles
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ========================================
           MODAL DE CONFIGURACIÓN DE TIMELINE
       ======================================== */}
-      {showTimelineModal && productoConfigurando && (
-        <div className="fixed inset-0 z-9950 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border-2 border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-            {/* Header del modal */}
-            <div className="sticky top-0 z-10 border-b border-gray-200 bg-white px-6 py-4 dark:border-gray-700 dark:bg-gray-800">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                    Configurar Timeline
-                  </h3>
-                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                    {productoConfigurando.descripcionProducto}
-                  </p>
+        {showTimelineModal && productoConfigurando && (
+          <div className="fixed inset-0 z-9950 flex items-center justify-center bg-black/50 p-4">
+            <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border-2 border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+              {/* Header del modal */}
+              <div className="sticky top-0 z-10 border-b border-gray-200 bg-white px-6 py-4 dark:border-gray-700 dark:bg-gray-800">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                      Configurar Timeline
+                    </h3>
+                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                      {productoConfigurando.descripcionProducto}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowTimelineModal(false);
+                      setProductoConfigurando(null);
+                    }}
+                    className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
+                  >
+                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
                 </div>
-                <button
-                  onClick={() => {
-                    setShowTimelineModal(false);
-                    setProductoConfigurando(null);
-                  }}
-                  className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
-                >
-                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
               </div>
-            </div>
 
-            {/* Contenido del modal */}
-            <TimelineModalContent
-              producto={productoConfigurando}
-              paises={paises}
-              tipoCompra={cotizacionSeleccionada?.tipoCompra || 'NACIONAL'}
-              onSave={guardarConfiguracion}
-              onCancel={() => {
-                setShowTimelineModal(false);
-                setProductoConfigurando(null);
-              }}
-              onReject={async (motivoRechazo) => {
-                // 🟢 CORRECCIÓN: Permitir rechazar si es productoConfigurando válido
-                if (!cotizacionSeleccionada || !productoConfigurando) return;
-
-                try {
-                  // ID híbrido: Si tiene estado, usa estado.id; si no, usa producto.id
-                  const idParaRechazar = productoConfigurando.estadoProducto?.id || productoConfigurando.id;
-
-                  await api.rechazarProducto(
-                    cotizacionSeleccionada.id,
-                    idParaRechazar,
-                    motivoRechazo
-                  );
-
-                  addNotification("success", "Producto rechazado", "El solicitante será notificado");
+              {/* Contenido del modal */}
+              <TimelineModalContent
+                producto={productoConfigurando}
+                paises={paises}
+                tipoCompra={cotizacionSeleccionada?.tipoCompra || 'NACIONAL'}
+                onSave={guardarConfiguracion}
+                onCancel={() => {
                   setShowTimelineModal(false);
                   setProductoConfigurando(null);
+                }}
+                onReject={async (motivoRechazo) => {
+                  // 🟢 CORRECCIÓN: Permitir rechazar si es productoConfigurando válido
+                  if (!cotizacionSeleccionada || !productoConfigurando) return;
 
-                  // Recargar detalle
-                  await seleccionarCotizacion(cotizacionSeleccionada);
-                  await cargarCotizaciones();
-                } catch (error) {
-                  console.error("Error al rechazar producto:", error);
-                  addNotification("danger", "Error al rechazar producto", "Intenta de nuevo");
-                }
-              }}
-            />
+                  try {
+                    // ID híbrido: Si tiene estado, usa estado.id; si no, usa producto.id
+                    const idParaRechazar = productoConfigurando.estadoProducto?.id || productoConfigurando.id;
+
+                    await api.rechazarProducto(
+                      cotizacionSeleccionada.id,
+                      idParaRechazar,
+                      motivoRechazo
+                    );
+
+                    addNotification("success", "Producto rechazado", "El solicitante será notificado");
+                    setShowTimelineModal(false);
+                    setProductoConfigurando(null);
+
+                    // Recargar detalle
+                    await seleccionarCotizacion(cotizacionSeleccionada);
+                    await cargarCotizaciones();
+                  } catch (error) {
+                    console.error("Error al rechazar producto:", error);
+                    addNotification("danger", "Error al rechazar producto", "Intenta de nuevo");
+                  }
+                }}
+              />
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </>
   );
 }
