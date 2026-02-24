@@ -722,8 +722,13 @@ export default function FollowUps() {
       // Recargar lista
       await cargarCotizaciones();
     } catch (error) {
-      console.error("Error al aprobar producto:", error);
-      addNotification("danger", "Error al actualizar aprobación", "Error al actualizar aprobación");
+      console.error("Error al aprobar producto:", error.message);
+
+      if (error.message === "Error al aprobar productos") {
+        addNotification("danger", "Faltan datos por confirmar", "Confirmar precio final, con descuento o sin descuento");
+      } else {
+        addNotification("danger", "Error al actualizar aprobación", error.message);
+      }
     }
   };
 
@@ -874,9 +879,21 @@ export default function FollowUps() {
       await api.selectPrecio(precioId);
       addNotification("success", "Éxito", "Precio seleccionado");
       await cargarPreciosProducto(detalleId);
+      // Recargar cotización para actualizar preciosId y aprobadoPorSupervisor
+      if (cotizacionSeleccionada) {
+        const detalle = await api.getCotizacionDetalle(cotizacionSeleccionada.id);
+        setCotizacionSeleccionada(detalle);
+      }
     } catch (error) {
-      console.error("Error al seleccionar precio:", error);
-      addNotification("danger", "Error", "Error al seleccionar precio");
+      console.error("Error al seleccionar precio:", error.message);
+
+      //Verificar si es por el estado que se encuentra como enviada en lugar de 'EN_CONFIGURACION'
+      if (error.message === "Error al seleccionar precio") {
+        addNotification("danger", "Error", "Configurar primero los dias de entrega de la cotización");
+        toast.error("Configurar primero los dias de entrega de la cotización");
+      } else {
+        addNotification("danger", "Error", "Error al seleccionar precio");
+      }
     }
   };
 
@@ -887,6 +904,11 @@ export default function FollowUps() {
       await api.deletePrecio(precioId);
       addNotification("success", "Éxito", "Precio eliminado");
       await cargarPreciosProducto(detalleId);
+      // Recargar cotización para actualizar preciosId
+      if (cotizacionSeleccionada) {
+        const detalle = await api.getCotizacionDetalle(cotizacionSeleccionada.id);
+        setCotizacionSeleccionada(detalle);
+      }
     } catch (error) {
       console.error("Error al eliminar precio:", error);
       addNotification("danger", "Error", "Error al eliminar precio");
@@ -894,9 +916,11 @@ export default function FollowUps() {
   };
 
   const tienePrecioSeleccionado = (detalleId: string): boolean => {
-    // Verificar si el detalle tiene un preciosId asignado
+    // Verificar en los precios cargados (fuente más reciente)
+    const precios = preciosPorProducto[detalleId];
+    if (precios && precios.some(p => p.seleccionado)) return true;
     if (!cotizacionSeleccionada?.detalles) return false;
-
+    // Fallback: verificar en la cotización
     const detalle = cotizacionSeleccionada.detalles.find(d => d.id === detalleId);
     return detalle?.preciosId != null;
   };

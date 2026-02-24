@@ -829,6 +829,59 @@ export class EstadoProductoService {
   }
 
   /**
+   * Rechazar compra de un producto
+   */
+  async rechazarCompra(id: string, motivo: string, user: UserJwt) {
+    if (!this.isSupervisorOrAdmin(user)) {
+      throw new ForbiddenException(
+        'Solo supervisores/admin pueden rechazar compras',
+      );
+    }
+
+    const estado = await this.prisma.estadoProducto.findUnique({
+      where: { id },
+    });
+
+    if (!estado) throw new NotFoundException('Producto no encontrado');
+
+    await this.prisma.estadoProducto.update({
+      where: { id },
+      data: {
+        rechazado: true,
+        fechaRechazo: new Date(),
+        motivoRechazo: motivo,
+        aprobadoCompra: false,
+        aprobadoCompraPorId: null,
+        fechaAprobadoCompra: null,
+      } as any,
+    });
+
+    return { message: 'Compra rechazada', id, rechazado: true };
+  }
+
+  /**
+   * Revertir rechazo de compra
+   */
+  async revertirRechazo(id: string, user: UserJwt) {
+    if (!this.isSupervisorOrAdmin(user)) {
+      throw new ForbiddenException(
+        'Solo supervisores/admin pueden revertir rechazos',
+      );
+    }
+
+    await this.prisma.estadoProducto.update({
+      where: { id },
+      data: {
+        rechazado: false,
+        fechaRechazo: null,
+        motivoRechazo: null,
+      } as any,
+    });
+
+    return { message: 'Rechazo revertido', id };
+  }
+
+  /**
    * Asignar responsable de seguimiento a un producto
    */
   async asignarResponsable(

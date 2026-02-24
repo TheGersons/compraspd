@@ -307,6 +307,29 @@ export class EstadoProductoController {
     return this.service.revocarAprobacionCompra(id, user);
   }
 
+  @Patch(':id/rechazar-compra')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Rechazar compra de un producto' })
+  @ApiParam({ name: 'id', description: 'ID del estado de producto' })
+  rechazarCompra(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { motivo: string },
+    @CurrentUser() user: UserJwt,
+  ) {
+    return this.service.rechazarCompra(id, body.motivo, user);
+  }
+
+  @Patch(':id/revertir-rechazo')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Revertir rechazo de compra' })
+  @ApiParam({ name: 'id', description: 'ID del estado de producto' })
+  revertirRechazo(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: UserJwt,
+  ) {
+    return this.service.revertirRechazo(id, user);
+  }
+
   /**
    * Obtener mis productos (para solicitantes)
    * Permite al usuario ver el estado de compra de sus productos aprobados
