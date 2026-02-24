@@ -370,6 +370,28 @@ const api = {
     if (!response.ok) { const e = await response.json(); throw new Error(e.message || "Error al avanzar masivo"); }
     return response.json();
   },
+
+  async actualizarSku(id: string, sku: string) {
+    const token = getToken();
+    const response = await fetch(`${API_BASE_URL}/api/v1/estado-productos/${id}/datos`, {
+      method: "PATCH", credentials: "include",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ sku }),
+    });
+    if (!response.ok) { const e = await response.json(); throw new Error(e.message || "Error al actualizar SKU"); }
+    return response.json();
+  },
+
+  async actualizarNombreCotizacion(id: string, nombreCotizacion: string) {
+    const token = getToken();
+    const response = await fetch(`${API_BASE_URL}/api/v1/quotations/${id}`, {
+      method: "PATCH", credentials: "include",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ nombreCotizacion }),
+    });
+    if (!response.ok) { const e = await response.json(); throw new Error(e.message || "Error al actualizar nombre"); }
+    return response.json();
+  },
 };
 
 // ============================================================================
@@ -468,6 +490,12 @@ export default function ShoppingFollowUps() {
   const [observacionMasiva, setObservacionMasiva] = useState("");
   const [verificacionMasiva, setVerificacionMasiva] = useState<Record<string, { completo: boolean; faltantes: string[] }>>({});
   const [loadingVerificacionMasiva, setLoadingVerificacionMasiva] = useState(false);
+
+  // Edición inline
+  const [editandoSku, setEditandoSku] = useState<string | null>(null);
+  const [skuEditado, setSkuEditado] = useState("");
+  const [editandoCotizacion, setEditandoCotizacion] = useState<string | null>(null);
+  const [nombreCotEditado, setNombreCotEditado] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null); // Se mantiene por si TimelineItem lo usa
 
@@ -743,6 +771,26 @@ export default function ShoppingFollowUps() {
   };
 
   // Determinar si el siguiente estado requiere selección FOB/CIF
+  const handleGuardarSku = async (productoId: string) => {
+    if (!skuEditado.trim()) return;
+    try {
+      await api.actualizarSku(productoId, skuEditado.trim());
+      toast.success("Nombre actualizado");
+      setEditandoSku(null);
+      await cargarProductos();
+    } catch (e: any) { toast.error(e.message); }
+  };
+
+  const handleGuardarNombreCotizacion = async (cotizacionId: string) => {
+    if (!nombreCotEditado.trim()) return;
+    try {
+      await api.actualizarNombreCotizacion(cotizacionId, nombreCotEditado.trim());
+      toast.success("Nombre actualizado");
+      setEditandoCotizacion(null);
+      await cargarProductos();
+    } catch (e: any) { toast.error(e.message); }
+  };
+
   const requiereSeleccionFobCif = productoSeleccionado?.siguienteEstado === 'enFOB';
 
   // ============================================================================
@@ -918,11 +966,30 @@ export default function ShoppingFollowUps() {
                       gruposOrdenados.map((grupo) => (
                         <div key={grupo.cotizacionId || 'sin'}>
                           {/* Header del grupo */}
-                          <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-50 dark:bg-gray-800/50 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
-                            onClick={() => setGrupoExpandido(grupoExpandido === grupo.cotizacionId ? null : grupo.cotizacionId)}>
-                            <span className="text-xs">{grupoExpandido === grupo.cotizacionId ? '▼' : '▶'}</span>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{grupo.nombre}</p>
+                          <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800">
+                            <span className="text-xs cursor-pointer" onClick={() => setGrupoExpandido(grupoExpandido === grupo.cotizacionId ? null : grupo.cotizacionId)}>
+                              {grupoExpandido === grupo.cotizacionId ? '▼' : '▶'}
+                            </span>
+                            <div className="flex-1 min-w-0" onClick={() => setGrupoExpandido(grupoExpandido === grupo.cotizacionId ? null : grupo.cotizacionId)}>
+                              {editandoCotizacion === grupo.cotizacionId ? (
+                                <input type="text" value={nombreCotEditado} autoFocus
+                                  onClick={(e) => e.stopPropagation()}
+                                  onChange={(e) => setNombreCotEditado(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleGuardarNombreCotizacion(grupo.cotizacionId);
+                                    if (e.key === 'Escape') setEditandoCotizacion(null);
+                                  }}
+                                  onBlur={() => setEditandoCotizacion(null)}
+                                  className="text-sm font-semibold border-b border-blue-500 bg-transparent text-gray-900 dark:text-white outline-none w-full" />
+                              ) : (
+                                <div className="flex items-center gap-1.5 cursor-pointer">
+                                  <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{grupo.nombre}</p>
+                                  <button onClick={(e) => { e.stopPropagation(); setEditandoCotizacion(grupo.cotizacionId); setNombreCotEditado(grupo.nombre); }}
+                                    className="text-gray-400 hover:text-blue-500 transition-colors flex-shrink-0" title="Editar nombre">
+                                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                  </button>
+                                </div>
+                              )}
                               <p className="text-[10px] text-gray-500">{grupo.productos.length} producto(s) • {grupo.tipoCompra}</p>
                             </div>
                             {grupo.productos.some(p => p.progreso < 100 && p.siguienteEstado) && (
@@ -937,31 +1004,39 @@ export default function ShoppingFollowUps() {
                           </div>
                           {/* Productos del grupo */}
                           {grupoExpandido === grupo.cotizacionId && grupo.productos.map((producto) => (
-                            <button
-                              key={producto.id}
-                              onClick={() => seleccionarProducto(producto.id)}
-                              className={`w-full p-3 pl-8 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 border-l-2 ${productoSeleccionado?.id === producto.id
-                                ? "bg-blue-50 dark:bg-blue-900/20 border-l-blue-600"
-                                : "border-l-transparent"
-                                }`}
-                            >
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-xs font-medium text-gray-900 dark:text-white truncate">{producto.sku}</p>
-                                  <p className="text-[10px] text-gray-500 truncate">{producto.descripcion}</p>
-                                  <p className="text-[10px] text-gray-400 mt-0.5">
-                                    {ESTADOS_ICONOS[producto.estadoActual || 'cotizado']} {ESTADOS_LABELS[producto.estadoActual || 'cotizado']}
-                                  </p>
+                            <div key={producto.id}
+                              className={`flex items-center gap-2 p-3 pl-8 border-l-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${productoSeleccionado?.id === producto.id ? "bg-blue-50 dark:bg-blue-900/20 border-l-blue-600" : "border-l-transparent"}`}>
+                              <div className="flex-1 min-w-0 cursor-pointer" onClick={() => seleccionarProducto(producto.id)}>
+                                <div className="flex items-center gap-1.5">
+                                  {editandoSku === producto.id ? (
+                                    <input type="text" value={skuEditado} autoFocus
+                                      onClick={(e) => e.stopPropagation()}
+                                      onChange={(e) => setSkuEditado(e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') handleGuardarSku(producto.id);
+                                        if (e.key === 'Escape') setEditandoSku(null);
+                                      }}
+                                      onBlur={() => setEditandoSku(null)}
+                                      className="text-xs font-medium font-mono border-b border-blue-500 bg-transparent text-gray-900 dark:text-white outline-none w-24" />
+                                  ) : (
+                                    <>
+                                      <p className="text-xs font-medium text-gray-900 dark:text-white truncate">{producto.sku}</p>
+                                      <button onClick={(e) => { e.stopPropagation(); setEditandoSku(producto.id); setSkuEditado(producto.sku); }}
+                                        className="text-gray-400 hover:text-blue-500 transition-colors flex-shrink-0" title="Editar SKU">
+                                        <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                      </button>
+                                    </>
+                                  )}
                                 </div>
-                                <span className={`text-sm font-bold ${producto.progreso === 100 ? 'text-green-600' : 'text-gray-900 dark:text-white'}`}>
-                                  {producto.progreso}%
-                                </span>
+                                <p className="text-[10px] text-gray-500 truncate">{producto.descripcion}</p>
+                                <p className="text-[10px] text-gray-400 mt-0.5">
+                                  {ESTADOS_ICONOS[producto.estadoActual || 'cotizado']} {ESTADOS_LABELS[producto.estadoActual || 'cotizado']}
+                                </p>
                               </div>
-                              <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-                                <div className={`h-full rounded-full ${producto.progreso === 100 ? "bg-green-600" : "bg-blue-600"}`}
-                                  style={{ width: `${producto.progreso}%` }} />
-                              </div>
-                            </button>
+                              <span className={`text-sm font-bold ${producto.progreso === 100 ? 'text-green-600' : 'text-gray-900 dark:text-white'}`}>
+                                {producto.progreso}%
+                              </span>
+                            </div>
                           ))}
                         </div>
                       ))
