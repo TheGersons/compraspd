@@ -268,9 +268,25 @@ export default function Documents() {
         catch (error: any) { toast.error(error.message || "Error al subir documento", { id: toastId }); }
         finally { setUploadingFor(null); if (fileInputRef.current) fileInputRef.current.value = ""; }
     };
+
+    const mountedRef = useRef(true);
+    const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => {
+            mountedRef.current = false;
+            if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        };
+    }, []);
+
     const triggerUpload = (estado: string, requeridoId?: string, requeridoNombre?: string) => {
         setUploadingFor({ estado, requeridoId, requeridoNombre: requeridoNombre || "Documento extra" });
-        setTimeout(() => fileInputRef.current?.click(), 100);
+
+        timeoutRef.current = setTimeout(() => {
+            if (!mountedRef.current) return;
+            fileInputRef.current?.click();
+        }, 150);
     };
     const handleDeleteDocumento = async (docId: string) => {
         if (!confirm("¿Eliminar este documento?")) return;

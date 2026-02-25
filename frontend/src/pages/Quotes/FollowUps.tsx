@@ -993,8 +993,24 @@ export default function FollowUps() {
       } else {
         window.open(url, '_blank');
       }
+      // 1. Agregar refs
+      const mountedRef = useRef(true);
+      const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-      setTimeout(() => window.URL.revokeObjectURL(url), 100);
+      // 2. Cleanup en useEffect
+      useEffect(() => {
+        mountedRef.current = true;
+        return () => {
+          mountedRef.current = false;
+          if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        };
+      }, []);
+
+      timeoutRef.current = setTimeout(() => {
+        if (!mountedRef.current) return;
+        window.URL.revokeObjectURL(url);
+      }, 100);
+
       toast.dismiss(toastId);
 
     } catch (error) {

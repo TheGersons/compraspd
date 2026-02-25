@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { getToken } from '../../../lib/api';
 import Button from '@/components/ui/button/Button';
 
@@ -40,6 +40,25 @@ export default function DescuentoActions({
   const [showResultModal, setShowResultModal] = useState(false);
   const [precioDescuento, setPrecioDescuento] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mountedRef = useRef(true);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
+
+  // Update seguro que verifica si el componente sigue montado
+  const safeUpdate = useCallback(() => {
+    timeoutRef.current = setTimeout(() => {
+      if (mountedRef.current) {
+        onUpdate();
+      }
+    }, 150);
+  }, [onUpdate]);
 
   const tieneComprobante = !!precio.ComprobanteDescuento;
   const tieneResultado = precio.precioDescuento !== null && precio.precioDescuento !== undefined;
@@ -88,12 +107,12 @@ export default function DescuentoActions({
       if (!resultadoRes.ok) throw new Error('Error al registrar resultado');
 
       onNotification('success', 'Éxito', 'Marcado como "No aplica descuento"');
-      setTimeout(() => onUpdate(), 100);
+      safeUpdate();
     } catch (error) {
       console.error('Error:', error);
       onNotification('danger', 'Error', 'No se pudo procesar la solicitud');
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   };
 
@@ -140,12 +159,12 @@ export default function DescuentoActions({
 
       onNotification('success', 'Éxito', 'Comprobante subido correctamente');
       setShowUploadModal(false);
-      setTimeout(() => onUpdate(), 100);
+      safeUpdate();
     } catch (error: any) {
       console.error('Error:', error);
       onNotification('danger', 'Error', error.message || 'No se pudo subir el archivo');
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   };
 
@@ -181,12 +200,12 @@ export default function DescuentoActions({
       onNotification('success', 'Éxito', data.aprobado ? 'Descuento aprobado' : 'Descuento denegado');
       setPrecioDescuento('');
       setShowResultModal(false);
-      setTimeout(() => onUpdate(), 100);
+      safeUpdate();
     } catch (error) {
       console.error('Error:', error);
       onNotification('danger', 'Error', 'No se pudo registrar el resultado');
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   };
 
