@@ -38,8 +38,6 @@ export default function DescuentoActions({
   const [loading, setLoading] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showResultModal, setShowResultModal] = useState(false);
-  const [uploadCompletado, setUploadCompletado] = useState(false);
-  const [resultadoCompletado, setResultadoCompletado] = useState(false);
   const [precioDescuento, setPrecioDescuento] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mountedRef = useRef(true);
@@ -53,10 +51,8 @@ export default function DescuentoActions({
   const cerrarYRecargar = useCallback((modal: 'upload' | 'resultado') => {
     if (modal === 'upload') {
       setShowUploadModal(false);
-      setUploadCompletado(false);
     } else {
       setShowResultModal(false);
-      setResultadoCompletado(false);
     }
     // Recargar datos después de cerrar
     requestAnimationFrame(() => {
@@ -139,7 +135,10 @@ export default function DescuentoActions({
       if (!solicitarRes.ok) throw new Error('Error al registrar comprobante');
 
       onNotification('success', 'Éxito', 'Comprobante subido correctamente');
-      setUploadCompletado(true);
+      setShowUploadModal(false);
+      requestAnimationFrame(() => {
+        if (mountedRef.current) onUpdate();
+      });
     } catch (error: any) {
       console.error('Error:', error);
       onNotification('danger', 'Error', error.message || 'No se pudo subir el archivo');
@@ -174,8 +173,11 @@ export default function DescuentoActions({
 
       const data = await response.json();
       onNotification('success', 'Éxito', data.aprobado ? 'Descuento aprobado' : 'Descuento denegado');
+      setShowResultModal(false);
       setPrecioDescuento('');
-      setResultadoCompletado(true);
+      requestAnimationFrame(() => {
+        if (mountedRef.current) onUpdate();
+      });
     } catch (error) {
       console.error('Error:', error);
       onNotification('danger', 'Error', 'No se pudo registrar el resultado');
@@ -261,79 +263,55 @@ export default function DescuentoActions({
       {showUploadModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-xl bg-white p-6 dark:bg-gray-800">
-            {uploadCompletado ? (
-              <>
-                <div className="flex flex-col items-center py-6">
-                  <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
-                    <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">¡Comprobante subido!</h3>
-                  <p className="mt-1 text-sm text-gray-500">El comprobante se registró correctamente.</p>
-                </div>
-                <div className="flex justify-center">
-                  <button
-                    onClick={() => cerrarYRecargar('upload')}
-                    className="rounded-lg bg-blue-600 px-6 py-2 text-sm font-medium text-white hover:bg-blue-700"
-                  >
-                    Cerrar
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
-                  Subir Comprobante de Descuento
-                </h3>
-                <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-                  Sube una imagen o PDF del comprobante de solicitud de descuento.
-                </p>
+            <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
+              Subir Comprobante de Descuento
+            </h3>
+            <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+              Sube una imagen o PDF del comprobante de solicitud de descuento.
+            </p>
 
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf,.png,.jpg,.jpeg,.gif,.webp"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleUploadFile(file);
-                  }}
-                  className="hidden"
-                />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.png,.jpg,.jpeg,.gif,.webp"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleUploadFile(file);
+              }}
+              className="hidden"
+            />
 
-                <div
-                  onClick={() => !loading && fileInputRef.current?.click()}
-                  className="mb-4 cursor-pointer rounded-lg border-2 border-dashed border-gray-300 p-8 text-center transition-colors hover:border-blue-400 hover:bg-blue-50 dark:border-gray-600 dark:hover:border-blue-500 dark:hover:bg-blue-900/20"
-                >
-                  {loading ? (
-                    <div className="flex flex-col items-center">
-                      <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
-                      <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Subiendo...</p>
-                    </div>
-                  ) : (
-                    <>
-                      <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                      </svg>
-                      <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                        Haz clic para seleccionar un archivo
-                      </p>
-                      <p className="mt-1 text-xs text-gray-500">PDF, PNG, JPG hasta 10MB</p>
-                    </>
-                  )}
+            <div
+              onClick={() => !loading && fileInputRef.current?.click()}
+              className="mb-4 cursor-pointer rounded-lg border-2 border-dashed border-gray-300 p-8 text-center transition-colors hover:border-blue-400 hover:bg-blue-50 dark:border-gray-600 dark:hover:border-blue-500 dark:hover:bg-blue-900/20"
+            >
+              {loading ? (
+                <div className="flex flex-col items-center">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+                  <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Subiendo...</p>
                 </div>
+              ) : (
+                <>
+                  <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                    Haz clic para seleccionar un archivo
+                  </p>
+                  <p className="mt-1 text-xs text-gray-500">PDF, PNG, JPG hasta 10MB</p>
+                </>
+              )}
+            </div>
 
-                <div className="flex justify-end">
-                  <button
-                    onClick={() => setShowUploadModal(false)}
-                    disabled={loading}
-                    className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300"
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              </>
-            )}
+            <div className="flex justify-end">
+              <button
+                onClick={() => setShowUploadModal(false)}
+                disabled={loading}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300"
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -342,68 +320,44 @@ export default function DescuentoActions({
       {showResultModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-xl bg-white p-6 dark:bg-gray-800">
-            {resultadoCompletado ? (
-              <>
-                <div className="flex flex-col items-center py-6">
-                  <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
-                    <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">¡Resultado guardado!</h3>
-                  <p className="mt-1 text-sm text-gray-500">El precio final se registró correctamente.</p>
-                </div>
-                <div className="flex justify-center">
-                  <button
-                    onClick={() => cerrarYRecargar('resultado')}
-                    className="rounded-lg bg-blue-600 px-6 py-2 text-sm font-medium text-white hover:bg-blue-700"
-                  >
-                    Cerrar
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
-                  Resultado del Descuento
-                </h3>
-                <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-                  Precio original: <strong>L. {Number(precio.precio).toFixed(2)}</strong>
-                </p>
-                <div className="mb-4">
-                  <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Precio final (con o sin descuento)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={precioDescuento}
-                    onChange={(e) => setPrecioDescuento(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                    placeholder="0.00"
-                  />
-                  <p className="mt-1 text-xs text-gray-500">
-                    Si el descuento fue denegado, ingresa el precio original
-                  </p>
-                </div>
-                <div className="flex justify-end gap-2">
-                  <button
-                    onClick={() => setShowResultModal(false)}
-                    className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={handleResultadoDescuento}
-                    disabled={loading}
-                    className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    {loading ? 'Guardando...' : 'Guardar'}
-                  </button>
-                </div>
-              </>
-            )}
+            <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
+              Resultado del Descuento
+            </h3>
+            <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+              Precio original: <strong>L. {Number(precio.precio).toFixed(2)}</strong>
+            </p>
+            <div className="mb-4">
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Precio final (con o sin descuento)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={precioDescuento}
+                onChange={(e) => setPrecioDescuento(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                placeholder="0.00"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Si el descuento fue denegado, ingresa el precio original
+              </p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowResultModal(false)}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleResultadoDescuento}
+                disabled={loading}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {loading ? 'Guardando...' : 'Guardar'}
+              </button>
+            </div>
           </div>
         </div>
       )}
