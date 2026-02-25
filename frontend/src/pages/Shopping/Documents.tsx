@@ -268,25 +268,9 @@ export default function Documents() {
         catch (error: any) { toast.error(error.message || "Error al subir documento", { id: toastId }); }
         finally { setUploadingFor(null); if (fileInputRef.current) fileInputRef.current.value = ""; }
     };
-
-    const mountedRef = useRef(true);
-    const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    useEffect(() => {
-        mountedRef.current = true;
-        return () => {
-            mountedRef.current = false;
-            if (timeoutRef.current) clearTimeout(timeoutRef.current);
-        };
-    }, []);
-
     const triggerUpload = (estado: string, requeridoId?: string, requeridoNombre?: string) => {
         setUploadingFor({ estado, requeridoId, requeridoNombre: requeridoNombre || "Documento extra" });
-
-        timeoutRef.current = setTimeout(() => {
-            if (!mountedRef.current) return;
-            fileInputRef.current?.click();
-        }, 150);
+        setTimeout(() => fileInputRef.current?.click(), 100);
     };
     const handleDeleteDocumento = async (docId: string) => {
         if (!confirm("¿Eliminar este documento?")) return;
@@ -326,6 +310,8 @@ export default function Documents() {
     };
 
     const productosFiltrados = productos.filter((p) => {
+        // Ocultar rechazados del flujo
+        if ((p as any).rechazado) return false;
         if (!searchQuery) return true; const q = searchQuery.toLowerCase();
         return p.sku.toLowerCase().includes(q) || p.descripcion.toLowerCase().includes(q) || p.proveedor?.toLowerCase().includes(q);
     });

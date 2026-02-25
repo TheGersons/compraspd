@@ -58,6 +58,8 @@ type EstadoProducto = {
   cantidad?: number;
   precioTotal?: number;
   precioUnitario?: number;
+  rechazado?: boolean;
+  motivoRechazo?: string;
 };
 
 type Stats = {
@@ -266,8 +268,10 @@ const getCriticidadBadge = (nivel: string) => {
 };
 
 const calcularStats = (productos: EstadoProducto[]): Stats => {
+  // Excluir rechazados de las estadísticas
+  const activos = productos.filter(p => !p.rechazado);
   const stats: Stats = {
-    total: productos.length,
+    total: activos.length,
     enProceso: 0,
     completados: 0,
     porTipoCompra: {
@@ -295,7 +299,7 @@ const calcularStats = (productos: EstadoProducto[]): Stats => {
     valorTotal: 0,
   };
 
-  productos.forEach((p) => {
+  activos.forEach((p) => {
     const progreso = calcularProgreso(p);
     const tipoCompra = getTipoCompra(p);
     const estadoActual = getEstadoActual(p);
@@ -394,6 +398,8 @@ export default function Shopping() {
 
   // Filtrar productos por estado de completado
   const productosFiltrados = productos.filter(p => {
+    // Ocultar rechazados del flujo
+    if (p.rechazado) return false;
     const progreso = calcularProgreso(p);
     if (verCompletados) {
       return progreso === 100;

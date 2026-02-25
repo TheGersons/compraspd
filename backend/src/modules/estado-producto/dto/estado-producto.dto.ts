@@ -321,6 +321,15 @@ export class ListEstadoProductoQueryDto {
   @IsOptional()
   @IsString()
   sinAsignar?: string;
+
+  @ApiPropertyOptional({
+    description: 'Filtrar por productos rechazados',
+    enum: ['true', 'todos', 'false'],
+    default: 'true',
+  })
+  @IsOptional()
+  @IsString()
+  rechazados?: 'true' | 'todos' | 'false';
 }
 
 export class AprobarProductoDto {

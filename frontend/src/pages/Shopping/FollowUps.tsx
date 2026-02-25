@@ -658,6 +658,9 @@ export default function ShoppingFollowUps() {
 
   // Filtrar productos por búsqueda, estado y responsable
   const productosFiltrados = productos.filter(p => {
+    // Ocultar rechazados del flujo
+    if (p.rechazado) return false;
+
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       const matchQuery = (
@@ -682,8 +685,9 @@ export default function ShoppingFollowUps() {
     }
   });
 
-  const totalPendientes = productos.filter(p => p.progreso !== 100).length;
-  const totalCompletados = productos.filter(p => p.progreso === 100).length;
+  const productosActivos = productos.filter(p => !p.rechazado);
+  const totalPendientes = productosActivos.filter(p => p.progreso !== 100).length;
+  const totalCompletados = productosActivos.filter(p => p.progreso === 100).length;
 
   const handleAsignarResponsable = async (productoId: string, responsableId: string | null) => {
     try {

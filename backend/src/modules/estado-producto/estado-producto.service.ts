@@ -149,6 +149,15 @@ export class EstadoProductoService {
       aprobadoPorSupervisor: true,
     };
 
+    // Por defecto excluir rechazados, excepto si se piden explícitamente
+    if (filters.rechazados === 'true') {
+      where.rechazado = true;
+    } else if (filters.rechazados === 'todos') {
+      // No filtrar por rechazado
+    } else {
+      where.rechazado = { not: true };
+    }
+
     if (filters.proyectoId) where.proyectoId = filters.proyectoId;
     if (filters.cotizacionId) where.cotizacionId = filters.cotizacionId;
     if (filters.sku) where.sku = { contains: filters.sku, mode: 'insensitive' };
