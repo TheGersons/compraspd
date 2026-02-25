@@ -2,7 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
-  NotFoundException
+  NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreatePrecioDto } from './dto/create-precio.dto';
@@ -16,7 +16,7 @@ type UserJwt = { sub: string; role?: string };
  */
 @Injectable()
 export class PreciosService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
    * Crear oferta de proveedor para un item de cotización
@@ -28,7 +28,9 @@ export class PreciosService {
   async create(dto: CreatePrecioDto, user: UserJwt) {
     // Validar permisos
     if (!this.isSupervisorOrAdmin(user)) {
-      throw new ForbiddenException('Solo supervisores pueden registrar ofertas de proveedores');
+      throw new ForbiddenException(
+        'Solo supervisores pueden registrar ofertas de proveedores',
+      );
     }
 
     // Validar detalle de cotización
@@ -36,9 +38,9 @@ export class PreciosService {
       where: { id: dto.cotizacionDetalleId },
       include: {
         cotizacion: {
-          select: { estado: true, nombreCotizacion: true }
-        }
-      }
+          select: { estado: true, nombreCotizacion: true },
+        },
+      },
     });
 
     if (!detalle) {
@@ -46,15 +48,22 @@ export class PreciosService {
     }
 
     // Solo permitir ofertas si la cotización está EN_REVISION o ENVIADA
-    if (!['ENVIADA', 'EN_REVISION', 'EN_CONFIGURACION', 'APROBADA_PARCIAL'].includes(detalle.cotizacion.estado)) {
+    if (
+      ![
+        'ENVIADA',
+        'EN_REVISION',
+        'EN_CONFIGURACION',
+        'APROBADA_PARCIAL',
+      ].includes(detalle.cotizacion.estado)
+    ) {
       throw new BadRequestException(
-        `No se pueden agregar ofertas a una cotización en estado ${detalle.cotizacion.estado}`
+        `No se pueden agregar ofertas a una cotización en estado ${detalle.cotizacion.estado}`,
       );
     }
 
     // Validar proveedor
     const proveedor = await this.prisma.proveedor.findUnique({
-      where: { id: dto.proveedorId }
+      where: { id: dto.proveedorId },
     });
 
     if (!proveedor || !proveedor.activo) {
@@ -63,7 +72,9 @@ export class PreciosService {
 
     // Validar que precio con descuento sea menor que precio normal
     if (dto.precioDescuento && dto.precioDescuento > dto.precio) {
-      throw new BadRequestException('El precio con descuento debe ser menor al precio normal');
+      throw new BadRequestException(
+        'El precio con descuento debe ser menor al precio normal',
+      );
     }
 
     return this.prisma.precios.create({
@@ -79,18 +90,18 @@ export class PreciosService {
           select: {
             id: true,
             nombre: true,
-            email: true
-          }
+            email: true,
+          },
         },
         cotizacionDetalle: {
           select: {
             id: true,
             descripcionProducto: true,
             cantidad: true,
-            tipoUnidad: true
-          }
-        }
-      }
+            tipoUnidad: true,
+          },
+        },
+      },
     });
   }
 
@@ -106,10 +117,10 @@ export class PreciosService {
         cotizacion: {
           select: {
             solicitanteId: true,
-            estado: true
-          }
-        }
-      }
+            estado: true,
+          },
+        },
+      },
     });
 
     if (!detalle) {
@@ -133,19 +144,17 @@ export class PreciosService {
             nombre: true,
             rtn: true,
             email: true,
-            telefono: true
-          }
-        }
+            telefono: true,
+          },
+        },
       },
-      orderBy: [
-        { precio: 'asc' }
-      ]
+      orderBy: [{ precio: 'asc' }],
     });
 
     // Agregar campo "seleccionado" a cada precio
-    return precios.map(precio => ({
+    return precios.map((precio) => ({
       ...precio,
-      seleccionado: detalle.preciosId === precio.id
+      seleccionado: detalle.preciosId === precio.id,
     }));
   }
 
@@ -164,12 +173,12 @@ export class PreciosService {
                 id: true,
                 nombreCotizacion: true,
                 solicitanteId: true,
-                estado: true
-              }
-            }
-          }
-        }
-      }
+                estado: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!precio) {
@@ -177,7 +186,8 @@ export class PreciosService {
     }
 
     // Validar permisos
-    const isOwner = precio.cotizacionDetalle.cotizacion.solicitanteId === user.sub;
+    const isOwner =
+      precio.cotizacionDetalle.cotizacion.solicitanteId === user.sub;
     const isSupervisor = this.isSupervisorOrAdmin(user);
 
     if (!isOwner && !isSupervisor) {
@@ -193,7 +203,9 @@ export class PreciosService {
    */
   async update(id: string, dto: UpdatePrecioDto, user: UserJwt) {
     if (!this.isSupervisorOrAdmin(user)) {
-      throw new ForbiddenException('Solo supervisores pueden actualizar ofertas');
+      throw new ForbiddenException(
+        'Solo supervisores pueden actualizar ofertas',
+      );
     }
 
     const current = await this.prisma.precios.findUnique({
@@ -201,10 +213,10 @@ export class PreciosService {
       include: {
         cotizacionDetalle: {
           include: {
-            cotizacion: { select: { estado: true } }
-          }
-        }
-      }
+            cotizacion: { select: { estado: true } },
+          },
+        },
+      },
     });
 
     if (!current) {
@@ -212,16 +224,25 @@ export class PreciosService {
     }
 
     // Solo permitir edición si cotización está EN_REVISION o ENVIADA
-    if (!['ENVIADA', 'EN_REVISION', 'EN_CONFIGURACION'].includes(current.cotizacionDetalle.cotizacion.estado)) {
+    if (
+      ![
+        'ENVIADA',
+        'EN_REVISION',
+        'EN_CONFIGURACION',
+        'APROBADA_PARCIAL',
+      ].includes(current.cotizacionDetalle.cotizacion.estado)
+    ) {
       throw new BadRequestException(
-        'No se pueden modificar ofertas de una cotización ya procesada'
+        'No se pueden modificar ofertas de una cotización ya procesada',
       );
     }
 
     // Validar precio con descuento
     const nuevoPrecio = dto.precio || current.precio;
     if (dto.precioDescuento && dto.precioDescuento >= Number(nuevoPrecio)) {
-      throw new BadRequestException('El precio con descuento debe ser menor al precio normal');
+      throw new BadRequestException(
+        'El precio con descuento debe ser menor al precio normal',
+      );
     }
 
     return this.prisma.precios.update({
@@ -229,16 +250,16 @@ export class PreciosService {
       data: {
         precio: dto.precio,
         precioDescuento: dto.precioDescuento,
-        ComprobanteDescuento: dto.comprobanteDescuento
+        ComprobanteDescuento: dto.comprobanteDescuento,
       },
       include: {
         proveedor: {
           select: {
             id: true,
-            nombre: true
-          }
-        }
-      }
+            nombre: true,
+          },
+        },
+      },
     });
   }
 
@@ -256,10 +277,10 @@ export class PreciosService {
       include: {
         cotizacionDetalle: {
           select: {
-            preciosId: true // Verificar si está seleccionado
-          }
-        }
-      }
+            preciosId: true, // Verificar si está seleccionado
+          },
+        },
+      },
     });
 
     if (!precio) {
@@ -269,12 +290,12 @@ export class PreciosService {
     // No permitir eliminar si es la oferta seleccionada
     if (precio.cotizacionDetalle.preciosId === id) {
       throw new BadRequestException(
-        'No se puede eliminar la oferta seleccionada. Primero selecciona otra.'
+        'No se puede eliminar la oferta seleccionada. Primero selecciona otra.',
       );
     }
 
     await this.prisma.precios.delete({
-      where: { id }
+      where: { id },
     });
 
     return { ok: true, message: 'Oferta eliminada exitosamente' };
@@ -286,7 +307,9 @@ export class PreciosService {
    */
   async selectOffer(id: string, user: UserJwt) {
     if (!this.isSupervisorOrAdmin(user)) {
-      throw new ForbiddenException('Solo supervisores pueden seleccionar ofertas');
+      throw new ForbiddenException(
+        'Solo supervisores pueden seleccionar ofertas',
+      );
     }
 
     const precio = await this.prisma.precios.findUnique({
@@ -294,10 +317,10 @@ export class PreciosService {
       include: {
         cotizacionDetalle: {
           include: {
-            cotizacion: { select: { estado: true, id: true } }
-          }
-        }
-      }
+            cotizacion: { select: { estado: true, id: true } },
+          },
+        },
+      },
     });
 
     if (!precio) {
@@ -305,11 +328,14 @@ export class PreciosService {
     }
 
     // Solo permitir selección en estado EN_CONFIGURACION o EN_REVISION
-    if (precio.cotizacionDetalle.cotizacion.estado !== 'EN_REVISION' && precio.cotizacionDetalle.cotizacion.estado !== 'EN_CONFIGURACION') {
+    if (
+      precio.cotizacionDetalle.cotizacion.estado !== 'EN_REVISION' &&
+      precio.cotizacionDetalle.cotizacion.estado !== 'EN_CONFIGURACION' &&
+      precio.cotizacionDetalle.cotizacion.estado !== 'APROBADA_PARCIAL'
+    ) {
       throw new BadRequestException(
         `Solo se pueden seleccionar ofertas cuando la cotización está EN_REVISION` +
-        ` o EN_CONFIGURACION. Estado actual: ${precio.cotizacionDetalle.cotizacion.estado}`
-
+          ` o EN_CONFIGURACION. Estado actual: ${precio.cotizacionDetalle.cotizacion.estado}`,
       );
     }
 
@@ -317,14 +343,14 @@ export class PreciosService {
     await this.prisma.cotizacionDetalle.update({
       where: { id: precio.cotizacionDetalleId },
       data: {
-        preciosId: id
-      }
+        preciosId: id,
+      },
     });
 
     return {
       ok: true,
       message: 'Oferta seleccionada exitosamente',
-      precioId: id
+      precioId: id,
     };
   }
 
@@ -336,7 +362,7 @@ export class PreciosService {
     // Validar acceso a la cotización
     const cotizacion = await this.prisma.cotizacion.findUnique({
       where: { id: cotizacionId },
-      select: { solicitanteId: true }
+      select: { solicitanteId: true },
     });
 
     if (!cotizacion) {
@@ -347,7 +373,9 @@ export class PreciosService {
     const isSupervisor = this.isSupervisorOrAdmin(user);
 
     if (!isOwner && !isSupervisor) {
-      throw new ForbiddenException('No tienes permiso para ver esta comparativa');
+      throw new ForbiddenException(
+        'No tienes permiso para ver esta comparativa',
+      );
     }
 
     // Obtener todos los detalles con sus ofertas
@@ -359,23 +387,23 @@ export class PreciosService {
             proveedor: {
               select: {
                 id: true,
-                nombre: true
-              }
-            }
+                nombre: true,
+              },
+            },
           },
-          orderBy: { precio: 'asc' }
-        }
+          orderBy: { precio: 'asc' },
+        },
       },
-      orderBy: { descripcionProducto: 'asc' }
+      orderBy: { descripcionProducto: 'asc' },
     });
 
-    return detalles.map(detalle => ({
+    return detalles.map((detalle) => ({
       id: detalle.id,
       descripcionProducto: detalle.descripcionProducto,
       cantidad: detalle.cantidad,
       tipoUnidad: detalle.tipoUnidad,
       ofertas: detalle.preciosOfertas,
-      ofertaSeleccionada: detalle.preciosId
+      ofertaSeleccionada: detalle.preciosId,
     }));
   }
 
@@ -387,7 +415,6 @@ export class PreciosService {
     return role === 'SUPERVISOR' || role === 'ADMIN';
   }
 
-
   /**
    * Solicitar descuento para un precio
    * Guarda el comprobante (imagen/link) de la solicitud
@@ -395,7 +422,7 @@ export class PreciosService {
   async solicitarDescuento(
     precioId: string,
     comprobanteDescuento: string,
-    user: UserJwt
+    user: UserJwt,
   ) {
     const precio = await this.prisma.precios.findUnique({
       where: { id: precioId },
@@ -415,16 +442,21 @@ export class PreciosService {
     }
 
     // Validar permisos
-    const isOwner = precio.cotizacionDetalle.cotizacion.solicitanteId === user.sub;
+    const isOwner =
+      precio.cotizacionDetalle.cotizacion.solicitanteId === user.sub;
     const isSupervisor = this.isSupervisorOrAdmin(user);
 
     if (!isOwner && !isSupervisor) {
-      throw new ForbiddenException('No tienes permiso para solicitar descuento');
+      throw new ForbiddenException(
+        'No tienes permiso para solicitar descuento',
+      );
     }
 
     // Validar que el comprobante no esté vacío
     if (!comprobanteDescuento || comprobanteDescuento.trim() === '') {
-      throw new BadRequestException('Debe proporcionar un comprobante de descuento');
+      throw new BadRequestException(
+        'Debe proporcionar un comprobante de descuento',
+      );
     }
 
     // Actualizar el precio con el comprobante
@@ -458,7 +490,7 @@ export class PreciosService {
   async resultadoDescuento(
     precioId: string,
     precioDescuento: number,
-    user: UserJwt
+    user: UserJwt,
   ) {
     const precio = await this.prisma.precios.findUnique({
       where: { id: precioId },
@@ -478,23 +510,28 @@ export class PreciosService {
     }
 
     // Validar permisos
-    const isOwner = precio.cotizacionDetalle.cotizacion.solicitanteId === user.sub;
+    const isOwner =
+      precio.cotizacionDetalle.cotizacion.solicitanteId === user.sub;
     const isSupervisor = this.isSupervisorOrAdmin(user);
 
     if (!isOwner && !isSupervisor) {
-      throw new ForbiddenException('No tienes permiso para agregar resultado de descuento');
+      throw new ForbiddenException(
+        'No tienes permiso para agregar resultado de descuento',
+      );
     }
 
     // Validar que se haya solicitado descuento primero
     if (!precio.ComprobanteDescuento) {
       throw new BadRequestException(
-        'Debe solicitar el descuento antes de agregar el resultado'
+        'Debe solicitar el descuento antes de agregar el resultado',
       );
     }
 
     // Validar que el precio de descuento sea válido
     if (precioDescuento <= 0) {
-      throw new BadRequestException('El precio de descuento debe ser mayor a 0');
+      throw new BadRequestException(
+        'El precio de descuento debe ser mayor a 0',
+      );
     }
 
     // Actualizar el precio con el descuento
@@ -528,12 +565,14 @@ export class PreciosService {
   }
 
   /**
- * Deseleccionar una oferta
- * Quita la referencia preciosId del CotizacionDetalle
- */
+   * Deseleccionar una oferta
+   * Quita la referencia preciosId del CotizacionDetalle
+   */
   async deselectOffer(id: string, user: UserJwt) {
     if (!this.isSupervisorOrAdmin(user)) {
-      throw new ForbiddenException('Solo supervisores pueden deseleccionar ofertas');
+      throw new ForbiddenException(
+        'Solo supervisores pueden deseleccionar ofertas',
+      );
     }
 
     const precio = await this.prisma.precios.findUnique({
@@ -542,10 +581,10 @@ export class PreciosService {
         cotizacionDetalle: {
           select: {
             id: true,
-            preciosId: true
-          }
-        }
-      }
+            preciosId: true,
+          },
+        },
+      },
     });
 
     if (!precio) {
@@ -561,13 +600,13 @@ export class PreciosService {
     await this.prisma.cotizacionDetalle.update({
       where: { id: precio.cotizacionDetalleId },
       data: {
-        preciosId: null
-      }
+        preciosId: null,
+      },
     });
 
     return {
       ok: true,
-      message: 'Oferta deseleccionada exitosamente'
+      message: 'Oferta deseleccionada exitosamente',
     };
   }
 }
