@@ -63,12 +63,20 @@ type ProductoResumen = {
 
 const api = {
     token: () => getToken(),
-    async getProductos() {
+    async getProductosAprobados() {
         const token = this.token();
         const r = await fetch(`${API}/api/v1/estado-productos?pageSize=200`, {
             credentials: "include", headers: { Authorization: `Bearer ${token}` },
         });
         if (!r.ok) throw new Error("Error al cargar productos");
+        return r.json();
+    },
+    async getProductosRechazados() {
+        const token = this.token();
+        const r = await fetch(`${API}/api/v1/estado-productos?pageSize=200&rechazados=true`, {
+            credentials: "include", headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!r.ok) throw new Error("Error al cargar productos rechazados");
         return r.json();
     },
     async getCotizacion(id: string) {
@@ -137,6 +145,7 @@ export default function AprobacionCompras() {
     const esAdmin = user?.rol?.nombre.toLowerCase().includes("admin") || user?.rol?.nombre.toLowerCase().includes("supervisor");
 
     const [productos, setProductos] = useState<ProductoResumen[]>([]);
+    const [productosRechazados, setProductosRechazados] = useState<ProductoResumen[]>([]);
     const [cotizacionesMap, setCotizacionesMap] = useState<Record<string, Cotizacion>>({});
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
@@ -146,13 +155,14 @@ export default function AprobacionCompras() {
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [showRechazoModal, setShowRechazoModal] = useState<string | null>(null);
     const [motivoRechazo, setMotivoRechazo] = useState("");
+    const [habilitarEdicionId, setHabilitarEdicionId] = useState(null);
 
-    useEffect(() => { cargarProductos(); }, []);
+    useEffect(() => { cargarProductosAprobados(); }, []);
 
-    const cargarProductos = async () => {
+    const cargarProductosAprobados = async () => {
         try {
             setLoading(true);
-            const data = await api.getProductos();
+            const data = await api.getProductosAprobados();
             const items = (data.items || []).map((p: any) => ({
                 id: p.id,
                 sku: p.sku,
@@ -168,6 +178,34 @@ export default function AprobacionCompras() {
                 precioTotal: p.precioTotal ? parseFloat(p.precioTotal) : undefined,
             }));
             setProductos(items);
+        } catch {
+            addNotification("danger", "Error", "Error al cargar productos");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => { cargarProductosRechazados(); }, []);
+
+    const cargarProductosRechazados = async () => {
+        try {
+            setLoading(true);
+            const data = await api.getProductosRechazados();
+            const items = (data.items || []).map((p: any) => ({
+                id: p.id,
+                sku: p.sku,
+                descripcion: p.descripcion,
+                proveedor: p.proveedor,
+                estadoActual: p.estadoActual,
+                aprobacionCompra: p.aprobacionCompra || false,
+                aprobadoCompra: p.aprobadoCompra || false,
+                comprado: p.comprado || false,
+                rechazado: p.rechazado || false,
+                motivoRechazo: p.motivoRechazo || undefined,
+                cotizacionId: p.cotizacionId,
+                precioTotal: p.precioTotal ? parseFloat(p.precioTotal) : undefined,
+            }));
+            setProductosRechazados(items);
         } catch {
             addNotification("danger", "Error", "Error al cargar productos");
         } finally {
@@ -198,7 +236,7 @@ export default function AprobacionCompras() {
         try {
             await api.aprobarCompra(productoId);
             toast.success("Compra aprobada", { id: toastId });
-            await cargarProductos();
+            await cargarProductosAprobados();
         } catch (e: any) {
             toast.error(e.message, { id: toastId });
         } finally {
@@ -213,7 +251,7 @@ export default function AprobacionCompras() {
         try {
             await api.revocarAprobacion(productoId);
             toast.success("Aprobación revocada", { id: toastId });
-            await cargarProductos();
+            await cargarProductosAprobados();
         } catch (e: any) {
             toast.error(e.message, { id: toastId });
         } finally {
@@ -230,7 +268,7 @@ export default function AprobacionCompras() {
             toast.success("Compra rechazada", { id: toastId });
             setShowRechazoModal(null);
             setMotivoRechazo("");
-            await cargarProductos();
+            await cargarProductosAprobados();
         } catch (e: any) {
             toast.error(e.message, { id: toastId });
         } finally {
@@ -245,7 +283,7 @@ export default function AprobacionCompras() {
         try {
             await api.revertirRechazo(productoId);
             toast.success("Rechazo revertido", { id: toastId });
-            await cargarProductos();
+            await cargarProductosRechazados();
         } catch (e: any) {
             toast.error(e.message, { id: toastId });
         } finally {
@@ -253,8 +291,10 @@ export default function AprobacionCompras() {
         }
     };
 
+    const productosCombinados = [...productos, ...productosRechazados];
+
     // Filtrado
-    const productosFiltrados = productos.filter(p => {
+    const productosFiltrados = productosCombinados.filter(p => {
         // Solo mostrar productos que tienen cotización
         if (!p.cotizacionId) return false;
 
@@ -279,17 +319,17 @@ export default function AprobacionCompras() {
         porCotizacion[key].push(p);
     }
 
-    const totalPendientes = productos.filter(p => p.cotizacionId && !p.aprobadoCompra && !p.comprado && !p.rechazado).length;
-    const totalAprobados = productos.filter(p => p.aprobadoCompra && !p.comprado && !p.rechazado).length;
-    const totalComprados = productos.filter(p => p.comprado).length;
-    const totalRechazados = productos.filter(p => p.rechazado).length;
+    const totalPendientes = productosCombinados.filter(p => p.cotizacionId && !p.aprobadoCompra && !p.comprado && !p.rechazado).length;
+    const totalAprobados = productosCombinados.filter(p => p.aprobadoCompra && !p.comprado && !p.rechazado).length;
+    const totalComprados = productosCombinados.filter(p => p.comprado).length;
+    const totalRechazados = productosCombinados.filter(p => p.rechazado).length;
 
     const filtros: { key: Filtro; label: string; count: number; icon: any; color: string; activeColor: string }[] = [
         { key: "pendientes", label: "Pendientes", count: totalPendientes, icon: Clock, color: "text-yellow-500", activeColor: "border-yellow-400 bg-yellow-50 dark:bg-yellow-900/10" },
         { key: "aprobados", label: "Aprobados", count: totalAprobados, icon: ThumbsUp, color: "text-green-500", activeColor: "border-green-400 bg-green-50 dark:bg-green-900/10" },
         { key: "comprados", label: "Comprados", count: totalComprados, icon: ShoppingCart, color: "text-blue-500", activeColor: "border-blue-400 bg-blue-50 dark:bg-blue-900/10" },
         { key: "rechazados", label: "Rechazados", count: totalRechazados, icon: ThumbsDown, color: "text-red-500", activeColor: "border-red-400 bg-red-50 dark:bg-red-900/10" },
-        { key: "todos", label: "Total", count: productos.filter(p => p.cotizacionId).length, icon: Package, color: "text-gray-500", activeColor: "border-gray-400 bg-gray-50 dark:bg-gray-900/10" },
+        { key: "todos", label: "Total", count: productosCombinados.filter(p => p.cotizacionId).length, icon: Package, color: "text-gray-500", activeColor: "border-gray-400 bg-gray-50 dark:bg-gray-900/10" },
     ];
 
     return (
@@ -420,15 +460,33 @@ export default function AprobacionCompras() {
                                                             {p.comprado ? (
                                                                 <span className="text-xs text-gray-400">—</span>
                                                             ) : p.rechazado ? (
-                                                                <button onClick={() => handleRevertirRechazo(p.id)}
-                                                                    disabled={actionLoading === p.id}
-                                                                    className="inline-flex items-center gap-1 rounded-lg border border-orange-300 px-2.5 py-1 text-xs font-medium text-orange-600 hover:bg-orange-50 disabled:opacity-50 transition-colors dark:border-orange-600 dark:text-orange-400 dark:hover:bg-orange-900/20">
-                                                                    {actionLoading === p.id ? (
-                                                                        <div className="h-3 w-3 animate-spin rounded-full border-2 border-orange-600 border-t-transparent" />
-                                                                    ) : (
-                                                                        <><Undo2 size={12} /> Revertir</>
-                                                                    )}
-                                                                </button>
+                                                                <div className="flex flex-col items-center justify-center gap-1.5">
+                                                                    {/* Checkbox para habilitar edición */}
+                                                                    <label className="flex items-center gap-1 text-[10px] text-gray-500 cursor-pointer hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={habilitarEdicionId === p.id}
+                                                                            onChange={(e) => setHabilitarEdicionId(e.target.checked ? p.id : null)}
+                                                                            className="h-3 w-3 rounded border-gray-300 text-orange-600 focus:ring-orange-500 bg-transparent"
+                                                                        />
+                                                                        Habilitar edición
+                                                                    </label>
+
+                                                                    {/* Botón Revertir (inhabilitado por defecto) */}
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            handleRevertirRechazo(p.id);
+                                                                            setHabilitarEdicionId(null); // Bloquea de nuevo después de usarlo
+                                                                        }}
+                                                                        disabled={actionLoading === p.id || habilitarEdicionId !== p.id}
+                                                                        className="inline-flex items-center gap-1 rounded-lg border border-orange-300 px-2.5 py-1 text-xs font-medium text-orange-600 hover:bg-orange-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors dark:border-orange-600 dark:text-orange-400 dark:hover:bg-orange-900/20">
+                                                                        {actionLoading === p.id ? (
+                                                                            <div className="h-3 w-3 animate-spin rounded-full border-2 border-orange-600 border-t-transparent" />
+                                                                        ) : (
+                                                                            <><Undo2 size={12} /> Revertir</>
+                                                                        )}
+                                                                    </button>
+                                                                </div>
                                                             ) : p.aprobadoCompra ? (
                                                                 <button onClick={() => handleRevocar(p.id)}
                                                                     disabled={actionLoading === p.id}

@@ -9,6 +9,7 @@ const allTabs = [
   { to: "/quotes/my-quotes", label: "Mis cotizaciónes" },
   // 🛑 Solo para Supervisores/Administradores
   { to: "/quotes/follow-ups", label: "Seguimiento", supervisorOnly: true },
+  { to: "/quotes/rejected", label: "Rechazadas", supervisorOnly: true },
   { to: "/quotes/history", label: "Historial" },
   // 🛑 Solo para Supervisores/Administradores
 ];

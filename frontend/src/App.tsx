@@ -56,6 +56,7 @@ import ChangePasswordRequired from "./pages/AuthPages/ChangePasswordRequired";
 import Documents from "./pages/Shopping/Documents";
 import Proveedores from "./pages/Proveedores/Proveedores";
 import AprobacionCompras from "./pages/Shopping/AprobacionCompras";
+import RejectedQuotes from "./pages/Quotes/Rejectedquotes";
 
 const SHOPPING_MANAGER_ROLES = ["ADMIN", "SUPERVISOR"];
 const QUOTES_SUPERVISOR_ROLES = ["SUPERVISOR", "ADMIN"];
@@ -182,6 +183,14 @@ export default function App() {
                   element={
                     <ProtectedRoute roles={STAFF_ROLES}>
                       <QuotesFollowUps />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="rejected"
+                  element={
+                    <ProtectedRoute roles={STAFF_ROLES}>
+                      <RejectedQuotes />
                     </ProtectedRoute>
                   }
                 />
