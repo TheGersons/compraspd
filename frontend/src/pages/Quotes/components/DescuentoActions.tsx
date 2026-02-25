@@ -41,23 +41,19 @@ export default function DescuentoActions({
   const [precioDescuento, setPrecioDescuento] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mountedRef = useRef(true);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
+    return () => { mountedRef.current = false; };
   }, []);
 
-  // Update seguro que verifica si el componente sigue montado
+  // Cerrar modales PRIMERO, luego actualizar datos en el siguiente frame
   const safeUpdate = useCallback(() => {
-    timeoutRef.current = setTimeout(() => {
-      if (mountedRef.current) {
-        onUpdate();
-      }
-    }, 150);
+    setShowUploadModal(false);
+    setShowResultModal(false);
+    requestAnimationFrame(() => {
+      if (mountedRef.current) onUpdate();
+    });
   }, [onUpdate]);
 
   const tieneComprobante = !!precio.ComprobanteDescuento;
@@ -70,40 +66,25 @@ export default function DescuentoActions({
     try {
       const token = getToken();
 
-      // 1. Generar comprobante NO_APLICA
       const noAplicaRes = await fetch(`${API_BASE_URL}/api/v1/storage/no-aplica`, {
-        method: 'POST',
-        credentials: 'include',
+        method: 'POST', credentials: 'include',
         headers: { Authorization: `Bearer ${token}` },
       });
-
       if (!noAplicaRes.ok) throw new Error('Error al generar comprobante');
       const { comprobante } = await noAplicaRes.json();
 
-      // 2. Solicitar descuento con comprobante automático
       const solicitarRes = await fetch(`${API_BASE_URL}/api/v1/precios/${precio.id}/solicitar-descuento`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        method: 'POST', credentials: 'include',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ comprobanteDescuento: comprobante }),
       });
-
       if (!solicitarRes.ok) throw new Error('Error al solicitar descuento');
 
-      // 3. Automáticamente establecer precio descuento = precio original (sin descuento)
       const resultadoRes = await fetch(`${API_BASE_URL}/api/v1/precios/${precio.id}/resultado-descuento`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        method: 'POST', credentials: 'include',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ precioDescuento: precio.precio }),
       });
-
       if (!resultadoRes.ok) throw new Error('Error al registrar resultado');
 
       onNotification('success', 'Éxito', 'Marcado como "No aplica descuento"');
@@ -122,17 +103,15 @@ export default function DescuentoActions({
     try {
       const token = getToken();
 
-      // 1. Subir archivo a Nextcloud
       const formData = new FormData();
       formData.append('file', file);
       formData.append('cotizacionId', cotizacionId);
       formData.append('sku', sku);
-      formData.append('proveedorNombre', precio.proveedor.nombre);
+      formData.append('proveedorNombre', precio.proveedor?.nombre || 'desconocido');
       formData.append('tipo', 'comprobantes_descuento');
 
       const uploadRes = await fetch(`${API_BASE_URL}/api/v1/storage/upload`, {
-        method: 'POST',
-        credentials: 'include',
+        method: 'POST', credentials: 'include',
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
@@ -144,21 +123,14 @@ export default function DescuentoActions({
 
       const { url, fileName } = await uploadRes.json();
 
-      // 2. Registrar comprobante en el precio
       const solicitarRes = await fetch(`${API_BASE_URL}/api/v1/precios/${precio.id}/solicitar-descuento`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        method: 'POST', credentials: 'include',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ comprobanteDescuento: url || fileName }),
       });
-
       if (!solicitarRes.ok) throw new Error('Error al registrar comprobante');
 
       onNotification('success', 'Éxito', 'Comprobante subido correctamente');
-      setShowUploadModal(false);
       safeUpdate();
     } catch (error: any) {
       console.error('Error:', error);
@@ -185,12 +157,8 @@ export default function DescuentoActions({
       const token = getToken();
 
       const response = await fetch(`${API_BASE_URL}/api/v1/precios/${precio.id}/resultado-descuento`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        method: 'POST', credentials: 'include',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ precioDescuento: parseFloat(precioDescuento) }),
       });
 
@@ -199,7 +167,6 @@ export default function DescuentoActions({
       const data = await response.json();
       onNotification('success', 'Éxito', data.aprobado ? 'Descuento aprobado' : 'Descuento denegado');
       setPrecioDescuento('');
-      setShowResultModal(false);
       safeUpdate();
     } catch (error) {
       console.error('Error:', error);
@@ -209,32 +176,35 @@ export default function DescuentoActions({
     }
   };
 
-  // Si ya tiene resultado de descuento, mostrar solo el estado
-  if (tieneResultado) {
-    return (
-      <div className="mt-2 flex items-center gap-2">
-        {esNoAplica ? (
-          <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-400">
-            ➖ No aplica descuento
-          </span>
-        ) : Number(precio.precioDescuento) < Number(precio.precio) ? (
-          <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700 dark:bg-green-900/30 dark:text-green-400">
-            ✓ Descuento aprobado
-          </span>
-        ) : (
-          <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-700 dark:bg-red-900/30 dark:text-red-400">
-            ✗ Descuento denegado
-          </span>
-        )}
-      </div>
-    );
-  }
+  // ═══════════════════════════════════════════
+  // UN SOLO RETURN — sin early returns condicionales
+  // Esto evita el error removeChild/insertBefore de React
+  // cuando el estado cambia y el árbol DOM se reestructura
+  // ═══════════════════════════════════════════
+  return (
+    <div className="mt-2">
+      {/* === Estado: Ya tiene resultado === */}
+      {tieneResultado && (
+        <div className="flex items-center gap-2">
+          {esNoAplica ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-400">
+              ➖ No aplica descuento
+            </span>
+          ) : Number(precio.precioDescuento) < Number(precio.precio) ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700 dark:bg-green-900/30 dark:text-green-400">
+              ✓ Descuento aprobado
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-700 dark:bg-red-900/30 dark:text-red-400">
+              ✗ Descuento denegado
+            </span>
+          )}
+        </div>
+      )}
 
-  // Si tiene comprobante pero no resultado, mostrar botón para agregar resultado
-  if (tieneComprobante && !tieneResultado) {
-    return (
-      <>
-        <div className="mt-2 flex items-center gap-2">
+      {/* === Estado: Tiene comprobante, falta resultado === */}
+      {tieneComprobante && !tieneResultado && (
+        <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-0.5 text-xs text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
             ⏳ Pendiente resultado
           </span>
@@ -251,85 +221,38 @@ export default function DescuentoActions({
             Agregar Precio Final
           </Button>
         </div>
+      )}
 
-        {/* Modal resultado */}
-        {showResultModal && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4">
-            <div className="w-full max-w-md rounded-xl bg-white p-6 dark:bg-gray-800">
-              <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
-                Resultado del Descuento
-              </h3>
-              <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-                Precio original: <strong>L. {Number(precio.precio).toFixed(2)}</strong>
-              </p>
-              <div className="mb-4">
-                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Precio final (con o sin descuento)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={precioDescuento}
-                  onChange={(e) => setPrecioDescuento(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                  placeholder="0.00"
-                />
-                <p className="mt-1 text-xs text-gray-500">
-                  Si el descuento fue denegado, ingresa el precio original
-                </p>
-              </div>
-              <div className="flex justify-end gap-2">
-                <button
-                  onClick={() => setShowResultModal(false)}
-                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleResultadoDescuento}
-                  disabled={loading}
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {loading ? 'Guardando...' : 'Guardar'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </>
-    );
-  }
+      {/* === Estado inicial: Sin comprobante ni resultado === */}
+      {!tieneComprobante && !tieneResultado && (
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={handleNoAplica}
+            disabled={loading}
+            className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
+          >
+            {loading ? (
+              <div className="h-3 w-3 animate-spin rounded-full border-2 border-gray-400 border-t-transparent" />
+            ) : (
+              '➖'
+            )}
+            No aplica descuento
+          </button>
 
-  // Estado inicial: mostrar botones para solicitar descuento
-  return (
-    <>
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        <button
-          onClick={handleNoAplica}
-          disabled={loading}
-          className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
-        >
-          {loading ? (
-            <div className="h-3 w-3 animate-spin rounded-full border-2 border-gray-400 border-t-transparent" />
-          ) : (
-            '➖'
-          )}
-          No aplica descuento
-        </button>
+          <button
+            onClick={() => setShowUploadModal(true)}
+            disabled={loading}
+            className="inline-flex items-center gap-1 rounded-lg border border-blue-300 px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-50 dark:border-blue-600 dark:text-blue-400 dark:hover:bg-blue-900/20"
+          >
+            📎 Subir comprobante
+          </button>
+        </div>
+      )}
 
-        <button
-          onClick={() => setShowUploadModal(true)}
-          disabled={loading}
-          className="inline-flex items-center gap-1 rounded-lg border border-blue-300 px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-50 dark:border-blue-600 dark:text-blue-400 dark:hover:bg-blue-900/20"
-        >
-          📎 Subir comprobante
-        </button>
-      </div>
-
-      {/* Modal subir archivo */}
+      {/* === Modal subir archivo === */}
       {showUploadModal && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4"
+          onClick={(e) => { if (e.target === e.currentTarget && !loading) setShowUploadModal(false); }}>
           <div className="w-full max-w-md rounded-xl bg-white p-6 dark:bg-gray-800">
             <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
               Subir Comprobante de Descuento
@@ -350,7 +273,7 @@ export default function DescuentoActions({
             />
 
             <div
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => !loading && fileInputRef.current?.click()}
               className="mb-4 cursor-pointer rounded-lg border-2 border-dashed border-gray-300 p-8 text-center transition-colors hover:border-blue-400 hover:bg-blue-50 dark:border-gray-600 dark:hover:border-blue-500 dark:hover:bg-blue-900/20"
             >
               {loading ? (
@@ -383,6 +306,53 @@ export default function DescuentoActions({
           </div>
         </div>
       )}
-    </>
+
+      {/* === Modal resultado === */}
+      {showResultModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4"
+          onClick={(e) => { if (e.target === e.currentTarget && !loading) setShowResultModal(false); }}>
+          <div className="w-full max-w-md rounded-xl bg-white p-6 dark:bg-gray-800">
+            <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
+              Resultado del Descuento
+            </h3>
+            <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+              Precio original: <strong>L. {Number(precio.precio).toFixed(2)}</strong>
+            </p>
+            <div className="mb-4">
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Precio final (con o sin descuento)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={precioDescuento}
+                onChange={(e) => setPrecioDescuento(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                placeholder="0.00"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Si el descuento fue denegado, ingresa el precio original
+              </p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowResultModal(false)}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleResultadoDescuento}
+                disabled={loading}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {loading ? 'Guardando...' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
