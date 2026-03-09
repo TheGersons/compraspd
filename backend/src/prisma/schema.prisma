@@ -806,6 +806,8 @@ model Adjuntos {
   direccionArchivo String   @map("direccion_archivo")
   tipoArchivo      String   @map("tipo_archivo")
   tamanio          BigInt
+  nombreArchivo    String?  @map("nombre_archivo")
+  previewUrl       String?  @map("preview_url")
   creado           DateTime @default(now())
 
   mensaje Mensaje @relation(fields: [mensajeId], references: [id], onDelete: Cascade)

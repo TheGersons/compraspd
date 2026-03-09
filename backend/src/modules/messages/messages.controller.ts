@@ -1,15 +1,18 @@
-import { 
-  Body, 
-  Controller, 
-  Get, 
-  Param, 
-  Post, 
-  Query, 
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
   UseGuards,
   ParseUUIDPipe,
-  Patch
+  Patch,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiTags, ApiConsumes } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { MessagesService } from './messages.service';
 import { CreateChatDto, AddParticipantsDto } from './dto/create-chat.dto';
@@ -20,7 +23,7 @@ type UserJwt = { sub: string; role?: string };
 
 /**
  * Controller para gestión de chats y mensajería
- * 
+ *
  * Endpoints principales:
  * - POST /messages - Crear nuevo chat
  * - GET /messages - Listar mis chats
@@ -43,10 +46,7 @@ export class MessagesController {
    * Crea un nuevo chat con participantes
    */
   @Post()
-  createChat(
-    @CurrentUser() user: UserJwt,
-    @Body() dto: CreateChatDto
-  ) {
+  createChat(@CurrentUser() user: UserJwt, @Body() dto: CreateChatDto) {
     return this.service.createChat(dto, user);
   }
 
@@ -64,7 +64,7 @@ export class MessagesController {
     return this.service.listMyChats(
       user,
       Number(page || 1),
-      Number(pageSize || 20)
+      Number(pageSize || 20),
     );
   }
 
@@ -85,7 +85,7 @@ export class MessagesController {
   @Get(':chatId')
   getChat(
     @CurrentUser() user: UserJwt,
-    @Param('chatId', ParseUUIDPipe) chatId: string
+    @Param('chatId', ParseUUIDPipe) chatId: string,
   ) {
     return this.service.getChat(chatId, user);
   }
@@ -98,7 +98,7 @@ export class MessagesController {
   addParticipants(
     @CurrentUser() user: UserJwt,
     @Param('chatId', ParseUUIDPipe) chatId: string,
-    @Body() dto: AddParticipantsDto
+    @Body() dto: AddParticipantsDto,
   ) {
     return this.service.addParticipants(chatId, dto, user);
   }
@@ -108,10 +108,7 @@ export class MessagesController {
    * Envía un mensaje en un chat
    */
   @Post(':chatId/messages')
-  createMessage(
-    @CurrentUser() user: UserJwt,
-    @Body() dto: CreateMessageDto
-  ) {
+  createMessage(@CurrentUser() user: UserJwt, @Body() dto: CreateMessageDto) {
     return this.service.createMessage(dto, user);
   }
 
@@ -131,7 +128,7 @@ export class MessagesController {
       chatId,
       user,
       Number(page || 1),
-      Number(pageSize || 50)
+      Number(pageSize || 50),
     );
   }
 
@@ -142,8 +139,25 @@ export class MessagesController {
   @Patch(':chatId/read')
   markAsRead(
     @CurrentUser() user: UserJwt,
-    @Param('chatId', ParseUUIDPipe) chatId: string
+    @Param('chatId', ParseUUIDPipe) chatId: string,
   ) {
     return this.service.markAsRead(chatId, user);
+  }
+
+  /**
+   * POST /api/v1/messages/:chatId/upload
+   * Envía un mensaje con archivo adjunto
+   * Sube el archivo a Nextcloud y crea el mensaje con el adjunto
+   */
+  @Post(':chatId/upload')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  async createMessageWithFile(
+    @CurrentUser() user: UserJwt,
+    @Param('chatId', ParseUUIDPipe) chatId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Body('contenido') contenido?: string,
+  ) {
+    return this.service.createMessageWithFile(chatId, file, user, contenido);
   }
 }

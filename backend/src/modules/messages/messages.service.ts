@@ -1,13 +1,13 @@
-import { 
-  Injectable, 
-  NotFoundException, 
+import {
+  Injectable,
+  NotFoundException,
   ForbiddenException,
-  BadRequestException 
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateChatDto, AddParticipantsDto } from './dto/create-chat.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
-
+import { StorageService } from '../storage';
 
 type UserJwt = { sub: string; role?: string };
 
@@ -17,7 +17,10 @@ type UserJwt = { sub: string; role?: string };
  */
 @Injectable()
 export class MessagesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storageService: StorageService,
+  ) {}
 
   /**
    * Crea un nuevo chat con participantes
@@ -30,11 +33,13 @@ export class MessagesService {
         id: { in: dto.participantesIds },
         activo: true,
       },
-      select: { id: true, nombre: true }
+      select: { id: true, nombre: true },
     });
 
     if (usuarios.length !== dto.participantesIds.length) {
-      throw new NotFoundException('Uno o más usuarios no encontrados o inactivos');
+      throw new NotFoundException(
+        'Uno o más usuarios no encontrados o inactivos',
+      );
     }
 
     // Crear chat con participantes (incluyendo al creador)
@@ -43,11 +48,11 @@ export class MessagesService {
     return this.prisma.chat.create({
       data: {
         participantes: {
-          create: allParticipants.map(userId => ({
+          create: allParticipants.map((userId) => ({
             userId,
             ultimoLeido: new Date(), // El creador marca como leído desde inicio
-          }))
-        }
+          })),
+        },
       },
       include: {
         participantes: {
@@ -57,11 +62,11 @@ export class MessagesService {
                 id: true,
                 nombre: true,
                 email: true,
-              }
-            }
-          }
-        }
-      }
+              },
+            },
+          },
+        },
+      },
     });
   }
 
@@ -86,9 +91,9 @@ export class MessagesService {
                     id: true,
                     nombre: true,
                     email: true,
-                  }
-                }
-              }
+                  },
+                },
+              },
             },
             mensajes: {
               take: 1,
@@ -98,17 +103,17 @@ export class MessagesService {
                   select: {
                     id: true,
                     nombre: true,
-                  }
-                }
-              }
-            }
-          }
-        }
+                  },
+                },
+              },
+            },
+          },
+        },
       },
       orderBy: {
         chat: {
-          actualizado: 'desc'
-        }
+          actualizado: 'desc',
+        },
       },
       skip,
       take,
@@ -125,8 +130,8 @@ export class MessagesService {
             },
             emisorId: {
               not: user.sub, // No contar propios mensajes
-            }
-          }
+            },
+          },
         });
 
         return {
@@ -136,11 +141,11 @@ export class MessagesService {
           chat: p.chat,
           lastMessage: p.chat.mensajes[0] || null,
         };
-      })
+      }),
     );
 
     const total = await this.prisma.participantesChat.count({
-      where: { userId: user.sub }
+      where: { userId: user.sub },
     });
 
     return {
@@ -162,8 +167,8 @@ export class MessagesService {
         chatId_userId: {
           chatId,
           userId: user.sub,
-        }
-      }
+        },
+      },
     });
 
     if (!participacion) {
@@ -180,11 +185,11 @@ export class MessagesService {
                 id: true,
                 nombre: true,
                 email: true,
-              }
-            }
-          }
-        }
-      }
+              },
+            },
+          },
+        },
+      },
     });
   }
 
@@ -192,15 +197,19 @@ export class MessagesService {
    * Agrega participantes a un chat existente
    * Solo participantes actuales pueden agregar nuevos
    */
-  async addParticipants(chatId: string, dto: AddParticipantsDto, user: UserJwt) {
+  async addParticipants(
+    chatId: string,
+    dto: AddParticipantsDto,
+    user: UserJwt,
+  ) {
     // Verificar que el usuario es participante actual
     const isParticipant = await this.prisma.participantesChat.findUnique({
       where: {
         chatId_userId: {
           chatId,
           userId: user.sub,
-        }
-      }
+        },
+      },
     });
 
     if (!isParticipant) {
@@ -213,7 +222,7 @@ export class MessagesService {
         id: { in: dto.participantesIds },
         activo: true,
       },
-      select: { id: true }
+      select: { id: true },
     });
 
     if (usuarios.length !== dto.participantesIds.length) {
@@ -222,7 +231,7 @@ export class MessagesService {
 
     // Agregar participantes (ignorar duplicados)
     await this.prisma.participantesChat.createMany({
-      data: dto.participantesIds.map(userId => ({
+      data: dto.participantesIds.map((userId) => ({
         chatId,
         userId,
       })),
@@ -243,8 +252,8 @@ export class MessagesService {
         chatId_userId: {
           chatId: dto.chatId,
           userId: user.sub,
-        }
-      }
+        },
+      },
     });
 
     if (!participacion) {
@@ -256,12 +265,14 @@ export class MessagesService {
       const adjuntos = await this.prisma.adjuntos.findMany({
         where: {
           id: { in: dto.adjuntosIds },
-          mensajeId: "", // Solo adjuntos sin asignar
-        }
+          mensajeId: '', // Solo adjuntos sin asignar
+        },
       });
 
       if (adjuntos.length !== dto.adjuntosIds.length) {
-        throw new BadRequestException('Uno o más adjuntos no encontrados o ya están asignados');
+        throw new BadRequestException(
+          'Uno o más adjuntos no encontrados o ya están asignados',
+        );
       }
     }
 
@@ -274,25 +285,25 @@ export class MessagesService {
           emisorId: user.sub,
           contenido: dto.contenido,
           tipoMensaje: dto.tipoMensaje || 'TEXTO',
-        }
+        },
       });
 
       // 2. Asociar adjuntos si existen
       if (dto.adjuntosIds && dto.adjuntosIds.length > 0) {
         await tx.adjuntos.updateMany({
           where: {
-            id: { in: dto.adjuntosIds }
+            id: { in: dto.adjuntosIds },
           },
           data: {
             mensajeId: mensaje.id,
-          }
+          },
         });
       }
 
       // 3. Actualizar timestamp del chat
       await tx.chat.update({
         where: { id: dto.chatId },
-        data: { actualizado: new Date() }
+        data: { actualizado: new Date() },
       });
 
       // 4. Marcar como leído para el emisor
@@ -301,13 +312,13 @@ export class MessagesService {
           chatId_userId: {
             chatId: dto.chatId,
             userId: user.sub,
-          }
+          },
         },
-        data: { ultimoLeido: new Date() }
+        data: { ultimoLeido: new Date() },
       });
 
       // 5. Retornar mensaje completo
-      return tx.mensaje.findUnique({
+      const result = await tx.mensaje.findUnique({
         where: { id: mensaje.id },
         include: {
           emisor: {
@@ -315,11 +326,19 @@ export class MessagesService {
               id: true,
               nombre: true,
               email: true,
-            }
+            },
           },
           adjuntos: true,
-        }
+        },
       });
+      // Convertir BigInt a Number para serialización JSON
+      if (result?.adjuntos) {
+        (result as any).adjuntos = result.adjuntos.map((a: any) => ({
+          ...a,
+          tamanio: a.tamanio ? Number(a.tamanio) : 0,
+        }));
+      }
+      return result;
     });
   }
 
@@ -327,20 +346,15 @@ export class MessagesService {
    * Lista mensajes de un chat con paginación
    * Marca como leídos automáticamente
    */
-  async listMessages(
-    chatId: string, 
-    user: UserJwt,
-    page = 1,
-    pageSize = 50
-  ) {
+  async listMessages(chatId: string, user: UserJwt, page = 1, pageSize = 50) {
     // Verificar que el usuario es participante
     const participacion = await this.prisma.participantesChat.findUnique({
       where: {
         chatId_userId: {
           chatId,
           userId: user.sub,
-        }
-      }
+        },
+      },
     });
 
     if (!participacion) {
@@ -360,34 +374,43 @@ export class MessagesService {
               id: true,
               nombre: true,
               email: true,
-            }
+            },
           },
           adjuntos: true,
         },
         orderBy: { creado: 'desc' },
         skip,
         take,
-      })
+      }),
     ]);
 
     // Marcar como leído (asíncrono, no esperar)
-    this.prisma.participantesChat.update({
-      where: {
-        chatId_userId: {
-          chatId,
-          userId: user.sub,
-        }
-      },
-      data: { ultimoLeido: new Date() }
-    }).catch(() => {
-      // Ignorar errores silenciosamente
-    });
+    this.prisma.participantesChat
+      .update({
+        where: {
+          chatId_userId: {
+            chatId,
+            userId: user.sub,
+          },
+        },
+        data: { ultimoLeido: new Date() },
+      })
+      .catch(() => {
+        // Ignorar errores silenciosamente
+      });
 
     return {
       page,
       pageSize,
       total,
-      items: mensajes,
+      items: mensajes.map((m: any) => ({
+        ...m,
+        adjuntos:
+          m.adjuntos?.map((a: any) => ({
+            ...a,
+            tamanio: a.tamanio ? Number(a.tamanio) : 0,
+          })) || [],
+      })),
     };
   }
 
@@ -401,8 +424,8 @@ export class MessagesService {
         chatId_userId: {
           chatId,
           userId: user.sub,
-        }
-      }
+        },
+      },
     });
 
     if (!participacion) {
@@ -414,9 +437,9 @@ export class MessagesService {
         chatId_userId: {
           chatId,
           userId: user.sub,
-        }
+        },
       },
-      data: { ultimoLeido: new Date() }
+      data: { ultimoLeido: new Date() },
     });
 
     return { message: 'Mensajes marcados como leídos' };
@@ -431,7 +454,7 @@ export class MessagesService {
       select: {
         chatId: true,
         ultimoLeido: true,
-      }
+      },
     });
 
     let totalUnread = 0;
@@ -445,12 +468,104 @@ export class MessagesService {
           },
           emisorId: {
             not: user.sub,
-          }
-        }
+          },
+        },
       });
       totalUnread += count;
     }
 
     return { unreadCount: totalUnread };
+  }
+
+  /**
+   * Crea un mensaje con archivo adjunto
+   * 1. Sube archivo a Nextcloud
+   * 2. Crea mensaje + adjunto en una transacción
+   */
+  async createMessageWithFile(
+    chatId: string,
+    file: Express.Multer.File,
+    user: UserJwt,
+    contenido?: string,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No se proporcionó archivo');
+    }
+
+    // Verificar que el usuario es participante
+    const participacion = await this.prisma.participantesChat.findUnique({
+      where: {
+        chatId_userId: { chatId, userId: user.sub },
+      },
+    });
+
+    if (!participacion) {
+      throw new ForbiddenException('No eres participante de este chat');
+    }
+
+    // Subir archivo a Nextcloud
+    const uploadResult = await this.storageService.uploadChatFile(
+      file.buffer,
+      file.originalname,
+      chatId,
+      user.sub,
+    );
+
+    // Crear mensaje + adjunto en transacción
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Crear mensaje
+      const mensaje = await tx.mensaje.create({
+        data: {
+          chatId,
+          emisorId: user.sub,
+          contenido: contenido || `📎 ${file.originalname}`,
+          tipoMensaje: 'ARCHIVO',
+        },
+      });
+
+      // 2. Crear adjunto
+      await tx.adjuntos.create({
+        data: {
+          mensajeId: mensaje.id,
+          direccionArchivo: uploadResult.url,
+          tipoArchivo: uploadResult.tipoArchivo,
+          tamanio: file.size,
+          nombreArchivo: file.originalname,
+          previewUrl: uploadResult.previewUrl,
+        } as any,
+      });
+
+      // 3. Actualizar timestamp del chat
+      await tx.chat.update({
+        where: { id: chatId },
+        data: { actualizado: new Date() },
+      });
+
+      // 4. Marcar como leído para el emisor
+      await tx.participantesChat.update({
+        where: {
+          chatId_userId: { chatId, userId: user.sub },
+        },
+        data: { ultimoLeido: new Date() },
+      });
+
+      // 5. Retornar mensaje completo
+      const result = await tx.mensaje.findUnique({
+        where: { id: mensaje.id },
+        include: {
+          emisor: {
+            select: { id: true, nombre: true, email: true },
+          },
+          adjuntos: true,
+        },
+      });
+      if (result?.adjuntos) {
+        (result as any).adjuntos = result.adjuntos.map((a: any) => ({
+          ...a,
+          tamanio: a.tamanio ? Number(a.tamanio) : 0,
+        }));
+      }
+      return result;
+    });
   }
 }
