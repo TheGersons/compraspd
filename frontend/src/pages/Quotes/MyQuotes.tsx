@@ -18,7 +18,7 @@ type EstadoProductoCompra = {
     precioUnitario?: number;
     precioTotal?: number;
     proveedor?: string;
-    
+
     // Estados booleanos
     cotizado: boolean;
     conDescuento: boolean;
@@ -30,7 +30,7 @@ type EstadoProductoCompra = {
     segundoSeguimiento: boolean;
     enCIF: boolean;
     recibido: boolean;
-    
+
     // Fechas
     fechaCotizado?: string | null;
     fechaConDescuento?: string | null;
@@ -42,13 +42,13 @@ type EstadoProductoCompra = {
     fechaSegundoSeguimiento?: string | null;
     fechaEnCIF?: string | null;
     fechaRecibido?: string | null;
-    
+
     // Criticidad
     criticidad: number;
     nivelCriticidad: string;
     diasRetrasoActual: number;
     estadoGeneral: string;
-    
+
     // Calculados
     estadoActual?: string;
     progreso?: number;
@@ -144,12 +144,21 @@ type Cotizacion = {
 type ChatMessage = {
     id: string;
     contenido: string;
+    tipoMensaje?: string;
     creado: string;
     emisor: {
         id: string;
         nombre: string;
         email: string;
     };
+    adjuntos?: {
+        id: string;
+        direccionArchivo: string;
+        tipoArchivo: string;
+        tamanio: number;
+        nombreArchivo?: string;
+        previewUrl?: string;
+    }[];
 };
 
 // ============================================================================
@@ -231,11 +240,11 @@ const api = {
         // Adaptar respuesta para incluir estadísticas
         const totalProductos = data.detalles?.length || 0;
         const estadosProductos = data.estadosProductos || [];
-        
+
         const productosAprobados = estadosProductos.filter(
             (ep: any) => ep.aprobadoPorSupervisor && !ep.rechazado
         ).length;
-        
+
         const productosRechazados = estadosProductos.filter(
             (ep: any) => ep.rechazado
         ).length;
@@ -262,7 +271,7 @@ const api = {
             }
         });
 
-        const progresoCompraTotal = productosEnCompra > 0 
+        const progresoCompraTotal = productosEnCompra > 0
             ? Math.round(sumaProgreso / productosEnCompra)
             : 0;
 
@@ -321,6 +330,24 @@ const api = {
             body: JSON.stringify({ chatId, contenido }),
         });
         if (!response.ok) throw new Error("Error al enviar mensaje");
+        return response.json();
+    },
+
+    async sendMessageWithFile(chatId: string, file: File, contenido?: string) {
+        const token = this.getToken();
+        const formData = new FormData();
+        formData.append("file", file);
+        if (contenido?.trim()) formData.append("contenido", contenido);
+        const response = await fetch(`${API_BASE_URL}/api/v1/messages/${chatId}/upload`, {
+            method: "POST",
+            credentials: "include",
+            headers: { Authorization: `Bearer ${token}` },
+            body: formData,
+        });
+        if (!response.ok) {
+            const e = await response.json().catch(() => ({}));
+            throw new Error(e.message || "Error al enviar archivo");
+        }
         return response.json();
     },
 };
@@ -407,7 +434,7 @@ const getCriticidadBadge = (nivel: string) => {
 
 const calcularProgresoProducto = (producto: any, tipoCompra: string): number => {
     if (producto.progreso !== undefined) return producto.progreso;
-    
+
     const estados = tipoCompra === 'NACIONAL' ? ESTADOS_NACIONAL : ESTADOS_INTERNACIONAL;
     let completados = 0;
     estados.forEach(estado => {
@@ -418,7 +445,7 @@ const calcularProgresoProducto = (producto: any, tipoCompra: string): number => 
 
 const getEstadoActualProducto = (producto: any, tipoCompra: string): string => {
     if (producto.estadoActual) return producto.estadoActual;
-    
+
     const estados = tipoCompra === 'NACIONAL' ? ESTADOS_NACIONAL : ESTADOS_INTERNACIONAL;
     for (let i = estados.length - 1; i >= 0; i--) {
         if (producto[estados[i]]) {
@@ -451,14 +478,17 @@ export default function MyQuotes() {
     const [nuevoMensaje, setNuevoMensaje] = useState("");
     const [loadingChat, setLoadingChat] = useState(false);
     const [sendingMessage, setSendingMessage] = useState(false);
+    const chatFileRef = useRef<HTMLInputElement>(null);
+    const [sendingFile, setSendingFile] = useState(false);
+    const [imagenModal, setImagenModal] = useState<{ src: string; nombre: string; downloadUrl: string } | null>(null);
     const navigate = useNavigate();
-    
+
     // Estados de UI
     const [showProductos, setShowProductos] = useState(false);
     const [productoExpandido, setProductoExpandido] = useState<string | null>(null);
 
     const { user, isLoading } = useAuth();
-    
+
     if (isLoading) {
         return (
             <div className="flex h-screen items-center justify-center">
@@ -466,9 +496,9 @@ export default function MyQuotes() {
             </div>
         );
     }
-    
+
     const [currentUserId, setCurrentUserId] = useState<string>("");
-    
+
     if (!user) {
         return null;
     }
@@ -568,6 +598,22 @@ export default function MyQuotes() {
         }
     };
 
+    const enviarArchivo = async (file: File) => {
+        if (!file || !cotizacionSeleccionada?.chatId) return;
+        try {
+            setSendingFile(true);
+            await api.sendMessageWithFile(cotizacionSeleccionada.chatId, file);
+            await cargarMensajes(cotizacionSeleccionada.chatId);
+            addNotification("success", "Archivo enviado", file.name);
+        } catch (error: any) {
+            console.error("Error al enviar archivo:", error);
+            addNotification("danger", "Error", error.message || "Error al enviar archivo");
+        } finally {
+            setSendingFile(false);
+            if (chatFileRef.current) chatFileRef.current.value = "";
+        }
+    };
+
     const scrollToBottom = () => {
         chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
@@ -592,7 +638,7 @@ export default function MyQuotes() {
             // Mostrar cotizaciones donde TODOS los productos aprobados están recibidos
             return cot.productosAprobados > 0 && (cot.productosRecibidos || 0) >= cot.productosAprobados;
         }
-        
+
         return true;
     });
 
@@ -611,7 +657,7 @@ export default function MyQuotes() {
 
     const renderTimelineProducto = (producto: Producto, tipoCompra: 'NACIONAL' | 'INTERNACIONAL') => {
         if (!producto.estadoProducto?.aprobadoPorSupervisor) return null;
-        
+
         const ep = producto.estadoProducto;
         const estados = tipoCompra === 'NACIONAL' ? ESTADOS_NACIONAL : ESTADOS_INTERNACIONAL;
         const progreso = calcularProgresoProducto(ep, tipoCompra);
@@ -627,13 +673,12 @@ export default function MyQuotes() {
                         {progreso}%
                     </span>
                 </div>
-                
+
                 {/* Barra de progreso */}
                 <div className="mb-3 h-2 w-full overflow-hidden rounded-full bg-blue-200 dark:bg-blue-800">
                     <div
-                        className={`h-full rounded-full transition-all ${
-                            progreso === 100 ? 'bg-green-600' : 'bg-blue-600'
-                        }`}
+                        className={`h-full rounded-full transition-all ${progreso === 100 ? 'bg-green-600' : 'bg-blue-600'
+                            }`}
                         style={{ width: `${progreso}%` }}
                     />
                 </div>
@@ -643,17 +688,16 @@ export default function MyQuotes() {
                     {estados.map((estado, index) => {
                         const completado = ep[estado as keyof typeof ep];
                         const esActual = estado === estadoActual;
-                        
+
                         return (
                             <div
                                 key={estado}
-                                className={`flex items-center gap-1 rounded px-2 py-1 text-xs ${
-                                    completado
+                                className={`flex items-center gap-1 rounded px-2 py-1 text-xs ${completado
                                         ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                                         : esActual
-                                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 ring-2 ring-blue-500'
-                                        : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500'
-                                }`}
+                                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 ring-2 ring-blue-500'
+                                            : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500'
+                                    }`}
                                 title={ESTADOS_COMPRA_LABELS[estado]}
                             >
                                 <span>{ESTADOS_COMPRA_ICONOS[estado]}</span>
@@ -701,7 +745,7 @@ export default function MyQuotes() {
                                 </div>
                             )}
                         </div>
-                        
+
                         {/* Fechas */}
                         <div className="text-xs text-gray-600 dark:text-gray-400">
                             {ep.fechaCotizado && <div>📋 Cotizado: {shortDate(String(ep.fechaCotizado))}</div>}
@@ -755,46 +799,40 @@ export default function MyQuotes() {
                 <div className="mb-6 flex flex-wrap gap-2">
                     <button
                         onClick={() => { setVistaActual('cotizaciones'); setCotizacionSeleccionada(null); }}
-                        className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                            vistaActual === 'cotizaciones'
+                        className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${vistaActual === 'cotizaciones'
                                 ? 'bg-blue-600 text-white'
                                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
-                        }`}
+                            }`}
                     >
                         📝 Cotizaciones
-                        <span className={`rounded-full px-2 py-0.5 text-xs ${
-                            vistaActual === 'cotizaciones' ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'
-                        }`}>
+                        <span className={`rounded-full px-2 py-0.5 text-xs ${vistaActual === 'cotizaciones' ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'
+                            }`}>
                             {countCotizaciones}
                         </span>
                     </button>
                     <button
                         onClick={() => { setVistaActual('enCompras'); setCotizacionSeleccionada(null); }}
-                        className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                            vistaActual === 'enCompras'
+                        className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${vistaActual === 'enCompras'
                                 ? 'bg-orange-600 text-white'
                                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
-                        }`}
+                            }`}
                     >
                         🛒 En Compras
-                        <span className={`rounded-full px-2 py-0.5 text-xs ${
-                            vistaActual === 'enCompras' ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-600'
-                        }`}>
+                        <span className={`rounded-full px-2 py-0.5 text-xs ${vistaActual === 'enCompras' ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-600'
+                            }`}>
                             {countEnCompras}
                         </span>
                     </button>
                     <button
                         onClick={() => { setVistaActual('completadas'); setCotizacionSeleccionada(null); }}
-                        className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                            vistaActual === 'completadas'
+                        className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${vistaActual === 'completadas'
                                 ? 'bg-green-600 text-white'
                                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
-                        }`}
+                            }`}
                     >
                         ✅ Recibidas
-                        <span className={`rounded-full px-2 py-0.5 text-xs ${
-                            vistaActual === 'completadas' ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
-                        }`}>
+                        <span className={`rounded-full px-2 py-0.5 text-xs ${vistaActual === 'completadas' ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
+                            }`}>
                             {countCompletadas}
                         </span>
                     </button>
@@ -843,11 +881,10 @@ export default function MyQuotes() {
                                             <li key={cot.id}>
                                                 <button
                                                     onClick={() => seleccionarCotizacion(cot)}
-                                                    className={`w-full rounded-lg border p-3 text-left transition-all ${
-                                                        isSelected
+                                                    className={`w-full rounded-lg border p-3 text-left transition-all ${isSelected
                                                             ? "border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/20"
                                                             : "border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/50"
-                                                    }`}
+                                                        }`}
                                                 >
                                                     {/* Header con estado */}
                                                     <div className="mb-2 flex items-center justify-between">
@@ -857,11 +894,10 @@ export default function MyQuotes() {
                                                             {getEstadoLabel(cot.estado)}
                                                         </span>
                                                         {/* Badge tipo compra */}
-                                                        <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${
-                                                            cot.tipoCompra === 'NACIONAL'
+                                                        <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${cot.tipoCompra === 'NACIONAL'
                                                                 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                                                                 : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                                                        }`}>
+                                                            }`}>
                                                             {cot.tipoCompra === 'NACIONAL' ? '🇭🇳' : '🌍'}
                                                         </span>
                                                     </div>
@@ -901,17 +937,15 @@ export default function MyQuotes() {
                                                                 <span className="text-gray-600 dark:text-gray-400">
                                                                     Recibidos: {cot.productosRecibidos || 0}/{cot.productosAprobados}
                                                                 </span>
-                                                                <span className={`font-medium ${
-                                                                    cot.progresoCompraTotal === 100 ? 'text-green-600 dark:text-green-400' : ''
-                                                                }`}>
+                                                                <span className={`font-medium ${cot.progresoCompraTotal === 100 ? 'text-green-600 dark:text-green-400' : ''
+                                                                    }`}>
                                                                     {cot.progresoCompraTotal || 0}%
                                                                 </span>
                                                             </div>
                                                             <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
                                                                 <div
-                                                                    className={`h-full rounded-full ${
-                                                                        cot.progresoCompraTotal === 100 ? 'bg-green-600' : 'bg-orange-500'
-                                                                    }`}
+                                                                    className={`h-full rounded-full ${cot.progresoCompraTotal === 100 ? 'bg-green-600' : 'bg-orange-500'
+                                                                        }`}
                                                                     style={{ width: `${cot.progresoCompraTotal || 0}%` }}
                                                                 />
                                                             </div>
@@ -960,11 +994,10 @@ export default function MyQuotes() {
                                                 <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${getEstadoBadgeColor(cotizacionSeleccionada.estado)}`}>
                                                     {getEstadoLabel(cotizacionSeleccionada.estado)}
                                                 </span>
-                                                <span className={`rounded px-2 py-0.5 text-xs font-medium ${
-                                                    cotizacionSeleccionada.tipoCompra === 'NACIONAL'
+                                                <span className={`rounded px-2 py-0.5 text-xs font-medium ${cotizacionSeleccionada.tipoCompra === 'NACIONAL'
                                                         ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                                                         : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                                                }`}>
+                                                    }`}>
                                                     {cotizacionSeleccionada.tipoCompra === 'NACIONAL' ? '🇭🇳 Nacional' : '🌍 Internacional'}
                                                 </span>
                                             </div>
@@ -1035,11 +1068,10 @@ export default function MyQuotes() {
                                                     <p className="text-xs text-gray-600 dark:text-gray-400">Recibidos</p>
                                                 </div>
                                                 <div>
-                                                    <p className={`text-2xl font-bold ${
-                                                        cotizacionSeleccionada.progresoCompraTotal === 100 
-                                                            ? 'text-green-600 dark:text-green-400' 
+                                                    <p className={`text-2xl font-bold ${cotizacionSeleccionada.progresoCompraTotal === 100
+                                                            ? 'text-green-600 dark:text-green-400'
                                                             : 'text-orange-600 dark:text-orange-400'
-                                                    }`}>
+                                                        }`}>
                                                         {cotizacionSeleccionada.progresoCompraTotal || 0}%
                                                     </p>
                                                     <p className="text-xs text-gray-600 dark:text-gray-400">Progreso</p>
@@ -1070,13 +1102,12 @@ export default function MyQuotes() {
                                                 {cotizacionSeleccionada.detalles?.map((producto) => (
                                                     <div
                                                         key={producto.id}
-                                                        className={`rounded-lg border p-3 ${
-                                                            producto.estadoProducto?.rechazado
+                                                        className={`rounded-lg border p-3 ${producto.estadoProducto?.rechazado
                                                                 ? 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/10'
                                                                 : producto.estadoProducto?.aprobadoPorSupervisor
-                                                                ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/10'
-                                                                : 'border-gray-200 dark:border-gray-700'
-                                                        }`}
+                                                                    ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/10'
+                                                                    : 'border-gray-200 dark:border-gray-700'
+                                                            }`}
                                                     >
                                                         <div className="flex items-start justify-between">
                                                             <div className="flex-1">
@@ -1119,11 +1150,11 @@ export default function MyQuotes() {
                                                         )}
 
                                                         {/* Timeline de compra (solo si está aprobado y en vista de compras) */}
-                                                        {(vistaActual === 'enCompras' || vistaActual === 'completadas') && 
-                                                         producto.estadoProducto?.aprobadoPorSupervisor && 
-                                                         !producto.estadoProducto?.rechazado && (
-                                                            renderTimelineProducto(producto, cotizacionSeleccionada.tipoCompra)
-                                                        )}
+                                                        {(vistaActual === 'enCompras' || vistaActual === 'completadas') &&
+                                                            producto.estadoProducto?.aprobadoPorSupervisor &&
+                                                            !producto.estadoProducto?.rechazado && (
+                                                                renderTimelineProducto(producto, cotizacionSeleccionada.tipoCompra)
+                                                            )}
                                                     </div>
                                                 ))}
                                             </div>
@@ -1140,7 +1171,7 @@ export default function MyQuotes() {
                                                         Productos Rechazados
                                                     </h4>
                                                     <p className="mt-1 text-sm text-red-700 dark:text-red-400">
-                                                        {cotizacionSeleccionada.detalles?.filter(p => p.estadoProducto?.rechazado).length} producto(s) 
+                                                        {cotizacionSeleccionada.detalles?.filter(p => p.estadoProducto?.rechazado).length} producto(s)
                                                         han sido rechazados. Revisa los detalles arriba.
                                                     </p>
                                                 </div>
@@ -1192,15 +1223,47 @@ export default function MyQuotes() {
                                                                         </span>
                                                                     )}
                                                                     <div
-                                                                        className={`rounded-2xl px-4 py-2 ${
-                                                                            esPropio
+                                                                        className={`rounded-2xl px-4 py-2 ${esPropio
                                                                                 ? "bg-blue-600 text-white"
                                                                                 : "bg-white text-gray-900 dark:bg-gray-800 dark:text-white"
-                                                                        }`}
+                                                                            }`}
                                                                     >
-                                                                        <p className="whitespace-pre-wrap break-words text-sm">
-                                                                            {mensaje.contenido}
-                                                                        </p>
+                                                                        {/* Adjuntos */}
+                                                                        {mensaje.adjuntos && mensaje.adjuntos.length > 0 && (
+                                                                            <div className="mb-2">
+                                                                                {mensaje.adjuntos.map((adj) => {
+                                                                                    const esImagen = adj.tipoArchivo?.startsWith('image/');
+                                                                                    const nombre = adj.nombreArchivo || adj.direccionArchivo?.split('/').pop() || 'Archivo';
+                                                                                    return (
+                                                                                        <div key={adj.id}>
+                                                                                            {esImagen && adj.previewUrl ? (
+                                                                                                <div className="cursor-pointer" onClick={() => setImagenModal({ src: adj.direccionArchivo + '/download', nombre, downloadUrl: adj.direccionArchivo })}>
+                                                                                                    <img src={adj.previewUrl} alt={nombre} className="max-w-[250px] max-h-[180px] rounded-lg hover:opacity-90 transition-opacity" loading="lazy" />
+                                                                                                </div>
+                                                                                            ) : (
+                                                                                                <a href={adj.direccionArchivo} target="_blank" rel="noopener noreferrer"
+                                                                                                    className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors ${esPropio
+                                                                                                        ? 'border-blue-400 text-blue-100 hover:bg-blue-500'
+                                                                                                        : 'border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-600'
+                                                                                                        }`}>
+                                                                                                    <span className="text-base">
+                                                                                                        {adj.tipoArchivo?.includes('pdf') ? '📄' : adj.tipoArchivo?.includes('sheet') || adj.tipoArchivo?.includes('excel') ? '📊' : adj.tipoArchivo?.includes('word') ? '📝' : '📎'}
+                                                                                                    </span>
+                                                                                                    <span className="max-w-[150px] truncate">{nombre}</span>
+                                                                                                    <span className="text-[10px] opacity-70">{adj.tamanio ? `${(Number(adj.tamanio) / 1024).toFixed(0)}KB` : ''}</span>
+                                                                                                </a>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    );
+                                                                                })}
+                                                                            </div>
+                                                                        )}
+                                                                        {/* Texto (ocultar el automático "📎 filename" si hay adjuntos) */}
+                                                                        {mensaje.contenido && !(mensaje.tipoMensaje === 'ARCHIVO' && mensaje.adjuntos?.length && mensaje.contenido.startsWith('📎')) && (
+                                                                            <p className="whitespace-pre-wrap break-words text-sm">
+                                                                                {mensaje.contenido}
+                                                                            </p>
+                                                                        )}
                                                                     </div>
                                                                     <span className="mt-1 text-xs text-gray-500">
                                                                         {formatDate(mensaje.creado)}
@@ -1216,6 +1279,20 @@ export default function MyQuotes() {
 
                                         {/* Input */}
                                         <div className="mt-2 flex items-end gap-2">
+                                            {/* Botón adjuntar */}
+                                            <input ref={chatFileRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,.rar"
+                                                onChange={(e) => { const file = e.target.files?.[0]; if (file) enviarArchivo(file); }} className="hidden" />
+                                            <button onClick={() => chatFileRef.current?.click()} disabled={sendingFile || sendingMessage}
+                                                className="rounded-lg border border-gray-300 p-2.5 text-gray-500 hover:border-blue-400 hover:text-blue-500 disabled:opacity-50 dark:border-gray-600 dark:text-gray-400 dark:hover:border-blue-500 dark:hover:text-blue-400 transition-colors"
+                                                title="Adjuntar archivo">
+                                                {sendingFile ? (
+                                                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+                                                ) : (
+                                                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                                    </svg>
+                                                )}
+                                            </button>
                                             <textarea
                                                 value={nuevoMensaje}
                                                 onChange={(e) => setNuevoMensaje(e.target.value)}
@@ -1244,6 +1321,32 @@ export default function MyQuotes() {
                     </div>
                 </div>
             </div>
+
+            {/* Modal de imagen ampliada */}
+            {imagenModal && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-4"
+                    onClick={() => setImagenModal(null)}>
+                    <div className="relative max-h-[90vh] max-w-[90vw] flex flex-col items-center"
+                        onClick={(e) => e.stopPropagation()}>
+                        <div className="absolute -top-10 right-0 flex items-center gap-2">
+                            <a href={imagenModal.downloadUrl} target="_blank" rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors">
+                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                </svg>
+                                Descargar
+                            </a>
+                            <button onClick={() => setImagenModal(null)}
+                                className="rounded-lg bg-gray-700 px-3 py-1.5 text-sm text-white hover:bg-gray-600 transition-colors">
+                                ✕ Cerrar
+                            </button>
+                        </div>
+                        <img src={imagenModal.src} alt={imagenModal.nombre}
+                            className="max-h-[85vh] w-auto h-auto min-w-[50vw] rounded-lg object-contain shadow-2xl" />
+                        <p className="mt-2 text-sm text-gray-300">{imagenModal.nombre}</p>
+                    </div>
+                </div>
+            )}
         </>
     );
 }

@@ -117,6 +117,7 @@ type ChatMessage = {
     email: string;
   };
   adjuntos?: any[];
+  tipoMensaje: string;
 };
 
 type HistorialCambio = {
@@ -263,6 +264,24 @@ const api = {
       body: JSON.stringify({ chatId, contenido }),
     });
     if (!response.ok) throw new Error("Error al enviar mensaje");
+    return response.json();
+  },
+
+  async sendMessageWithFile(chatId: string, file: File, contenido?: string) {
+    const token = getToken();
+    const formData = new FormData();
+    formData.append("file", file);
+    if (contenido?.trim()) formData.append("contenido", contenido);
+    const response = await fetch(`${API_BASE_URL}/api/v1/messages/${chatId}/upload`, {
+      method: "POST",
+      credentials: "include",
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+    if (!response.ok) {
+      const e = await response.json().catch(() => ({}));
+      throw new Error(e.message || "Error al enviar archivo");
+    }
     return response.json();
   },
 
@@ -447,6 +466,9 @@ export default function FollowUps() {
   const [nuevoMensaje, setNuevoMensaje] = useState("");
   const [loadingChat, setLoadingChat] = useState(false);
   const [sendingMessage, setSendingMessage] = useState(false);
+  const chatFileRef = useRef<HTMLInputElement>(null);
+  const [sendingFile, setSendingFile] = useState(false);
+  const [imagenModal, setImagenModal] = useState<{ src: string; nombre: string; downloadUrl: string } | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const [notasAbiertas, setNotasAbiertas] = useState<string | null>(null);
   const { user, isLoading } = useAuth();
@@ -652,6 +674,22 @@ export default function FollowUps() {
       addNotification("danger", "Error al enviar mensaje", "Error");
     } finally {
       setSendingMessage(false);
+    }
+  };
+
+  const enviarArchivo = async (file: File) => {
+    if (!file || !cotizacionSeleccionada?.chatId) return;
+    try {
+      setSendingFile(true);
+      await api.sendMessageWithFile(cotizacionSeleccionada.chatId, file);
+      await cargarMensajes(cotizacionSeleccionada.chatId);
+      addNotification("success", "Archivo enviado", file.name);
+    } catch (error: any) {
+      console.error("Error al enviar archivo:", error);
+      addNotification("danger", "Error", error.message || "Error al enviar archivo");
+    } finally {
+      setSendingFile(false);
+      if (chatFileRef.current) chatFileRef.current.value = "";
     }
   };
 
@@ -1656,9 +1694,66 @@ export default function FollowUps() {
                                               : "bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white"
                                               }`}
                                           >
-                                            <p className="text-sm whitespace-pre-wrap break-words max-w-[500px]">
-                                              {mensaje.contenido}
-                                            </p>
+                                            {/* Adjuntos: preview de imagen o link de archivo */}
+                                            {mensaje.adjuntos && mensaje.adjuntos.length > 0 && (
+                                              <div className="mb-2">
+                                                {mensaje.adjuntos.map((adj: any) => {
+                                                  const esImagen = adj.tipoArchivo?.startsWith('image/');
+                                                  const nombre = adj.nombreArchivo || adj.direccionArchivo?.split('/').pop() || 'Archivo';
+                                                  return (
+                                                    <div key={adj.id}>
+                                                      {esImagen && adj.previewUrl ? (
+                                                        <div
+                                                          className="cursor-pointer"
+                                                          onClick={() => setImagenModal({ src: adj.direccionArchivo + '/download', nombre, downloadUrl: adj.direccionArchivo })}
+                                                        >
+                                                          <img
+                                                            src={adj.previewUrl}
+                                                            alt={nombre}
+                                                            className="max-w-[280px] max-h-[200px] rounded-lg hover:opacity-90 transition-opacity"
+                                                            loading="lazy"
+                                                            onError={(e) => {
+                                                              (e.target as HTMLImageElement).style.display = 'none';
+                                                              (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                                                            }}
+                                                          />
+                                                          <div className="hidden mt-1">
+                                                            <span className={`inline-flex items-center gap-1 text-xs underline ${esPropio ? 'text-blue-100' : 'text-blue-600 dark:text-blue-400'}`}>
+                                                              📎 {nombre}
+                                                            </span>
+                                                          </div>
+                                                        </div>
+                                                      ) : (
+                                                        <a
+                                                          href={adj.direccionArchivo}
+                                                          target="_blank"
+                                                          rel="noopener noreferrer"
+                                                          className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors ${esPropio
+                                                            ? 'border-blue-400 text-blue-100 hover:bg-blue-500'
+                                                            : 'border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-600'
+                                                            }`}
+                                                        >
+                                                          <span className="text-base">
+                                                            {adj.tipoArchivo?.includes('pdf') ? '📄' :
+                                                              adj.tipoArchivo?.includes('sheet') || adj.tipoArchivo?.includes('excel') ? '📊' :
+                                                                adj.tipoArchivo?.includes('word') || adj.tipoArchivo?.includes('document') ? '📝' :
+                                                                  '📎'}
+                                                          </span>
+                                                          <span className="max-w-[180px] truncate">{nombre}</span>
+                                                          <span className="text-[10px] opacity-70">{adj.tamanio ? `${(Number(adj.tamanio) / 1024).toFixed(0)}KB` : ''}</span>
+                                                        </a>
+                                                      )}
+                                                    </div>
+                                                  );
+                                                })}
+                                              </div>
+                                            )}
+                                            {/* Texto del mensaje (no mostrar el "📎 filename" automático si hay adjuntos) */}
+                                            {mensaje.contenido && !(mensaje.tipoMensaje === 'ARCHIVO' && mensaje.adjuntos?.length > 0 && mensaje.contenido.startsWith('📎')) && (
+                                              <p className="text-sm whitespace-pre-wrap break-words max-w-[500px]">
+                                                {mensaje.contenido}
+                                              </p>
+                                            )}
                                           </div>
 
                                           {/* Fecha */}
@@ -1676,13 +1771,38 @@ export default function FollowUps() {
 
                             {/* Input para enviar mensaje */}
                             <div className="flex gap-2 border-t border-gray-200 pt-4 dark:border-gray-700">
+                              {/* Botón adjuntar archivo */}
+                              <input
+                                ref={chatFileRef}
+                                type="file"
+                                accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,.rar"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) enviarArchivo(file);
+                                }}
+                                className="hidden"
+                              />
+                              <button
+                                onClick={() => chatFileRef.current?.click()}
+                                disabled={sendingFile || sendingMessage}
+                                className="rounded-lg border-2 border-gray-300 px-3 py-2 text-gray-500 transition-colors hover:border-blue-400 hover:text-blue-500 disabled:opacity-50 dark:border-gray-600 dark:text-gray-400 dark:hover:border-blue-500 dark:hover:text-blue-400"
+                                title="Adjuntar archivo"
+                              >
+                                {sendingFile ? (
+                                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+                                ) : (
+                                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                  </svg>
+                                )}
+                              </button>
                               <input
                                 type="text"
                                 value={nuevoMensaje}
                                 onChange={(e) => setNuevoMensaje(e.target.value)}
                                 onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && enviarMensaje()}
                                 placeholder="Escribe un mensaje..."
-                                disabled={sendingMessage}
+                                disabled={sendingMessage || sendingFile}
                                 className="flex-1 rounded-lg border-2 border-gray-300 bg-white px-4 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
                               />
                               <button
@@ -2025,6 +2145,50 @@ export default function FollowUps() {
           </div>
         )}
       </div>
+
+      {/* Modal de imagen ampliada */}
+      {imagenModal && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setImagenModal(null)}
+        >
+          <div
+            className="relative max-h-[90vh] max-w-[90vw] flex flex-col items-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Botones superiores */}
+            <div className="absolute -top-10 right-0 flex items-center gap-2">
+              <a
+                href={imagenModal.downloadUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Descargar
+              </a>
+              <button
+                onClick={() => setImagenModal(null)}
+                className="rounded-lg bg-gray-700 px-3 py-1.5 text-sm text-white hover:bg-gray-600 transition-colors"
+              >
+                ✕ Cerrar
+              </button>
+            </div>
+
+            {/* Imagen */}
+            <img
+              src={imagenModal.src}
+              alt={imagenModal.nombre}
+              className="max-h-[85vh] w-auto h-auto min-w-[50vw] rounded-lg object-contain shadow-2xl"
+            />
+
+            {/* Nombre del archivo */}
+            <p className="mt-2 text-sm text-gray-300">{imagenModal.nombre}</p>
+          </div>
+        </div>
+      )}
     </>
   );
 }
