@@ -121,6 +121,9 @@ export class FollowUpsService {
             select: {
               id: true,
               aprobadoPorSupervisor: true,
+              responsableSeguimiento: {
+                select: { id: true, nombre: true },
+              },
             },
           },
         },
@@ -246,6 +249,9 @@ export class FollowUpsService {
         estadosProductos: {
           include: {
             paisOrigen: true,
+            responsableSeguimiento: {
+              select: { id: true, nombre: true, email: true },
+            },
           },
         },
         // Incluir chat con participantes para verificar

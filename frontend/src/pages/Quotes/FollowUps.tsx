@@ -191,13 +191,34 @@ const api = {
   // Eliminar cotización completa (Usamos el endpoint de quotations que agregaste en el controller)
   async deleteCotizacion(id: string) {
     const token = getToken();
-    // NOTA: Usamos /quotations porque ahí agregaste el @Delete en el backend
     const response = await fetch(`${API_BASE_URL}/api/v1/quotations/${id}`, {
       method: "DELETE",
       credentials: "include",
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!response.ok) throw new Error("Error al eliminar cotización");
+    return response.json();
+  },
+
+  async getSupervisores() {
+    const token = getToken();
+    const response = await fetch(`${API_BASE_URL}/api/v1/estado-productos/supervisores`, {
+      credentials: "include",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error("Error al cargar supervisores");
+    return response.json();
+  },
+
+  async asignarResponsableMasivo(ids: string[], responsableId: string | null) {
+    const token = getToken();
+    const response = await fetch(`${API_BASE_URL}/api/v1/estado-productos/asignar-responsable-masivo`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ ids, responsableId }),
+    });
+    if (!response.ok) throw new Error("Error al asignar responsable");
     return response.json();
   },
 
@@ -453,6 +474,9 @@ export default function FollowUps() {
 
   // Estados principales
   const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>([]);
+  const [supervisores, setSupervisores] = useState<{ id: string; nombre: string }[]>([]);
+  const [menuResponsableCot, setMenuResponsableCot] = useState(false);
+  const [responsableCotAsignado, setResponsableCotAsignado] = useState<{ id: string; nombre: string } | null>(null);
   const [cotizacionSeleccionada, setCotizacionSeleccionada] = useState<Cotizacion | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingDetalle, setLoadingDetalle] = useState(false);
@@ -523,6 +547,7 @@ export default function FollowUps() {
     cargarCotizaciones();
     cargarPaises();
     asignarUsuario();
+    api.getSupervisores().then(setSupervisores).catch(() => { });
   }, [estadoFiltro]);
 
   // Cargar mensajes cuando cambia la cotización seleccionada
@@ -608,6 +633,13 @@ export default function FollowUps() {
       const detalle = await api.getCotizacionDetalle(cotizacion.id);
       setCotizacionSeleccionada(detalle);
       setVistaActiva("detalle");
+      // Detectar responsable actual del primer producto
+      const primerEstado = detalle.estadosProductos?.[0];
+      if (primerEstado?.responsableSeguimiento) {
+        setResponsableCotAsignado({ id: primerEstado.responsableSeguimiento.id, nombre: primerEstado.responsableSeguimiento.nombre });
+      } else {
+        setResponsableCotAsignado(null);
+      }
     } catch (error) {
       console.error("Error al cargar detalle:", error);
       addNotification("danger", "Error al cargar detalle de cotización", "Error");
@@ -690,6 +722,24 @@ export default function FollowUps() {
     } finally {
       setSendingFile(false);
       if (chatFileRef.current) chatFileRef.current.value = "";
+    }
+  };
+
+  const handleAsignarResponsableCotizacion = async (responsableId: string | null) => {
+    if (!cotizacionSeleccionada?.estadosProductos) return;
+    const ids = cotizacionSeleccionada.estadosProductos.map((ep: any) => ep.id);
+    if (ids.length === 0) {
+      addNotification("warn", "Sin productos", "No hay productos para asignar");
+      return;
+    }
+    try {
+      await api.asignarResponsableMasivo(ids, responsableId);
+      const sup = responsableId ? supervisores.find(s => s.id === responsableId) || null : null;
+      setResponsableCotAsignado(sup ? { id: sup.id, nombre: sup.nombre } : null);
+      addNotification("success", "Éxito", responsableId ? `Responsable asignado a ${ids.length} productos` : `Responsable removido de ${ids.length} productos`);
+      setMenuResponsableCot(false);
+    } catch (e: any) {
+      addNotification("danger", "Error", e.message);
     }
   };
 
@@ -1379,30 +1429,74 @@ export default function FollowUps() {
                         </svg>
                         Eliminar
                       </button>
-                    </div>
-                  </div>
 
-                  {/* Progreso */}
-                  <div className="flex items-center gap-4">
-                    <div className="flex-1">
-                      <div className="mb-2 flex items-center justify-between text-sm">
-                        <span className="font-medium text-gray-700 dark:text-gray-300">
-                          Progreso de aprobación
-                        </span>
-                        <span className="font-semibold text-gray-900 dark:text-white">
-                          {cotizacionSeleccionada.productosAprobados} / {cotizacionSeleccionada.totalProductos}
-                        </span>
-                      </div>
-                      <div className="h-3 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-                        <div
-                          className="h-full rounded-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all dark:from-blue-600 dark:to-blue-700"
-                          style={{ width: `${cotizacionSeleccionada.porcentajeAprobado || 0}%` }}
-                        />
+                      {/* Asignar responsable de seguimiento */}
+                      <div className="relative">
+                        <button
+                          onClick={() => setMenuResponsableCot(!menuResponsableCot)}
+                          className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors ${responsableCotAsignado
+                            ? "text-green-600 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20"
+                            : "text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
+                            }`}
+                          title="Asignar responsable de seguimiento a todos los productos"
+                        >
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          {responsableCotAsignado ? responsableCotAsignado.nombre : "Asignar Responsable"}
+                        </button>
+                        {menuResponsableCot && (
+                          <div className="absolute right-0 top-full z-50 mt-1 w-52 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
+                            <div className="p-1.5">
+                              <p className="px-2 py-1 text-[10px] font-semibold text-gray-400 uppercase">Asignar a todos los productos:</p>
+                              {supervisores.map(sup => (
+                                <button key={sup.id}
+                                  onClick={() => handleAsignarResponsableCotizacion(sup.id)}
+                                  className={`w-full rounded-md px-2 py-1.5 text-left text-xs transition-colors ${responsableCotAsignado?.id === sup.id
+                                    ? "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
+                                    : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
+                                    }`}>
+                                  {sup.nombre} {responsableCotAsignado?.id === sup.id && "✓"}
+                                </button>
+                              ))}
+                              {responsableCotAsignado && (
+                                <>
+                                  <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
+                                  <button
+                                    onClick={() => handleAsignarResponsableCotizacion(null)}
+                                    className="w-full rounded-md px-2 py-1.5 text-left text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
+                                    Quitar responsable de todos
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
-                    <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {cotizacionSeleccionada.porcentajeAprobado || 0}%
-                    </span>
+
+                    {/* Progreso */}
+                    <div className="flex items-center gap-4">
+                      <div className="flex-1">
+                        <div className="mb-2 flex items-center justify-between text-sm">
+                          <span className="font-medium text-gray-700 dark:text-gray-300">
+                            Progreso de aprobación
+                          </span>
+                          <span className="font-semibold text-gray-900 dark:text-white">
+                            {cotizacionSeleccionada.productosAprobados} / {cotizacionSeleccionada.totalProductos}
+                          </span>
+                        </div>
+                        <div className="h-3 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all dark:from-blue-600 dark:to-blue-700"
+                            style={{ width: `${cotizacionSeleccionada.porcentajeAprobado || 0}%` }}
+                          />
+                        </div>
+                      </div>
+                      <span className="text-2xl font-bold text-gray-900 dark:text-white">
+                        {cotizacionSeleccionada.porcentajeAprobado || 0}%
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -2045,7 +2139,6 @@ export default function FollowUps() {
                 </div>
               </>
             ) : (
-              // Estado vacío cuando no hay cotización seleccionada
               <div className="flex h-full items-center justify-center rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700">
                 <div className="text-center">
                   <svg
@@ -2075,7 +2168,7 @@ export default function FollowUps() {
 
         {/* ========================================
           MODAL DE CONFIGURACIÓN DE TIMELINE
-      ======================================== */}
+        ======================================== */}
         {showTimelineModal && productoConfigurando && (
           <div className="fixed inset-0 z-9950 flex items-center justify-center bg-black/50 p-4">
             <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border-2 border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">

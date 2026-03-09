@@ -16,7 +16,7 @@ import DatePicker from "../../components/common/DatePicker";
 
 type TipoCompra = "NACIONAL" | "INTERNACIONAL";
 type LugarEntrega = "ALMACEN" | "OFICINA" | "PROYECTO";
-type TipoUnidad = "UNIDAD" | "CAJA" | "PAQUETE" | "METRO" | "KILOGRAMO" | "LITRO" | "OTRO";
+type TipoUnidad = "UNIDAD" | "CAJA" | "PAQUETE" | "METRO" | "Pies" | "KILOGRAMO" | "LITRO" | "OTRO";
 
 interface ItemCotizacion {
   // sku eliminado - será autoasignado por backend
@@ -801,6 +801,7 @@ export default function New() {
                       <option value="CAJA">Caja</option>
                       <option value="PAQUETE">Paquete</option>
                       <option value="METRO">Metro</option>
+                      <option value="PIES">Pies</option>
                       <option value="KILOGRAMO">Kilogramo</option>
                       <option value="LITRO">Litro</option>
                       <option value="OTRO">Otro</option>
