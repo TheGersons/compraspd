@@ -1132,7 +1132,7 @@ export default function MyQuotes() {
                                                     <div className="mt-2 flex items-center justify-between rounded-lg bg-white px-3 py-2 text-xs shadow-sm dark:bg-gray-800">
                                                         <span className="text-gray-500 dark:text-gray-400">💵 Valor total del pedido:</span>
                                                         <span className="font-bold text-gray-900 dark:text-white">
-                                                            ${precioTotal.toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                            L. {precioTotal.toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                         </span>
                                                     </div>
                                                 )}
@@ -1236,13 +1236,13 @@ export default function MyQuotes() {
                                                                                 <div>
                                                                                     <span className="text-gray-500 dark:text-gray-400">Unit:</span>
                                                                                     <span className="ml-1 font-semibold text-gray-900 dark:text-white">
-                                                                                        ${precioUnit.toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                                                        L.{precioUnit.toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                                                     </span>
                                                                                 </div>
                                                                                 <div>
                                                                                     <span className="text-gray-500 dark:text-gray-400">Total:</span>
                                                                                     <span className="ml-1 font-semibold text-green-700 dark:text-green-400">
-                                                                                        ${precioTot.toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                                                        L. {precioTot.toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                                                     </span>
                                                                                 </div>
                                                                                 {nombreProveedor && (

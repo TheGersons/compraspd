@@ -18,6 +18,13 @@ type TipoCompra = "NACIONAL" | "INTERNACIONAL";
 type LugarEntrega = "ALMACEN" | "OFICINA" | "PROYECTO";
 type TipoUnidad = "UNIDAD" | "CAJA" | "PAQUETE" | "METRO" | "Pies" | "KILOGRAMO" | "LITRO" | "OTRO";
 
+interface ArchivoAdjunto {
+  file: File;
+  id: string; // local key para el preview
+  estado: "pendiente" | "subiendo" | "ok" | "error";
+  error?: string;
+}
+
 interface ItemCotizacion {
   // sku eliminado - será autoasignado por backend
   descripcionProducto: string;
@@ -167,6 +174,31 @@ const api = {
     if (!response.ok) { const e = await response.json(); throw new Error(e.message || "Error al crear proyecto"); }
     return response.json();
   },
+
+  async subirArchivosChat(chatId: string, archivos: File[]): Promise<{ ok: File[]; error: File[] }> {
+    const ok: File[] = [];
+    const error: File[] = [];
+    await Promise.all(
+      archivos.map(async (file) => {
+        try {
+          const token = await getToken();
+          const formData = new FormData();
+          formData.append("file", file);
+          const response = await fetch(`${API_BASE_URL}/api/v1/messages/${chatId}/upload`, {
+            method: "POST",
+            credentials: "include",
+            headers: { Authorization: `Bearer ${token}` },
+            body: formData,
+          });
+          if (!response.ok) throw new Error("Error al subir archivo");
+          ok.push(file);
+        } catch {
+          error.push(file);
+        }
+      })
+    );
+    return { ok, error };
+  },
 };
 
 // ============================================================================
@@ -210,6 +242,10 @@ export default function New() {
   const [nuevoProyectoNombre, setNuevoProyectoNombre] = useState("");
   const [nuevoProyectoAreaId, setNuevoProyectoAreaId] = useState("");
   const [creandoProyecto, setCreandoProyecto] = useState(false);
+
+  // Archivos adjuntos
+  const [archivos, setArchivos] = useState<ArchivoAdjunto[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Estados de carga y errores
   const [loading, setLoading] = useState(false);
@@ -339,6 +375,41 @@ export default function New() {
     setItems(nuevosItems);
   };
 
+  // Manejo de archivos adjuntos
+  const agregarArchivos = (files: FileList | File[]) => {
+    const nuevos: ArchivoAdjunto[] = Array.from(files).map((file) => ({
+      file,
+      id: `${file.name}-${Date.now()}-${Math.random()}`,
+      estado: "pendiente" as const,
+    }));
+    setArchivos((prev) => [...prev, ...nuevos]);
+  };
+
+  const eliminarArchivo = (id: string) => {
+    setArchivos((prev) => prev.filter((a) => a.id !== id));
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files.length > 0) agregarArchivos(e.dataTransfer.files);
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const getFileIcon = (file: File) => {
+    const type = file.type;
+    if (type.startsWith("image/")) return "🖼️";
+    if (type === "application/pdf") return "📄";
+    if (type.includes("spreadsheet") || type.includes("excel")) return "📊";
+    if (type.includes("word") || type.includes("document")) return "📝";
+    return "📎";
+  };
+
   // Validación
   const validarFormulario = (): string | null => {
     if (!nombreCotizacion.trim()) return "El nombre de la cotización es obligatorio";
@@ -405,6 +476,31 @@ export default function New() {
       };
 
       const resultado = await api.crearCotizacion(payload);
+
+      // Subir archivos adjuntos al chat (si hay)
+      if (archivos.length > 0 && resultado.chatId) {
+        // Marcar todos como "subiendo"
+        setArchivos((prev) => prev.map((a) => ({ ...a, estado: "subiendo" as const })));
+
+        const { ok, error: errores } = await api.subirArchivosChat(
+          resultado.chatId,
+          archivos.map((a) => a.file)
+        );
+
+        // Actualizar estados individuales
+        setArchivos((prev) =>
+          prev.map((a) => ({
+            ...a,
+            estado: errores.includes(a.file) ? ("error" as const) : ("ok" as const),
+          }))
+        );
+
+        if (errores.length > 0 && ok.length === 0) {
+          addNotification("warn", "Archivos no subidos", `La cotización se creó pero no se pudieron subir ${errores.length} archivo(s). Puedes adjuntarlos desde el chat en Mis Cotizaciones.`);
+        } else if (errores.length > 0) {
+          addNotification("warn", "Algunos archivos fallaron", `${ok.length} archivo(s) subidos, ${errores.length} fallaron. Puedes adjuntar los faltantes desde el chat.`);
+        }
+      }
 
       addNotification(
         "success",
@@ -825,6 +921,98 @@ export default function New() {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Archivos Adjuntos */}
+        <div className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <h2 className="mb-1 text-lg font-semibold text-gray-900 dark:text-white">
+            Archivos Adjuntos
+          </h2>
+          <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
+            Opcional — los archivos se enviarán directamente al chat de la cotización al crearla.
+          </p>
+
+          {/* Drop zone */}
+          <div
+            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={handleDrop}
+            className={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-8 transition-colors cursor-pointer
+              ${isDragging
+                ? "border-blue-400 bg-blue-50 dark:border-blue-500 dark:bg-blue-900/20"
+                : "border-gray-300 bg-gray-50 hover:border-blue-400 hover:bg-blue-50/50 dark:border-gray-600 dark:bg-gray-700/50 dark:hover:border-blue-500"
+              }`}
+            onClick={() => document.getElementById("file-input-new")?.click()}
+          >
+            <input
+              id="file-input-new"
+              type="file"
+              multiple
+              className="hidden"
+              onChange={(e) => { if (e.target.files) { agregarArchivos(e.target.files); e.target.value = ""; } }}
+            />
+            <svg className={`mb-2 h-10 w-10 ${isDragging ? "text-blue-500" : "text-gray-400"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
+              {isDragging ? "Suelta los archivos aquí" : "Arrastra archivos o haz clic para seleccionar"}
+            </p>
+            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+              PDF, imágenes, Excel, Word — cualquier tipo de archivo
+            </p>
+          </div>
+
+          {/* Lista de archivos seleccionados */}
+          {archivos.length > 0 && (
+            <div className="mt-4 space-y-2">
+              {archivos.map((adjunto) => (
+                <div
+                  key={adjunto.id}
+                  className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm transition-colors
+                    ${adjunto.estado === "ok" ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-900/20"
+                      : adjunto.estado === "error" ? "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20"
+                        : adjunto.estado === "subiendo" ? "border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20"
+                          : "border-gray-200 bg-white dark:border-gray-600 dark:bg-gray-700"}`}
+                >
+                  <span className="text-lg">{getFileIcon(adjunto.file)}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium text-gray-800 dark:text-gray-200">
+                      {adjunto.file.name}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {formatFileSize(adjunto.file.size)}
+                    </p>
+                  </div>
+                  {/* Estado */}
+                  {adjunto.estado === "subiendo" && (
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+                  )}
+                  {adjunto.estado === "ok" && (
+                    <svg className="h-5 w-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                  {adjunto.estado === "error" && (
+                    <span className="text-xs font-medium text-red-600 dark:text-red-400">Error</span>
+                  )}
+                  {adjunto.estado === "pendiente" && (
+                    <button
+                      type="button"
+                      onClick={() => eliminarArchivo(adjunto.id)}
+                      className="ml-1 rounded p-1 text-gray-400 transition-colors hover:bg-red-100 hover:text-red-500 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              ))}
+              <p className="text-right text-xs text-gray-400 dark:text-gray-500">
+                {archivos.length} archivo{archivos.length !== 1 ? "s" : ""} seleccionado{archivos.length !== 1 ? "s" : ""}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Botones */}
