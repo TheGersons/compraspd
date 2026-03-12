@@ -57,6 +57,8 @@ import Documents from "./pages/Shopping/Documents";
 import Proveedores from "./pages/Proveedores/Proveedores";
 import AprobacionCompras from "./pages/Shopping/AprobacionCompras";
 import RejectedQuotes from "./pages/Quotes/Rejectedquotes";
+import Licitaciones from "./pages/Licitaciones/Licitaciones";
+import Archivadas from "./pages/Licitaciones/Archivadas";
 
 const SHOPPING_MANAGER_ROLES = ["ADMIN", "SUPERVISOR"];
 const QUOTES_SUPERVISOR_ROLES = ["SUPERVISOR", "ADMIN"];
@@ -235,6 +237,26 @@ export default function App() {
                 <Route path="aprobacion" element={
                   <ProtectedRoute roles={STAFF_ROLES}>
                     <AprobacionCompras />
+                  </ProtectedRoute>
+                } />
+              </Route>
+
+              {/* LICITACIONES - Solo STAFF */}
+              <Route
+                path="/licitaciones"
+                element={
+                  <ProtectedRoute roles={STAFF_ROLES}>
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={
+                  <ProtectedRoute roles={STAFF_ROLES}>
+                    <Licitaciones />
+                  </ProtectedRoute>
+                } />
+                <Route path="archivo" element={
+                  <ProtectedRoute roles={STAFF_ROLES}>
+                    <Archivadas />
                   </ProtectedRoute>
                 } />
               </Route>

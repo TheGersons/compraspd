@@ -72,6 +72,10 @@ type Producto = {
         rechazado?: boolean;
         fechaRechazo?: string;
         motivoRechazo?: string;
+        // Precio cotizado
+        precioUnitario?: number | null;
+        precioTotal?: number | null;
+        proveedor?: string | null;
         // Estados de compra
         cotizado?: boolean;
         conDescuento?: boolean;
@@ -168,31 +172,39 @@ type ChatMessage = {
 const ESTADOS_COMPRA_ICONOS: Record<string, string> = {
     cotizado: "📋",
     conDescuento: "💰",
+    aprobacionCompra: "✅",
     comprado: "🛒",
     pagado: "💳",
+    aprobacionPlanos: "📐",
     primerSeguimiento: "📞",
     enFOB: "🚢",
+    cotizacionFleteInternacional: "📊",
     conBL: "📄",
-    segundoSeguimiento: "📞",
-    enCIF: "🌊",
+    segundoSeguimiento: "🚚",
+    enCIF: "🛃",
     recibido: "📦",
 };
 
 const ESTADOS_COMPRA_LABELS: Record<string, string> = {
     cotizado: "Cotizado",
     conDescuento: "Con Descuento",
+    aprobacionCompra: "Aprobación de Compra",
     comprado: "Comprado",
     pagado: "Pagado",
-    primerSeguimiento: "1er Seguimiento",
-    enFOB: "En FOB",
-    conBL: "Con BL",
-    segundoSeguimiento: "2do Seguimiento",
-    enCIF: "En CIF",
+    aprobacionPlanos: "Aprobación de Planos",
+    primerSeguimiento: "1er Seguimiento / Estado de producto",
+    enFOB: "Incoterms",
+    cotizacionFleteInternacional: "Cotización Flete Int.",
+    conBL: "Documentos de importación",
+    segundoSeguimiento: "2do Seg. / En Tránsito",
+    enCIF: "Proceso de aduana",
     recibido: "Recibido",
 };
 
-const ESTADOS_NACIONAL = ['cotizado', 'conDescuento', 'comprado', 'pagado', 'recibido'];
-const ESTADOS_INTERNACIONAL = ['cotizado', 'conDescuento', 'comprado', 'pagado', 'primerSeguimiento', 'enFOB', 'conFleteInternacional', 'conBL', 'segundoSeguimiento', 'enCIF', 'recibido'];
+// NACIONAL: cotizado → conDescuento → aprobacionCompra → comprado → pagado → recibido
+const ESTADOS_NACIONAL = ['cotizado', 'conDescuento', 'aprobacionCompra', 'comprado', 'pagado', 'recibido'];
+// INTERNACIONAL: 13 etapas completas
+const ESTADOS_INTERNACIONAL = ['cotizado', 'conDescuento', 'aprobacionCompra', 'comprado', 'pagado', 'aprobacionPlanos', 'primerSeguimiento', 'enFOB', 'cotizacionFleteInternacional', 'conBL', 'segundoSeguimiento', 'enCIF', 'recibido'];
 
 // ============================================================================
 // API SERVICE
@@ -287,6 +299,16 @@ const api = {
             productosEnCompra,
             productosRecibidos,
             progresoCompraTotal,
+            // Join de detalles con sus estadosProductos (para tener datos de precio y progreso)
+            detalles: (data.detalles || []).map((detalle: any) => {
+                const ep = estadosProductos.find(
+                    (e: any) => e.cotizacionDetalleId === detalle.id
+                );
+                return {
+                    ...detalle,
+                    estadoProducto: ep || detalle.estadoProducto || null,
+                };
+            }),
         };
     },
 
@@ -693,10 +715,10 @@ export default function MyQuotes() {
                             <div
                                 key={estado}
                                 className={`flex items-center gap-1 rounded px-2 py-1 text-xs ${completado
-                                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                        : esActual
-                                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 ring-2 ring-blue-500'
-                                            : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500'
+                                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                    : esActual
+                                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 ring-2 ring-blue-500'
+                                        : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500'
                                     }`}
                                 title={ESTADOS_COMPRA_LABELS[estado]}
                             >
@@ -800,8 +822,8 @@ export default function MyQuotes() {
                     <button
                         onClick={() => { setVistaActual('cotizaciones'); setCotizacionSeleccionada(null); }}
                         className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${vistaActual === 'cotizaciones'
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
                             }`}
                     >
                         📝 Cotizaciones
@@ -813,8 +835,8 @@ export default function MyQuotes() {
                     <button
                         onClick={() => { setVistaActual('enCompras'); setCotizacionSeleccionada(null); }}
                         className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${vistaActual === 'enCompras'
-                                ? 'bg-orange-600 text-white'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                            ? 'bg-orange-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
                             }`}
                     >
                         🛒 En Compras
@@ -826,8 +848,8 @@ export default function MyQuotes() {
                     <button
                         onClick={() => { setVistaActual('completadas'); setCotizacionSeleccionada(null); }}
                         className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${vistaActual === 'completadas'
-                                ? 'bg-green-600 text-white'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                            ? 'bg-green-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
                             }`}
                     >
                         ✅ Recibidas
@@ -882,8 +904,8 @@ export default function MyQuotes() {
                                                 <button
                                                     onClick={() => seleccionarCotizacion(cot)}
                                                     className={`w-full rounded-lg border p-3 text-left transition-all ${isSelected
-                                                            ? "border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/20"
-                                                            : "border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/50"
+                                                        ? "border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/20"
+                                                        : "border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/50"
                                                         }`}
                                                 >
                                                     {/* Header con estado */}
@@ -895,8 +917,8 @@ export default function MyQuotes() {
                                                         </span>
                                                         {/* Badge tipo compra */}
                                                         <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${cot.tipoCompra === 'NACIONAL'
-                                                                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                                                : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                                                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                                            : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
                                                             }`}>
                                                             {cot.tipoCompra === 'NACIONAL' ? '🇭🇳' : '🌍'}
                                                         </span>
@@ -995,8 +1017,8 @@ export default function MyQuotes() {
                                                     {getEstadoLabel(cotizacionSeleccionada.estado)}
                                                 </span>
                                                 <span className={`rounded px-2 py-0.5 text-xs font-medium ${cotizacionSeleccionada.tipoCompra === 'NACIONAL'
-                                                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                                        : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                                                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                                    : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
                                                     }`}>
                                                     {cotizacionSeleccionada.tipoCompra === 'NACIONAL' ? '🇭🇳 Nacional' : '🌍 Internacional'}
                                                 </span>
@@ -1048,37 +1070,75 @@ export default function MyQuotes() {
                                         )}
                                     </div>
 
-                                    {/* Resumen de progreso */}
-                                    {(vistaActual === 'enCompras' || vistaActual === 'completadas') && (
-                                        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
-                                            <h5 className="mb-2 font-medium text-blue-800 dark:text-blue-200">
-                                                📊 Resumen de Compra
-                                            </h5>
-                                            <div className="grid grid-cols-3 gap-4 text-center">
-                                                <div>
-                                                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                                                        {cotizacionSeleccionada.productosAprobados}
-                                                    </p>
-                                                    <p className="text-xs text-gray-600 dark:text-gray-400">En compra</p>
+                                    {/* Resumen de progreso - calculado dinámicamente */}
+                                    {(vistaActual === 'enCompras' || vistaActual === 'completadas') && (() => {
+                                        const detalles = cotizacionSeleccionada.detalles || [];
+                                        const tipoCompra = cotizacionSeleccionada.tipoCompra || 'INTERNACIONAL';
+                                        const estadosList = tipoCompra === 'NACIONAL' ? ESTADOS_NACIONAL : ESTADOS_INTERNACIONAL;
+
+                                        const aprobados = detalles.filter(
+                                            (p: any) => p.estadoProducto?.aprobadoPorSupervisor && !p.estadoProducto?.rechazado
+                                        );
+                                        const recibidos = aprobados.filter((p: any) => p.estadoProducto?.recibido);
+                                        const comprados = aprobados.filter((p: any) => p.estadoProducto?.comprado);
+
+                                        let sumaProgreso = 0;
+                                        aprobados.forEach((p: any) => {
+                                            const ep = p.estadoProducto;
+                                            let completados = 0;
+                                            estadosList.forEach((e: string) => { if (ep?.[e]) completados++; });
+                                            sumaProgreso += (completados / estadosList.length) * 100;
+                                        });
+                                        const progresoReal = aprobados.length > 0
+                                            ? Math.round(sumaProgreso / aprobados.length)
+                                            : 0;
+
+                                        const precioTotal = aprobados.reduce((sum: number, p: any) => {
+                                            return sum + (p.estadoProducto?.precioTotal ? Number(p.estadoProducto.precioTotal) : 0);
+                                        }, 0);
+
+                                        return (
+                                            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
+                                                <h5 className="mb-3 font-medium text-blue-800 dark:text-blue-200">
+                                                    📊 Resumen de Compra
+                                                </h5>
+                                                <div className="mb-3 grid grid-cols-4 gap-2 text-center">
+                                                    <div className="rounded-lg bg-white p-2 shadow-sm dark:bg-gray-800">
+                                                        <p className="text-xl font-bold text-blue-600 dark:text-blue-400">{aprobados.length}</p>
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400">En compra</p>
+                                                    </div>
+                                                    <div className="rounded-lg bg-white p-2 shadow-sm dark:bg-gray-800">
+                                                        <p className="text-xl font-bold text-orange-500 dark:text-orange-400">{comprados.length}</p>
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400">Comprados</p>
+                                                    </div>
+                                                    <div className="rounded-lg bg-white p-2 shadow-sm dark:bg-gray-800">
+                                                        <p className="text-xl font-bold text-green-600 dark:text-green-400">{recibidos.length}</p>
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400">Recibidos</p>
+                                                    </div>
+                                                    <div className="rounded-lg bg-white p-2 shadow-sm dark:bg-gray-800">
+                                                        <p className={`text-xl font-bold ${progresoReal === 100 ? 'text-green-600 dark:text-green-400' : 'text-blue-600 dark:text-blue-400'}`}>{progresoReal}%</p>
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400">Progreso</p>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                                                        {cotizacionSeleccionada.productosRecibidos || 0}
-                                                    </p>
-                                                    <p className="text-xs text-gray-600 dark:text-gray-400">Recibidos</p>
+                                                <div className="mb-2">
+                                                    <div className="h-2.5 w-full overflow-hidden rounded-full bg-blue-200 dark:bg-blue-800">
+                                                        <div
+                                                            className={`h-full rounded-full transition-all duration-500 ${progresoReal === 100 ? 'bg-green-500' : 'bg-blue-600'}`}
+                                                            style={{ width: `${progresoReal}%` }}
+                                                        />
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <p className={`text-2xl font-bold ${cotizacionSeleccionada.progresoCompraTotal === 100
-                                                            ? 'text-green-600 dark:text-green-400'
-                                                            : 'text-orange-600 dark:text-orange-400'
-                                                        }`}>
-                                                        {cotizacionSeleccionada.progresoCompraTotal || 0}%
-                                                    </p>
-                                                    <p className="text-xs text-gray-600 dark:text-gray-400">Progreso</p>
-                                                </div>
+                                                {precioTotal > 0 && (
+                                                    <div className="mt-2 flex items-center justify-between rounded-lg bg-white px-3 py-2 text-xs shadow-sm dark:bg-gray-800">
+                                                        <span className="text-gray-500 dark:text-gray-400">💵 Valor total del pedido:</span>
+                                                        <span className="font-bold text-gray-900 dark:text-white">
+                                                            ${precioTotal.toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                        </span>
+                                                    </div>
+                                                )}
                                             </div>
-                                        </div>
-                                    )}
+                                        );
+                                    })()}
 
                                     {/* Lista de productos con timeline */}
                                     <div>
@@ -1103,10 +1163,10 @@ export default function MyQuotes() {
                                                     <div
                                                         key={producto.id}
                                                         className={`rounded-lg border p-3 ${producto.estadoProducto?.rechazado
-                                                                ? 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/10'
-                                                                : producto.estadoProducto?.aprobadoPorSupervisor
-                                                                    ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/10'
-                                                                    : 'border-gray-200 dark:border-gray-700'
+                                                            ? 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/10'
+                                                            : producto.estadoProducto?.aprobadoPorSupervisor
+                                                                ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/10'
+                                                                : 'border-gray-200 dark:border-gray-700'
                                                             }`}
                                                     >
                                                         <div className="flex items-start justify-between">
@@ -1139,6 +1199,64 @@ export default function MyQuotes() {
                                                                 <p className="text-xs text-gray-500 dark:text-gray-400">
                                                                     {producto.cantidad} {producto.tipoUnidad}
                                                                 </p>
+
+                                                                {/* Precio cotizado - Tab Cotizaciones */}
+                                                                {vistaActual === 'cotizaciones' && (() => {
+                                                                    const ep = producto.estadoProducto;
+                                                                    const tienePrecio = ep?.precioUnitario && Number(ep.precioUnitario) > 0;
+                                                                    // También revisar precio del detalle (precios seleccionados desde el backend)
+                                                                    const precioDetalle = (producto as any).precios;
+                                                                    const tienePrecioDetalle = precioDetalle?.precio && Number(precioDetalle.precio) > 0;
+
+                                                                    if (!tienePrecio && !tienePrecioDetalle) {
+                                                                        return (
+                                                                            <div className="mt-1.5 inline-flex items-center gap-1 rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                                                                                ⏳ Sin precio cotizado aún
+                                                                            </div>
+                                                                        );
+                                                                    }
+
+                                                                    const precioUnit = tienePrecio
+                                                                        ? Number(ep!.precioUnitario)
+                                                                        : Number(precioDetalle.precio);
+                                                                    const precioTot = tienePrecio
+                                                                        ? Number(ep!.precioTotal)
+                                                                        : precioUnit * producto.cantidad;
+                                                                    const nombreProveedor = tienePrecio
+                                                                        ? ep!.proveedor
+                                                                        : precioDetalle?.proveedor?.nombre;
+                                                                    const tieneDescuento = tienePrecio && ep?.conDescuento && precioDetalle?.precioDescuento;
+
+                                                                    return (
+                                                                        <div className="mt-2 rounded-lg border border-green-200 bg-green-50 p-2 dark:border-green-800 dark:bg-green-900/20">
+                                                                            <div className="mb-1 flex items-center gap-1 text-xs font-medium text-green-700 dark:text-green-400">
+                                                                                💰 {tieneDescuento ? 'Precio con descuento' : 'Último precio cotizado'}
+                                                                            </div>
+                                                                            <div className="grid grid-cols-2 gap-2 text-xs">
+                                                                                <div>
+                                                                                    <span className="text-gray-500 dark:text-gray-400">Unit:</span>
+                                                                                    <span className="ml-1 font-semibold text-gray-900 dark:text-white">
+                                                                                        ${precioUnit.toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                                                    </span>
+                                                                                </div>
+                                                                                <div>
+                                                                                    <span className="text-gray-500 dark:text-gray-400">Total:</span>
+                                                                                    <span className="ml-1 font-semibold text-green-700 dark:text-green-400">
+                                                                                        ${precioTot.toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                                                    </span>
+                                                                                </div>
+                                                                                {nombreProveedor && (
+                                                                                    <div className="col-span-2">
+                                                                                        <span className="text-gray-500 dark:text-gray-400">Proveedor:</span>
+                                                                                        <span className="ml-1 font-medium text-gray-900 dark:text-white">
+                                                                                            🏭 {nombreProveedor}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })()}
                                                             </div>
                                                         </div>
 
@@ -1224,8 +1342,8 @@ export default function MyQuotes() {
                                                                     )}
                                                                     <div
                                                                         className={`rounded-2xl px-4 py-2 ${esPropio
-                                                                                ? "bg-blue-600 text-white"
-                                                                                : "bg-white text-gray-900 dark:bg-gray-800 dark:text-white"
+                                                                            ? "bg-blue-600 text-white"
+                                                                            : "bg-white text-gray-900 dark:bg-gray-800 dark:text-white"
                                                                             }`}
                                                                     >
                                                                         {/* Adjuntos */}

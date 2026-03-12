@@ -4,7 +4,8 @@ import {
   ShoppingCart, /*, User*/
   User,
   UtilityPole,
-  Building2
+  Building2,
+  BadgeDollarSign
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
@@ -66,6 +67,15 @@ const navItems: NavItem[] = [
       { name: "Aprobación de Compras", path: "/shopping/aprobacion", pro: false },
       { name: "Documentos", path: "/shopping/documents", pro: false },
       { name: "Historial", path: "/shopping/history", pro: false },
+    ],
+  },
+  {
+    icon: <BadgeDollarSign />,
+    name: "Licitaciones",
+    roles: ["ADMIN", "SUPERVISOR"], // USUARIO no ve este menú
+    subItems: [
+      { name: "Seguimiento", path: "/licitaciones", pro: false },
+      { name: "Archivadas", path: "/licitaciones/archivo", pro: false },
     ],
   },
   {

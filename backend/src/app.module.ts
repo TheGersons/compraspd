@@ -31,6 +31,8 @@ import { EstadoProductoModule } from './modules/estado-producto/estado-producto.
 import { StorageModule } from './modules/storage';
 import { MailModule } from './modules/Mail/mail.module';
 import { DocumentoModule } from './modules/documentos/documento.module';
+import { LocationsModule } from './modules/Locations/locations.module';
+import { LicitacionesModule } from './modules/licitaciones/licitaciones.module';
 
 @Module({
   imports: [
@@ -63,6 +65,8 @@ import { DocumentoModule } from './modules/documentos/documento.module';
     StorageModule,
     MailModule,
     DocumentoModule,
+    LocationsModule,
+    LicitacionesModule,
   ],
   providers: [SessionCleanupService],
 })

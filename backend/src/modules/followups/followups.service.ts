@@ -1025,6 +1025,58 @@ export class FollowUpsService {
         },
       });
 
+      // Si todos aprobados y es tipo licitación, crear licitación automáticamente
+      if (todosAprobados) {
+        const cotData = await tx.cotizacion.findUnique({
+          where: { id: cotizacionId },
+          select: { tipoId: true },
+        });
+
+        // Mantenemos la validación del UUID de tipo Licitación
+        if (cotData?.tipoId === '552548ae-4fb7-45a5-88f6-d02b8af0dfdd') {
+          // 1. Verificar si ya existe la licitación usando Prisma nativo
+          const existente = await tx.licitacion.findUnique({
+            where: { cotizacionId: cotizacionId },
+          });
+
+          if (!existente) {
+            // 2. Obtener los productos aprobados
+            const estadosAprobados = await tx.estadoProducto.findMany({
+              where: {
+                cotizacionId: cotizacionId,
+                aprobadoPorSupervisor: true,
+              },
+            });
+
+            // 3. Crear Licitación y sus productos en una sola operación (Nested Write)
+            // Esto es más eficiente y seguro que múltiples raw queries
+            await tx.licitacion.create({
+              data: {
+                cotizacionId: cotizacionId,
+                nombre: cotizacion.nombreCotizacion,
+                productos: {
+                  create: estadosAprobados.map((ep) => ({
+                    estadoProductoId: ep.id,
+                    cotizacionId: cotizacionId,
+                    sku: ep.sku,
+                    descripcion: ep.descripcion,
+                    cotizado: true,
+                    conDescuento: true,
+                    proveedor: ep.proveedor,
+                    precioUnitario: ep.precioUnitario,
+                    precioTotal: ep.precioTotal,
+                    cantidad: ep.cantidad,
+                    tipoCompra: cotizacion.tipoCompra || 'NACIONAL',
+                    fechaCotizado: ep.fechaCotizado,
+                    fechaConDescuento: ep.fechaConDescuento,
+                  })),
+                },
+              },
+            });
+          }
+        }
+      }
+
       return {
         cambios,
         totalProductos,
@@ -1035,10 +1087,45 @@ export class FollowUpsService {
       };
     });
 
+    // Si se aprobó todo, verificar si es licitación
+    if (resultado.todosAprobados) {
+      await this.verificarYCrearLicitacion(cotizacionId);
+    }
+
     return {
       message: 'Aprobaciones actualizadas exitosamente',
       ...resultado,
     };
+  }
+
+  /**
+   * Verifica si la cotización es tipo Licitación y crea la licitación
+   * Se llama después de aprobar productos
+   */
+  async verificarYCrearLicitacion(cotizacionId: string) {
+    const LICITACIONES_TIPO_ID = '552548ae-4fb7-45a5-88f6-d02b8af0dfdd';
+
+    const cotizacion = await this.prisma.cotizacion.findUnique({
+      where: { id: cotizacionId },
+      select: { tipoId: true, todosProductosAprobados: true },
+    });
+
+    if (
+      cotizacion?.tipoId === LICITACIONES_TIPO_ID &&
+      cotizacion.todosProductosAprobados
+    ) {
+      try {
+        // Importar dinámicamente para evitar dependencia circular
+        const {
+          LicitacionesService,
+        } = require('../licitaciones/licitaciones.service');
+        const licitacionesService = new LicitacionesService(this.prisma);
+        await licitacionesService.crearDesdeCotizacion(cotizacionId);
+      } catch (error) {
+        console.error('Error al crear licitación:', error);
+        // No fallar la aprobación si falla crear licitación
+      }
+    }
   }
 
   /**

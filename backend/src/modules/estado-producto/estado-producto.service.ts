@@ -147,6 +147,10 @@ export class EstadoProductoService {
     const where: any = {
       // Solo mostrar productos aprobados por supervisor
       aprobadoPorSupervisor: true,
+      // Excluir productos de cotizaciones tipo licitación (van a su propio flujo)
+      cotizacion: {
+        tipoId: { not: '552548ae-4fb7-45a5-88f6-d02b8af0dfdd' },
+      },
     };
 
     // Por defecto excluir rechazados, excepto si se piden explícitamente
@@ -164,9 +168,10 @@ export class EstadoProductoService {
     if (filters.nivelCriticidad)
       where.nivelCriticidad = filters.nivelCriticidad;
 
-    // Filtrar por tipo de compra
+    // Filtrar por tipo de compra (merge con filtro existente de cotizacion)
     if (filters.tipoCompra) {
       where.cotizacion = {
+        ...where.cotizacion,
         tipoCompra: filters.tipoCompra,
       };
     }
