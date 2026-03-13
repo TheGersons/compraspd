@@ -589,6 +589,7 @@ export class QuotationsService {
             id: true,
             sku: true,
             aprobadoPorSupervisor: true,
+            rechazado: true,
             criticidad: true,
             nivelCriticidad: true,
             diasRetrasoActual: true,
@@ -596,6 +597,9 @@ export class QuotationsService {
               select: { nombre: true },
             },
             medioTransporte: true,
+            // Campos necesarios para calcular tabs en MyQuotes
+            cotizado: true,
+            recibido: true,
           },
         },
       },
@@ -613,6 +617,14 @@ export class QuotationsService {
         totalProductos > 0
           ? Math.round((productosAprobados / totalProductos) * 100)
           : 0;
+
+      // Calcular progreso de compras basado en cotizado/recibido
+      const productosEnCompra = cot.estadosProductos.filter(
+        (ep) => !ep.rechazado && ep.cotizado,
+      ).length;
+      const productosRecibidos = cot.estadosProductos.filter(
+        (ep) => !ep.rechazado && ep.cotizado && ep.recibido,
+      ).length;
 
       return {
         id: cot.id,
@@ -639,6 +651,8 @@ export class QuotationsService {
         productosAprobados,
         productosPendientes,
         porcentajeAprobado,
+        productosEnCompra,
+        productosRecibidos,
 
         // NO incluir detalles completos aquí para reducir payload
         // El frontend pedirá los detalles con getById si es necesario

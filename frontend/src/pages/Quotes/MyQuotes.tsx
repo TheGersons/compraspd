@@ -267,7 +267,9 @@ const api = {
         let sumaProgreso = 0;
 
         estadosProductos.forEach((ep: any) => {
-            if (ep.aprobadoPorSupervisor && !ep.rechazado) {
+            if (ep.rechazado) return;
+            // Contar en compra: cualquier producto que tenga al menos cotizado=true
+            if (ep.cotizado) {
                 productosEnCompra++;
                 if (ep.recibido) {
                     productosRecibidos++;
@@ -654,11 +656,11 @@ export default function MyQuotes() {
             // Mostrar cotizaciones que aún no están todas aprobadas o no tienen productos en compra
             return !cot.todosProductosAprobados || cot.productosAprobados === 0;
         } else if (vistaActual === 'enCompras') {
-            // Mostrar cotizaciones con productos aprobados que NO están todos recibidos
-            return cot.productosAprobados > 0 && (cot.productosRecibidos || 0) < cot.productosAprobados;
+            // En compras: hay productos en compra y ninguno ha sido recibido aún
+            return cot.productosEnCompra > 0 && (cot.productosRecibidos || 0) === 0;
         } else if (vistaActual === 'completadas') {
-            // Mostrar cotizaciones donde TODOS los productos aprobados están recibidos
-            return cot.productosAprobados > 0 && (cot.productosRecibidos || 0) >= cot.productosAprobados;
+            // Recibidos: al menos un producto ya fue recibido
+            return cot.productosEnCompra > 0 && (cot.productosRecibidos || 0) > 0;
         }
 
         return true;
@@ -666,8 +668,8 @@ export default function MyQuotes() {
 
     // Contar por vista
     const countCotizaciones = cotizaciones.filter(c => !c.todosProductosAprobados || c.productosAprobados === 0).length;
-    const countEnCompras = cotizaciones.filter(c => c.productosAprobados > 0 && (c.productosRecibidos || 0) < c.productosAprobados).length;
-    const countCompletadas = cotizaciones.filter(c => c.productosAprobados > 0 && (c.productosRecibidos || 0) >= c.productosAprobados).length;
+    const countEnCompras = cotizaciones.filter(c => c.productosEnCompra > 0 && (c.productosRecibidos || 0) === 0).length;
+    const countCompletadas = cotizaciones.filter(c => c.productosEnCompra > 0 && (c.productosRecibidos || 0) > 0).length;
 
     const daysLeft = cotizacionSeleccionada
         ? calculateDaysLeft(cotizacionSeleccionada.fechaLimite)
@@ -1132,7 +1134,7 @@ export default function MyQuotes() {
                                                     <div className="mt-2 flex items-center justify-between rounded-lg bg-white px-3 py-2 text-xs shadow-sm dark:bg-gray-800">
                                                         <span className="text-gray-500 dark:text-gray-400">💵 Valor total del pedido:</span>
                                                         <span className="font-bold text-gray-900 dark:text-white">
-                                                            L. {precioTotal.toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                            ${precioTotal.toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                         </span>
                                                     </div>
                                                 )}
@@ -1236,13 +1238,13 @@ export default function MyQuotes() {
                                                                                 <div>
                                                                                     <span className="text-gray-500 dark:text-gray-400">Unit:</span>
                                                                                     <span className="ml-1 font-semibold text-gray-900 dark:text-white">
-                                                                                        L.{precioUnit.toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                                                        ${precioUnit.toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                                                     </span>
                                                                                 </div>
                                                                                 <div>
                                                                                     <span className="text-gray-500 dark:text-gray-400">Total:</span>
                                                                                     <span className="ml-1 font-semibold text-green-700 dark:text-green-400">
-                                                                                        L. {precioTot.toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                                                        ${precioTot.toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                                                     </span>
                                                                                 </div>
                                                                                 {nombreProveedor && (
