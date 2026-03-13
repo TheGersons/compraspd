@@ -227,10 +227,18 @@ export default function New() {
   ]);
   const [fechaLimite, setFechaLimite] = useState<Date | null>(null);
 
-  // Calcular fecha mínima (+5 días desde hoy)
-  const minDate = new Date();
-  minDate.setDate(minDate.getDate() + 5);
-  minDate.setHours(0, 0, 0, 0);
+  // Calcular fecha mínima (+5 días hábiles desde hoy, sin contar sábados ni domingos)
+  const minDate = (() => {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    let diasHabiles = 0;
+    while (diasHabiles < 5) {
+      date.setDate(date.getDate() + 1);
+      const day = date.getDay();
+      if (day !== 0 && day !== 6) diasHabiles++;
+    }
+    return date;
+  })();
   // Catálogos
   const [tipos, setTipos] = useState<Tipo[]>([]);
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
