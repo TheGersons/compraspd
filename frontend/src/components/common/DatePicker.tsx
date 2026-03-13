@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Calendar as CalendarIcon } from "lucide-react";
@@ -23,8 +24,10 @@ export default function DatePicker({
   placeholder = "Seleccionar fecha",
   disabled = false,
 }: DatePickerProps) {
+  const [open, setOpen] = useState(false);
+
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -47,10 +50,15 @@ export default function DatePicker({
         <Calendar
           mode="single"
           selected={selected || undefined}
-          onSelect={(date) => onChange(date || null)}
+          onSelect={(date) => {
+            onChange(date || null);
+            setOpen(false);
+          }}
           disabled={(date) => {
             if (minDate && date < minDate) return true;
             if (maxDate && date > maxDate) return true;
+            const day = date.getDay();
+            if (day === 0 || day === 6) return true; // domingo y sábado
             return false;
           }}
           locale={es}
