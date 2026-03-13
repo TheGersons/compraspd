@@ -279,6 +279,9 @@ export class QuotationsService {
             fechaSegundoSeguimiento: true,
             fechaEnCIF: true,
             fechaRecibido: true,
+            responsableSeguimiento: {
+              select: { id: true, nombre: true },
+            },
           },
         },
       },

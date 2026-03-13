@@ -492,6 +492,7 @@ export default function MyQuotes() {
     const [cotizacionSeleccionada, setCotizacionSeleccionada] = useState<Cotizacion | null>(null);
     const [loading, setLoading] = useState(true);
     const [loadingDetalle, setLoadingDetalle] = useState(false);
+    const [responsableSeguimiento, setResponsableSeguimiento] = useState<{ id: string; nombre: string } | null>(null);
 
     // Estados de búsqueda y filtros
     const [searchQuery, setSearchQuery] = useState("");
@@ -579,6 +580,13 @@ export default function MyQuotes() {
             setCotizacionSeleccionada(detalle);
             setShowProductos(false);
             setProductoExpandido(null);
+            // Detectar responsable del primer estadoProducto (igual que FollowUps)
+            const primerEstado = detalle.estadosProductos?.[0];
+            if (primerEstado?.responsableSeguimiento) {
+                setResponsableSeguimiento({ id: primerEstado.responsableSeguimiento.id, nombre: primerEstado.responsableSeguimiento.nombre });
+            } else {
+                setResponsableSeguimiento(null);
+            }
         } catch (error) {
             console.error("Error al cargar detalle:", error);
             addNotification("danger", "Error", "Error al cargar detalle de cotización");
@@ -990,11 +998,30 @@ export default function MyQuotes() {
                     <div className="space-y-6 lg:col-span-2">
                         {/* CARD DE DETALLE */}
                         <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-                            <h3 className="mb-4 font-semibold text-gray-800 dark:text-white/90">
-                                {vistaActual === 'cotizaciones' && 'Detalle de Solicitud'}
-                                {vistaActual === 'enCompras' && 'Seguimiento de Compra'}
-                                {vistaActual === 'completadas' && 'Pedido Completado'}
-                            </h3>
+                            <div className="mb-4 flex items-center justify-between">
+                                <h3 className="font-semibold text-gray-800 dark:text-white/90">
+                                    {vistaActual === 'cotizaciones' && 'Detalle de Solicitud'}
+                                    {vistaActual === 'enCompras' && 'Seguimiento de Compra'}
+                                    {vistaActual === 'completadas' && 'Pedido Completado'}
+                                </h3>
+                                {cotizacionSeleccionada && (
+                                    responsableSeguimiento ? (
+                                        <div className="flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 dark:border-blue-800 dark:bg-blue-900/20">
+                                            <div className="h-2 w-2 rounded-full bg-blue-500"></div>
+                                            <span className="text-xs text-blue-700 dark:text-blue-400">
+                                                Asignado a <span className="font-semibold">{responsableSeguimiento.nombre}</span>
+                                            </span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 dark:border-gray-700 dark:bg-gray-700/50">
+                                            <div className="h-2 w-2 animate-pulse rounded-full bg-amber-400"></div>
+                                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                En revisión por <span className="font-medium text-gray-700 dark:text-gray-300">Dept. de Compras</span>
+                                            </span>
+                                        </div>
+                                    )
+                                )}
+                            </div>
 
                             {!cotizacionSeleccionada ? (
                                 <div className="rounded-lg bg-gray-50 p-8 text-center dark:bg-gray-900">
