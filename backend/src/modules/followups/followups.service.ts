@@ -294,6 +294,36 @@ export class FollowUpsService {
       }
     }
     // =====================================================
+    const skusExistentes = new Set(
+      cotizacion.estadosProductos.map((ep) => ep.sku),
+    );
+
+    for (const detalle of cotizacion.detalles) {
+      if (detalle.sku && !skusExistentes.has(detalle.sku)) {
+        try {
+          const nuevo = await this.prisma.estadoProducto.create({
+            data: {
+              cotizacionId: cotizacionId,
+              cotizacionDetalleId: detalle.id,
+              proyectoId: cotizacion.proyectoId ?? null,
+              sku: detalle.sku,
+              descripcion: detalle.descripcionProducto,
+              cantidad: detalle.cantidad,
+              cotizado: false,
+            },
+          });
+          // Agregar al array en memoria para que el resto del método lo encuentre
+          (cotizacion.estadosProductos as any[]).push({
+            ...nuevo,
+            paisOrigen: null,
+            responsableSeguimiento: null,
+          });
+          skusExistentes.add(detalle.sku);
+        } catch {
+          // Ignorar si ya existe por race condition
+        }
+      }
+    }
 
     // Obtener timeline sugerido para cada SKU
     const productosConTimeline = await Promise.all(
