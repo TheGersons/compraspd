@@ -144,7 +144,7 @@ export default function OfertasFollowUps() {
                         <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                             {ofertas.length} oferta{ofertas.length !== 1 ? "s" : ""} activa{ofertas.length !== 1 ? "s" : ""}
                             {" · "}
-                            <span className="text-amber-600 dark:text-amber-400">Se archivan automáticamente a los 5 días sin avanzar</span>
+                            <span className="text-amber-600 dark:text-amber-400">Se archivan automáticamente a los 30 días sin avanzar</span>
                         </p>
                     </div>
                 </div>
