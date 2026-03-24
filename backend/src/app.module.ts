@@ -33,11 +33,14 @@ import { MailModule } from './modules/Mail/mail.module';
 import { DocumentoModule } from './modules/documentos/documento.module';
 import { LocationsModule } from './modules/Locations/locations.module';
 import { LicitacionesModule } from './modules/licitaciones/licitaciones.module';
+import { OfertasModule } from './modules/ofertas/ofertas.module';
+import { CronServicesModule } from './modules/cron-services/cron.service.module';
 
 @Module({
   imports: [
     ScheduleModule.forRoot(),
     ConfigModule.forRoot({ isGlobal: true }),
+    CronServicesModule,
     PrismaModule,
     AuthModule,
     UsersModule,
@@ -67,6 +70,7 @@ import { LicitacionesModule } from './modules/licitaciones/licitaciones.module';
     DocumentoModule,
     LocationsModule,
     LicitacionesModule,
+    OfertasModule,
   ],
   providers: [SessionCleanupService],
 })

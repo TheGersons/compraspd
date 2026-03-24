@@ -187,6 +187,8 @@ model Usuario {
   seguimientosAsignados    EstadoProducto[]        @relation("ResponsableSeguimiento")
   licitacionesArchivadas   Licitacion[]            @relation("LicitacionArchivadaPor")
   licitacionProductos      LicitacionProducto[]    @relation("ResponsableLicitacion")
+  ofertasArchivadas        Oferta[]                @relation("OfertaArchivadaPor")
+  ofertaProductos          OfertaProducto[]        @relation("ResponsableOferta")
 
   @@index([email])
   @@index([rolId])
@@ -308,6 +310,7 @@ model Cotizacion {
   compras          Compra[]
   estadosProductos EstadoProducto[]
   licitacion       Licitacion?
+  oferta           Oferta?
 
   @@index([solicitanteId])
   @@index([estado])
@@ -659,6 +662,7 @@ model EstadoProducto {
   // Relación con historial
   historialFechas                                HistorialFechaLimite[]
   licitacionProductos                            LicitacionProducto[]
+  ofertaProductos                                OfertaProducto[]
 
   @@index([proyectoId])
   @@index([cotizacionId])
@@ -952,4 +956,78 @@ model LicitacionProducto {
 
   @@index([licitacionId])
   @@map("licitacion_producto")
+}
+
+model Oferta {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cotizacionId   String    @unique @map("cotizacion_id") @db.Uuid
+  nombre         String    @db.VarChar(255)
+  estado         String    @default("ACTIVA") @db.VarChar(50) // ACTIVA | ARCHIVADA | RECHAZADA
+  motivoArchivo  String?   @map("motivo_archivo") @db.Text
+  fechaArchivo   DateTime? @map("fecha_archivo")
+  archivadaPorId String?   @map("archivada_por_id") @db.Uuid
+  creado         DateTime  @default(now())
+  actualizado    DateTime  @default(now()) @updatedAt
+
+  cotizacion   Cotizacion       @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  archivadaPor Usuario?         @relation("OfertaArchivadaPor", fields: [archivadaPorId], references: [id], onDelete: SetNull)
+  productos    OfertaProducto[]
+
+  @@index([estado])
+  @@map("oferta")
+}
+
+model OfertaProducto {
+  id               String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ofertaId         String  @map("oferta_id") @db.Uuid
+  estadoProductoId String? @map("estado_producto_id") @db.Uuid
+  cotizacionId     String? @map("cotizacion_id") @db.Uuid
+  sku              String  @db.VarChar(255)
+  descripcion      String  @db.Text
+
+  cotizado                     Boolean @default(false)
+  conDescuento                 Boolean @default(false) @map("con_descuento")
+  aprobacionCompra             Boolean @default(false) @map("aprobacion_compra")
+  comprado                     Boolean @default(false)
+  pagado                       Boolean @default(false)
+  aprobacionPlanos             Boolean @default(false) @map("aprobacion_planos")
+  primerSeguimiento            Boolean @default(false) @map("primer_seguimiento")
+  enFOB                        Boolean @default(false) @map("en_fob")
+  cotizacionFleteInternacional Boolean @default(false) @map("cotizacion_flete_internacional")
+  conBL                        Boolean @default(false) @map("con_bl")
+  segundoSeguimiento           Boolean @default(false) @map("segundo_seguimiento")
+  enCIF                        Boolean @default(false) @map("en_cif")
+  recibido                     Boolean @default(false)
+
+  fechaCotizado                     DateTime? @map("fecha_cotizado")
+  fechaConDescuento                 DateTime? @map("fecha_con_descuento")
+  fechaAprobacionCompra             DateTime? @map("fecha_aprobacion_compra")
+  fechaComprado                     DateTime? @map("fecha_comprado")
+  fechaPagado                       DateTime? @map("fecha_pagado")
+  fechaAprobacionPlanos             DateTime? @map("fecha_aprobacion_planos")
+  fechaPrimerSeguimiento            DateTime? @map("fecha_primer_seguimiento")
+  fechaEnFOB                        DateTime? @map("fecha_en_fob")
+  fechaCotizacionFleteInternacional DateTime? @map("fecha_cotizacion_flete_internacional")
+  fechaConBL                        DateTime? @map("fecha_con_bl")
+  fechaSegundoSeguimiento           DateTime? @map("fecha_segundo_seguimiento")
+  fechaEnCIF                        DateTime? @map("fecha_en_cif")
+  fechaRecibido                     DateTime? @map("fecha_recibido")
+
+  proveedor      String?  @db.VarChar(255)
+  precioUnitario Decimal? @map("precio_unitario") @db.Decimal(15, 4)
+  precioTotal    Decimal? @map("precio_total") @db.Decimal(15, 4)
+  cantidad       Int?
+  observaciones  String?  @db.Text
+  tipoCompra     String?  @default("NACIONAL") @map("tipo_compra") @db.VarChar(20)
+  responsableId  String?  @map("responsable_id") @db.Uuid
+
+  creado      DateTime @default(now())
+  actualizado DateTime @default(now()) @updatedAt
+
+  oferta         Oferta          @relation(fields: [ofertaId], references: [id], onDelete: Cascade)
+  estadoProducto EstadoProducto? @relation(fields: [estadoProductoId], references: [id], onDelete: SetNull)
+  responsable    Usuario?        @relation("ResponsableOferta", fields: [responsableId], references: [id], onDelete: SetNull)
+
+  @@index([ofertaId])
+  @@map("oferta_producto")
 }

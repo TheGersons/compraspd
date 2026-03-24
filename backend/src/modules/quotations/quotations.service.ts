@@ -128,7 +128,29 @@ export class QuotationsService {
         },
       });
 
-      // 3. Enviar notas de cada item como mensajes al chat
+      // 3. Auto-crear Licitacion u Oferta según el tipo comercial
+      const TIPO_LICITACION_ID = '552548ae-4fb7-45a5-88f6-d02b8af0dfdd';
+      const TIPO_OFERTA_ID = '25dae96a-6888-4a07-b5fa-c9cbb5b391f8';
+
+      if (dto.tipoId === TIPO_LICITACION_ID) {
+        await tx.licitacion.create({
+          data: {
+            cotizacionId: cotizacion.id,
+            nombre: cotizacion.nombreCotizacion,
+            estado: 'ACTIVA',
+          },
+        });
+      } else if (dto.tipoId === TIPO_OFERTA_ID) {
+        await tx.oferta.create({
+          data: {
+            cotizacionId: cotizacion.id,
+            nombre: cotizacion.nombreCotizacion,
+            estado: 'ACTIVA',
+          },
+        });
+      }
+
+      // 4. Enviar notas de cada item como mensajes al chat
       const itemsConNotas = items.filter(
         (item, i) => item.notas && item.notas.trim().length > 0,
       );
@@ -279,9 +301,6 @@ export class QuotationsService {
             fechaSegundoSeguimiento: true,
             fechaEnCIF: true,
             fechaRecibido: true,
-            responsableSeguimiento: {
-              select: { id: true, nombre: true },
-            },
           },
         },
       },
@@ -592,7 +611,6 @@ export class QuotationsService {
             id: true,
             sku: true,
             aprobadoPorSupervisor: true,
-            rechazado: true,
             criticidad: true,
             nivelCriticidad: true,
             diasRetrasoActual: true,
@@ -600,9 +618,6 @@ export class QuotationsService {
               select: { nombre: true },
             },
             medioTransporte: true,
-            // Campos necesarios para calcular tabs en MyQuotes
-            cotizado: true,
-            recibido: true,
           },
         },
       },
@@ -620,14 +635,6 @@ export class QuotationsService {
         totalProductos > 0
           ? Math.round((productosAprobados / totalProductos) * 100)
           : 0;
-
-      // Calcular progreso de compras basado en cotizado/recibido
-      const productosEnCompra = cot.estadosProductos.filter(
-        (ep) => !ep.rechazado && ep.cotizado,
-      ).length;
-      const productosRecibidos = cot.estadosProductos.filter(
-        (ep) => !ep.rechazado && ep.cotizado && ep.recibido,
-      ).length;
 
       return {
         id: cot.id,
@@ -654,8 +661,6 @@ export class QuotationsService {
         productosAprobados,
         productosPendientes,
         porcentajeAprobado,
-        productosEnCompra,
-        productosRecibidos,
 
         // NO incluir detalles completos aquí para reducir payload
         // El frontend pedirá los detalles con getById si es necesario
