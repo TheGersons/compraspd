@@ -11,6 +11,7 @@ node_modules
 dist
 dist-ssr
 *.local
+/backend/dist/tsconfig.build.tsbuildinfo
 
 # Editor directories and files
 .vscode/*
@@ -22,7 +23,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-
+/backend/dist
+/dist
 /generated/prisma
 /backend/dist/tsconfig.build.tsbuildinfo
 /backend/docker-compose.yml
