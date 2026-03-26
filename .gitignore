@@ -24,6 +24,11 @@ dist-ssr
 *.sw?
 
 /generated/prisma
+/backend/dist/tsconfig.build.tsbuildinfo
+/backend/docker-compose.yml
+/backend/Dockerfile.dev
+/backend/Dockerfile
+/backend/.env.docker
 /frontend/.vite
 /frontend/node_modules
 /frontend/dist
