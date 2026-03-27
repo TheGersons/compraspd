@@ -7,13 +7,29 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
-/backend/dist/tsconfig.build.tsbuildinfo
+# Dependencias y Compilados
+node_modules/
+dist/
+dist-ssr/
+.vite/
+/backend/dist/
+/frontend/dist/
+/frontend/node_modules/
+/backend/node_modules/
+/backend/.pnpm-store/
 
-# Editor directories and files
+# Archivos de entorno y secretos (ESTO ES LO MÁS IMPORTANTE)
+*.local
+.env
+.env.*
+!.env.example # Es buena práctica dejar un archivo de ejemplo vacío en el repo
+
+# Archivos generados
+/generated/prisma
+*.tsbuildinfo
+frontend/vite.config.ts
+
+# Editor y OS
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -23,27 +39,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-/backend/dist
-/dist
-/generated/prisma
-/backend/dist/tsconfig.build.tsbuildinfo
-/backend/docker-compose.yml
-/backend/Dockerfile.dev
-/backend/Dockerfile
-/backend/.env.docker
-/frontend/.vite
-/frontend/node_modules
-/frontend/dist
-/frontend/.env
-/backend/node_modules
-/backend/dist
-/backend/.env
-/backend/.env.test
-/backend/.pnpm-store
-/frontend/vite.config.ts
-/frontend/vite.config
-/vite.config.ts
-vite.config.ts
 
-.vite
-/vite.config
+# Overrides de Docker (Para tu sandbox/local)
+docker-compose.override.yml

@@ -21,7 +21,7 @@ async function bootstrap() {
       'http://192.168.114.18:8080',
       'http://192.168.3.38:5173',
       'http://192.168.3.38:8080',
-      'http://89.167.20.163:8080',
+      'http://89.167.20.163:6080',
     ],
     credentials: true,
   });
@@ -37,7 +37,7 @@ async function bootstrap() {
   const doc = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, doc);
 
-  await app.listen((process.env.PORT as any) || 3001);
-  new Logger('Bootstrap').log(`API on :${(process.env.PORT as any) || 3001}`);
+  await app.listen(process.env.PORT as any);
+  new Logger('Bootstrap').log(`API on :${process.env.PORT as any}`);
 }
 bootstrap();
