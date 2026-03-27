@@ -618,6 +618,9 @@ export class QuotationsService {
               select: { nombre: true },
             },
             medioTransporte: true,
+            rechazado: true,
+            cotizado: true,
+            recibido: true,
           },
         },
       },
@@ -628,13 +631,24 @@ export class QuotationsService {
     return cotizaciones.map((cot) => {
       const totalProductos = cot.detalles.length;
       const productosAprobados = cot.estadosProductos.filter(
-        (ep) => ep.aprobadoPorSupervisor,
+        (ep) => ep.aprobadoPorSupervisor && !ep.rechazado,
       ).length;
-      const productosPendientes = totalProductos - productosAprobados;
+      const productosRechazados = cot.estadosProductos.filter(
+        (ep) => ep.rechazado,
+      ).length;
+      const productosPendientes = totalProductos - productosAprobados - productosRechazados;
       const porcentajeAprobado =
         totalProductos > 0
           ? Math.round((productosAprobados / totalProductos) * 100)
           : 0;
+
+      // Estadísticas de compra
+      const productosEnCompra = cot.estadosProductos.filter(
+        (ep) => !ep.rechazado && ep.cotizado,
+      ).length;
+      const productosRecibidos = cot.estadosProductos.filter(
+        (ep) => !ep.rechazado && ep.cotizado && ep.recibido,
+      ).length;
 
       return {
         id: cot.id,
@@ -659,8 +673,11 @@ export class QuotationsService {
         // Estadísticas calculadas
         totalProductos,
         productosAprobados,
+        productosRechazados,
         productosPendientes,
         porcentajeAprobado,
+        productosEnCompra,
+        productosRecibidos,
 
         // NO incluir detalles completos aquí para reducir payload
         // El frontend pedirá los detalles con getById si es necesario
