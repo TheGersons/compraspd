@@ -44,13 +44,17 @@ export class FollowUpsService {
       where: { id: user.sub },
       include: { rol: true },
     });
-    let rol = usuario?.rol.nombre.toLowerCase() === 'supervisor' ? true : false;
-    rol = rol || usuario?.rol.nombre.toLowerCase() === 'admin' ? true : false;
-    if (!rol) {
+    const rolNombreList = usuario?.rol.nombre.toLowerCase() || '';
+    const esAutorizado =
+      rolNombreList.includes('supervisor') ||
+      rolNombreList.includes('admin') ||
+      rolNombreList.includes('comercial');
+    if (!esAutorizado) {
       throw new ForbiddenException(
         'Solo supervisores pueden acceder a esta función',
       );
     }
+    const esComercial = rolNombreList.includes('comercial');
 
     const page = filters?.page || 1;
     const pageSize = Math.min(filters?.pageSize || 20, 100);
@@ -61,6 +65,10 @@ export class FollowUpsService {
       estado: {
         in: ['ENVIADA', 'PENDIENTE', 'EN_CONFIGURACION', 'APROBADA_PARCIAL'],
       },
+      // COMERCIAL solo ve cotizaciones vinculadas a licitaciones u ofertas
+      ...(esComercial && {
+        OR: [{ licitacion: { isNot: null } }, { oferta: { isNot: null } }],
+      }),
     };
 
     if (filters?.estado) {
@@ -186,7 +194,9 @@ export class FollowUpsService {
 
     const rolNombre = usuario?.rol.nombre.toLowerCase() || '';
     const esSupervisorOAdmin =
-      rolNombre.includes('supervisor') || rolNombre.includes('admin');
+      rolNombre.includes('supervisor') ||
+      rolNombre.includes('admin') ||
+      rolNombre.includes('comercial');
 
     if (!esSupervisorOAdmin) {
       throw new ForbiddenException(
@@ -197,6 +207,8 @@ export class FollowUpsService {
     const cotizacion = await this.prisma.cotizacion.findUnique({
       where: { id: cotizacionId },
       include: {
+        licitacion: { select: { id: true } },
+        oferta: { select: { id: true } },
         solicitante: {
           select: {
             id: true,
@@ -268,6 +280,11 @@ export class FollowUpsService {
 
     if (!cotizacion) {
       throw new NotFoundException('Cotización no encontrada');
+    }
+
+    // COMERCIAL solo puede ver cotizaciones vinculadas a licitaciones u ofertas
+    if (rolNombre.includes('comercial') && !cotizacion.licitacion && !cotizacion.oferta) {
+      throw new ForbiddenException('Sin acceso a esta cotización');
     }
 
     // =====================================================
@@ -389,7 +406,12 @@ export class FollowUpsService {
       include: { rol: true },
     });
 
-    if (!usuario?.rol.nombre.toLowerCase().includes('supervisor')) {
+    const rolNombreTimeline = usuario?.rol.nombre.toLowerCase() || '';
+    if (
+      !rolNombreTimeline.includes('supervisor') &&
+      !rolNombreTimeline.includes('admin') &&
+      !rolNombreTimeline.includes('comercial')
+    ) {
       throw new ForbiddenException(
         'Solo supervisores pueden configurar timelines',
       );
@@ -810,7 +832,12 @@ export class FollowUpsService {
       include: { rol: true },
     });
 
-    if (!usuario?.rol.nombre.toLowerCase().includes('supervisor')) {
+    const rolNombreAprobar = usuario?.rol.nombre.toLowerCase() || '';
+    if (
+      !rolNombreAprobar.includes('supervisor') &&
+      !rolNombreAprobar.includes('admin') &&
+      !rolNombreAprobar.includes('comercial')
+    ) {
       throw new ForbiddenException(
         'Solo supervisores pueden aprobar productos',
       );
@@ -1219,7 +1246,12 @@ export class FollowUpsService {
       include: { rol: true },
     });
 
-    if (!usuario?.rol.nombre.toLowerCase().includes('supervisor')) {
+    const rolNombreStats = usuario?.rol.nombre.toLowerCase() || '';
+    if (
+      !rolNombreStats.includes('supervisor') &&
+      !rolNombreStats.includes('admin') &&
+      !rolNombreStats.includes('comercial')
+    ) {
       throw new ForbiddenException(
         'Solo supervisores pueden acceder a estadísticas',
       );
@@ -1272,7 +1304,12 @@ export class FollowUpsService {
       include: { rol: true },
     });
 
-    if (!usuario?.rol.nombre.toLowerCase().includes('supervisor')) {
+    const rolNombreReasignar = usuario?.rol.nombre.toLowerCase() || '';
+    if (
+      !rolNombreReasignar.includes('supervisor') &&
+      !rolNombreReasignar.includes('admin') &&
+      !rolNombreReasignar.includes('comercial')
+    ) {
       throw new ForbiddenException('Solo supervisores pueden reasignar');
     }
 
@@ -1384,7 +1421,9 @@ export class FollowUpsService {
 
     const rolNombre = usuario?.rol.nombre.toLowerCase() || '';
     const esSupervisorOAdmin =
-      rolNombre.includes('supervisor') || rolNombre.includes('admin');
+      rolNombre.includes('supervisor') ||
+      rolNombre.includes('admin') ||
+      rolNombre.includes('comercial');
 
     if (!esSupervisorOAdmin) {
       throw new ForbiddenException(
