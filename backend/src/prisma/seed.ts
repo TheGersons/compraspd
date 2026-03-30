@@ -48,6 +48,16 @@ async function main() {
     },
   });
 
+  await prisma.rol.upsert({
+    where: { nombre: 'COMERCIAL' },
+    update: {},
+    create: {
+      nombre: 'COMERCIAL',
+      descripcion: 'Jefe Comercial: seguimiento de compras de licitaciones y ofertas comerciales',
+      activo: true,
+    },
+  });
+
   console.log('✅ Roles creados\n');
 
   // ==========================================================================

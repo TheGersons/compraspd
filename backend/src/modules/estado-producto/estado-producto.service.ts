@@ -147,10 +147,16 @@ export class EstadoProductoService {
     const where: any = {
       // Solo mostrar productos aprobados por supervisor
       aprobadoPorSupervisor: true,
-      // Excluir productos de cotizaciones tipo licitación (van a su propio flujo)
-      cotizacion: {
-        tipoId: { not: '552548ae-4fb7-45a5-88f6-d02b8af0dfdd' },
-      },
+      // COMERCIAL: solo cotizaciones comerciales (licitación u oferta)
+      // Resto: excluir cotizaciones tipo licitación (van a su propio flujo)
+      cotizacion: this.isComercial(user)
+        ? {
+            OR: [
+              { licitacion: { isNot: null } },
+              { oferta: { isNot: null } },
+            ],
+          }
+        : { tipoId: { not: '552548ae-4fb7-45a5-88f6-d02b8af0dfdd' } },
     };
 
     // Por defecto excluir rechazados, excepto si se piden explícitamente
@@ -607,6 +613,8 @@ export class EstadoProductoService {
    * Requiere evidencia o marcar como "No aplica"
    */
   async avanzarEstado(id: string, dto: AvanzarEstadoDto, user: UserJwt) {
+    await this.assertComercialProductAccess(user, id);
+
     const estado = await this.prisma.estadoProducto.findUnique({
       where: { id },
       include: { cotizacion: true },
@@ -782,6 +790,7 @@ export class EstadoProductoService {
         'Solo supervisores/admin pueden editar datos',
       );
     }
+    await this.assertComercialProductAccess(user, id);
 
     const estado = await this.prisma.estadoProducto.findUnique({
       where: { id },
@@ -809,6 +818,7 @@ export class EstadoProductoService {
         'Solo supervisores/admin pueden aprobar compras',
       );
     }
+    await this.assertComercialProductAccess(user, id);
 
     const estado = await this.prisma.estadoProducto.findUnique({
       where: { id },
@@ -845,6 +855,7 @@ export class EstadoProductoService {
         'Solo supervisores/admin pueden revocar aprobaciones',
       );
     }
+    await this.assertComercialProductAccess(user, id);
 
     await this.prisma.estadoProducto.update({
       where: { id },
@@ -867,6 +878,7 @@ export class EstadoProductoService {
         'Solo supervisores/admin pueden rechazar compras',
       );
     }
+    await this.assertComercialProductAccess(user, id);
 
     const estado = await this.prisma.estadoProducto.findUnique({
       where: { id },
@@ -898,6 +910,7 @@ export class EstadoProductoService {
         'Solo supervisores/admin pueden revertir rechazos',
       );
     }
+    await this.assertComercialProductAccess(user, id);
 
     await this.prisma.estadoProducto.update({
       where: { id },
@@ -924,6 +937,7 @@ export class EstadoProductoService {
         'Solo supervisores/admin pueden asignar responsables',
       );
     }
+    await this.assertComercialProductAccess(user, id);
 
     const ep = await this.prisma.estadoProducto.findUnique({ where: { id } });
     if (!ep) throw new NotFoundException('Producto no encontrado');
@@ -1012,6 +1026,7 @@ export class EstadoProductoService {
     if (!this.isSupervisorOrAdmin(user)) {
       throw new ForbiddenException('Solo supervisores pueden cambiar estados');
     }
+    await this.assertComercialProductAccess(user, id);
 
     const estado = await this.prisma.estadoProducto.findUnique({
       where: { id },
@@ -1101,6 +1116,7 @@ export class EstadoProductoService {
         'Solo supervisores pueden actualizar fechas',
       );
     }
+    await this.assertComercialProductAccess(user, id);
 
     const estado = await this.prisma.estadoProducto.findUnique({
       where: { id },
@@ -1129,6 +1145,7 @@ export class EstadoProductoService {
         'Solo supervisores pueden actualizar fechas límite',
       );
     }
+    await this.assertComercialProductAccess(user, id);
 
     const estado = await this.prisma.estadoProducto.findUnique({
       where: { id },
@@ -1176,10 +1193,22 @@ export class EstadoProductoService {
    * Obtener productos críticos (con retrasos)
    */
   async getCriticos(user: UserJwt) {
+    const comercialFilter = this.isComercial(user)
+      ? {
+          cotizacion: {
+            OR: [
+              { licitacion: { isNot: null } },
+              { oferta: { isNot: null } },
+            ],
+          },
+        }
+      : {};
+
     const productos = await this.prisma.estadoProducto.findMany({
       where: {
         aprobadoPorSupervisor: true,
         OR: [{ nivelCriticidad: 'ALTO' }, { diasRetrasoActual: { gt: 0 } }],
+        ...comercialFilter,
       },
       include: {
         proyecto: { select: { nombre: true } },
@@ -1278,6 +1307,7 @@ export class EstadoProductoService {
         'Solo supervisores pueden aprobar productos',
       );
     }
+    await this.assertComercialProductAccess(user, id);
 
     const estado = await this.prisma.estadoProducto.findUnique({
       where: { id },
@@ -1585,7 +1615,41 @@ export class EstadoProductoService {
    */
   private isSupervisorOrAdmin(user: UserJwt): boolean {
     const role = (user.role || '').toUpperCase();
-    return role === 'SUPERVISOR' || role === 'ADMIN';
+    return role === 'SUPERVISOR' || role === 'ADMIN' || role === 'COMERCIAL';
+  }
+
+  private isComercial(user: UserJwt): boolean {
+    return (user.role || '').toUpperCase() === 'COMERCIAL';
+  }
+
+  /**
+   * Si el usuario es COMERCIAL, verifica que el EstadoProducto pertenezca
+   * a una cotización de tipo comercial (licitación u oferta).
+   * ADMIN/SUPERVISOR pasan sin restricción.
+   */
+  private async assertComercialProductAccess(
+    user: UserJwt,
+    estadoProductoId: string,
+  ): Promise<void> {
+    if (!this.isComercial(user)) return;
+
+    const ep = await this.prisma.estadoProducto.findUnique({
+      where: { id: estadoProductoId },
+      select: {
+        cotizacion: {
+          select: {
+            licitacion: { select: { id: true } },
+            oferta: { select: { id: true } },
+          },
+        },
+      },
+    });
+
+    if (!ep?.cotizacion?.licitacion && !ep?.cotizacion?.oferta) {
+      throw new ForbiddenException(
+        'El rol Comercial solo puede gestionar cotizaciones de tipo comercial (licitaciones u ofertas)',
+      );
+    }
   }
 
   /**

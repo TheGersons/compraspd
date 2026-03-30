@@ -19,11 +19,19 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   '/quotes/assignment': ['ADMIN', 'SUPERVISOR'],
   
   // Shopping
-  '/shopping': ['ADMIN', 'SUPERVISOR'],
-  '/shopping/follow-ups': ['ADMIN', 'SUPERVISOR'],
-  '/shopping/history': ['ADMIN', 'SUPERVISOR'],
+  '/shopping': ['ADMIN', 'SUPERVISOR', 'COMERCIAL'],
+  '/shopping/follow-ups': ['ADMIN', 'SUPERVISOR', 'COMERCIAL'],
+  '/shopping/history': ['ADMIN', 'SUPERVISOR', 'COMERCIAL'],
+  '/shopping/documents': ['ADMIN', 'SUPERVISOR', 'COMERCIAL'],
+  '/shopping/aprobacion': ['ADMIN', 'SUPERVISOR', 'COMERCIAL'],
   '/shopping/assignment': ['ADMIN', 'SUPERVISOR'],
   
+  // Licitaciones y Ofertas
+  '/licitaciones': ['ADMIN', 'SUPERVISOR', 'COMERCIAL'],
+  '/licitaciones/archivo': ['ADMIN', 'SUPERVISOR', 'COMERCIAL'],
+  '/ofertas': ['ADMIN', 'SUPERVISOR', 'COMERCIAL'],
+  '/ofertas/archivo': ['ADMIN', 'SUPERVISOR', 'COMERCIAL'],
+
   // Projects
   '/projects': ['ADMIN', 'SUPERVISOR'],
   '/projects/new': ['ADMIN', 'SUPERVISOR'],
@@ -127,11 +135,15 @@ export function useNavigateWithRole() {
   // Obtener la ruta de inicio según el rol
   const getHomeRoute = useCallback((): string => {
     const userRole = user?.rol?.nombre;
-    
+
     if (userRole === 'ADMIN' || userRole === 'SUPERVISOR') {
       return '/dashboard';
     }
-    
+
+    if (userRole === 'COMERCIAL') {
+      return '/shopping/follow-ups';
+    }
+
     return FALLBACK_ROUTE;
   }, [user]);
 

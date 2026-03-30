@@ -65,6 +65,7 @@ import Ofertas from "./pages/Ofertas/Ofertas";
 const SHOPPING_MANAGER_ROLES = ["ADMIN", "SUPERVISOR"];
 const QUOTES_SUPERVISOR_ROLES = ["SUPERVISOR", "ADMIN"];
 const STAFF_ROLES = ["ADMIN", "SUPERVISOR"]; // NUEVO - Todos menos USUARIO;
+const COMERCIAL_ROLES = ["ADMIN", "SUPERVISOR", "COMERCIAL"]; // Compras/Licitaciones/Ofertas comerciales
 
 export default function App() {
   const [accessDenied, setAccessDenied] = useState({ open: false, message: '' });
@@ -211,11 +212,11 @@ export default function App() {
                 />
               </Route>
 
-              {/* SHOPPING - Solo STAFF */}
+              {/* SHOPPING - STAFF + COMERCIAL */}
               <Route
                 path="/shopping"
                 element={
-                  <ProtectedRoute roles={STAFF_ROLES}>
+                  <ProtectedRoute roles={COMERCIAL_ROLES}>
                     <ShoppingLayout />
                   </ProtectedRoute>
                 }
@@ -232,51 +233,51 @@ export default function App() {
                   }
                 />
                 <Route path="documents" element={
-                  <ProtectedRoute roles={STAFF_ROLES}>
+                  <ProtectedRoute roles={COMERCIAL_ROLES}>
                     <Documents />
                   </ProtectedRoute>
                 } />
                 <Route path="aprobacion" element={
-                  <ProtectedRoute roles={STAFF_ROLES}>
+                  <ProtectedRoute roles={COMERCIAL_ROLES}>
                     <AprobacionCompras />
                   </ProtectedRoute>
                 } />
               </Route>
 
-              {/* LICITACIONES - Solo STAFF */}
+              {/* LICITACIONES - STAFF + COMERCIAL */}
               <Route
                 path="/licitaciones"
                 element={
-                  <ProtectedRoute roles={STAFF_ROLES}>
+                  <ProtectedRoute roles={COMERCIAL_ROLES}>
                   </ProtectedRoute>
                 }
               >
                 <Route index element={
-                  <ProtectedRoute roles={STAFF_ROLES}>
+                  <ProtectedRoute roles={COMERCIAL_ROLES}>
                     <Licitaciones />
                   </ProtectedRoute>
                 } />
                 <Route path="archivo" element={
-                  <ProtectedRoute roles={STAFF_ROLES}>
+                  <ProtectedRoute roles={COMERCIAL_ROLES}>
                     <Archivadas />
                   </ProtectedRoute>
                 } />
               </Route>
-              {/* OFERTAS - Solo STAFF */}
+              {/* OFERTAS - STAFF + COMERCIAL */}
               <Route
                 path="/ofertas"
                 element={
-                  <ProtectedRoute roles={STAFF_ROLES}>
+                  <ProtectedRoute roles={COMERCIAL_ROLES}>
                   </ProtectedRoute>
                 }
               >
                 <Route index element={
-                  <ProtectedRoute roles={STAFF_ROLES}>
+                  <ProtectedRoute roles={COMERCIAL_ROLES}>
                     <Ofertas />
                   </ProtectedRoute>
                 } />
                 <Route path="archivo" element={
-                  <ProtectedRoute roles={STAFF_ROLES}>
+                  <ProtectedRoute roles={COMERCIAL_ROLES}>
                     <OfertasArchivadas />
                   </ProtectedRoute>
                 } />

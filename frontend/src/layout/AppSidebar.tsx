@@ -61,19 +61,20 @@ const navItems: NavItem[] = [
   {
     icon: <ShoppingCart />,
     name: "Compras",
-    roles: ["ADMIN", "SUPERVISOR"], // USUARIO no ve este menú
+    roles: ["ADMIN", "SUPERVISOR", "COMERCIAL"],
     subItems: [
       { name: "Resumen", path: "/shopping", pro: false },
       { name: "Seguimiento", path: "/shopping/follow-ups", pro: false },
       { name: "Aprobación de Compras", path: "/shopping/aprobacion", pro: false },
       { name: "Documentos", path: "/shopping/documents", pro: false },
       { name: "Historial", path: "/shopping/history", pro: false },
+      { name: "Asignación", path: "/shopping/assignment", pro: false, roles: ["ADMIN", "SUPERVISOR"] },
     ],
   },
   {
     icon: <BadgeDollarSign />,
     name: "Licitaciones",
-    roles: ["ADMIN", "SUPERVISOR"], // USUARIO no ve este menú
+    roles: ["ADMIN", "SUPERVISOR", "COMERCIAL"],
     subItems: [
       { name: "Seguimiento", path: "/licitaciones", pro: false },
       { name: "Archivadas", path: "/licitaciones/archivo", pro: false },
@@ -82,7 +83,7 @@ const navItems: NavItem[] = [
   {
     icon: <ShoppingBag />,
     name: "Comercial",
-    roles: ["ADMIN", "SUPERVISOR"], // USUARIO no ve este menú
+    roles: ["ADMIN", "SUPERVISOR", "COMERCIAL"],
     subItems: [
       { name: "Seguimiento", path: "/ofertas", pro: false },
       { name: "Archivadas", path: "/ofertas/archivo", pro: false },
