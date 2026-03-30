@@ -15,7 +15,7 @@ export default function ShoppingLayout() {
 
   // 🛑 Paso 2: Verificar si el usuario tiene permiso de Supervisor
   const isSupervisor = user?.rol.nombre?.toUpperCase() !== undefined
-    ? ['SUPERVISOR', 'ADMIN'].includes(user.rol.nombre.toUpperCase())
+    ? ['SUPERVISOR', 'ADMIN', 'COMERCIAL'].includes(user.rol.nombre.toUpperCase())
     : false;
   // 🛑 Paso 3: Filtrar las pestañas basado en el rol
   const visibleTabs = allTabs.filter(t => {
