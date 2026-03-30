@@ -1,11 +1,12 @@
 import { Outlet, NavLink } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
 
+// Orden sincronizado con AppSidebar: Resumen, Seguimiento, Aprobación, Documentos, Historial
 const allTabs = [
   { to: "/shopping", label: "Resumen", end: true },
   { to: "/shopping/follow-ups", label: "Seguimiento", supervisorOnly: true },
-  { to: "/shopping/documents", label: "Documentos", supervisorOnly: true },
   { to: "/shopping/aprobacion", label: "Aprobación de Compras", supervisorOnly: true },
+  { to: "/shopping/documents", label: "Documentos", supervisorOnly: true },
   { to: "/shopping/history", label: "Historial", supervisorOnly: true },
 ];
 

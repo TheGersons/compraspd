@@ -2,24 +2,19 @@ import { Outlet, NavLink } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
 
 
-// Definición de las pestañas con la nueva propiedad 'supervisorOnly'
+// Orden sincronizado con AppSidebar: Resumen, Nueva, Mis, Seguimiento, Rechazadas, Historial
 const allTabs = [
-  { to: "/quotes", label: "Resumen", end: true },
+  { to: "/quotes", label: "Resumen", end: true, roles: ['ADMIN', 'SUPERVISOR', 'COMERCIAL'] },
   { to: "/quotes/new", label: "Nueva cotización" },
   { to: "/quotes/my-quotes", label: "Mis cotizaciónes" },
-  // 🛑 Solo para Supervisores/Administradores
-  { to: "/quotes/follow-ups", label: "Seguimiento", supervisorOnly: true },
-  { to: "/quotes/rejected", label: "Rechazadas", supervisorOnly: true },
+  { to: "/quotes/follow-ups", label: "Seguimiento", roles: ['ADMIN', 'SUPERVISOR', 'COMERCIAL'] },
+  { to: "/quotes/rejected", label: "Rechazadas", roles: ['ADMIN', 'SUPERVISOR'] },
   { to: "/quotes/history", label: "Historial" },
-  // 🛑 Solo para Supervisores/Administradores
 ];
 
 export default function QuotesLayout() {
-  // 🛑 Paso 1: Obtener el rol del usuario
-  const { user, isLoading } = useAuth(); // Asegúrate de que este hook exista y devuelva { user: { role } }
+  const { user, isLoading } = useAuth();
 
-
-  // Mostrar loading mientras carga
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -31,24 +26,12 @@ export default function QuotesLayout() {
     );
   }
 
-  // Si no hay usuario, no renderizar nada (ProtectedRoute redirigirá)
   if (!user) {
     return null;
   }
-  // 🛑 Paso 2: Verificar si el usuario tiene permiso de Supervisor
-  // DESPUÉS
-  const isSupervisor = user?.rol?.nombre
-    ? ['SUPERVISOR', 'ADMIN'].includes(user.rol.nombre.toUpperCase())
-    : false;
-  // 🛑 Paso 3: Filtrar las pestañas basado en el rol
-  const visibleTabs = allTabs.filter(t => {
-    // Si NO requiere rol especial, es visible para todos
-    if (!t.supervisorOnly) {
-      return true;
-    }
-    // Si SÍ requiere rol especial, solo es visible si es Supervisor
-    return isSupervisor;
-  });
+
+  const userRole = user?.rol?.nombre?.toUpperCase() || '';
+  const visibleTabs = allTabs.filter(t => !t.roles || t.roles.includes(userRole));
 
   return (
     <div className="space-y-6">

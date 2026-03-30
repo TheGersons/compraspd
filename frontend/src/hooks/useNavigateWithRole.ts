@@ -11,11 +11,11 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   '/home': ['ADMIN', 'SUPERVISOR'],
   
   // Quotes
-  '/quotes': ['ADMIN', 'SUPERVISOR'],
+  '/quotes': ['ADMIN', 'SUPERVISOR', 'COMERCIAL'],
   '/quotes/new': [],
   '/quotes/my-quotes': [],
   '/quotes/history': [],
-  '/quotes/follow-ups': ['ADMIN', 'SUPERVISOR'],
+  '/quotes/follow-ups': ['ADMIN', 'SUPERVISOR', 'COMERCIAL'],
   '/quotes/assignment': ['ADMIN', 'SUPERVISOR'],
   
   // Shopping

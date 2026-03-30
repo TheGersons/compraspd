@@ -169,11 +169,11 @@ export default function App() {
 
               {/* QUOTES */}
               <Route path="/quotes" element={<QuotesLayout />}>
-                {/* Resumen - Solo STAFF */}
+                {/* Resumen - STAFF + COMERCIAL */}
                 <Route
                   index
                   element={
-                    <ProtectedRoute roles={STAFF_ROLES}>
+                    <ProtectedRoute roles={COMERCIAL_ROLES}>
                       <Quotes />
                     </ProtectedRoute>
                   }
@@ -186,7 +186,7 @@ export default function App() {
                 <Route
                   path="follow-ups"
                   element={
-                    <ProtectedRoute roles={STAFF_ROLES}>
+                    <ProtectedRoute roles={COMERCIAL_ROLES}>
                       <QuotesFollowUps />
                     </ProtectedRoute>
                   }

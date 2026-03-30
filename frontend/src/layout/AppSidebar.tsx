@@ -51,11 +51,12 @@ const navItems: NavItem[] = [
     icon: <DocsIcon />,
     name: "Cotizaciones",
     subItems: [
-      { name: "Resumen", path: "/quotes", pro: false, roles: ["ADMIN", "SUPERVISOR"] },
-      { name: "Nueva Cotización", path: "/quotes/new", pro: false }, // TODOS
-      { name: "Mis cotizaciónes", path: "/quotes/my-quotes", pro: false }, // TODOS
-      { name: "Seguimiento", path: "/quotes/follow-ups", pro: false, roles: ["ADMIN", "SUPERVISOR"] },
+      { name: "Resumen", path: "/quotes", pro: false, roles: ["ADMIN", "SUPERVISOR", "COMERCIAL"] },
+      { name: "Nueva Cotización", path: "/quotes/new", pro: false },
+      { name: "Mis cotizaciónes", path: "/quotes/my-quotes", pro: false },
+      { name: "Seguimiento", path: "/quotes/follow-ups", pro: false, roles: ["ADMIN", "SUPERVISOR", "COMERCIAL"] },
       { name: "Rechazadas", path: "/quotes/rejected", pro: false, roles: ["ADMIN", "SUPERVISOR"] },
+      { name: "Historial", path: "/quotes/history", pro: false },
     ],
   },
   {
