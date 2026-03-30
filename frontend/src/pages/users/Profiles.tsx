@@ -44,13 +44,12 @@ type UserFormData = {
 // ============================================================================
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
-const token = getToken();
 
 const api = {
   async getUsers() {
     const response = await fetch(`${API_BASE_URL}/api/v1/users/all`, {
       credentials: "include",
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${getToken()}` },
     });
     if (!response.ok) throw new Error("Error al cargar usuarios");
     return response.json();
@@ -61,7 +60,7 @@ const api = {
       method: "POST",
       credentials: "include",
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${getToken()}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(data),
@@ -78,7 +77,7 @@ const api = {
       method: "PATCH",
       credentials: "include",
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${getToken()}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(data),
@@ -94,7 +93,7 @@ const api = {
     const response = await fetch(`${API_BASE_URL}/api/v1/users/${userId}/deactivate`, {
       method: "PATCH",
       credentials: "include",
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${getToken()}` },
     });
     if (!response.ok) throw new Error("Error al desactivar usuario");
     return response.json();
@@ -103,7 +102,7 @@ const api = {
   async getRoles() {
     const response = await fetch(`${API_BASE_URL}/api/v1/roles`, {
       credentials: "include",
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${getToken()}` },
     });
     if (!response.ok) throw new Error("Error al cargar roles");
     return response.json();
@@ -112,7 +111,7 @@ const api = {
   async getDepartments() {
     const response = await fetch(`${API_BASE_URL}/api/v1/departments`, {
       credentials: "include",
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${getToken()}` },
     });
     if (!response.ok) throw new Error("Error al cargar departamentos");
     return response.json();
@@ -311,10 +310,10 @@ const UserModal = ({
 
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Departamento *
+                Departamento {!user && '*'}
               </label>
               <select
-                required
+                required={!user}
                 value={formData.departamentoId}
                 onChange={(e) => setFormData({ ...formData, departamentoId: e.target.value })}
                 className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"

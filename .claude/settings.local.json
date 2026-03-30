@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find C:/Repo/admin-dashboard-main/backend/src/modules/users -type f -name *.ts)"
+    ]
+  }
+}
