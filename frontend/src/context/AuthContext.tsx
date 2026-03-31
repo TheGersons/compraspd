@@ -19,6 +19,7 @@ type User = {
   email: string;
   rol: { id: string; nombre: string };
   departmentId?: string;
+  departamento?: { id: string; nombre: string };
   isActive?: boolean;
   requierecambiopassword?: boolean;
 };

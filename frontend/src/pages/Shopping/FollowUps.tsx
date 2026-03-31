@@ -459,6 +459,7 @@ export default function ShoppingFollowUps() {
   const { addNotification } = useNotifications();
   const { user } = useAuth();
   const isComercial = user?.rol?.nombre?.toUpperCase() === 'COMERCIAL';
+  const canAsignarResponsable = user?.rol?.nombre?.toUpperCase() === 'SUPERVISOR' && (user as any)?.departamento?.nombre === 'Gerencia';
   const [searchParams] = useSearchParams();
 
   // Estados principales
@@ -1033,7 +1034,7 @@ export default function ShoppingFollowUps() {
                               </button>
                             )}
                             {/* Menú asignar responsable al grupo */}
-                            {!isComercial && (
+                            {canAsignarResponsable && (
                             <div className="relative" onClick={(e) => e.stopPropagation()}>
                               <button onClick={() => setMenuGrupoAbierto(menuGrupoAbierto === grupo.cotizacionId ? null : grupo.cotizacionId)}
                                 className="rounded-md p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300 transition-colors"
@@ -1098,7 +1099,7 @@ export default function ShoppingFollowUps() {
                                 {producto.progreso}%
                               </span>
                               {/* Responsable individual */}
-                              {!isComercial && (
+                              {canAsignarResponsable && (
                               <div className="relative" onClick={(e) => e.stopPropagation()}>
                                 <button onClick={() => setMenuAbierto(menuAbierto === producto.id ? null : producto.id)}
                                   className="rounded p-0.5 text-gray-400 hover:text-blue-500 transition-colors" title="Asignar responsable">
@@ -1192,9 +1193,9 @@ export default function ShoppingFollowUps() {
                               <div className="relative">
                                 <div
                                   role="button"
-                                  onClick={!isComercial ? (e) => { e.stopPropagation(); setMenuAbierto(menuAbierto === producto.id ? null : producto.id); } : undefined}
-                                  className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] transition-colors ${!isComercial ? 'hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer' : 'cursor-default'}`}
-                                  title={!isComercial ? "Asignar responsable" : undefined}
+                                  onClick={canAsignarResponsable ? (e) => { e.stopPropagation(); setMenuAbierto(menuAbierto === producto.id ? null : producto.id); } : undefined}
+                                  className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] transition-colors ${canAsignarResponsable ? 'hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer' : 'cursor-default'}`}
+                                  title={canAsignarResponsable ? "Asignar responsable" : undefined}
                                 >
                                   {producto.responsableSeguimiento ? (
                                     <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
@@ -1205,7 +1206,7 @@ export default function ShoppingFollowUps() {
                                     <span className="text-gray-400"><MoreVertical size={12} /></span>
                                   )}
                                 </div>
-                                {!isComercial && menuAbierto === producto.id && (
+                                {canAsignarResponsable && menuAbierto === producto.id && (
                                   <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900"
                                     onClick={(e) => e.stopPropagation()}>
                                     <div className="p-1.5">

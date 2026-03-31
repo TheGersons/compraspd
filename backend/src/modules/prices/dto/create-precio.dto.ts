@@ -19,10 +19,10 @@ export class CreatePrecioDto {
   @IsOptional()
   precioDescuento?: number;
 
-  @ApiProperty({ example: 'uuid-proveedor' })
+  @ApiPropertyOptional({ example: 'uuid-proveedor' })
   @IsUUID('4', { message: 'proveedorId debe ser un UUID válido' })
-  @IsNotEmpty({ message: 'proveedorId es requerido' })
-  proveedorId: string;
+  @IsOptional()
+  proveedorId?: string;
 
   @ApiPropertyOptional({ 
     example: '/uploads/comprobante-descuento.pdf',

@@ -61,13 +61,14 @@ export class PreciosService {
       );
     }
 
-    // Validar proveedor
-    const proveedor = await this.prisma.proveedor.findUnique({
-      where: { id: dto.proveedorId },
-    });
-
-    if (!proveedor || !proveedor.activo) {
-      throw new NotFoundException('Proveedor no encontrado o inactivo');
+    // Validar proveedor (opcional)
+    if (dto.proveedorId) {
+      const proveedor = await this.prisma.proveedor.findUnique({
+        where: { id: dto.proveedorId },
+      });
+      if (!proveedor || !proveedor.activo) {
+        throw new NotFoundException('Proveedor no encontrado o inactivo');
+      }
     }
 
     // Validar que precio con descuento sea menor que precio normal

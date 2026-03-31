@@ -416,6 +416,8 @@ export default function Profiles() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   // Estados de UI
   const [searchQuery, setSearchQuery] = useState("");
@@ -532,6 +534,14 @@ export default function Profiles() {
     return matchesSearch && matchesActiveFilter;
   });
 
+  const totalPages = Math.ceil(filteredUsers.length / PAGE_SIZE);
+  const paginatedUsers = filteredUsers.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  const handleFilterChange = (fn: () => void) => {
+    fn();
+    setCurrentPage(1);
+  };
+
   if (isLoading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -572,13 +582,13 @@ export default function Profiles() {
               type="text"
               placeholder="Buscar por nombre, email o rol..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => handleFilterChange(() => setSearchQuery(e.target.value))}
               className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
             />
           </div>
           <div className="flex gap-2">
             <button
-              onClick={() => setFilterActive('all')}
+              onClick={() => handleFilterChange(() => setFilterActive('all'))}
               className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${filterActive === 'all'
                 ? 'bg-blue-500 text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
@@ -587,7 +597,7 @@ export default function Profiles() {
               Todos
             </button>
             <button
-              onClick={() => setFilterActive('active')}
+              onClick={() => handleFilterChange(() => setFilterActive('active'))}
               className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${filterActive === 'active'
                 ? 'bg-green-500 text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
@@ -596,7 +606,7 @@ export default function Profiles() {
               Activos
             </button>
             <button
-              onClick={() => setFilterActive('inactive')}
+              onClick={() => handleFilterChange(() => setFilterActive('inactive'))}
               className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${filterActive === 'inactive'
                 ? 'bg-gray-500 text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
@@ -615,16 +625,52 @@ export default function Profiles() {
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {filteredUsers.map(user => (
-              <UserCard
-                key={user.id}
-                user={user}
-                onEdit={handleEdit}
-                onDelete={() => handleDeleteClick(user)}
-              />
-            ))}
-          </div>
+          <>
+            <div className="space-y-3">
+              {paginatedUsers.map(user => (
+                <UserCard
+                  key={user.id}
+                  user={user}
+                  onEdit={handleEdit}
+                  onDelete={() => handleDeleteClick(user)}
+                />
+              ))}
+            </div>
+            {totalPages > 1 && (
+              <div className="mt-4 flex items-center justify-between">
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Mostrando {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredUsers.length)} de {filteredUsers.length} usuarios
+                </p>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm disabled:opacity-40 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+                  >
+                    ‹
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`rounded-lg px-3 py-1.5 text-sm ${page === currentPage
+                        ? 'bg-blue-500 text-white'
+                        : 'border border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800'}`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm disabled:opacity-40 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+                  >
+                    ›
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {/* Stats */}
