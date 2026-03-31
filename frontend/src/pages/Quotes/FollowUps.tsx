@@ -576,12 +576,12 @@ export default function FollowUps() {
     }
   }, [cotizacionSeleccionada]);
 
-  // Auto-scroll en chat
+  // Auto-scroll en chat solo cuando llegan mensajes nuevos (no al cambiar de tab)
   useEffect(() => {
-    if (vistaActiva === "chat") {
+    if (vistaActiva === "chat" && mensajes.length > 0) {
       scrollToBottom();
     }
-  }, [mensajes, vistaActiva]);
+  }, [mensajes]);
   useEffect(() => {
     cargarProveedores();
   }, []);
@@ -1474,6 +1474,25 @@ export default function FollowUps() {
                               </div>
                               <span className="text-xl font-bold text-gray-900 dark:text-white">{cotizacionSeleccionada.porcentajeAprobado || 0}%</span>
                             </div>
+
+                            {/* Resumen: tipo de compra + fechas */}
+                            <div className="mt-3 flex flex-wrap items-center gap-3">
+                              {cotizacionSeleccionada.tipoCompra === 'NACIONAL' ? (
+                                <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1 text-sm font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                  🏠 Compra Nacional
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-3 py-1 text-sm font-semibold text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                                  🌍 Compra Internacional
+                                </span>
+                              )}
+                              <span className="text-sm text-gray-600 dark:text-gray-400">
+                                <span className="font-medium text-gray-700 dark:text-gray-300">Solicitud:</span> {formatFechaCorta(cotizacionSeleccionada.fechaSolicitud)}
+                              </span>
+                              <span className="text-sm text-gray-600 dark:text-gray-400">
+                                <span className="font-medium text-gray-700 dark:text-gray-300">Límite:</span> {formatFechaCorta(cotizacionSeleccionada.fechaLimite)}
+                              </span>
+                            </div>
                           </div>
 
                           {/* Tabs */}
@@ -1517,9 +1536,6 @@ export default function FollowUps() {
                                           <tr className="border-b border-gray-200 dark:border-gray-700 text-left">
                                             <th className="pb-3 pr-3 font-semibold text-gray-700 dark:text-gray-300">Descripción / SKU</th>
                                             <th className="pb-3 pr-3 font-semibold text-gray-700 dark:text-gray-300">Cantidad</th>
-                                            <th className="pb-3 pr-3 font-semibold text-gray-700 dark:text-gray-300">Nac. / Intl.</th>
-                                            <th className="pb-3 pr-3 font-semibold text-gray-700 dark:text-gray-300">F. Solicitud</th>
-                                            <th className="pb-3 pr-3 font-semibold text-gray-700 dark:text-gray-300">F. Límite</th>
                                             <th className="pb-3 pr-3 font-semibold text-gray-700 dark:text-gray-300">Precio</th>
                                             <th className="pb-3 pr-3 font-semibold text-gray-700 dark:text-gray-300">Comprobante</th>
                                             <th className="pb-3 pr-3 text-center font-semibold text-gray-700 dark:text-gray-300">Confirmar precio final</th>
@@ -1558,24 +1574,6 @@ export default function FollowUps() {
                                                     {producto.cantidad} <span className="text-gray-400">{producto.tipoUnidad.toLowerCase()}</span>
                                                   </td>
                                                   <td className="py-3 pr-3">
-                                                    {cotizacionSeleccionada.tipoCompra === 'NACIONAL' ? (
-                                                      <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">Nacional</span>
-                                                    ) : (
-                                                      <div>
-                                                        <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">Internacional</span>
-                                                        {producto.estadoProducto?.paisOrigen && (
-                                                          <div className="text-xs text-gray-500 mt-0.5">{producto.estadoProducto.paisOrigen.nombre}</div>
-                                                        )}
-                                                      </div>
-                                                    )}
-                                                  </td>
-                                                  <td className="py-3 pr-3 text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                                                    {formatFechaCorta(cotizacionSeleccionada.fechaSolicitud)}
-                                                  </td>
-                                                  <td className="py-3 pr-3 text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                                                    {formatFechaCorta(cotizacionSeleccionada.fechaLimite)}
-                                                  </td>
-                                                  <td className="py-3 pr-3">
                                                     <div className="flex items-center gap-1">
                                                       <input
                                                         type="number"
@@ -1601,16 +1599,37 @@ export default function FollowUps() {
                                                     </div>
                                                   </td>
                                                   <td className="py-3 pr-3">
-                                                    <select
-                                                      value={comprobanteStatus[producto.id] ?? ''}
-                                                      onChange={(e) => setComprobanteStatus(prev => ({ ...prev, [producto.id]: e.target.value as 'aplica' | 'no_aplica' | '' }))}
-                                                      disabled={yaAprobado}
-                                                      className="rounded border border-gray-300 bg-white px-2 py-1 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                                                    >
-                                                      <option value="">Seleccionar</option>
-                                                      <option value="aplica">Aplica</option>
-                                                      <option value="no_aplica">No Aplica</option>
-                                                    </select>
+                                                    <div className="flex flex-col gap-1.5">
+                                                      <select
+                                                        value={comprobanteStatus[producto.id] ?? ''}
+                                                        onChange={(e) => setComprobanteStatus(prev => ({ ...prev, [producto.id]: e.target.value as 'aplica' | 'no_aplica' | '' }))}
+                                                        disabled={yaAprobado}
+                                                        className="rounded border border-gray-300 bg-white px-2 py-1 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                                                      >
+                                                        <option value="">Seleccionar</option>
+                                                        <option value="aplica">Aplica</option>
+                                                        <option value="no_aplica">No Aplica</option>
+                                                      </select>
+                                                      {comprobanteStatus[producto.id] === 'aplica' && !yaAprobado && (
+                                                        <label className="flex items-center gap-1.5 cursor-pointer rounded border border-dashed border-gray-300 bg-gray-50 px-2 py-1 text-xs text-gray-600 hover:border-blue-400 hover:bg-blue-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:border-blue-500">
+                                                          <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                                          </svg>
+                                                          <span className="truncate max-w-[100px]">Subir comprobante</span>
+                                                          <input
+                                                            type="file"
+                                                            accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx"
+                                                            className="hidden"
+                                                            onChange={(e) => {
+                                                              const file = e.target.files?.[0];
+                                                              if (file && cotizacionSeleccionada?.chatId) {
+                                                                enviarArchivo(file);
+                                                              }
+                                                            }}
+                                                          />
+                                                        </label>
+                                                      )}
+                                                    </div>
                                                   </td>
                                                   <td className="py-3 pr-3 text-center">
                                                     <input
