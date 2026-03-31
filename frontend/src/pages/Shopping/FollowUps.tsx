@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 import PageMeta from "../../components/common/PageMeta";
 import { getToken } from "../../lib/api";
 import { useNotifications } from "../Notifications/context/NotificationContext";
@@ -456,6 +457,8 @@ const formatDate = (date: string | Date | null | undefined): string => {
 
 export default function ShoppingFollowUps() {
   const { addNotification } = useNotifications();
+  const { user } = useAuth();
+  const isComercial = user?.rol?.nombre?.toUpperCase() === 'COMERCIAL';
   const [searchParams] = useSearchParams();
 
   // Estados principales
@@ -1012,10 +1015,10 @@ export default function ShoppingFollowUps() {
                               ) : (
                                 <div className="flex items-center gap-1.5 cursor-pointer">
                                   <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{grupo.nombre}</p>
-                                  <button onClick={(e) => { e.stopPropagation(); setEditandoCotizacion(grupo.cotizacionId); setNombreCotEditado(grupo.nombre); }}
+                                  {!isComercial && <button onClick={(e) => { e.stopPropagation(); setEditandoCotizacion(grupo.cotizacionId); setNombreCotEditado(grupo.nombre); }}
                                     className="text-gray-400 hover:text-blue-500 transition-colors flex-shrink-0" title="Editar nombre">
                                     <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                                  </button>
+                                  </button>}
                                 </div>
                               )}
                               <p className="text-[10px] text-gray-500">{grupo.productos.length} producto(s) • {grupo.tipoCompra}</p>
@@ -1030,6 +1033,7 @@ export default function ShoppingFollowUps() {
                               </button>
                             )}
                             {/* Menú asignar responsable al grupo */}
+                            {!isComercial && (
                             <div className="relative" onClick={(e) => e.stopPropagation()}>
                               <button onClick={() => setMenuGrupoAbierto(menuGrupoAbierto === grupo.cotizacionId ? null : grupo.cotizacionId)}
                                 className="rounded-md p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300 transition-colors"
@@ -1057,6 +1061,7 @@ export default function ShoppingFollowUps() {
                                 </div>
                               )}
                             </div>
+                            )}
                           </div>
                           {/* Productos del grupo */}
                           {grupoExpandido === grupo.cotizacionId && grupo.productos.map((producto) => (
@@ -1093,6 +1098,7 @@ export default function ShoppingFollowUps() {
                                 {producto.progreso}%
                               </span>
                               {/* Responsable individual */}
+                              {!isComercial && (
                               <div className="relative" onClick={(e) => e.stopPropagation()}>
                                 <button onClick={() => setMenuAbierto(menuAbierto === producto.id ? null : producto.id)}
                                   className="rounded p-0.5 text-gray-400 hover:text-blue-500 transition-colors" title="Asignar responsable">
@@ -1129,6 +1135,7 @@ export default function ShoppingFollowUps() {
                                   </div>
                                 )}
                               </div>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -1185,9 +1192,9 @@ export default function ShoppingFollowUps() {
                               <div className="relative">
                                 <div
                                   role="button"
-                                  onClick={(e) => { e.stopPropagation(); setMenuAbierto(menuAbierto === producto.id ? null : producto.id); }}
-                                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
-                                  title="Asignar responsable"
+                                  onClick={!isComercial ? (e) => { e.stopPropagation(); setMenuAbierto(menuAbierto === producto.id ? null : producto.id); } : undefined}
+                                  className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] transition-colors ${!isComercial ? 'hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer' : 'cursor-default'}`}
+                                  title={!isComercial ? "Asignar responsable" : undefined}
                                 >
                                   {producto.responsableSeguimiento ? (
                                     <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
@@ -1198,7 +1205,7 @@ export default function ShoppingFollowUps() {
                                     <span className="text-gray-400"><MoreVertical size={12} /></span>
                                   )}
                                 </div>
-                                {menuAbierto === producto.id && (
+                                {!isComercial && menuAbierto === producto.id && (
                                   <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900"
                                     onClick={(e) => e.stopPropagation()}>
                                     <div className="p-1.5">

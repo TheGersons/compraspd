@@ -496,6 +496,7 @@ export default function FollowUps() {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const [notasAbiertas, setNotasAbiertas] = useState<string | null>(null);
   const { user, isLoading } = useAuth();
+  const isComercial = user?.rol?.nombre?.toUpperCase() === 'COMERCIAL';
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -1380,12 +1381,12 @@ export default function FollowUps() {
                           <button onClick={() => setEditandoNombre(false)} className="text-xs text-gray-400 hover:text-red-500">✕</button>
                         </div>
                       ) : (
-                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                          onClick={() => { setNombreEditado(cotizacionSeleccionada.nombreCotizacion); setEditandoNombre(true); }}
-                          title="Click para editar nombre"
+                        <h2 className={`text-2xl font-bold text-gray-900 dark:text-white transition-colors ${!isComercial ? 'cursor-pointer hover:text-blue-600 dark:hover:text-blue-400' : ''}`}
+                          onClick={!isComercial ? () => { setNombreEditado(cotizacionSeleccionada.nombreCotizacion); setEditandoNombre(true); } : undefined}
+                          title={!isComercial ? "Click para editar nombre" : undefined}
                         >
                           {cotizacionSeleccionada.nombreCotizacion}
-                          <span className="ml-2 text-xs text-gray-400">✏️</span>
+                          {!isComercial && <span className="ml-2 text-xs text-gray-400">✏️</span>}
                         </h2>
                       )}
                       <div className="mt-2 flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
@@ -1432,45 +1433,49 @@ export default function FollowUps() {
 
                       {/* Asignar responsable de seguimiento */}
                       <div className="relative">
-                        <button
-                          onClick={() => setMenuResponsableCot(!menuResponsableCot)}
-                          className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors ${responsableCotAsignado
-                            ? "text-green-600 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20"
-                            : "text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
-                            }`}
-                          title="Asignar responsable de seguimiento a todos los productos"
-                        >
-                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                          {responsableCotAsignado ? responsableCotAsignado.nombre : "Asignar Responsable"}
-                        </button>
-                        {menuResponsableCot && (
-                          <div className="absolute right-0 top-full z-50 mt-1 w-52 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
-                            <div className="p-1.5">
-                              <p className="px-2 py-1 text-[10px] font-semibold text-gray-400 uppercase">Asignar a todos los productos:</p>
-                              {supervisores.map(sup => (
-                                <button key={sup.id}
-                                  onClick={() => handleAsignarResponsableCotizacion(sup.id)}
-                                  className={`w-full rounded-md px-2 py-1.5 text-left text-xs transition-colors ${responsableCotAsignado?.id === sup.id
-                                    ? "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
-                                    : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
-                                    }`}>
-                                  {sup.nombre} {responsableCotAsignado?.id === sup.id && "✓"}
-                                </button>
-                              ))}
-                              {responsableCotAsignado && (
-                                <>
-                                  <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
-                                  <button
-                                    onClick={() => handleAsignarResponsableCotizacion(null)}
-                                    className="w-full rounded-md px-2 py-1.5 text-left text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
-                                    Quitar responsable de todos
+                        {!isComercial && (
+                          <>
+                          <button
+                            onClick={() => setMenuResponsableCot(!menuResponsableCot)}
+                            className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors ${responsableCotAsignado
+                              ? "text-green-600 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20"
+                              : "text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
+                              }`}
+                            title="Asignar responsable de seguimiento a todos los productos"
+                          >
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            {responsableCotAsignado ? responsableCotAsignado.nombre : "Asignar Responsable"}
+                          </button>
+                          {menuResponsableCot && (
+                            <div className="absolute right-0 top-full z-50 mt-1 w-52 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
+                              <div className="p-1.5">
+                                <p className="px-2 py-1 text-[10px] font-semibold text-gray-400 uppercase">Asignar a todos los productos:</p>
+                                {supervisores.map(sup => (
+                                  <button key={sup.id}
+                                    onClick={() => handleAsignarResponsableCotizacion(sup.id)}
+                                    className={`w-full rounded-md px-2 py-1.5 text-left text-xs transition-colors ${responsableCotAsignado?.id === sup.id
+                                      ? "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
+                                      : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
+                                      }`}>
+                                    {sup.nombre} {responsableCotAsignado?.id === sup.id && "✓"}
                                   </button>
-                                </>
-                              )}
+                                ))}
+                                {responsableCotAsignado && (
+                                  <>
+                                    <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
+                                    <button
+                                      onClick={() => handleAsignarResponsableCotizacion(null)}
+                                      className="w-full rounded-md px-2 py-1.5 text-left text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
+                                      Quitar responsable de todos
+                                    </button>
+                                  </>
+                                )}
+                              </div>
                             </div>
-                          </div>
+                          )}
+                          </>
                         )}
                       </div>
                     </div>
@@ -1683,6 +1688,7 @@ export default function FollowUps() {
 
                                             {/* Acciones */}
                                             <td className="py-4 text-right">
+                                              {!isComercial && (
                                               <button
                                                 onClick={() => configurarProducto(producto)}
                                                 className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
@@ -1693,6 +1699,7 @@ export default function FollowUps() {
                                                 </svg>
                                                 Configurar
                                               </button>
+                                              )}
                                             </td>
                                           </tr>
                                         ))}
