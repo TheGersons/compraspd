@@ -1,11 +1,10 @@
-import { Controller, Get, Post, Delete, Patch, Body, Param, Query, UseGuards, ParseUUIDPipe, Sse, MessageEvent, Res } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Patch, Body, Param, Query, UseGuards, ParseUUIDPipe, Sse, MessageEvent, Header } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { NotificacionService } from './notificacion.service';
 import { CreateNotificacionDto, ListNotificacionesQueryDto } from './dto/notificacion.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Observable } from 'rxjs';
-import type { Response } from 'express';
 
 type UserJwt = { sub: string; role?: string };
 
@@ -36,9 +35,9 @@ export class NotificacionController {
 
   @Sse('stream')
   @ApiOperation({ summary: 'Stream SSE de notificaciones en tiempo real' })
-  stream(@CurrentUser() user: UserJwt, @Res() res: Response): Observable<MessageEvent> {
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('X-Accel-Buffering', 'no'); // Nginx: deshabilitar buffering
+  @Header('Cache-Control', 'no-cache')
+  @Header('X-Accel-Buffering', 'no')
+  stream(@CurrentUser() user: UserJwt): Observable<MessageEvent> {
     return this.notificacionService.createUserStream(user.sub);
   }
 

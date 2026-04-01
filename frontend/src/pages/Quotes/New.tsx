@@ -292,10 +292,7 @@ export default function New() {
       ]);
       // 1. Manejar Tipos (CON VALIDACIÓN DE NULOS EXTRA)
       if (tiposResult.status === 'fulfilled') {
-        // Solo mostrar tipos del área comercial (4 tipos de cotización)
-        const datosSeguros = (tiposResult.value || []).filter(
-          (t: Tipo) => t.area?.tipo === 'comercial'
-        );
+        const datosSeguros = tiposResult.value || [];
         setTipos(datosSeguros);
       } else {
         console.warn("⚠️ Error cargando Tipos:", tiposResult.reason);

@@ -83,7 +83,7 @@ export class PreciosService {
         cotizacionDetalleId: dto.cotizacionDetalleId,
         precio: dto.precio,
         precioDescuento: dto.precioDescuento || null,
-        proveedorId: dto.proveedorId ?? '',
+        proveedorId: dto.proveedorId || undefined,
         ComprobanteDescuento: dto.comprobanteDescuento || null,
       },
       include: {
