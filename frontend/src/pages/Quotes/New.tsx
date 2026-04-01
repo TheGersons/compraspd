@@ -426,7 +426,7 @@ export default function New() {
           return;
         }
 
-        const UNIDADES: TipoUnidad[] = ["UNIDAD","CAJA","PAQUETE","METRO","PIES","KILOGRAMO","LITRO","OTRO"];
+        const UNIDADES: TipoUnidad[] = ["UNIDAD","CAJA","PAQUETE","METRO","Pies","KILOGRAMO","LITRO","OTRO"];
         const parsed: ItemCotizacion[] = dataRows.map((row) => {
           const rawUnidad = String(row[3] ?? "").toUpperCase().trim() as TipoUnidad;
           return {
@@ -1044,7 +1044,7 @@ export default function New() {
                           <option value="CAJA">Caja</option>
                           <option value="PAQUETE">Paquete</option>
                           <option value="METRO">Metro</option>
-                          <option value="PIES">Pies</option>
+                          <option value="Pies">Pies</option>
                           <option value="KILOGRAMO">Kilogramo</option>
                           <option value="LITRO">Litro</option>
                           <option value="OTRO">Otro</option>
