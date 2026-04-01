@@ -428,12 +428,12 @@ model Precios {
   cotizacionDetalleId  String   @map("cotizacion_detalle_id") @db.Uuid
   precio               Decimal  @db.Decimal(15, 4)
   precioDescuento      Decimal? @map("precio_descuento") @db.Decimal(15, 4)
-  proveedorId          String   @map("proveedor_id") @db.Uuid
+  proveedorId          String?  @map("proveedor_id") @db.Uuid
   fechaConsulta        DateTime @default(now()) @map("fecha_consulta")
   ComprobanteDescuento String?  @map("comprobante_descuento")
 
   cotizacionDetalle CotizacionDetalle @relation("PreciosPorDetalle", fields: [cotizacionDetalleId], references: [id], onDelete: Cascade)
-  proveedor         Proveedor         @relation(fields: [proveedorId], references: [id], onDelete: Restrict)
+  proveedor         Proveedor?        @relation(fields: [proveedorId], references: [id], onDelete: Restrict)
 
   cotizacionDetalleSeleccionado CotizacionDetalle[] @relation("PrecioSeleccionado")
 
