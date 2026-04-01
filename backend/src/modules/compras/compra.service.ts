@@ -90,7 +90,7 @@ export class CompraService {
         tipoUnidad: detalle.tipoUnidad,
         notas: detalle.notas,
         precio: detalle.precios!.precioDescuento || detalle.precios!.precio,
-        proveedorId: detalle.precios!.proveedorId,
+        proveedorId: detalle.precios!.proveedorId as string,
         estado: 'PRE-COMPRA'
       }));
 

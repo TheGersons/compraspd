@@ -82,7 +82,7 @@ export class EstadoProductoSyncService {
             fechaConDescuento: tieneDescuento ? new Date() : null,
             
             // Info del producto
-            proveedor: precio.proveedor.nombre,
+            proveedor: precio.proveedor?.nombre ?? '',
             cantidad: detalle.cantidad,
             precioUnitario,
             precioTotal,
@@ -168,7 +168,7 @@ export class EstadoProductoSyncService {
           fechaConDescuento: new Date(),
           precioUnitario,
           precioTotal,
-          proveedor: precio.proveedor.nombre, // Actualizar proveedor por si cambió
+          proveedor: precio.proveedor?.nombre ?? '',
         },
       });
 
