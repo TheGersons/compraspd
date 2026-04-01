@@ -1428,6 +1428,7 @@ export default function FollowUps() {
                                 <span className={`rounded-full px-3 py-1 text-xs font-medium ${getEstadoBadgeColor(cotizacionSeleccionada.estado)}`}>
                                   {getEstadoLabel(cotizacionSeleccionada.estado)}
                                 </span>
+                                {canAsignarResponsable && (
                                 <button
                                   onClick={eliminarCotizacionActual}
                                   className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
@@ -1437,6 +1438,7 @@ export default function FollowUps() {
                                   </svg>
                                   Eliminar
                                 </button>
+                                )}
                                 {canAsignarResponsable && (
                                   <div className="relative">
                                     <button
