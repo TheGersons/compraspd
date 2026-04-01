@@ -10,7 +10,8 @@
       "Bash(grep -r \"io\\(\\)\\\\|socket\\\\|Socket\" /c/Repo/admin-dashboard-main/frontend/src --include=*.ts --include=*.tsx)",
       "Bash(xargs grep:*)",
       "Bash(find /c/Repo/admin-dashboard-main -name *.gateway.ts -o -name *socket* -o -name *ws*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(git commit:*)"
     ]
   }
 }

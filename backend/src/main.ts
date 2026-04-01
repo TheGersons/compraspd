@@ -22,6 +22,7 @@ async function bootstrap() {
       'http://192.168.3.38:5173',
       'http://192.168.3.38:8080',
       'http://89.167.20.163:6080',
+      'http://89.167.20.163:8080',
     ],
     credentials: true,
   });
