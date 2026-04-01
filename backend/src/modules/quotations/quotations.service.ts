@@ -8,6 +8,9 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CreateQuotationDto } from './dto/create-quotation.dto';
 import { UpdateQuotationDto } from './dto/update-quotation.dto';
 import { QuotationStatus } from './dto/change-status.dto';
+import { MailService } from '../Mail/mail.service';
+import { NotificacionService } from '../notifications/notificacion.service';
+import { NotificationsGateway } from '../notifications/notifications.gateway';
 
 type UserJwt = { sub: string; role?: string };
 
@@ -28,7 +31,12 @@ const ALLOWED_TRANSITIONS: Record<QuotationStatus, QuotationStatus[]> = {
  */
 @Injectable()
 export class QuotationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mailService: MailService,
+    private readonly notificacionService: NotificacionService,
+    private readonly notificationsGateway: NotificationsGateway,
+  ) {}
 
   /**
    * Crea una cotización nueva con sus items
@@ -171,7 +179,66 @@ export class QuotationsService {
       }
 
       return cotizacion;
+    }).then((cotizacion) => {
+      // Notificar a todos los supervisores (fire-and-forget)
+      this.notifySupervisors(cotizacion.id, cotizacion.nombreCotizacion, cotizacion.solicitante.nombre).catch(() => {});
+      return cotizacion;
     });
+  }
+
+  /**
+   * Crea notificaciones en BD, emite por WebSocket y envía emails
+   * a todos los supervisores activos cuando se crea una cotización
+   */
+  private async notifySupervisors(
+    cotizacionId: string,
+    quotationName: string,
+    requesterName: string,
+  ): Promise<void> {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const quotationUrl = `${frontendUrl}/quotes/${cotizacionId}`;
+
+    // Obtener todos los usuarios con rol SUPERVISOR activos
+    const supervisores = await this.prisma.usuario.findMany({
+      where: {
+        activo: true,
+        rol: { nombre: 'SUPERVISOR' },
+      },
+      select: { id: true, nombre: true, email: true },
+    });
+
+    await Promise.allSettled(
+      supervisores.map(async (s) => {
+        const notifData = {
+          tipo: 'COMPRA_CREADA',
+          titulo: 'Nueva cotización pendiente',
+          descripcion: `"${quotationName}" solicitada por ${requesterName}`,
+        };
+
+        // 1. Crear notificación en BD
+        const notif = await this.notificacionService.create({
+          userId: s.id,
+          ...notifData,
+        } as any);
+
+        // 2. Emitir por WebSocket
+        this.notificationsGateway.emitToUser(s.id, 'nueva_notificacion', {
+          ...notif,
+          cotizacionId,
+        });
+
+        // 3. Email
+        if (s.email) {
+          return this.mailService.sendNewQuotationNotification(
+            s.email,
+            s.nombre,
+            quotationName,
+            requesterName,
+            quotationUrl,
+          );
+        }
+      }),
+    );
   }
 
   /**

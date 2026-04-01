@@ -8,6 +8,9 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CreateChatDto, AddParticipantsDto } from './dto/create-chat.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { StorageService } from '../storage';
+import { MailService } from '../Mail/mail.service';
+import { NotificacionService } from '../notifications/notificacion.service';
+import { NotificationsGateway } from '../notifications/notifications.gateway';
 
 type UserJwt = { sub: string; role?: string };
 
@@ -20,6 +23,9 @@ export class MessagesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
+    private readonly mailService: MailService,
+    private readonly notificacionService: NotificacionService,
+    private readonly notificationsGateway: NotificationsGateway,
   ) {}
 
   /**
@@ -339,6 +345,10 @@ export class MessagesService {
         }));
       }
       return result;
+    }).then((result) => {
+      // Enviar notificaciones por correo (fire-and-forget)
+      this.notifyOtherParticipants(dto.chatId, user.sub, dto.contenido).catch(() => {});
+      return result;
     });
   }
 
@@ -566,6 +576,84 @@ export class MessagesService {
         }));
       }
       return result;
+    }).then((result) => {
+      // Enviar notificaciones por correo (fire-and-forget)
+      const msgContent = contenido || `📎 ${file.originalname}`;
+      this.notifyOtherParticipants(chatId, user.sub, msgContent).catch(() => {});
+      return result;
     });
+  }
+
+  /**
+   * Crea notificaciones en BD, emite por WebSocket y envía emails
+   * a todos los participantes del chat excepto el emisor
+   */
+  private async notifyOtherParticipants(
+    chatId: string,
+    senderId: string,
+    messageContent: string,
+  ): Promise<void> {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+    // Obtener todos los participantes con sus datos de usuario
+    const participantes = await this.prisma.participantesChat.findMany({
+      where: {
+        chatId,
+        userId: { not: senderId },
+      },
+      include: {
+        usuario: {
+          select: { id: true, nombre: true, email: true, activo: true },
+        },
+      },
+    });
+
+    // Obtener el nombre del emisor
+    const emisor = await this.prisma.usuario.findUnique({
+      where: { id: senderId },
+      select: { nombre: true },
+    });
+
+    const senderName = emisor?.nombre || 'Un usuario';
+    const chatUrl = `${frontendUrl}/messages/${chatId}`;
+    const preview =
+      messageContent.length > 100
+        ? messageContent.substring(0, 100) + '...'
+        : messageContent;
+
+    const destinatariosActivos = participantes.filter((p) => p.usuario.activo);
+
+    await Promise.allSettled(
+      destinatariosActivos.map(async (p) => {
+        const notifData = {
+          tipo: 'COMENTARIO_NUEVO',
+          titulo: `Nuevo mensaje de ${senderName}`,
+          descripcion: preview,
+        };
+
+        // 1. Crear notificación en BD
+        const notif = await this.notificacionService.create({
+          userId: p.usuario.id,
+          ...notifData,
+        } as any);
+
+        // 2. Emitir por WebSocket
+        this.notificationsGateway.emitToUser(p.usuario.id, 'nueva_notificacion', {
+          ...notif,
+          chatId,
+        });
+
+        // 3. Email
+        if (p.usuario.email) {
+          return this.mailService.sendNewMessageNotification(
+            p.usuario.email,
+            p.usuario.nombre,
+            senderName,
+            messageContent,
+            chatUrl,
+          );
+        }
+      }),
+    );
   }
 }

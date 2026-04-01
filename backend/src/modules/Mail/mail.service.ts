@@ -161,6 +161,174 @@ export class MailService {
   }
 
   /**
+   * Notificación de nuevo mensaje en chat
+   */
+  async sendNewMessageNotification(
+    to: string,
+    recipientName: string,
+    senderName: string,
+    messagePreview: string,
+    chatUrl: string,
+  ): Promise<boolean> {
+    const preview = messagePreview.length > 120
+      ? messagePreview.substring(0, 120) + '...'
+      : messagePreview;
+
+    const mailOptions = {
+      from: `"Energía PD" <${process.env.MAIL_USER || 'noreply@energiapd.com'}>`,
+      to,
+      subject: `Nuevo mensaje de ${senderName} - Energía PD`,
+      html: `
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Nuevo Mensaje</title>
+        </head>
+        <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f0f4f8; -webkit-font-smoothing: antialiased;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f0f4f8; padding: 48px 16px;">
+            <tr>
+              <td align="center">
+                <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 520px; background: #ffffff; border-radius: 24px; overflow: hidden; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);">
+                  <tr>
+                    <td style="background: linear-gradient(145deg, #0D76B8 0%, #0a5a8c 50%, #14559c 100%); padding: 48px 40px; text-align: center;">
+                      <div style="margin-bottom: 16px;">${this.getLogoSvg()}</div>
+                      <p style="margin: 0; color: white; font-size: 13px; letter-spacing: 0.5px; text-transform: uppercase;">Sistema de Gestión Empresarial</p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 48px 40px 32px;">
+                      <h1 style="margin: 0 0 8px; color: #1a202c; font-size: 24px; font-weight: 700; text-align: center;">Nuevo Mensaje</h1>
+                      <p style="margin: 0 0 32px; color: #64748b; font-size: 15px; text-align: center; line-height: 1.6;">
+                        Hola <strong style="color: #334155;">${recipientName}</strong>, tienes un nuevo mensaje de <strong style="color: #334155;">${senderName}</strong>.
+                      </p>
+                      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #0D76B8; border-radius: 8px; padding: 20px 24px; margin-bottom: 32px;">
+                        <p style="margin: 0; color: #334155; font-size: 15px; line-height: 1.6; font-style: italic;">"${preview}"</p>
+                      </div>
+                      <div style="text-align: center; margin-bottom: 32px;">
+                        <a href="${chatUrl}" style="display: inline-block; background: linear-gradient(135deg, #0D76B8 0%, #0a5a8c 100%); color: #ffffff; text-decoration: none; padding: 16px 48px; border-radius: 12px; font-weight: 600; font-size: 15px; box-shadow: 0 4px 14px rgba(13, 118, 184, 0.4);">
+                          Ver Conversación
+                        </a>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="background: #f8fafc; padding: 32px 40px; border-top: 1px solid #e2e8f0; text-align: center;">
+                      <p style="margin: 0 0 8px; color: #64748b; font-size: 13px;">Este es un correo automático, por favor no respondas.</p>
+                      <p style="margin: 0; color: #94a3b8; font-size: 12px;">© ${new Date().getFullYear()} Energía PD · Todos los derechos reservados</p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+      `,
+    };
+
+    try {
+      const info = await this.transporter.sendMail(mailOptions);
+      this.logger.log(`Notificación de mensaje enviada a ${to}: ${info.messageId}`);
+      return true;
+    } catch (error) {
+      this.logger.error(`Error enviando notificación de mensaje a ${to}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Notificación de nueva cotización para supervisores
+   */
+  async sendNewQuotationNotification(
+    to: string,
+    supervisorName: string,
+    quotationName: string,
+    requesterName: string,
+    quotationUrl: string,
+  ): Promise<boolean> {
+    const mailOptions = {
+      from: `"Energía PD" <${process.env.MAIL_USER || 'noreply@energiapd.com'}>`,
+      to,
+      subject: `Nueva cotización pendiente: ${quotationName} - Energía PD`,
+      html: `
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Nueva Cotización</title>
+        </head>
+        <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f0f4f8; -webkit-font-smoothing: antialiased;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f0f4f8; padding: 48px 16px;">
+            <tr>
+              <td align="center">
+                <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 520px; background: #ffffff; border-radius: 24px; overflow: hidden; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);">
+                  <tr>
+                    <td style="background: linear-gradient(145deg, #0D76B8 0%, #0a5a8c 50%, #14559c 100%); padding: 48px 40px; text-align: center;">
+                      <div style="margin-bottom: 16px;">${this.getLogoSvg()}</div>
+                      <p style="margin: 0; color: white; font-size: 13px; letter-spacing: 0.5px; text-transform: uppercase;">Sistema de Gestión Empresarial</p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 48px 40px 32px;">
+                      <h1 style="margin: 0 0 8px; color: #1a202c; font-size: 24px; font-weight: 700; text-align: center;">Nueva Cotización por Atender</h1>
+                      <p style="margin: 0 0 32px; color: #64748b; font-size: 15px; text-align: center; line-height: 1.6;">
+                        Hola <strong style="color: #334155;">${supervisorName}</strong>, hay una nueva cotización que requiere tu atención.
+                      </p>
+                      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; margin-bottom: 32px;">
+                        <table cellpadding="0" cellspacing="0" width="100%">
+                          <tr>
+                            <td style="padding: 8px 0; color: #64748b; font-size: 14px; border-bottom: 1px solid #e2e8f0;">
+                              <strong style="color: #334155;">Cotización:</strong> ${quotationName}
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style="padding: 8px 0; color: #64748b; font-size: 14px;">
+                              <strong style="color: #334155;">Solicitante:</strong> ${requesterName}
+                            </td>
+                          </tr>
+                        </table>
+                      </div>
+                      <div style="background: linear-gradient(135deg, #fef3c7 0%, #fef9c3 100%); border-radius: 12px; padding: 16px 24px; margin-bottom: 32px;">
+                        <p style="margin: 0; color: #92400e; font-size: 14px; font-weight: 500;">
+                          ⚠️ Esta cotización se encuentra en estado <strong>ENVIADA</strong> y está esperando revisión.
+                        </p>
+                      </div>
+                      <div style="text-align: center; margin-bottom: 32px;">
+                        <a href="${quotationUrl}" style="display: inline-block; background: linear-gradient(135deg, #0D76B8 0%, #0a5a8c 100%); color: #ffffff; text-decoration: none; padding: 16px 48px; border-radius: 12px; font-weight: 600; font-size: 15px; box-shadow: 0 4px 14px rgba(13, 118, 184, 0.4);">
+                          Revisar Cotización
+                        </a>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="background: #f8fafc; padding: 32px 40px; border-top: 1px solid #e2e8f0; text-align: center;">
+                      <p style="margin: 0 0 8px; color: #64748b; font-size: 13px;">Este es un correo automático, por favor no respondas.</p>
+                      <p style="margin: 0; color: #94a3b8; font-size: 12px;">© ${new Date().getFullYear()} Energía PD · Todos los derechos reservados</p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+      `,
+    };
+
+    try {
+      const info = await this.transporter.sendMail(mailOptions);
+      this.logger.log(`Notificación de cotización enviada a ${to}: ${info.messageId}`);
+      return true;
+    } catch (error) {
+      this.logger.error(`Error enviando notificación de cotización a ${to}:`, error);
+      return false;
+    }
+  }
+
+  /**
    * Enviar correo con contraseña temporal - Diseño profesional
    */
   async sendPasswordResetEmail(to: string, tempPassword: string, userName: string): Promise<boolean> {

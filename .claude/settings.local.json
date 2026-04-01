@@ -4,7 +4,13 @@
       "Bash(find C:/Repo/admin-dashboard-main/backend/src/modules/users -type f -name *.ts)",
       "Bash(node:*)",
       "Bash(del:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(find /c/Repo/admin-dashboard-main/frontend/src -type d -name *[Cc]hat* -o -type d -name *[Mm]essage*)",
+      "Bash(grep -r \"WebSocket\\\\|socket.io\\\\|@WebSocketGateway\" /c/Repo/admin-dashboard-main/backend/src --include=*.ts)",
+      "Bash(grep -r \"io\\(\\)\\\\|socket\\\\|Socket\" /c/Repo/admin-dashboard-main/frontend/src --include=*.ts --include=*.tsx)",
+      "Bash(xargs grep:*)",
+      "Bash(find /c/Repo/admin-dashboard-main -name *.gateway.ts -o -name *socket* -o -name *ws*)",
+      "Bash(npm install:*)"
     ]
   }
 }

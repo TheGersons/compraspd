@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import * as XLSX from "xlsx";
 import PageMeta from "../../components/common/PageMeta";
 import Button from "../../components/ui/button/Button";
 import { useNotifications } from "../Notifications/context/NotificationContext";
@@ -26,11 +27,11 @@ interface ArchivoAdjunto {
 }
 
 interface ItemCotizacion {
-  // sku eliminado - será autoasignado por backend
+  numeroParte: string;
   descripcionProducto: string;
   cantidad: number;
   tipoUnidad: TipoUnidad;
-  notas?: string;
+  notas: string;
 }
 
 interface Tipo {
@@ -212,7 +213,8 @@ export default function New() {
   const [error, setError] = useState<string | null>(null);
 
   // Estado del formulario
-  const [nombreCotizacion, setNombreCotizacion] = useState("");
+  const [nombreBase, setNombreBase] = useState(""); // Nombre escrito por el usuario
+  const [nombreCotizacion, setNombreCotizacion] = useState(""); // Nombre completo (con # de parte)
   const [tipoCompra, setTipoCompra] = useState<TipoCompra>("NACIONAL");
   const [lugarEntrega, setLugarEntrega] = useState<LugarEntrega>("ALMACEN");
   const [comentarios, setComentarios] = useState("");
@@ -223,7 +225,7 @@ export default function New() {
   const [searchSolicitante, setSearchSolicitante] = useState("");
   const [proyectoId, setProyectoId] = useState("");
   const [items, setItems] = useState<ItemCotizacion[]>([
-    { descripcionProducto: "", cantidad: 1, tipoUnidad: "UNIDAD", notas: "" },
+    { numeroParte: "", descripcionProducto: "", cantidad: 1, tipoUnidad: "UNIDAD", notas: "" },
   ]);
   const [fechaLimite, setFechaLimite] = useState<Date | null>(null);
 
@@ -361,26 +363,104 @@ export default function New() {
     }
   }, [proyectoId]);
 
-  // Manejo de items
-  const agregarItem = () => {
-    setItems([
-      ...items,
-      { descripcionProducto: "", cantidad: 1, tipoUnidad: "UNIDAD", notas: "" },
-    ]);
-  };
+  // ─── Helpers para items ────────────────────────────────────────────────────
+  const emptyItem = (): ItemCotizacion => ({
+    numeroParte: "", descripcionProducto: "", cantidad: 1, tipoUnidad: "UNIDAD", notas: "",
+  });
 
+  const isRowTouched = (item: ItemCotizacion) =>
+    !!(item.numeroParte.trim() || item.descripcionProducto.trim());
+
+  const computeNombre = (base: string, firstPart: string) =>
+    firstPart.trim() && base.trim()
+      ? `${firstPart.trim()} - ${base.trim()}`
+      : firstPart.trim() || base.trim();
+
+  // ─── Manejo de items ───────────────────────────────────────────────────────
   const eliminarItem = (index: number) => {
-    if (items.length === 1) {
-      addNotification("warn", "Atención", "Debe haber al menos un item en la cotización.");
-      return;
-    }
-    setItems(items.filter((_, i) => i !== index));
+    const remaining = items.filter((_, i) => i !== index);
+    const base = remaining.length === 0 ? [emptyItem()] : remaining;
+    // Garantizar siempre una fila extra vacía al final
+    if (isRowTouched(base[base.length - 1])) base.push(emptyItem());
+    setItems(base);
   };
 
   const actualizarItem = (index: number, campo: keyof ItemCotizacion, valor: any) => {
     const nuevosItems = [...items];
     nuevosItems[index] = { ...nuevosItems[index], [campo]: valor };
+
+    // Auto-agregar fila vacía cuando la última fila recibe contenido
+    const lastIdx = nuevosItems.length - 1;
+    if (index === lastIdx && isRowTouched(nuevosItems[lastIdx])) {
+      nuevosItems.push(emptyItem());
+    }
+
     setItems(nuevosItems);
+
+    // Actualizar nombre de cotización cuando cambia el # de parte del primer item
+    if (index === 0 && campo === "numeroParte") {
+      const computed = computeNombre(nombreBase, valor as string);
+      setNombreCotizacion(computed);
+    }
+  };
+
+  // ─── Excel: Importar items ─────────────────────────────────────────────────
+  const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = new Uint8Array(ev.target!.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: "array" });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+
+        // Saltar encabezado (primera fila)
+        const dataRows = rows.slice(1).filter((r) =>
+          r.some((cell) => String(cell).trim() !== "")
+        );
+
+        if (dataRows.length === 0) {
+          addNotification("warn", "Archivo vacío", "El archivo no contiene datos.");
+          return;
+        }
+
+        const UNIDADES: TipoUnidad[] = ["UNIDAD","CAJA","PAQUETE","METRO","PIES","KILOGRAMO","LITRO","OTRO"];
+        const parsed: ItemCotizacion[] = dataRows.map((row) => {
+          const rawUnidad = String(row[3] ?? "").toUpperCase().trim() as TipoUnidad;
+          return {
+            numeroParte: String(row[0] ?? "").trim(),
+            descripcionProducto: String(row[1] ?? "").trim(),
+            cantidad: Math.max(1, parseInt(String(row[2])) || 1),
+            tipoUnidad: UNIDADES.includes(rawUnidad) ? rawUnidad : "UNIDAD",
+            notas: String(row[4] ?? "").trim(),
+          };
+        });
+
+        // Agregar fila extra vacía al final
+        setItems([...parsed, emptyItem()]);
+        addNotification("success", "Items importados", `${parsed.length} items cargados desde Excel.`);
+      } catch {
+        addNotification("danger", "Error al importar", "No se pudo leer el archivo Excel.");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = ""; // Reset input
+  };
+
+  // ─── Excel: Descargar plantilla ────────────────────────────────────────────
+  const handleDownloadTemplate = () => {
+    const wsData = [
+      ["# de Parte", "Descripción", "Cantidad", "Tipo Unidad", "Notas"],
+      ["PART-001", "Laptop Dell Latitude 5420", 2, "UNIDAD", "Con SSD 512GB, color negro"],
+      ["PART-002", "Monitor 24 pulgadas", 1, "UNIDAD", "Resolución 1920x1080"],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    ws["!cols"] = [{ wch: 15 }, { wch: 35 }, { wch: 10 }, { wch: 14 }, { wch: 30 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Items");
+    XLSX.writeFile(wb, "plantilla_cotizacion.xlsx");
   };
 
   // Manejo de archivos adjuntos
@@ -419,27 +499,27 @@ export default function New() {
   };
 
   // Validación
+  const getFilledItems = () => items.filter(isRowTouched);
+
   const validarFormulario = (): string | null => {
-    if (!nombreCotizacion.trim()) return "El nombre de la cotización es obligatorio";
+    if (!nombreBase.trim()) return "El nombre de la cotización es obligatorio";
     if (!tipoId) return "Debe seleccionar un tipo de cotización";
     if (!solicitanteId) return "Debe seleccionar un solicitante";
-    // ESTO ES LO CORRECTO
-    // Solo pide proyecto si el lugar de entrega es explícitamente 'PROYECTO'
     if (!proyectoId && lugarEntrega === 'PROYECTO') {
       return "Debe seleccionar un proyecto cuando el lugar de entrega es 'Proyecto'";
     }
     if (!fechaLimite) return "La fecha límite es obligatoria";
 
-    // Validar fecha
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
-    const limite = new Date(fechaLimite);
+    if (new Date(fechaLimite) < hoy) return "La fecha límite no puede ser en el pasado";
 
-    if (limite < hoy) return "La fecha límite no puede ser en el pasado";
+    const filled = getFilledItems();
+    if (filled.length === 0) return "Debes agregar al menos 1 ítem en la cotización";
 
-    // Validar items (SKU eliminado de validación)
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
+    for (let i = 0; i < filled.length; i++) {
+      const item = filled[i];
+      if (!item.descripcionProducto.trim() && !item.numeroParte.trim()) continue;
       if (!item.descripcionProducto.trim()) return `La descripción del item ${i + 1} es obligatoria`;
       if (item.cantidad <= 0) return `La cantidad del item ${i + 1} debe ser mayor a 0`;
     }
@@ -465,7 +545,7 @@ export default function New() {
       fechaEstimadaDefault.setDate(fechaEstimadaDefault.getDate() + 30); // +30 días
       // Preparar datos (SKU eliminado del payload)
       const payload = {
-        nombreCotizacion: nombreCotizacion.trim(),
+        nombreCotizacion: nombreCotizacion.trim() || nombreBase.trim(),
         tipoCompra,
         lugarEntrega,
         fechaLimite: fechaLimite?.toISOString(),
@@ -474,12 +554,15 @@ export default function New() {
         tipoId,
         solicitanteId,
         proyectoId,
-        items: items.map(item => ({
-          // sku eliminado - backend lo asignará automáticamente
-          descripcionProducto: item.descripcionProducto.trim(),
+        items: getFilledItems().map(item => ({
+          descripcionProducto: (
+            item.numeroParte.trim() && item.descripcionProducto.trim()
+              ? `${item.numeroParte.trim()} - ${item.descripcionProducto.trim()}`
+              : item.numeroParte.trim() || item.descripcionProducto.trim()
+          ),
           cantidad: item.cantidad,
           tipoUnidad: item.tipoUnidad,
-          notas: item.notas?.trim() || undefined,
+          notas: item.notas.trim() || undefined,
         })),
       };
 
@@ -587,12 +670,20 @@ export default function New() {
               </label>
               <input
                 type="text"
-                value={nombreCotizacion}
-                onChange={(e) => setNombreCotizacion(e.target.value)}
+                value={nombreBase}
+                onChange={(e) => {
+                  setNombreBase(e.target.value);
+                  setNombreCotizacion(computeNombre(e.target.value, items[0]?.numeroParte ?? ""));
+                }}
                 className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-2.5 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
                 placeholder="Ej: Cotización Laptops Octubre"
                 required
               />
+              {items[0]?.numeroParte?.trim() && (
+                <p className="mt-1 text-xs text-blue-600 dark:text-blue-400">
+                  Nombre final: <strong>{nombreCotizacion}</strong>
+                </p>
+              )}
             </div>
 
             {/* Tipo de Compra */}
@@ -818,117 +909,185 @@ export default function New() {
 
         {/* Items de la Cotización */}
         <div className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Items de la Cotización
-            </h2>
-            <Button
-              onClick={agregarItem}
-              size="sm"
-              variant="primary"
-              className="flex items-center gap-2"
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Agregar Item
-            </Button>
-          </div>
-
-          <div className="space-y-4">
-            {items.map((item, index) => (
-              <div
-                key={index}
-                className="rounded-lg border-2 border-gray-200 bg-gray-50 p-4 dark:border-gray-600 dark:bg-gray-700/50"
+          {/* Cabecera */}
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Items de la Cotización
+              </h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                El # de parte del primer item se agrega automáticamente como prefijo al nombre.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {/* Importar Excel */}
+              <label
+                className="flex cursor-pointer items-center gap-1.5 rounded-lg border-2 border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400"
+                title="Importar items desde Excel"
               >
-                <div className="mb-3 flex items-center justify-between">
-                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                    Item #{index + 1}
-                  </span>
-                  {items.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => eliminarItem(index)}
-                      className="rounded-lg p-1.5 text-rose-600 transition-colors hover:bg-rose-100 dark:text-rose-400 dark:hover:bg-rose-900/30"
-                    >
-                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                Importar Excel
+                <input
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  className="hidden"
+                  onChange={handleImportExcel}
+                />
+              </label>
 
-                {/* Grid cambiado de 4 a 3 columnas, SKU eliminado */}
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {/* Descripción - ahora ocupa más espacio */}
-                  <div className="md:col-span-2 lg:col-span-3">
-                    <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
-                      Descripción del Producto <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={item.descripcionProducto}
-                      onChange={(e) => actualizarItem(index, "descripcionProducto", e.target.value)}
-                      className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
-                      placeholder="Laptop Dell Latitude 5420"
-                      required
-                    />
-                  </div>
-
-                  {/* Cantidad */}
-                  <div>
-                    <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
-                      Cantidad <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      value={item.cantidad}
-                      onChange={(e) => actualizarItem(index, "cantidad", parseInt(e.target.value) || 1)}
-                      min="1"
-                      className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
-                      required
-                    />
-                  </div>
-
-                  {/* Tipo de Unidad */}
-                  <div>
-                    <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
-                      Tipo Unidad <span className="text-rose-500">*</span>
-                    </label>
-                    <select
-                      value={item.tipoUnidad}
-                      onChange={(e) => actualizarItem(index, "tipoUnidad", e.target.value)}
-                      className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
-                      required
-                    >
-                      <option value="UNIDAD">Unidad</option>
-                      <option value="CAJA">Caja</option>
-                      <option value="PAQUETE">Paquete</option>
-                      <option value="METRO">Metro</option>
-                      <option value="PIES">Pies</option>
-                      <option value="KILOGRAMO">Kilogramo</option>
-                      <option value="LITRO">Litro</option>
-                      <option value="OTRO">Otro</option>
-                    </select>
-                  </div>
-
-                  {/* Notas */}
-                  <div className="md:col-span-2 lg:col-span-3">
-                    <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
-                      Notas/Especificaciones
-                    </label>
-                    <input
-                      type="text"
-                      value={item.notas || ""}
-                      onChange={(e) => actualizarItem(index, "notas", e.target.value)}
-                      className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
-                      placeholder="Preferiblemente con SSD"
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
+              {/* Descargar plantilla */}
+              <button
+                type="button"
+                onClick={handleDownloadTemplate}
+                className="flex items-center gap-1.5 rounded-lg border-2 border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-900/20 dark:text-blue-400"
+                title="Descargar plantilla de ejemplo"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Descargar Plantilla
+              </button>
+            </div>
           </div>
+
+          {/* Tabla */}
+          <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+            <table className="w-full min-w-[700px] border-collapse text-sm">
+              <thead>
+                <tr className="bg-gray-50 dark:bg-gray-700/60">
+                  <th className="w-8 border-b border-gray-200 py-2.5 pl-3 text-center text-xs font-semibold text-gray-500 dark:border-gray-600 dark:text-gray-400">
+                    #
+                  </th>
+                  <th className="w-32 border-b border-l border-gray-200 px-2.5 py-2.5 text-left text-xs font-semibold text-gray-600 dark:border-gray-600 dark:text-gray-300">
+                    # de Parte
+                  </th>
+                  <th className="border-b border-l border-gray-200 px-2.5 py-2.5 text-left text-xs font-semibold text-gray-600 dark:border-gray-600 dark:text-gray-300">
+                    Descripción <span className="text-rose-500">*</span>
+                  </th>
+                  <th className="w-20 border-b border-l border-gray-200 px-2.5 py-2.5 text-center text-xs font-semibold text-gray-600 dark:border-gray-600 dark:text-gray-300">
+                    Cantidad <span className="text-rose-500">*</span>
+                  </th>
+                  <th className="w-28 border-b border-l border-gray-200 px-2.5 py-2.5 text-left text-xs font-semibold text-gray-600 dark:border-gray-600 dark:text-gray-300">
+                    Tipo Unidad
+                  </th>
+                  <th className="w-40 border-b border-l border-gray-200 px-2.5 py-2.5 text-left text-xs font-semibold text-gray-600 dark:border-gray-600 dark:text-gray-300">
+                    Notas
+                  </th>
+                  <th className="w-10 border-b border-l border-gray-200 py-2.5 dark:border-gray-600" />
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item, index) => {
+                  const isEmpty = !isRowTouched(item);
+                  const isLast = index === items.length - 1;
+                  return (
+                    <tr
+                      key={index}
+                      className={`group transition-colors ${
+                        isEmpty
+                          ? "bg-gray-50/50 dark:bg-gray-800/30"
+                          : "bg-white dark:bg-gray-800"
+                      } hover:bg-blue-50/30 dark:hover:bg-blue-900/10`}
+                    >
+                      {/* # row */}
+                      <td className="border-b border-gray-100 py-1.5 pl-3 text-center text-xs text-gray-400 dark:border-gray-700">
+                        {isEmpty ? (
+                          <span className="text-gray-300 dark:text-gray-600">+</span>
+                        ) : (
+                          index + 1
+                        )}
+                      </td>
+
+                      {/* # de Parte */}
+                      <td className="border-b border-l border-gray-100 p-1 dark:border-gray-700">
+                        <input
+                          type="text"
+                          value={item.numeroParte}
+                          onChange={(e) => actualizarItem(index, "numeroParte", e.target.value)}
+                          className="w-full rounded border-0 bg-transparent px-2 py-1.5 text-sm text-gray-800 placeholder-gray-300 focus:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-400/50 dark:text-gray-200 dark:placeholder-gray-600 dark:focus:bg-blue-900/20"
+                          placeholder={isLast ? "Ej: PART-001" : ""}
+                        />
+                      </td>
+
+                      {/* Descripción */}
+                      <td className="border-b border-l border-gray-100 p-1 dark:border-gray-700">
+                        <input
+                          type="text"
+                          value={item.descripcionProducto}
+                          onChange={(e) => actualizarItem(index, "descripcionProducto", e.target.value)}
+                          className="w-full rounded border-0 bg-transparent px-2 py-1.5 text-sm text-gray-800 placeholder-gray-300 focus:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-400/50 dark:text-gray-200 dark:placeholder-gray-600 dark:focus:bg-blue-900/20"
+                          placeholder={isLast ? "Laptop Dell Latitude 5420" : ""}
+                        />
+                      </td>
+
+                      {/* Cantidad */}
+                      <td className="border-b border-l border-gray-100 p-1 dark:border-gray-700">
+                        <input
+                          type="number"
+                          value={item.cantidad}
+                          min="1"
+                          onChange={(e) => actualizarItem(index, "cantidad", parseInt(e.target.value) || 1)}
+                          className="w-full rounded border-0 bg-transparent px-2 py-1.5 text-center text-sm text-gray-800 focus:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-400/50 dark:text-gray-200 dark:focus:bg-blue-900/20"
+                        />
+                      </td>
+
+                      {/* Tipo Unidad */}
+                      <td className="border-b border-l border-gray-100 p-1 dark:border-gray-700">
+                        <select
+                          value={item.tipoUnidad}
+                          onChange={(e) => actualizarItem(index, "tipoUnidad", e.target.value)}
+                          className="w-full rounded border-0 bg-transparent px-1 py-1.5 text-sm text-gray-800 focus:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-400/50 dark:bg-transparent dark:text-gray-200 dark:focus:bg-blue-900/20"
+                        >
+                          <option value="UNIDAD">Unidad</option>
+                          <option value="CAJA">Caja</option>
+                          <option value="PAQUETE">Paquete</option>
+                          <option value="METRO">Metro</option>
+                          <option value="PIES">Pies</option>
+                          <option value="KILOGRAMO">Kilogramo</option>
+                          <option value="LITRO">Litro</option>
+                          <option value="OTRO">Otro</option>
+                        </select>
+                      </td>
+
+                      {/* Notas */}
+                      <td className="border-b border-l border-gray-100 p-1 dark:border-gray-700">
+                        <input
+                          type="text"
+                          value={item.notas}
+                          onChange={(e) => actualizarItem(index, "notas", e.target.value)}
+                          className="w-full rounded border-0 bg-transparent px-2 py-1.5 text-sm text-gray-800 placeholder-gray-300 focus:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-400/50 dark:text-gray-200 dark:placeholder-gray-600 dark:focus:bg-blue-900/20"
+                          placeholder={isLast ? "Especificaciones..." : ""}
+                        />
+                      </td>
+
+                      {/* Eliminar */}
+                      <td className="border-b border-l border-gray-100 p-1 text-center dark:border-gray-700">
+                        {!isEmpty && (
+                          <button
+                            type="button"
+                            onClick={() => eliminarItem(index)}
+                            className="rounded p-1 text-gray-300 opacity-0 transition-all hover:bg-rose-100 hover:text-rose-500 group-hover:opacity-100 dark:hover:bg-rose-900/30 dark:hover:text-rose-400"
+                            title="Eliminar fila"
+                          >
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <p className="mt-2 text-right text-xs text-gray-400 dark:text-gray-500">
+            {getFilledItems().length} item{getFilledItems().length !== 1 ? "s" : ""} agregado{getFilledItems().length !== 1 ? "s" : ""}
+            {" · "}La última fila vacía se agrega automáticamente
+          </p>
         </div>
 
         {/* Archivos Adjuntos */}
