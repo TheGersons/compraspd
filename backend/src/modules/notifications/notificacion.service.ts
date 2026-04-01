@@ -1,12 +1,34 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, MessageEvent } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateNotificacionDto, ListNotificacionesQueryDto } from './dto/notificacion.dto';
+import { Observable, Subject, filter, map } from 'rxjs';
 
 type UserJwt = { sub: string; role?: string };
 
 @Injectable()
 export class NotificacionService {
   constructor(private readonly prisma: PrismaService) {}
+
+  // ─── SSE: canal global compartido, filtrado por userId ─────────────────────
+  private readonly sseSubject = new Subject<{ userId: string; data: any }>();
+
+  /**
+   * Devuelve un Observable SSE para el usuario dado.
+   * Cada conexión (pestaña/dispositivo) recibe eventos en tiempo real.
+   */
+  createUserStream(userId: string): Observable<MessageEvent> {
+    return this.sseSubject.pipe(
+      filter((event) => event.userId === userId),
+      map((event) => ({ data: JSON.stringify(event.data) } as MessageEvent)),
+    );
+  }
+
+  /**
+   * Emite una notificación en tiempo real a un usuario conectado por SSE.
+   */
+  emitToUser(userId: string, data: any): void {
+    this.sseSubject.next({ userId, data });
+  }
 
   async create(dto: CreateNotificacionDto) {
     return this.prisma.notificacion.create({

@@ -10,7 +10,6 @@ import { CreateMessageDto } from './dto/create-message.dto';
 import { StorageService } from '../storage';
 import { MailService } from '../Mail/mail.service';
 import { NotificacionService } from '../notifications/notificacion.service';
-import { NotificationsGateway } from '../notifications/notifications.gateway';
 
 type UserJwt = { sub: string; role?: string };
 
@@ -25,7 +24,6 @@ export class MessagesService {
     private readonly storageService: StorageService,
     private readonly mailService: MailService,
     private readonly notificacionService: NotificacionService,
-    private readonly notificationsGateway: NotificationsGateway,
   ) {}
 
   /**
@@ -637,8 +635,8 @@ export class MessagesService {
           ...notifData,
         } as any);
 
-        // 2. Emitir por WebSocket
-        this.notificationsGateway.emitToUser(p.usuario.id, 'nueva_notificacion', {
+        // 2. Emitir por SSE
+        this.notificacionService.emitToUser(p.usuario.id, {
           ...notif,
           chatId,
         });

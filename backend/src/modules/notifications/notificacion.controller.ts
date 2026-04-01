@@ -1,9 +1,11 @@
-import { Controller, Get, Post, Delete, Patch, Body, Param, Query, UseGuards, ParseUUIDPipe } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Patch, Body, Param, Query, UseGuards, ParseUUIDPipe, Sse, MessageEvent, Res } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { NotificacionService } from './notificacion.service';
 import { CreateNotificacionDto, ListNotificacionesQueryDto } from './dto/notificacion.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Observable } from 'rxjs';
+import type { Response } from 'express';
 
 type UserJwt = { sub: string; role?: string };
 
@@ -30,6 +32,14 @@ export class NotificacionController {
   @ApiOperation({ summary: 'Contador de no leídas' })
   getUnreadCount(@CurrentUser() user: UserJwt) {
     return this.notificacionService.getUnreadCount(user.sub);
+  }
+
+  @Sse('stream')
+  @ApiOperation({ summary: 'Stream SSE de notificaciones en tiempo real' })
+  stream(@CurrentUser() user: UserJwt, @Res() res: Response): Observable<MessageEvent> {
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('X-Accel-Buffering', 'no'); // Nginx: deshabilitar buffering
+    return this.notificacionService.createUserStream(user.sub);
   }
 
   @Get(':id')

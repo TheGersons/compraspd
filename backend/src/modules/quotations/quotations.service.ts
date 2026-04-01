@@ -10,7 +10,6 @@ import { UpdateQuotationDto } from './dto/update-quotation.dto';
 import { QuotationStatus } from './dto/change-status.dto';
 import { MailService } from '../Mail/mail.service';
 import { NotificacionService } from '../notifications/notificacion.service';
-import { NotificationsGateway } from '../notifications/notifications.gateway';
 
 type UserJwt = { sub: string; role?: string };
 
@@ -35,7 +34,6 @@ export class QuotationsService {
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
     private readonly notificacionService: NotificacionService,
-    private readonly notificationsGateway: NotificationsGateway,
   ) {}
 
   /**
@@ -221,8 +219,8 @@ export class QuotationsService {
           ...notifData,
         } as any);
 
-        // 2. Emitir por WebSocket
-        this.notificationsGateway.emitToUser(s.id, 'nueva_notificacion', {
+        // 2. Emitir por SSE
+        this.notificacionService.emitToUser(s.id, {
           ...notif,
           cotizacionId,
         });
