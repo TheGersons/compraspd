@@ -28,7 +28,8 @@ export class TiposService {
         area: {
           select: {
             id: true,
-            nombreArea: true
+            nombreArea: true,
+            tipo: true
           }
         },
         _count: {

@@ -53,7 +53,8 @@ async function main() {
     update: {},
     create: {
       nombre: 'COMERCIAL',
-      descripcion: 'Jefe Comercial: seguimiento de compras de licitaciones y ofertas comerciales',
+      descripcion:
+        'Jefe Comercial: seguimiento de compras de licitaciones y ofertas comerciales',
       activo: true,
     },
   });
@@ -67,22 +68,50 @@ async function main() {
 
   const permisos = [
     // Cotizaciones
-    { modulo: 'cotizaciones', accion: 'crear', descripcion: 'Crear cotizaciones' },
+    {
+      modulo: 'cotizaciones',
+      accion: 'crear',
+      descripcion: 'Crear cotizaciones',
+    },
     { modulo: 'cotizaciones', accion: 'ver', descripcion: 'Ver cotizaciones' },
-    { modulo: 'cotizaciones', accion: 'editar', descripcion: 'Editar cotizaciones' },
-    { modulo: 'cotizaciones', accion: 'eliminar', descripcion: 'Eliminar cotizaciones' },
-    { modulo: 'cotizaciones', accion: 'aprobar', descripcion: 'Aprobar cotizaciones' },
+    {
+      modulo: 'cotizaciones',
+      accion: 'editar',
+      descripcion: 'Editar cotizaciones',
+    },
+    {
+      modulo: 'cotizaciones',
+      accion: 'eliminar',
+      descripcion: 'Eliminar cotizaciones',
+    },
+    {
+      modulo: 'cotizaciones',
+      accion: 'aprobar',
+      descripcion: 'Aprobar cotizaciones',
+    },
 
     // Compras
-    { modulo: 'compras', accion: 'crear', descripcion: 'Crear órdenes de compra' },
+    {
+      modulo: 'compras',
+      accion: 'crear',
+      descripcion: 'Crear órdenes de compra',
+    },
     { modulo: 'compras', accion: 'ver', descripcion: 'Ver órdenes de compra' },
-    { modulo: 'compras', accion: 'editar', descripcion: 'Editar órdenes de compra' },
+    {
+      modulo: 'compras',
+      accion: 'editar',
+      descripcion: 'Editar órdenes de compra',
+    },
 
     // Usuarios
     { modulo: 'usuarios', accion: 'crear', descripcion: 'Crear usuarios' },
     { modulo: 'usuarios', accion: 'ver', descripcion: 'Ver usuarios' },
     { modulo: 'usuarios', accion: 'editar', descripcion: 'Editar usuarios' },
-    { modulo: 'usuarios', accion: 'eliminar', descripcion: 'Eliminar usuarios' },
+    {
+      modulo: 'usuarios',
+      accion: 'eliminar',
+      descripcion: 'Eliminar usuarios',
+    },
 
     // Catálogos
     { modulo: 'catalogos', accion: 'crear', descripcion: 'Crear catálogos' },
@@ -91,7 +120,11 @@ async function main() {
 
     // Reportes
     { modulo: 'reportes', accion: 'ver', descripcion: 'Ver reportes' },
-    { modulo: 'reportes', accion: 'exportar', descripcion: 'Exportar reportes' },
+    {
+      modulo: 'reportes',
+      accion: 'exportar',
+      descripcion: 'Exportar reportes',
+    },
   ];
 
   for (const permiso of permisos) {
@@ -205,14 +238,14 @@ async function main() {
 
   for (const nombre of departamentos) {
     const existente = await prisma.departamento.findFirst({
-      where: { nombre }
+      where: { nombre },
     });
 
     if (existente) {
       deptCreados.push(existente);
     } else {
       const dept = await prisma.departamento.create({
-        data: { nombre }
+        data: { nombre },
       });
       deptCreados.push(dept);
     }
@@ -251,28 +284,28 @@ async function main() {
 
   const areas = [
     {
-      nombreArea: 'Tecnología',
-      tipo: 'tecnica',
-      icono: '💻',
-      tipos: ['Hardware', 'Software', 'Telecomunicaciones', 'Soporte Técnico'],
-    },
-    {
-      nombreArea: 'Oficina',
+      nombreArea: 'Operativa',
       tipo: 'operativa',
       icono: '🏢',
-      tipos: ['Papelería', 'Mobiliario', 'Equipos de Oficina', 'Limpieza'],
+      tipos: ['Area operativa'],
     },
     {
       nombreArea: 'Proyectos',
       tipo: 'proyectos',
       icono: '🏗️',
-      tipos: ['Construcción', 'Infraestructura', 'Equipamiento', 'Servicios'],
+      tipos: ['Proyectos'],
     },
     {
       nombreArea: 'Comercial',
       tipo: 'comercial',
       icono: '💼',
-      tipos: ['Marketing', 'Ventas', 'Distribución', 'Logística'],
+      tipos: ['Ofertas', 'Licitaciones'],
+    },
+    {
+      nombreArea: 'Técnica',
+      tipo: 'tecnica',
+      icono: '⚙️',
+      tipos: ['Area tecnica'],
     },
   ];
 
@@ -281,7 +314,7 @@ async function main() {
 
     // Buscar si el área ya existe
     let area = await prisma.area.findFirst({
-      where: { nombreArea: areaInfo.nombreArea }
+      where: { nombreArea: areaInfo.nombreArea },
     });
 
     if (!area) {
@@ -295,8 +328,8 @@ async function main() {
       const tipoExistente = await prisma.tipo.findFirst({
         where: {
           areaId: area.id,
-          nombre: tipoNombre
-        }
+          nombre: tipoNombre,
+        },
       });
 
       if (!tipoExistente) {
@@ -332,7 +365,7 @@ async function main() {
 
   for (const pais of paises) {
     const existente = await prisma.pais.findFirst({
-      where: { codigo: pais.codigo }
+      where: { codigo: pais.codigo },
     });
 
     if (!existente) {
@@ -358,27 +391,11 @@ async function main() {
       direccion: 'Col. Tepeyac, Tegucigalpa',
       activo: true,
     },
-    {
-      nombre: 'Oficinas y Más',
-      rtn: '08019876543210',
-      email: 'info@oficinasymas.hn',
-      telefono: '+504 2234-8888',
-      direccion: 'Blvd. Morazán, Tegucigalpa',
-      activo: true,
-    },
-    {
-      nombre: 'Importadora Global',
-      rtn: '08015555555555',
-      email: 'compras@importadoraglobal.com',
-      telefono: '+504 2234-9999',
-      direccion: 'Zona Industrial, San Pedro Sula',
-      activo: true,
-    },
   ];
 
   for (const proveedor of proveedores) {
     const existente = await prisma.proveedor.findFirst({
-      where: { nombre: proveedor.nombre }
+      where: { nombre: proveedor.nombre },
     });
 
     if (!existente) {
@@ -396,7 +413,7 @@ async function main() {
   console.log('📁 Creando proyecto inicial...');
 
   const proyectoExistente = await prisma.proyecto.findFirst({
-    where: { nombre: 'Proyecto General' }
+    where: { nombre: 'Proyecto General' },
   });
 
   if (!proyectoExistente) {

@@ -12,18 +12,18 @@ export class MailService {
       port: 587,
       secure: false,
       auth: {
-        user: process.env.MAIL_USER ,
-        pass: process.env.MAIL_PASS ,
+        user: process.env.MAIL_USER,
+        pass: process.env.MAIL_PASS,
       },
       connectionTimeout: 5000,
       tls: {
         ciphers: 'SSLv3',
-        rejectUnauthorized: false
-      }
+        rejectUnauthorized: false,
+      },
     });
   }
 
-   /**
+  /**
    * Logo SVG de la empresa en base64 para emails
    */
   private getLogoSvg(): string {
@@ -170,9 +170,10 @@ export class MailService {
     messagePreview: string,
     chatUrl: string,
   ): Promise<boolean> {
-    const preview = messagePreview.length > 120
-      ? messagePreview.substring(0, 120) + '...'
-      : messagePreview;
+    const preview =
+      messagePreview.length > 120
+        ? messagePreview.substring(0, 120) + '...'
+        : messagePreview;
 
     const mailOptions = {
       from: `"Energía PD" <${process.env.MAIL_USER || 'noreply@energiapd.com'}>`,
@@ -230,10 +231,15 @@ export class MailService {
 
     try {
       const info = await this.transporter.sendMail(mailOptions);
-      this.logger.log(`Notificación de mensaje enviada a ${to}: ${info.messageId}`);
+      this.logger.log(
+        `Notificación de mensaje enviada a ${to}: ${info.messageId}`,
+      );
       return true;
     } catch (error) {
-      this.logger.error(`Error enviando notificación de mensaje a ${to}:`, error);
+      this.logger.error(
+        `Error enviando notificación de mensaje a ${to}:`,
+        error,
+      );
       return false;
     }
   }
@@ -320,10 +326,15 @@ export class MailService {
 
     try {
       const info = await this.transporter.sendMail(mailOptions);
-      this.logger.log(`Notificación de cotización enviada a ${to}: ${info.messageId}`);
+      this.logger.log(
+        `Notificación de cotización enviada a ${to}: ${info.messageId}`,
+      );
       return true;
     } catch (error) {
-      this.logger.error(`Error enviando notificación de cotización a ${to}:`, error);
+      this.logger.error(
+        `Error enviando notificación de cotización a ${to}:`,
+        error,
+      );
       return false;
     }
   }
@@ -331,10 +342,14 @@ export class MailService {
   /**
    * Enviar correo con contraseña temporal - Diseño profesional
    */
-  async sendPasswordResetEmail(to: string, tempPassword: string, userName: string): Promise<boolean> {
+  async sendPasswordResetEmail(
+    to: string,
+    tempPassword: string,
+    userName: string,
+  ): Promise<boolean> {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const changePasswordUrl = `${frontendUrl}/change-password-required`;
-    
+
     const mailOptions = {
       from: `"Energía PD" <${process.env.MAIL_USER || 'noreply@energiapd.com'}>`,
       to,
@@ -365,7 +380,7 @@ export class MailService {
                         ${this.getLogoSvg()}
                       </div>
                       <p style="margin: 0; color: white; font-size: 13px; letter-spacing: 0.5px; text-transform: uppercase;">
-                        Sistema de Gestión Empresarial
+                        Compras Energía PD
                       </p>
                     </td>
                   </tr>
@@ -486,7 +501,9 @@ export class MailService {
 
     try {
       const info = await this.transporter.sendMail(mailOptions);
-      this.logger.log(`Email de reset password enviado a ${to}: ${info.messageId}`);
+      this.logger.log(
+        `Email de reset password enviado a ${to}: ${info.messageId}`,
+      );
       return true;
     } catch (error) {
       this.logger.error(`Error enviando email a ${to}:`, error);

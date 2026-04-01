@@ -213,8 +213,7 @@ export default function New() {
   const [error, setError] = useState<string | null>(null);
 
   // Estado del formulario
-  const [nombreBase, setNombreBase] = useState(""); // Nombre escrito por el usuario
-  const [nombreCotizacion, setNombreCotizacion] = useState(""); // Nombre completo (con # de parte)
+  const [nombreBase, setNombreBase] = useState("");
   const [tipoCompra, setTipoCompra] = useState<TipoCompra>("NACIONAL");
   const [lugarEntrega, setLugarEntrega] = useState<LugarEntrega>("ALMACEN");
   const [comentarios, setComentarios] = useState("");
@@ -293,8 +292,10 @@ export default function New() {
       ]);
       // 1. Manejar Tipos (CON VALIDACIÓN DE NULOS EXTRA)
       if (tiposResult.status === 'fulfilled') {
-        // Si tiposResult.value es null o undefined, usamos [] para evitar pantallas blancas
-        const datosSeguros = tiposResult.value || [];
+        // Solo mostrar tipos del área comercial (4 tipos de cotización)
+        const datosSeguros = (tiposResult.value || []).filter(
+          (t: Tipo) => t.area?.tipo === 'comercial'
+        );
         setTipos(datosSeguros);
       } else {
         console.warn("⚠️ Error cargando Tipos:", tiposResult.reason);
@@ -371,11 +372,6 @@ export default function New() {
   const isRowTouched = (item: ItemCotizacion) =>
     !!(item.numeroParte.trim() || item.descripcionProducto.trim());
 
-  const computeNombre = (base: string, firstPart: string) =>
-    firstPart.trim() && base.trim()
-      ? `${firstPart.trim()} - ${base.trim()}`
-      : firstPart.trim() || base.trim();
-
   // ─── Manejo de items ───────────────────────────────────────────────────────
   const eliminarItem = (index: number) => {
     const remaining = items.filter((_, i) => i !== index);
@@ -396,12 +392,6 @@ export default function New() {
     }
 
     setItems(nuevosItems);
-
-    // Actualizar nombre de cotización cuando cambia el # de parte del primer item
-    if (index === 0 && campo === "numeroParte") {
-      const computed = computeNombre(nombreBase, valor as string);
-      setNombreCotizacion(computed);
-    }
   };
 
   // ─── Excel: Importar items ─────────────────────────────────────────────────
@@ -427,16 +417,33 @@ export default function New() {
         }
 
         const UNIDADES: TipoUnidad[] = ["UNIDAD","CAJA","PAQUETE","METRO","Pies","KILOGRAMO","LITRO","OTRO"];
-        const parsed: ItemCotizacion[] = dataRows.map((row) => {
-          const rawUnidad = String(row[3] ?? "").toUpperCase().trim() as TipoUnidad;
-          return {
-            numeroParte: String(row[0] ?? "").trim(),
-            descripcionProducto: String(row[1] ?? "").trim(),
-            cantidad: Math.max(1, parseInt(String(row[2])) || 1),
-            tipoUnidad: UNIDADES.includes(rawUnidad) ? rawUnidad : "UNIDAD",
-            notas: String(row[4] ?? "").trim(),
-          };
-        });
+
+        // Normaliza texto: quita acentos, pasa a mayúsculas, recorta espacios
+        const normalizar = (s: string) =>
+          s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+
+        // Mapa de alias (valor normalizado → TipoUnidad exacto)
+        const ALIAS: Record<string, TipoUnidad> = {
+          UNIDAD: "UNIDAD", UNIDADES: "UNIDAD", UND: "UNIDAD", U: "UNIDAD",
+          CAJA: "CAJA", CAJAS: "CAJA",
+          PAQUETE: "PAQUETE", PAQUETES: "PAQUETE", PKT: "PAQUETE",
+          METRO: "METRO", METROS: "METRO", MT: "METRO", M: "METRO",
+          PIES: "Pies", PIE: "Pies", FT: "Pies",
+          KILOGRAMO: "KILOGRAMO", KILOGRAMOS: "KILOGRAMO", KG: "KILOGRAMO", KILO: "KILOGRAMO", KILOS: "KILOGRAMO",
+          LITRO: "LITRO", LITROS: "LITRO", LT: "LITRO", L: "LITRO",
+          OTRO: "OTRO", OTROS: "OTRO",
+        };
+
+        const resolveUnidad = (raw: string): TipoUnidad =>
+          ALIAS[normalizar(raw)] ?? "UNIDAD";
+
+        const parsed: ItemCotizacion[] = dataRows.map((row) => ({
+          numeroParte: String(row[0] ?? "").trim(),
+          descripcionProducto: String(row[1] ?? "").trim(),
+          cantidad: Math.max(1, parseInt(String(row[2])) || 1),
+          tipoUnidad: resolveUnidad(String(row[3] ?? "")),
+          notas: String(row[4] ?? "").trim(),
+        }));
 
         // Agregar fila extra vacía al final
         setItems([...parsed, emptyItem()]);
@@ -458,8 +465,25 @@ export default function New() {
     ];
     const ws = XLSX.utils.aoa_to_sheet(wsData);
     ws["!cols"] = [{ wch: 15 }, { wch: 35 }, { wch: 10 }, { wch: 14 }, { wch: 30 }];
+
+    // Hoja de referencia con tipos de unidad disponibles
+    const refData = [
+      ["Tipo Unidad (valor exacto)", "Alias aceptados", "Descripción"],
+      ["UNIDAD",    "UNIDAD, UND, U",                  "Unidad individual"],
+      ["CAJA",      "CAJA, CAJAS",                     "Caja o empaque colectivo"],
+      ["PAQUETE",   "PAQUETE, PAQUETES, PKT",           "Paquete agrupado"],
+      ["METRO",     "METRO, METROS, MT, M",             "Metro lineal"],
+      ["Pies",      "PIES, PIE, FT",                   "Pie (foot)"],
+      ["KILOGRAMO", "KILOGRAMO, KG, KILO, KILOS",      "Kilogramo de peso"],
+      ["LITRO",     "LITRO, LITROS, LT, L",            "Litro de volumen"],
+      ["OTRO",      "OTRO, OTROS",                     "Otro tipo de medida"],
+    ];
+    const wsRef = XLSX.utils.aoa_to_sheet(refData);
+    wsRef["!cols"] = [{ wch: 22 }, { wch: 32 }, { wch: 28 }];
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Items");
+    XLSX.utils.book_append_sheet(wb, wsRef, "Tipos de Unidad");
     XLSX.writeFile(wb, "plantilla_cotizacion.xlsx");
   };
 
@@ -545,7 +569,7 @@ export default function New() {
       fechaEstimadaDefault.setDate(fechaEstimadaDefault.getDate() + 30); // +30 días
       // Preparar datos (SKU eliminado del payload)
       const payload = {
-        nombreCotizacion: nombreCotizacion.trim() || nombreBase.trim(),
+        nombreCotizacion: nombreBase.trim(),
         tipoCompra,
         lugarEntrega,
         fechaLimite: fechaLimite?.toISOString(),
@@ -671,19 +695,11 @@ export default function New() {
               <input
                 type="text"
                 value={nombreBase}
-                onChange={(e) => {
-                  setNombreBase(e.target.value);
-                  setNombreCotizacion(computeNombre(e.target.value, items[0]?.numeroParte ?? ""));
-                }}
+                onChange={(e) => setNombreBase(e.target.value)}
                 className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-2.5 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
                 placeholder="Ej: Cotización Laptops Octubre"
                 required
               />
-              {items[0]?.numeroParte?.trim() && (
-                <p className="mt-1 text-xs text-blue-600 dark:text-blue-400">
-                  Nombre final: <strong>{nombreCotizacion}</strong>
-                </p>
-              )}
             </div>
 
             {/* Tipo de Compra */}
