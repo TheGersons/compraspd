@@ -492,6 +492,7 @@ export default function FollowUps() {
   const [cotizacionSeleccionada, setCotizacionSeleccionada] = useState<Cotizacion | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingDetalle, setLoadingDetalle] = useState(false);
+  const accordionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // Estados de filtros
   const [searchTerm, setSearchTerm] = useState("");
@@ -575,6 +576,15 @@ export default function FollowUps() {
       cargarMensajes(cotizacionSeleccionada.chatId);
     }
   }, [cotizacionSeleccionada]);
+
+  // Scroll al acordeón expandido
+  useEffect(() => {
+    if (!cotizacionSeleccionada?.id) return;
+    const el = accordionRefs.current[cotizacionSeleccionada.id];
+    if (el) {
+      setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+    }
+  }, [cotizacionSeleccionada?.id]);
 
   // Auto-scroll en chat solo cuando llegan mensajes nuevos (no al cambiar de tab)
   useEffect(() => {
@@ -1309,11 +1319,15 @@ export default function FollowUps() {
           ) : (
             <div className="divide-y divide-gray-200 dark:divide-gray-700">
               {filteredCotizaciones.map((cot) => (
-                <div key={cot.id}>
+                <div
+                  key={cot.id}
+                  ref={el => { accordionRefs.current[cot.id] = el; }}
+                  className={cotizacionSeleccionada?.id === cot.id ? "border-l-4 border-blue-500" : "border-l-4 border-transparent"}
+                >
                   {/* Fila de cotización (clickable) */}
                   <button
                     onClick={() => seleccionarCotizacion(cot)}
-                    className={`w-full p-4 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50 ${cotizacionSeleccionada?.id === cot.id ? "bg-blue-50 dark:bg-blue-900/20" : ""}`}
+                    className={`w-full p-4 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50 ${cotizacionSeleccionada?.id === cot.id ? "bg-gray-100 dark:bg-gray-700/60" : ""}`}
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
@@ -1344,7 +1358,7 @@ export default function FollowUps() {
 
                   {/* Panel expandido del acordeón */}
                   {cotizacionSeleccionada?.id === cot.id && (
-                    <div className="border-t border-blue-200 bg-blue-50/40 dark:border-blue-900/40 dark:bg-blue-900/10">
+                    <div className="border-t-2 border-blue-400 bg-gray-50 dark:border-blue-600 dark:bg-gray-700/40">
                       {loadingDetalle ? (
                         <div className="flex h-32 items-center justify-center">
                           <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>

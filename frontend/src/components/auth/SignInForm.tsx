@@ -187,11 +187,6 @@ export default function SignInForm() {
 
   return (
     <div className="flex flex-col flex-1">
-      {/* Banner entorno de prueba */}
-      <div className="w-full bg-amber-400 py-2 text-center text-sm font-semibold text-amber-900">
-        ⚠️ ENTORNO DE PRUEBA — Los datos aquí no son de producción
-      </div>
-
       <div className="w-full max-w-md pt-10 mx-auto" />
       <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto">
         <div>
