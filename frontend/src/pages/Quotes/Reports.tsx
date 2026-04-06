@@ -8,13 +8,17 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 type Reporte = {
   id: string;
-  compraId: string;
+  cotizacionId: string;
+  compraId: string | null;
   fechaSolicitud: string;
   nombreCotizacion: string;
+  estadoCotizacion: string;
   tipoCompra: string;
+  area: string | null;
+  tipo: string | null;
   solicitante: string | null;
   descripcionProducto: string;
-  statusOC: string;
+  statusOC: string | null;
   numeroPO: string;
   proveedor: string | null;
   origen: string | null;
@@ -302,22 +306,45 @@ function LogDrawer({ reporteId, onClose }: { reporteId: string; onClose: () => v
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
+// Default: últimos 3 meses → hoy
+function defaultDesde() {
+  const d = new Date();
+  d.setMonth(d.getMonth() - 3);
+  return d.toISOString().slice(0, 10);
+}
+function defaultHasta() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+const ESTADO_COT: Record<string, { label: string; cls: string }> = {
+  ENVIADA:          { label: "Enviada",         cls: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300" },
+  PENDIENTE:        { label: "Pendiente",        cls: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" },
+  EN_CONFIGURACION: { label: "En config.",       cls: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300" },
+  APROBADA_PARCIAL: { label: "Aprob. parcial",   cls: "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300" },
+  APROBADA:         { label: "Aprobada",         cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" },
+};
+
 export default function Reports() {
   const [reportes, setReportes] = useState<Reporte[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [logReporteId, setLogReporteId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [desde, setDesde] = useState(defaultDesde());
+  const [hasta, setHasta] = useState(defaultHasta());
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await apiFetch<Reporte[]>("/api/v1/reportes");
+      const params = new URLSearchParams();
+      if (desde) params.set("desde", desde);
+      if (hasta) params.set("hasta", hasta);
+      const data = await apiFetch<Reporte[]>(`/api/v1/reportes?${params}`);
       setReportes(data);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [desde, hasta]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -356,7 +383,9 @@ export default function Reports() {
         r.nombreCotizacion?.toLowerCase().includes(q) ||
         r.numeroPO?.toLowerCase().includes(q) ||
         r.proveedor?.toLowerCase().includes(q) ||
-        r.descripcionProducto?.toLowerCase().includes(q)
+        r.descripcionProducto?.toLowerCase().includes(q) ||
+        r.solicitante?.toLowerCase().includes(q) ||
+        r.area?.toLowerCase().includes(q)
       );
     });
 
@@ -368,22 +397,53 @@ export default function Reports() {
       <PageMeta title="Reportes de Compras" description="Tabla de seguimiento y reporte de órdenes de compra" />
 
       {/* Header */}
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-title-sm sm:text-title-md font-semibold text-gray-800 dark:text-white/90">
             Reportes de Compras
           </h1>
           <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
-            Tabla de seguimiento de órdenes de compra — campos editables en línea
+            Control de flujo — cotizaciones y compras en proceso · campos editables en línea
           </p>
         </div>
-        <input
-          type="text"
-          placeholder="Buscar por nombre, #PO, proveedor…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full max-w-xs rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500"
-        />
+      </div>
+
+      {/* Filtros */}
+      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800">
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Desde</label>
+          <input
+            type="date"
+            value={desde}
+            onChange={(e) => setDesde(e.target.value)}
+            className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs outline-none focus:border-blue-400 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Hasta</label>
+          <input
+            type="date"
+            value={hasta}
+            onChange={(e) => setHasta(e.target.value)}
+            className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs outline-none focus:border-blue-400 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-medium text-gray-500 dark:text-gray-400 sr-only">Buscar</label>
+          <input
+            type="text"
+            placeholder="Buscar por nombre, #PO, proveedor, área…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-56 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs outline-none focus:border-blue-400 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-500"
+          />
+        </div>
+        <button
+          onClick={() => { setDesde(defaultDesde()); setHasta(defaultHasta()); setSearch(""); }}
+          className="ml-auto rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
+        >
+          Resetear
+        </button>
       </div>
 
       {loading ? (
@@ -411,11 +471,15 @@ export default function Reports() {
 
           {/* Tabla horizontal scrollable */}
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[2800px] border-collapse text-sm">
+            <table className="w-full min-w-[3200px] border-collapse text-sm">
               <thead>
                 <tr>
                   <th className={`${th} w-[30px]`}></th>
                   <th className={th}>Fecha Solicitud</th>
+                  <th className={th}>Cotización</th>
+                  <th className={th}>Estado Cot.</th>
+                  <th className={th}>Área / Tipo</th>
+                  <th className={th}>Solicitante</th>
                   <th className={th}>#PO</th>
                   <th className={th}>Proveedor</th>
                   <th className={th}>Origen</th>
@@ -442,7 +506,7 @@ export default function Reports() {
               </thead>
               <tbody>
                 {filtered.map((r) => {
-                  const ocCfg = STATUS_OC[r.statusOC] ?? { label: r.statusOC, cls: "bg-gray-100 text-gray-600" };
+                  const ocCfg = r.statusOC ? (STATUS_OC[r.statusOC] ?? { label: r.statusOC, cls: "bg-gray-100 text-gray-600" }) : null;
                   const pagoCfg = STATUS_PAGO[r.statusPago] ?? STATUS_PAGO.SIN_PAGOS;
 
                   return (
@@ -463,6 +527,39 @@ export default function Reports() {
                       {/* Fecha solicitud — auto */}
                       <td className={td}>
                         <span className="whitespace-nowrap text-xs text-gray-500">{fmtDate(r.fechaSolicitud)}</span>
+                      </td>
+
+                      {/* Cotización nombre — auto */}
+                      <td className={td}>
+                        <span className="block max-w-[180px] truncate text-xs font-medium text-gray-700 dark:text-gray-200" title={r.nombreCotizacion}>
+                          {r.nombreCotizacion || "—"}
+                        </span>
+                      </td>
+
+                      {/* Estado cotización — auto */}
+                      <td className={td}>
+                        {(() => {
+                          const cfg = ESTADO_COT[r.estadoCotizacion] ?? { label: r.estadoCotizacion, cls: "bg-gray-100 text-gray-600" };
+                          return (
+                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${cfg.cls}`}>
+                              {cfg.label}
+                            </span>
+                          );
+                        })()}
+                      </td>
+
+                      {/* Área / Tipo — auto */}
+                      <td className={td}>
+                        <div className="flex flex-col gap-0.5">
+                          {r.area && <span className="text-xs text-gray-600 dark:text-gray-300">{r.area}</span>}
+                          {r.tipo && <span className="text-xs text-gray-400 dark:text-gray-500">{r.tipo}</span>}
+                          {!r.area && !r.tipo && <span className="text-xs text-gray-300 dark:text-gray-600">—</span>}
+                        </div>
+                      </td>
+
+                      {/* Solicitante — auto */}
+                      <td className={td}>
+                        <span className="text-xs text-gray-600 dark:text-gray-300">{r.solicitante || "—"}</span>
                       </td>
 
                       {/* #PO — editable */}
@@ -494,9 +591,13 @@ export default function Reports() {
 
                       {/* Status OC — auto */}
                       <td className={td}>
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${ocCfg.cls}`}>
-                          {ocCfg.label}
-                        </span>
+                        {r.statusOC ? (
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${ocCfg.cls}`}>
+                            {ocCfg.label}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-300 dark:text-gray-600">Sin OC</span>
+                        )}
                       </td>
 
                       {/* Total Price — editable */}

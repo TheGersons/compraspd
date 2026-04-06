@@ -200,14 +200,6 @@ export default function App() {
                     </ProtectedRoute>
                   }
                 />
-                <Route
-                  path="reportes"
-                  element={
-                    <ProtectedRoute roles={STAFF_ROLES}>
-                      <Reports />
-                    </ProtectedRoute>
-                  }
-                />
                 {/* History - TODOS pueden acceder */}
                 <Route path="history" element={<QuotesHistory />} />
                 {/* Assignment - Solo SUPERVISOR/ADMIN */}
@@ -291,6 +283,16 @@ export default function App() {
                   </ProtectedRoute>
                 } />
               </Route>
+
+              {/* REPORTES - Solo STAFF */}
+              <Route
+                path="/reportes"
+                element={
+                  <ProtectedRoute roles={STAFF_ROLES}>
+                    <Reports />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* PROVEEDORES - Solo STAFF */}
               <Route

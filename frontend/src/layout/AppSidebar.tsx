@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { LogoPD } from "../components/common/LogoPD";
 import { Link, useLocation } from "react-router-dom";
 import {
   ShoppingCart, /*, User*/
@@ -56,7 +57,6 @@ const navItems: NavItem[] = [
       { name: "Mis cotizaciónes", path: "/quotes/my-quotes", pro: false },
       { name: "Seguimiento", path: "/quotes/follow-ups", pro: false, roles: ["ADMIN", "SUPERVISOR", "COMERCIAL"] },
       { name: "Rechazadas", path: "/quotes/rejected", pro: false, roles: ["ADMIN", "SUPERVISOR"] },
-      { name: "Reportes", path: "/quotes/reportes", pro: false, roles: ["ADMIN", "SUPERVISOR"] },
       { name: "Historial", path: "/quotes/history", pro: false },
     ],
   },
@@ -90,6 +90,12 @@ const navItems: NavItem[] = [
       { name: "Seguimiento", path: "/ofertas", pro: false },
       { name: "Archivadas", path: "/ofertas/archivo", pro: false },
     ],
+  },
+  {
+    icon: <BoxCubeIcon />,
+    name: "Reportes",
+    roles: ["ADMIN", "SUPERVISOR"],
+    path: "/reportes",
   },
   {
     icon: <Building2 />,
@@ -374,28 +380,14 @@ const AppSidebar: React.FC = () => {
       >
         <Link to="/">
           {isExpanded || isHovered || isMobileOpen ? (
-            <>
-              <img
-                className="dark:hidden"
-                src="/images/logo/logo-pd-light.svg"
-                alt="Logo"
-                width={210}
-                height={40}
-              />
-              <img
-                className="hidden dark:block"
-                src="/images/logo/logo-pd-dark.svg"
-                alt="Logo"
-                width={210}
-                height={40}
-              />
-            </>
+            <LogoPD
+              variant="full"
+              className="h-10 w-auto text-gray-900 dark:text-white"
+            />
           ) : (
-            <img
-              src="/images/logo/logo-pd.svg"
-              alt="Logo"
-              width={64}
-              height={64}
+            <LogoPD
+              variant="icon"
+              className="h-10 w-10"
             />
           )}
         </Link>
