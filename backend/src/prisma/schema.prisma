@@ -312,6 +312,7 @@ model Cotizacion {
   estadosProductos EstadoProducto[]
   licitacion       Licitacion?
   oferta           Oferta?
+  reporte          ReporteCompra?
 
   @@index([solicitanteId])
   @@index([estado])
@@ -459,7 +460,6 @@ model Compra {
   detalles         CompraDetalle[]
   seguimientos     Seguimiento[]    @relation("SeguimientoCompra")
   estadosProductos EstadoProducto[]
-  reporte          ReporteCompra?
 
   @@index([cotizacionId])
   @@index([estado])
@@ -1040,7 +1040,7 @@ model OfertaProducto {
 
 model ReporteCompra {
   id                   String    @id @default(uuid()) @db.Uuid
-  compraId             String    @unique @map("compra_id") @db.Uuid
+  cotizacionId         String    @unique @map("cotizacion_id") @db.Uuid
   numeroPO             String?   @default("-") @map("numero_po")
   proveedor            String?
   origen               String?
@@ -1061,8 +1061,8 @@ model ReporteCompra {
   creado               DateTime  @default(now())
   actualizado          DateTime  @updatedAt
 
-  compra Compra             @relation(fields: [compraId], references: [id], onDelete: Cascade)
-  logs   ReporteCompraLog[]
+  cotizacion Cotizacion        @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  logs       ReporteCompraLog[]
 
   @@map("reporte_compra")
 }

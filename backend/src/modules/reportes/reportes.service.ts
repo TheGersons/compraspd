@@ -7,6 +7,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 
 type UserJwt = { sub: string; role?: string };
 
+const ESTADOS_FINALES = ['RECHAZADA', 'CANCELADA'];
+
 const CAMPO_LABELS: Record<string, string> = {
   numeroPO: '#PO',
   proveedor: 'Proveedor',
@@ -37,99 +39,91 @@ export class ReportesService {
       include: { rol: true },
     });
     const rol = usuario?.rol.nombre.toLowerCase() ?? '';
-    if (!rol.includes('supervisor') && !rol.includes('admin') && !rol.includes('gerencia')) {
+    if (
+      !rol.includes('supervisor') &&
+      !rol.includes('admin') &&
+      !rol.includes('gerencia')
+    ) {
       throw new ForbiddenException('Acceso restringido a supervisores y gerencia');
     }
     return usuario!;
   }
 
   /**
-   * Lista todos los reportes.
-   * Por cada compra que no tenga aún un ReporteCompra, lo crea automáticamente.
+   * Lista todas las cotizaciones en proceso (no en estado final),
+   * filtradas por rango de fecha de solicitud.
+   * Auto-crea un ReporteCompra por cotización si aún no existe.
    */
-  async listar(user: UserJwt) {
+  async listar(
+    user: UserJwt,
+    filters?: { desde?: string; hasta?: string },
+  ) {
     await this.verificarAcceso(user);
 
-    // Obtener todas las compras con sus datos de cotización
-    const compras = await this.prisma.compra.findMany({
+    const where: any = {
+      estado: { notIn: ESTADOS_FINALES },
+    };
+
+    if (filters?.desde || filters?.hasta) {
+      where.fechaSolicitud = {};
+      if (filters.desde) where.fechaSolicitud.gte = new Date(filters.desde);
+      if (filters.hasta) {
+        // Incluye todo el día "hasta"
+        const fin = new Date(filters.hasta);
+        fin.setHours(23, 59, 59, 999);
+        where.fechaSolicitud.lte = fin;
+      }
+    }
+
+    const cotizaciones = await this.prisma.cotizacion.findMany({
+      where,
       include: {
-        cotizacion: {
-          select: {
-            id: true,
-            nombreCotizacion: true,
-            fechaSolicitud: true,
-            tipoCompra: true,
-            solicitante: { select: { nombre: true } },
-            supervisorResponsable: { select: { nombre: true } },
-          },
-        },
+        solicitante: { select: { nombre: true } },
+        supervisorResponsable: { select: { nombre: true } },
+        tipo: { select: { nombre: true, area: { select: { nombreArea: true } } } },
+        proyecto: { select: { nombre: true } },
         detalles: {
           select: {
             descripcionProducto: true,
             cantidad: true,
-            precio: true,
             proveedor: { select: { nombre: true } },
           },
           orderBy: { descripcionProducto: 'asc' },
         },
+        compras: {
+          select: { id: true, estado: true },
+          orderBy: { creacion: 'desc' },
+          take: 1,
+        },
         reporte: true,
       },
-      orderBy: { creacion: 'desc' },
+      orderBy: { fechaSolicitud: 'desc' },
     });
 
-    // Auto-crear ReporteCompra para compras que no tengan uno
-    const sinReporte = compras.filter((c) => !c.reporte);
+    // Auto-crear reportes para cotizaciones que no tienen uno
+    const sinReporte = cotizaciones.filter((c) => !c.reporte);
     if (sinReporte.length > 0) {
       await this.prisma.reporteCompra.createMany({
-        data: sinReporte.map((c) => ({ compraId: c.id, numeroPO: '-' })),
+        data: sinReporte.map((c) => ({ cotizacionId: c.id, numeroPO: '-' })),
         skipDuplicates: true,
       });
+
+      // Recargar con reportes creados
+      return this.listar(user, filters);
     }
 
-    // Recargar con reportes actualizados si hubo creaciones
-    const reportes = await this.prisma.reporteCompra.findMany({
-      include: {
-        compra: {
-          include: {
-            cotizacion: {
-              select: {
-                id: true,
-                nombreCotizacion: true,
-                fechaSolicitud: true,
-                tipoCompra: true,
-                solicitante: { select: { nombre: true } },
-                supervisorResponsable: { select: { nombre: true } },
-              },
-            },
-            detalles: {
-              select: {
-                descripcionProducto: true,
-                cantidad: true,
-                precio: true,
-                proveedor: { select: { nombre: true } },
-              },
-              orderBy: { descripcionProducto: 'asc' },
-            },
-          },
-        },
-      },
-      orderBy: { compra: { creacion: 'desc' } },
-    });
-
-    return reportes.map((r) => this.mapReporte(r));
+    return cotizaciones.map((c) => this.mapRow(c));
   }
 
   /**
-   * Obtiene los logs de cambio de un reporte específico
+   * Historial de cambios de un reporte
    */
   async getLogs(reporteId: string, user: UserJwt) {
     await this.verificarAcceso(user);
 
     const logs = await this.prisma.reporteCompraLog.findMany({
       where: { reporteId },
-      include: {
-        usuario: { select: { nombre: true, email: true } },
-      },
+      include: { usuario: { select: { nombre: true, email: true } } },
       orderBy: { creado: 'desc' },
     });
 
@@ -145,7 +139,7 @@ export class ReportesService {
   }
 
   /**
-   * Actualiza campos editables de un reporte y registra el log de cambio
+   * Actualiza campos editables y registra el log
    */
   async actualizar(reporteId: string, dto: Record<string, any>, user: UserJwt) {
     await this.verificarAcceso(user);
@@ -168,28 +162,19 @@ export class ReportesService {
 
     for (const campo of camposEditables) {
       if (!(campo in dto)) continue;
-
       const valorNuevo = dto[campo] ?? null;
       const valorAnterior = (reporte as any)[campo];
-
-      // Solo logear si realmente cambió
       const anteriorStr = valorAnterior == null ? null : String(valorAnterior);
       const nuevoStr = valorNuevo == null ? null : String(valorNuevo);
       if (anteriorStr === nuevoStr) continue;
-
       updates[campo] = valorNuevo;
       logs.push({ campo, valorAnterior: anteriorStr, valorNuevo: nuevoStr });
     }
 
-    if (Object.keys(updates).length === 0) {
-      return reporte;
-    }
+    if (Object.keys(updates).length === 0) return reporte;
 
     const [updated] = await this.prisma.$transaction([
-      this.prisma.reporteCompra.update({
-        where: { id: reporteId },
-        data: updates,
-      }),
+      this.prisma.reporteCompra.update({ where: { id: reporteId }, data: updates }),
       this.prisma.reporteCompraLog.createMany({
         data: logs.map((l) => ({
           reporteId,
@@ -204,28 +189,25 @@ export class ReportesService {
     return updated;
   }
 
-  // ── Helpers ──────────────────────────────────────────────────────────────
+  // ── Private mapper ────────────────────────────────────────────────────────
 
-  private mapReporte(r: any) {
-    const detalles = r.compra.detalles ?? [];
+  private mapRow(c: any) {
+    const r = c.reporte;
+    const compra = c.compras?.[0] ?? null;
 
-    // Descripción: concatenar productos
-    const descripcion = detalles
+    const descripcion = (c.detalles as any[])
       .map((d: any) => `${d.descripcionProducto} (x${d.cantidad})`)
       .join(' | ');
 
-    // Proveedor auto (del primer detalle, si no hay proveedor manual)
-    const proveedorAuto = detalles[0]?.proveedor?.nombre ?? null;
+    const proveedorAuto = c.detalles?.[0]?.proveedor?.nombre ?? null;
 
-    // Pagos: sumar los no nulos
     const pagos = [r.pago1, r.pago2, r.pago3, r.pago4]
-      .filter((p) => p != null)
-      .map((p) => Number(p));
-    const totalPagado = pagos.reduce((a, b) => a + b, 0);
+      .filter((p: any) => p != null)
+      .map((p: any) => Number(p));
+    const totalPagado = pagos.reduce((a: number, b: number) => a + b, 0);
     const totalPrice = r.totalPrice != null ? Number(r.totalPrice) : null;
     const saldoPendiente = totalPrice != null ? totalPrice - totalPagado : null;
 
-    // Status de pago
     let statusPago = 'SIN_PAGOS';
     if (totalPrice != null && totalPagado >= totalPrice && totalPrice > 0) {
       statusPago = 'PAGO_COMPLETO';
@@ -235,22 +217,27 @@ export class ReportesService {
 
     return {
       id: r.id,
-      compraId: r.compraId,
-      compraEstado: r.compra.estado,
-      // Auto fields
-      fechaSolicitud: r.compra.cotizacion.fechaSolicitud,
-      nombreCotizacion: r.compra.cotizacion.nombreCotizacion,
-      tipoCompra: r.compra.cotizacion.tipoCompra,
-      solicitante: r.compra.cotizacion.solicitante?.nombre ?? null,
-      supervisorResponsable: r.compra.cotizacion.supervisorResponsable?.nombre ?? null,
+      cotizacionId: c.id,
+      // Auto – cotización
+      fechaSolicitud: c.fechaSolicitud,
+      nombreCotizacion: c.nombreCotizacion,
+      estadoCotizacion: c.estado,
+      tipoCompra: c.tipoCompra,
+      area: c.tipo?.area?.nombreArea ?? null,
+      tipo: c.tipo?.nombre ?? null,
+      solicitante: c.solicitante?.nombre ?? null,
+      supervisorResponsable: c.supervisorResponsable?.nombre ?? null,
+      proyecto: c.proyecto?.nombre ?? null,
       descripcionProducto: descripcion,
-      statusOC: r.compra.estado,
-      // Manual fields
+      // Auto – compra (si existe)
+      statusOC: compra ? compra.estado : null,
+      compraId: compra?.id ?? null,
+      // Manual
       numeroPO: r.numeroPO ?? '-',
       proveedor: r.proveedor ?? proveedorAuto,
       origen: r.origen,
       epdEps: r.epdEps,
-      totalPrice: r.totalPrice != null ? Number(r.totalPrice) : null,
+      totalPrice,
       fechaContratoFirmado: r.fechaContratoFirmado,
       terminosPago: r.terminosPago,
       observaciones: r.observaciones,
