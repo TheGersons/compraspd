@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import PageMeta from "../../components/common/PageMeta";
 import { getToken } from "../../lib/api";
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
@@ -389,6 +392,66 @@ export default function Reports() {
       );
     });
 
+  // ─── Export helpers ────────────────────────────────────────────────────────
+
+  const EXPORT_COLUMNS = [
+    { key: "fechaSolicitud",       label: "Fecha Solicitud",      fmt: (v: any) => v ? new Date(v).toLocaleDateString("es-HN") : "" },
+    { key: "nombreCotizacion",     label: "Cotización",           fmt: (v: any) => v ?? "" },
+    { key: "estadoCotizacion",     label: "Estado Cot.",          fmt: (v: any) => ESTADO_COT[v]?.label ?? v ?? "" },
+    { key: "area",                 label: "Área",                 fmt: (v: any) => v ?? "" },
+    { key: "tipo",                 label: "Tipo",                 fmt: (v: any) => v ?? "" },
+    { key: "solicitante",          label: "Solicitante",          fmt: (v: any) => v ?? "" },
+    { key: "numeroPO",             label: "#PO",                  fmt: (v: any) => v ?? "" },
+    { key: "proveedor",            label: "Proveedor",            fmt: (v: any) => v ?? "" },
+    { key: "origen",               label: "Origen",               fmt: (v: any) => v ?? "" },
+    { key: "descripcionProducto",  label: "Descripción Producto", fmt: (v: any) => v ?? "" },
+    { key: "epdEps",               label: "EPD/EPS",              fmt: (v: any) => v ?? "" },
+    { key: "statusOC",             label: "Status OC",            fmt: (v: any) => v ?? "Sin OC" },
+    { key: "totalPrice",           label: "Total Price",          fmt: (v: any) => v ?? "" },
+    { key: "fechaContratoFirmado", label: "Fecha Contrato",       fmt: (v: any) => v ? new Date(v).toLocaleDateString("es-HN") : "" },
+    { key: "terminosPago",         label: "Términos Pago",        fmt: (v: any) => v ?? "" },
+    { key: "observaciones",        label: "Observaciones",        fmt: (v: any) => v ?? "" },
+    { key: "pago1",                label: "1er Pago",             fmt: (v: any) => v ?? "" },
+    { key: "fechaPago1",           label: "Fecha 1er Pago",       fmt: (v: any) => v ? new Date(v).toLocaleDateString("es-HN") : "" },
+    { key: "pago2",                label: "2do Pago",             fmt: (v: any) => v ?? "" },
+    { key: "fechaPago2",           label: "Fecha 2do Pago",       fmt: (v: any) => v ? new Date(v).toLocaleDateString("es-HN") : "" },
+    { key: "pago3",                label: "3er Pago",             fmt: (v: any) => v ?? "" },
+    { key: "fechaPago3",           label: "Fecha 3er Pago",       fmt: (v: any) => v ? new Date(v).toLocaleDateString("es-HN") : "" },
+    { key: "pago4",                label: "4to Pago",             fmt: (v: any) => v ?? "" },
+    { key: "fechaPago4",           label: "Fecha 4to Pago",       fmt: (v: any) => v ? new Date(v).toLocaleDateString("es-HN") : "" },
+    { key: "totalPagado",          label: "Total Pagado",         fmt: (v: any) => v ?? 0 },
+    { key: "saldoPendiente",       label: "Saldo Pendiente",      fmt: (v: any) => v ?? "" },
+    { key: "statusPago",           label: "Status Pago",          fmt: (v: any) => STATUS_PAGO[v]?.label ?? v ?? "" },
+    { key: "comentarios",          label: "Comentarios",          fmt: (v: any) => v ?? "" },
+  ] as const;
+
+  const exportExcel = () => {
+    const rows = filtered.map((r) =>
+      Object.fromEntries(EXPORT_COLUMNS.map((c) => [c.label, c.fmt((r as any)[c.key])]))
+    );
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Reportes");
+    XLSX.writeFile(wb, `Reportes_${defaultHasta()}.xlsx`);
+  };
+
+  const exportPDF = () => {
+    const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a3" });
+    doc.setFontSize(11);
+    doc.text(`Reportes de Compras — ${defaultHasta()}`, 40, 30);
+    autoTable(doc, {
+      head: [EXPORT_COLUMNS.map((c) => c.label)],
+      body: filtered.map((r) => EXPORT_COLUMNS.map((c) => String(c.fmt((r as any)[c.key])))),
+      startY: 45,
+      styles: { fontSize: 6, cellPadding: 2 },
+      headStyles: { fillColor: [37, 99, 235], textColor: 255, fontStyle: "bold" },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+    });
+    doc.save(`Reportes_${defaultHasta()}.pdf`);
+  };
+
+  // ──────────────────────────────────────────────────────────────────────────
+
   const th = "sticky top-0 z-10 whitespace-nowrap border-b border-gray-200 bg-gray-50 px-3 py-2.5 text-left text-xs font-semibold text-gray-600 dark:border-gray-700 dark:bg-gray-800/90 dark:text-gray-300";
   const td = "border-b border-gray-100 px-3 py-2 align-top dark:border-gray-800";
 
@@ -405,6 +468,34 @@ export default function Reports() {
           <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
             Control de flujo — cotizaciones y compras en proceso · campos editables en línea
           </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={exportExcel}
+            disabled={filtered.length === 0}
+            className="flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-40 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="16" y1="13" x2="8" y2="13" />
+              <line x1="16" y1="17" x2="8" y2="17" />
+            </svg>
+            Excel
+          </button>
+          <button
+            onClick={exportPDF}
+            disabled={filtered.length === 0}
+            className="flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700 hover:bg-rose-100 disabled:opacity-40 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-400 dark:hover:bg-rose-900/30"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="12" y1="18" x2="12" y2="12" />
+              <polyline points="9 15 12 18 15 15" />
+            </svg>
+            PDF
+          </button>
         </div>
       </div>
 
