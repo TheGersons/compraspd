@@ -15,7 +15,9 @@
       "Bash(find /c/Repo/admin-dashboard-main/frontend/src/pages -name *.tsx)",
       "Bash(grep -r \"solucionestecnologicas\\\\|test.*env\\\\|NODE_ENV\\\\|VITE_ENV\\\\|6080\\\\|5173\" /c/Repo/admin-dashboard-main/frontend --include=*.ts --include=*.tsx --include=*.env* -l)",
       "Bash(ls /c/Repo/admin-dashboard-main/backend/.env*)",
-      "Bash(ls /c/Repo/admin-dashboard-main/frontend/.env*)"
+      "Bash(ls /c/Repo/admin-dashboard-main/frontend/.env*)",
+      "Bash(grep -n \"followup\\\\|FollowUp\\\\|followups\\\\|quotes\\\\|Messages\\\\|messages\" /c/Repo/admin-dashboard-main/frontend/src/router/*.tsx)",
+      "Bash(grep -rn \"messages\\\\|Messages\" /c/Repo/admin-dashboard-main/frontend/src/App.tsx /c/Repo/admin-dashboard-main/frontend/src/router/*.tsx)"
     ]
   }
 }

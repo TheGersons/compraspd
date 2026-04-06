@@ -608,10 +608,12 @@ export class MessagesService {
 
     const participantesIds = new Set(participantes.map((p) => p.usuario.id));
 
-    // Buscar cotización vinculada a este chat para obtener responsables
+    // Buscar cotización vinculada a este chat para obtener responsables y contexto
     const cotizacion = await this.prisma.cotizacion.findFirst({
       where: { chatId },
       select: {
+        id: true,
+        nombreCotizacion: true,
         supervisorResponsable: {
           select: { id: true, nombre: true, email: true, activo: true },
         },
@@ -667,6 +669,15 @@ export class MessagesService {
         ? messageContent.substring(0, 100) + '...'
         : messageContent;
 
+    // Título enriquecido con nombre de la cotización si existe
+    const titulo = cotizacion?.nombreCotizacion
+      ? `Nuevo mensaje en "${cotizacion.nombreCotizacion}"`
+      : `Nuevo mensaje de ${senderName}`;
+
+    const descripcion = cotizacion?.nombreCotizacion
+      ? `${senderName}: ${preview}`
+      : preview;
+
     // Destinatarios = participantes originales (sin el emisor) + responsables externos activos
     const destinatarios: UsuarioBasico[] = [
       ...participantes
@@ -679,8 +690,8 @@ export class MessagesService {
       destinatarios.map(async (usuario) => {
         const notifData = {
           tipo: 'COMENTARIO_NUEVO',
-          titulo: `Nuevo mensaje de ${senderName}`,
-          descripcion: preview,
+          titulo,
+          descripcion,
         };
 
         // 1. Crear notificación en BD
@@ -689,10 +700,11 @@ export class MessagesService {
           ...notifData,
         } as any);
 
-        // 2. Emitir por SSE
+        // 2. Emitir por SSE — incluir chatId y cotizacionId para navegación en el frontend
         this.notificacionService.emitToUser(usuario.id, {
           ...notif,
           chatId,
+          cotizacionId: cotizacion?.id ?? null,
         });
 
         // 3. Email

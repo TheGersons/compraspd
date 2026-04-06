@@ -1,13 +1,46 @@
 import { useState, useEffect, useCallback } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { getToken } from "../../lib/api";
+import { useAuth } from "../../context/AuthContext";
 import {
   useNotificationSocket,
   BackendNotification,
 } from "../../hooks/useNotificationSocket";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
+/**
+ * Devuelve la ruta a la que debe navegar una notificación según su tipo,
+ * los IDs disponibles y el rol del usuario.
+ */
+function resolveNotifUrl(
+  n: BackendNotification,
+  userRole: string | undefined,
+): string | null {
+  const isSupervisorOrAbove =
+    userRole === "SUPERVISOR" || userRole === "ADMIN" || userRole === "COMERCIAL";
+
+  if (n.tipo === "COMPRA_CREADA") {
+    if (n.cotizacionId)
+      return `/quotes/follow-ups?cotizacion=${n.cotizacionId}`;
+    return "/quotes/follow-ups";
+  }
+
+  if (n.tipo === "COMENTARIO_NUEVO") {
+    const base = isSupervisorOrAbove ? "/quotes/follow-ups" : "/quotes/my-quotes";
+    if (n.cotizacionId) return `${base}?cotizacion=${n.cotizacionId}`;
+    return base;
+  }
+
+  if (n.tipo === "ESTADO_ACTUALIZADO" || n.tipo === "COMPRA_COMPLETADA") {
+    if (n.cotizacionId)
+      return `/quotes/my-quotes?cotizacion=${n.cotizacionId}`;
+    return "/quotes/my-quotes";
+  }
+
+  return null;
+}
 
 // Iconos por tipo de notificación
 function NotifIcon({ tipo }: { tipo: string }) {
@@ -38,6 +71,9 @@ export default function NotificationDropdown() {
   const [notifications, setNotifications] = useState<BackendNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const userRole = (user as any)?.rol?.nombre?.toUpperCase() as string | undefined;
 
   const fetchNotifications = useCallback(async () => {
     const token = getToken();
@@ -164,56 +200,49 @@ export default function NotificationDropdown() {
             </li>
           )}
 
-          {notifications.map((n) => (
-            <li key={n.id}>
-              <div
-                className={`flex gap-3 rounded-lg border-b border-gray-100 px-3 py-3 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5 transition-colors ${
-                  !n.completada ? "bg-blue-50/40 dark:bg-blue-900/10" : ""
-                }`}
-              >
-                <NotifIcon tipo={n.tipo} />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-gray-800 dark:text-white/90 leading-tight">
-                    {n.titulo}
-                    {!n.completada && (
-                      <span className="ml-1.5 inline-block h-2 w-2 rounded-full bg-blue-500 align-middle" />
-                    )}
-                  </p>
-                  <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
-                    {n.descripcion}
-                  </p>
-                  <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-                    {timeAgo(n.creada)}
-                  </p>
+          {notifications.map((n) => {
+            const destUrl = resolveNotifUrl(n, userRole);
+            const handleClick = () => {
+              setIsOpen(false);
+              if (destUrl) navigate(destUrl);
+            };
+            return (
+              <li key={n.id}>
+                <div
+                  role={destUrl ? "button" : undefined}
+                  tabIndex={destUrl ? 0 : undefined}
+                  onClick={destUrl ? handleClick : undefined}
+                  onKeyDown={destUrl ? (e) => e.key === "Enter" && handleClick() : undefined}
+                  className={`flex gap-3 rounded-lg border-b border-gray-100 px-3 py-3 transition-colors dark:border-gray-800 ${
+                    !n.completada ? "bg-blue-50/40 dark:bg-blue-900/10" : ""
+                  } ${destUrl ? "cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5" : ""}`}
+                >
+                  <NotifIcon tipo={n.tipo} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-gray-800 dark:text-white/90 leading-tight">
+                      {n.titulo}
+                      {!n.completada && (
+                        <span className="ml-1.5 inline-block h-2 w-2 rounded-full bg-blue-500 align-middle" />
+                      )}
+                    </p>
+                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+                      {n.descripcion}
+                    </p>
+                    <div className="mt-1 flex items-center gap-2">
+                      <p className="text-xs text-gray-400 dark:text-gray-500">
+                        {timeAgo(n.creada)}
+                      </p>
+                      {destUrl && (
+                        <span className="text-[10px] font-medium text-blue-500 dark:text-blue-400">
+                          Ver →
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                {/* Link a cotización si aplica */}
-                {n.cotizacionId && (
-                  <Link
-                    to={`/quotes/${n.cotizacionId}`}
-                    onClick={() => setIsOpen(false)}
-                    className="flex-shrink-0 self-center text-blue-500 hover:text-blue-700"
-                    title="Ver cotización"
-                  >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </Link>
-                )}
-                {n.chatId && (
-                  <Link
-                    to={`/messages/${n.chatId}`}
-                    onClick={() => setIsOpen(false)}
-                    className="flex-shrink-0 self-center text-blue-500 hover:text-blue-700"
-                    title="Ver chat"
-                  >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </Link>
-                )}
-              </div>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
 
         {/* Footer */}

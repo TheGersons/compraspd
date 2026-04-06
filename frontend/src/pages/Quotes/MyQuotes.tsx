@@ -3,7 +3,7 @@ import PageMeta from "../../components/common/PageMeta";
 import { getToken } from "../../lib/api";
 import { useNotifications } from "../Notifications/context/NotificationContext";
 import { useAuth } from "../../context/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 
 // ============================================================================
@@ -507,6 +507,7 @@ export default function MyQuotes() {
     const [sendingFile, setSendingFile] = useState(false);
     const [imagenModal, setImagenModal] = useState<{ src: string; nombre: string; downloadUrl: string } | null>(null);
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
 
     // Estados de UI
     const [showProductos, setShowProductos] = useState(false);
@@ -564,7 +565,15 @@ export default function MyQuotes() {
                 toast.error('No cuentas con los permisos necesarios');
                 return;
             }
-            setCotizaciones(data || []);
+            const items = data || [];
+            setCotizaciones(items);
+
+            // Auto-seleccionar cotización indicada en el query param ?cotizacion=ID
+            const targetId = searchParams.get('cotizacion');
+            if (targetId) {
+                const target = items.find((c: Cotizacion) => c.id === targetId);
+                if (target) seleccionarCotizacion(target);
+            }
         } catch (error) {
             console.error("Error al cargar cotizaciones:", error);
             addNotification("danger", "Error", "Error al cargar tus cotizaciones");

@@ -5,7 +5,7 @@ import { useNotifications } from "../Notifications/context/NotificationContext";
 import Historial from "./components/Historial";
 import { useAuth } from "../../context/AuthContext";
 import toast from "react-hot-toast";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import DescuentoActions from "./components/DescuentoActions";
 
 // ============================================================================
@@ -537,6 +537,7 @@ export default function FollowUps() {
   // Estados de configuración
   const [showTimelineModal, setShowTimelineModal] = useState(false);
   const [productoConfigurando, setProductoConfigurando] = useState<Producto | null>(null);
+  const [aplicarATodos, setAplicarATodos] = useState(false);
   const [paises, setPaises] = useState<Pais[]>([]);
 
   // Estados de historial
@@ -557,6 +558,7 @@ export default function FollowUps() {
   const [productoParaPrecio, setProductoParaPrecio] = useState<Producto | null>(null);
   const [loadingPrecios, setLoadingPrecios] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   // Estados para edición inline de precios
   const [precioEditando, setPrecioEditando] = useState<Record<string, string>>({});
@@ -627,7 +629,20 @@ export default function FollowUps() {
         navigate('/quotes/new');
         return;
       }
-      setCotizaciones(data.items || []);
+      const items = data.items || [];
+      setCotizaciones(items);
+
+      // Auto-seleccionar cotización indicada en el query param ?cotizacion=ID
+      const targetId = searchParams.get('cotizacion');
+      if (targetId) {
+        const target = items.find((c: any) => c.id === targetId);
+        if (target) {
+          seleccionarCotizacion(target);
+          setTimeout(() => {
+            accordionRefs.current[targetId]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 300);
+        }
+      }
     } catch (error) {
       console.error("Error al cargar cotizaciones:", error);
       addNotification("danger", "Error al cargar cotizaciones", "Error");
@@ -787,7 +802,17 @@ export default function FollowUps() {
   };
 
   const configurarProducto = (producto: Producto) => {
+    setAplicarATodos(false);
     setProductoConfigurando(producto);
+    setShowTimelineModal(true);
+  };
+
+  const configurarTodosProductos = () => {
+    if (!cotizacionSeleccionada?.detalles?.length) return;
+    const primerProducto = cotizacionSeleccionada.detalles.find(p => !p.estadoProducto?.rechazado);
+    if (!primerProducto) return;
+    setAplicarATodos(true);
+    setProductoConfigurando(primerProducto);
     setShowTimelineModal(true);
   };
 
@@ -795,26 +820,41 @@ export default function FollowUps() {
     if (!cotizacionSeleccionada || !productoConfigurando) return;
 
     const esNacional = cotizacionSeleccionada.tipoCompra === 'NACIONAL';
-    // Honduras hardcoded para nacional; China para internacional
     const HONDURAS_ID = '53b360e4-f5fe-4f27-beba-90bc79390f07';
     const chinaId = paises.find((p) => p.nombre.toLowerCase().includes('china'))?.id || '';
+    const paisOrigenId = esNacional ? HONDURAS_ID : chinaId;
+    const medioTransporte = esNacional ? 'TERRESTRE' : 'MARITIMO';
 
     try {
-      await api.configurarTimeline(cotizacionSeleccionada.id, [
-        {
-          sku: productoConfigurando.sku,
-          paisOrigenId: esNacional ? HONDURAS_ID : chinaId,
-          medioTransporte: esNacional ? 'TERRESTRE' : 'MARITIMO',
-          timeline: config.timeline,
-          notas: '',
-        },
-      ]);
+      if (aplicarATodos && cotizacionSeleccionada.detalles) {
+        // Aplicar a todos los productos no rechazados
+        const productosValidos = cotizacionSeleccionada.detalles.filter(p => !p.estadoProducto?.rechazado);
+        await api.configurarTimeline(
+          cotizacionSeleccionada.id,
+          productosValidos.map(p => ({
+            sku: p.sku,
+            paisOrigenId,
+            medioTransporte,
+            timeline: config.timeline,
+            notas: '',
+          })),
+        );
+        addNotification("success", "Timeline configurado", `Aplicado a ${productosValidos.length} productos`);
+      } else {
+        await api.configurarTimeline(cotizacionSeleccionada.id, [
+          {
+            sku: productoConfigurando.sku,
+            paisOrigenId,
+            medioTransporte,
+            timeline: config.timeline,
+            notas: '',
+          },
+        ]);
+        addNotification("success", "Timeline configurado exitosamente", "Timeline configurado exitosamente");
+      }
 
-
-      addNotification("success", "Timeline configurado exitosamente", "Timeline configurado exitosamente");
       setShowTimelineModal(false);
-
-      // Recargar detalle
+      setAplicarATodos(false);
       await seleccionarCotizacion(cotizacionSeleccionada);
     } catch (error) {
       console.error("Error al configurar timeline:", error);
@@ -1575,6 +1615,20 @@ export default function FollowUps() {
                                   )}
                                   {cotizacionSeleccionada.detalles && cotizacionSeleccionada.detalles.length > 0 ? (
                                     <div className="overflow-x-auto">
+                                      {/* Botón "aplicar a todos" — solo cuando hay 2+ productos y el usuario puede configurar */}
+                                      {!isComercial && cotizacionSeleccionada.detalles.filter(p => !p.estadoProducto?.rechazado).length > 1 && (
+                                        <div className="mb-3 flex justify-end">
+                                          <button
+                                            onClick={configurarTodosProductos}
+                                            className="inline-flex items-center gap-2 rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/40"
+                                          >
+                                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                            </svg>
+                                            Aplicar misma configuración a todos los productos
+                                          </button>
+                                        </div>
+                                      )}
                                       <table className="w-full text-sm">
                                         <thead>
                                           <tr className="border-b border-gray-200 dark:border-gray-700 text-left">
@@ -1838,9 +1892,13 @@ export default function FollowUps() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-xl font-bold text-gray-900 dark:text-white">Configurar Timeline</h3>
-                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{productoConfigurando.descripcionProducto}</p>
+                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                      {aplicarATodos
+                        ? `Se aplicará a todos los productos (${cotizacionSeleccionada?.detalles?.filter(p => !p.estadoProducto?.rechazado).length ?? 0})`
+                        : productoConfigurando.descripcionProducto}
+                    </p>
                   </div>
-                  <button onClick={() => { setShowTimelineModal(false); setProductoConfigurando(null); }}
+                  <button onClick={() => { setShowTimelineModal(false); setProductoConfigurando(null); setAplicarATodos(false); }}
                     className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300">
                     <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1853,7 +1911,7 @@ export default function FollowUps() {
                 paises={paises}
                 tipoCompra={cotizacionSeleccionada?.tipoCompra || 'NACIONAL'}
                 onSave={guardarConfiguracion}
-                onCancel={() => { setShowTimelineModal(false); setProductoConfigurando(null); }}
+                onCancel={() => { setShowTimelineModal(false); setProductoConfigurando(null); setAplicarATodos(false); }}
                 onReject={async (motivoRechazo) => {
                   if (!cotizacionSeleccionada || !productoConfigurando) return;
                   try {
