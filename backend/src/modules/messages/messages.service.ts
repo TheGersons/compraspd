@@ -583,8 +583,11 @@ export class MessagesService {
   }
 
   /**
-   * Crea notificaciones en BD, emite por WebSocket y envía emails
-   * a todos los participantes del chat excepto el emisor
+   * Crea notificaciones en BD, emite por SSE y envía emails
+   * a todos los participantes del chat excepto el emisor.
+   * También incluye al supervisorResponsable y al responsableSeguimiento
+   * de la cotización vinculada al chat si aún no son participantes,
+   * y los agrega automáticamente al chat.
    */
   private async notifyOtherParticipants(
     chatId: string,
@@ -593,18 +596,63 @@ export class MessagesService {
   ): Promise<void> {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 
-    // Obtener todos los participantes con sus datos de usuario
+    // Obtener todos los participantes actuales con sus datos de usuario
     const participantes = await this.prisma.participantesChat.findMany({
-      where: {
-        chatId,
-        userId: { not: senderId },
-      },
+      where: { chatId },
       include: {
         usuario: {
           select: { id: true, nombre: true, email: true, activo: true },
         },
       },
     });
+
+    const participantesIds = new Set(participantes.map((p) => p.usuario.id));
+
+    // Buscar cotización vinculada a este chat para obtener responsables
+    const cotizacion = await this.prisma.cotizacion.findFirst({
+      where: { chatId },
+      select: {
+        supervisorResponsable: {
+          select: { id: true, nombre: true, email: true, activo: true },
+        },
+        estadosProductos: {
+          select: {
+            responsableSeguimiento: {
+              select: { id: true, nombre: true, email: true, activo: true },
+            },
+          },
+        },
+      },
+    });
+
+    // Recopilar responsables que no son participantes del chat todavía
+    type UsuarioBasico = { id: string; nombre: string; email: string; activo: boolean };
+    const responsablesExternos: UsuarioBasico[] = [];
+    const responsablesVistos = new Set<string>();
+
+    const agregarSiExterno = (u: UsuarioBasico | null | undefined) => {
+      if (u && !participantesIds.has(u.id) && !responsablesVistos.has(u.id)) {
+        responsablesVistos.add(u.id);
+        responsablesExternos.push(u);
+      }
+    };
+
+    agregarSiExterno(cotizacion?.supervisorResponsable as UsuarioBasico | undefined);
+    for (const ep of cotizacion?.estadosProductos ?? []) {
+      agregarSiExterno(ep.responsableSeguimiento as UsuarioBasico | undefined);
+    }
+
+    // Agregar responsables externos como participantes del chat
+    if (responsablesExternos.length > 0) {
+      await this.prisma.participantesChat.createMany({
+        data: responsablesExternos.map((r) => ({
+          chatId,
+          userId: r.id,
+          ultimoLeido: new Date(0),
+        })),
+        skipDuplicates: true,
+      });
+    }
 
     // Obtener el nombre del emisor
     const emisor = await this.prisma.usuario.findUnique({
@@ -619,10 +667,16 @@ export class MessagesService {
         ? messageContent.substring(0, 100) + '...'
         : messageContent;
 
-    const destinatariosActivos = participantes.filter((p) => p.usuario.activo);
+    // Destinatarios = participantes originales (sin el emisor) + responsables externos activos
+    const destinatarios: UsuarioBasico[] = [
+      ...participantes
+        .filter((p) => p.usuario.id !== senderId && p.usuario.activo)
+        .map((p) => p.usuario),
+      ...responsablesExternos.filter((r) => r.activo),
+    ];
 
     await Promise.allSettled(
-      destinatariosActivos.map(async (p) => {
+      destinatarios.map(async (usuario) => {
         const notifData = {
           tipo: 'COMENTARIO_NUEVO',
           titulo: `Nuevo mensaje de ${senderName}`,
@@ -631,21 +685,21 @@ export class MessagesService {
 
         // 1. Crear notificación en BD
         const notif = await this.notificacionService.create({
-          userId: p.usuario.id,
+          userId: usuario.id,
           ...notifData,
         } as any);
 
         // 2. Emitir por SSE
-        this.notificacionService.emitToUser(p.usuario.id, {
+        this.notificacionService.emitToUser(usuario.id, {
           ...notif,
           chatId,
         });
 
         // 3. Email
-        if (p.usuario.email) {
+        if (usuario.email) {
           return this.mailService.sendNewMessageNotification(
-            p.usuario.email,
-            p.usuario.nombre,
+            usuario.email,
+            usuario.nombre,
             senderName,
             messageContent,
             chatUrl,

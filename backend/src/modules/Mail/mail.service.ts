@@ -210,7 +210,7 @@ export class MailService {
                   <tr>
                     <td style="background: linear-gradient(145deg, #0D76B8 0%, #0a5a8c 50%, #14559c 100%); padding: 48px 40px; text-align: center;">
                       <div style="margin-bottom: 16px;">${this.getLogoSvg()}</div>
-                      <p style="margin: 0; color: white; font-size: 13px; letter-spacing: 0.5px; text-transform: uppercase;">Sistema de Gestión Empresarial</p>
+                      <p style="margin: 0; color: white; font-size: 13px; letter-spacing: 0.5px; text-transform: uppercase;">COMPRAS EPD</p>
                     </td>
                   </tr>
                   <tr>
@@ -289,7 +289,7 @@ export class MailService {
                   <tr>
                     <td style="background: linear-gradient(145deg, #0D76B8 0%, #0a5a8c 50%, #14559c 100%); padding: 48px 40px; text-align: center;">
                       <div style="margin-bottom: 16px;">${this.getLogoSvg()}</div>
-                      <p style="margin: 0; color: white; font-size: 13px; letter-spacing: 0.5px; text-transform: uppercase;">Sistema de Gestión Empresarial</p>
+                      <p style="margin: 0; color: white; font-size: 13px; letter-spacing: 0.5px; text-transform: uppercase;">COMPRAS EPD</p>
                     </td>
                   </tr>
                   <tr>

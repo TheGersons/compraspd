@@ -794,32 +794,21 @@ export default function FollowUps() {
   const guardarConfiguracion = async (config: any) => {
     if (!cotizacionSeleccionada || !productoConfigurando) return;
 
+    const esNacional = cotizacionSeleccionada.tipoCompra === 'NACIONAL';
+    // Honduras hardcoded para nacional; China para internacional
+    const HONDURAS_ID = '53b360e4-f5fe-4f27-beba-90bc79390f07';
+    const chinaId = paises.find((p) => p.nombre.toLowerCase().includes('china'))?.id || '';
 
     try {
-      if (cotizacionSeleccionada.tipoCompra === 'NACIONAL') {
-
-        await api.configurarTimeline(cotizacionSeleccionada.id, [
-          {
-            sku: productoConfigurando.sku,
-            paisOrigenId: '53b360e4-f5fe-4f27-beba-90bc79390f07',
-            medioTransporte: config.medioTransporte,
-            timeline: config.timeline,
-            notas: config.notas,
-          },
-        ]);
-
-      } else {
-
-        await api.configurarTimeline(cotizacionSeleccionada.id, [
-          {
-            sku: productoConfigurando.sku,
-            paisOrigenId: config.paisOrigenId,
-            medioTransporte: config.medioTransporte,
-            timeline: config.timeline,
-            notas: config.notas,
-          },
-        ]);
-      }
+      await api.configurarTimeline(cotizacionSeleccionada.id, [
+        {
+          sku: productoConfigurando.sku,
+          paisOrigenId: esNacional ? HONDURAS_ID : chinaId,
+          medioTransporte: esNacional ? 'TERRESTRE' : 'MARITIMO',
+          timeline: config.timeline,
+          notas: '',
+        },
+      ]);
 
 
       addNotification("success", "Timeline configurado exitosamente", "Timeline configurado exitosamente");
@@ -1313,7 +1302,10 @@ export default function FollowUps() {
             ))}
           </div>
           {/* Filtro por responsable asignado */}
-          <div className="mt-3">
+          <div className="mt-3 flex items-center gap-2">
+            <label className="shrink-0 text-sm font-medium text-gray-700 dark:text-gray-300">
+              Filtrar responsable:
+            </label>
             <select
               value={responsableFiltro}
               onChange={(e) => setResponsableFiltro(e.target.value)}
@@ -1912,7 +1904,6 @@ export default function FollowUps() {
 
 function TimelineModalContent({
   producto,
-  paises,
   tipoCompra,
   onSave,
   onCancel,
@@ -1921,62 +1912,28 @@ function TimelineModalContent({
   producto: Producto;
   paises: Pais[];
   tipoCompra: 'NACIONAL' | 'INTERNACIONAL';
-  onSave: (config: any) => Promise<void> | void; // 🟢 Promise support
+  onSave: (config: any) => Promise<void> | void;
   onCancel: () => void;
-  onReject: (motivoRechazo: string) => Promise<void> | void; // 🟢 Promise support
+  onReject: (motivoRechazo: string) => Promise<void> | void;
 }) {
-
-  // 🟢 ESTADO DE CARGA
   const [loading, setLoading] = useState(false);
-
   const esNacional = tipoCompra === 'NACIONAL';
-
-  // Estados existentes
-  const [paisOrigenId, setPaisOrigenId] = useState(
-    producto.estadoProducto?.paisOrigen?.id || (esNacional ? '' : paises[0]?.id) || ""
-  );
-  const [medioTransporte, setMedioTransporte] = useState<MedioTransporte>(
-    producto.estadoProducto?.medioTransporte || "TERRESTRE"
-  );
-  const [timeline, setTimeline] = useState<TimelineConfig>({
-    diasCotizadoADescuento: producto.timelineSugerido?.diasCotizadoADescuento || 2,
-    diasDescuentoAAprobacionCompra: producto.timelineSugerido?.diasDescuentoAAprobacionCompra || 2,         // ← NUEVO
-    diasAprobacionCompraAComprado: producto.timelineSugerido?.diasAprobacionCompraAComprado || 1,           // ← NUEVO
-    diasCompradoAPagado: producto.timelineSugerido?.diasCompradoAPagado || 5,
-    diasPagadoAAprobacionPlanos: esNacional ? undefined : (producto.timelineSugerido?.diasPagadoAAprobacionPlanos || 3),     // ← NUEVO
-    diasAprobacionPlanosASeguimiento1: esNacional ? undefined : (producto.timelineSugerido?.diasAprobacionPlanosASeguimiento1 || 2), // ← NUEVO
-    diasSeguimiento1AFob: esNacional ? undefined : producto.timelineSugerido?.diasSeguimiento1AFob,
-    diasFobACotizacionFlete: esNacional ? undefined : (producto.timelineSugerido?.diasFobACotizacionFlete || 3),
-    diasCotizacionFleteABl: esNacional ? undefined : (producto.timelineSugerido?.diasCotizacionFleteABl || 2),
-    diasBlASeguimiento2: esNacional ? undefined : producto.timelineSugerido?.diasBlASeguimiento2,
-    diasSeguimiento2ACif: esNacional ? undefined : producto.timelineSugerido?.diasSeguimiento2ACif,
-    diasCifARecibido: esNacional
-      ? (producto.timelineSugerido?.diasCifARecibido || 3)
-      : (producto.timelineSugerido?.diasCifARecibido || 5),
-  });
-  const [notas, setNotas] = useState(producto.timelineSugerido?.notas || "");
-
-  // NUEVOS ESTADOS para rechazo
-  const [mostrarRechazo, setMostrarRechazo] = useState(false);
-  const [motivoRechazo, setMotivoRechazo] = useState("");
-
-  const diasTotales = Object.values(timeline).reduce((sum, dias) => sum + (dias || 0), 0);
 
   const procesosNacional = [
     { key: "diasCotizadoADescuento", label: "Cotizado → Con Descuento" },
-    { key: "diasDescuentoAAprobacionCompra", label: "Con Descuento → Aprob. Compra" },    // ← NUEVO
-    { key: "diasAprobacionCompraAComprado", label: "Aprob. Compra → Comprado" },          // ← NUEVO
+    { key: "diasDescuentoAAprobacionCompra", label: "Con Descuento → Aprob. Compra" },
+    { key: "diasAprobacionCompraAComprado", label: "Aprob. Compra → Comprado" },
     { key: "diasCompradoAPagado", label: "Comprado → Pagado" },
     { key: "diasCifARecibido", label: "Pagado → Recibido" },
   ];
 
   const procesosInternacional = [
     { key: "diasCotizadoADescuento", label: "Cotizado → Con Descuento" },
-    { key: "diasDescuentoAAprobacionCompra", label: "Con Descuento → Aprob. Compra" },              // ← NUEVO
-    { key: "diasAprobacionCompraAComprado", label: "Aprob. Compra → Comprado" },                    // ← NUEVO
+    { key: "diasDescuentoAAprobacionCompra", label: "Con Descuento → Aprob. Compra" },
+    { key: "diasAprobacionCompraAComprado", label: "Aprob. Compra → Comprado" },
     { key: "diasCompradoAPagado", label: "Comprado → Pagado" },
-    { key: "diasPagadoAAprobacionPlanos", label: "Pagado → Aprob. Planos" },                        // ← NUEVO
-    { key: "diasAprobacionPlanosASeguimiento1", label: "Aprob. Planos → 1er Seguimiento" },         // ← NUEVO
+    { key: "diasPagadoAAprobacionPlanos", label: "Pagado → Aprob. Planos" },
+    { key: "diasAprobacionPlanosASeguimiento1", label: "Aprob. Planos → 1er Seguimiento" },
     { key: "diasSeguimiento1AFob", label: "1er Seg. → En FOB / En CIF" },
     { key: "diasFobACotizacionFlete", label: "FOB/CIF → Cotización Flete Int." },
     { key: "diasCotizacionFleteABl", label: "Cotización Flete → BL / Póliza Seguros" },
@@ -1987,35 +1944,45 @@ function TimelineModalContent({
 
   const procesos = esNacional ? procesosNacional : procesosInternacional;
 
-  const handleSave = async () => {
-    if (!esNacional && !paisOrigenId) {
-      alert("Selecciona un país de origen");
-      return;
-    }
+  // Inicializar todos los días en 5 (o valor existente si ya fue configurado)
+  const initTimeline = () => {
+    const base: Record<string, number> = {};
+    procesos.forEach((p) => {
+      base[p.key] = (producto.timelineSugerido as any)?.[p.key] ?? 5;
+    });
+    return base as TimelineConfig;
+  };
 
+  const [timeline, setTimeline] = useState<TimelineConfig>(initTimeline);
+  const [mostrarRechazo, setMostrarRechazo] = useState(false);
+  const [motivoRechazo, setMotivoRechazo] = useState("");
+
+  const diasTotales = procesos.reduce((sum, p) => sum + ((timeline as any)[p.key] || 0), 0);
+
+  const cambiarDias = (key: string, delta: number) => {
+    setTimeline((prev) => ({
+      ...prev,
+      [key]: Math.max(0, ((prev as any)[key] || 0) + delta),
+    }));
+  };
+
+  const handleSave = async () => {
     try {
-      setLoading(true); // 🔒 Bloqueo
-      await onSave({
-        paisOrigenId,
-        medioTransporte,
-        timeline,
-        notas,
-      });
-      // No desbloqueamos porque el modal se cierra
+      setLoading(true);
+      await onSave({ timeline });
     } catch (error) {
       console.error(error);
-      setLoading(false); // 🔓 Desbloqueo error
+      setLoading(false);
     }
   };
 
   const handleReject = async () => {
     if (motivoRechazo.trim().length < 10) return;
-
     try {
-      setLoading(true); // 🔒 Bloqueo
+      setLoading(true);
       await onReject(motivoRechazo.trim());
     } catch (error) {
-      setLoading(false); // 🔓 Desbloqueo error
+      setLoading(false);
     }
   };
 
@@ -2029,7 +1996,6 @@ function TimelineModalContent({
           <p className="mb-4 text-sm text-red-800 dark:text-red-200">
             Al rechazar este producto, el solicitante será notificado y deberá corregir o justificar la solicitud antes de que pueda ser aprobada.
           </p>
-
           <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
             Motivo del rechazo <span className="text-red-500">*</span>
           </label>
@@ -2039,18 +2005,14 @@ function TimelineModalContent({
             placeholder="Explica por qué se rechaza este producto..."
             value={motivoRechazo}
             onChange={(e) => setMotivoRechazo(e.target.value)}
-            disabled={loading} // Deshabilitar
+            disabled={loading}
           />
           <div className="mt-1 text-right text-xs text-gray-500 dark:text-gray-400">
             {motivoRechazo.length}/10 caracteres mínimos
           </div>
-
           <div className="mt-4 flex justify-end gap-3">
             <button
-              onClick={() => {
-                setMostrarRechazo(false);
-                setMotivoRechazo("");
-              }}
+              onClick={() => { setMostrarRechazo(false); setMotivoRechazo(""); }}
               disabled={loading}
               className="rounded-lg border-2 border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300"
             >
@@ -2061,9 +2023,7 @@ function TimelineModalContent({
               disabled={motivoRechazo.trim().length < 10 || loading}
               className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading && (
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-              )}
+              {loading && <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>}
               {loading ? "Rechazando..." : "Confirmar Rechazo"}
             </button>
           </div>
@@ -2076,131 +2036,73 @@ function TimelineModalContent({
     <div className="p-6">
       {/* Aviso si ya fue rechazado antes */}
       {producto.estadoProducto?.rechazado && producto.estadoProducto?.motivoRechazo && (
-        <div className="mb-6 rounded-lg bg-red-50 p-4 dark:bg-red-900/20">
+        <div className="mb-4 rounded-lg bg-red-50 p-4 dark:bg-red-900/20">
           <div className="flex gap-3">
             <svg className="h-6 w-6 flex-shrink-0 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
             <div>
               <h4 className="font-semibold text-red-800 dark:text-red-200">Producto Previamente Rechazado</h4>
-              <p className="mt-1 text-sm text-red-700 dark:text-red-300">
-                Motivo: {producto.estadoProducto.motivoRechazo}
-              </p>
+              <p className="mt-1 text-sm text-red-700 dark:text-red-300">Motivo: {producto.estadoProducto.motivoRechazo}</p>
             </div>
           </div>
         </div>
       )}
 
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Columna Izquierda: Configuración Básica */}
-        <div className="space-y-4">
-          <h4 className="border-b border-gray-200 pb-2 font-semibold text-gray-800 dark:border-gray-700 dark:text-white">
-            Datos Logísticos
-          </h4>
-
-          {/* País de Origen */}
-          {!esNacional && (
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                País de Origen
-              </label>
-              <select
-                value={paisOrigenId}
-                onChange={(e) => setPaisOrigenId(e.target.value)}
-                disabled={loading}
-                className="w-full rounded-lg border-2 border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-              >
-                <option value="">Seleccionar país...</option>
-                {paises.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre} ({p.codigo})
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Medio de Transporte */}
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Medio de Transporte
-            </label>
-            <div className="flex gap-2">
-              {(["MARITIMO", "AEREO", "TERRESTRE"] as MedioTransporte[]).map((tipo) => (
-                <button
-                  key={tipo}
-                  onClick={() => setMedioTransporte(tipo)}
-                  disabled={loading}
-                  className={`flex-1 rounded-lg border-2 px-2 py-2 text-xs font-medium transition-colors ${medioTransporte === tipo
-                    ? "border-blue-600 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                    : "border-gray-200 hover:border-blue-300 dark:border-gray-600 dark:text-gray-300"
-                    }`}
-                >
-                  {tipo === "MARITIMO" && "🚢 Marítimo"}
-                  {tipo === "AEREO" && "✈️ Aéreo"}
-                  {tipo === "TERRESTRE" && "🚚 Terrestre"}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Notas */}
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Notas Adicionales
-            </label>
-            <textarea
-              value={notas}
-              onChange={(e) => setNotas(e.target.value)}
-              disabled={loading}
-              className="w-full rounded-lg border-2 border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-              rows={3}
-              placeholder="Notas sobre el proveedor, ruta, etc..."
-            />
-          </div>
-        </div>
-
-        {/* Columna Derecha: Timeline */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between border-b border-gray-200 pb-2 dark:border-gray-700">
-            <h4 className="font-semibold text-gray-800 dark:text-white">
-              Tiempos Estimados
-            </h4>
-            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-              Total: {diasTotales} días
-            </span>
-          </div>
-
-          <div className="max-h-[300px] space-y-3 overflow-y-auto pr-2">
-            {procesos.map((proc) => (
-              <div key={proc.key} className="flex items-center justify-between gap-4">
-                <span className="text-sm text-gray-600 dark:text-gray-400">
-                  {proc.label}
-                </span>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min="0"
-                    value={(timeline as any)[proc.key] || 0}
-                    onChange={(e) =>
-                      setTimeline({
-                        ...timeline,
-                        [proc.key]: parseInt(e.target.value) || 0,
-                      })
-                    }
-                    disabled={loading}
-                    className="w-16 rounded-lg border-2 border-gray-200 px-2 py-1 text-center text-sm focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                  />
-                  <span className="text-xs text-gray-400">días</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* Info de origen/transporte (solo lectura) */}
+      <div className="mb-4 flex items-center gap-3 rounded-lg bg-gray-50 px-4 py-2 text-sm text-gray-600 dark:bg-gray-700/50 dark:text-gray-400">
+        <span>{esNacional ? "🇭🇳 Honduras" : "🇨🇳 China"}</span>
+        <span className="text-gray-300 dark:text-gray-600">|</span>
+        <span>{esNacional ? "🚚 Terrestre" : "🚢 Marítimo"}</span>
       </div>
 
-      {/* Footer con acciones */}
-      <div className="mt-8 flex items-center justify-between border-t border-gray-200 pt-4 dark:border-gray-700">
+      {/* Timeline */}
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="font-semibold text-gray-800 dark:text-white">Tiempos Estimados</h4>
+        <span className="rounded-full bg-blue-100 px-3 py-0.5 text-xs font-bold text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+          Total: {diasTotales} días
+        </span>
+      </div>
+
+      <div className="space-y-2">
+        {procesos.map((proc) => (
+          <div key={proc.key} className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 px-3 py-2 dark:border-gray-700">
+            <span className="flex-1 text-sm text-gray-700 dark:text-gray-300">{proc.label}</span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => cambiarDias(proc.key, -1)}
+                disabled={loading || ((timeline as any)[proc.key] || 0) <= 0}
+                className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-600 transition-colors hover:bg-gray-100 disabled:opacity-40 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+              >
+                −
+              </button>
+              <input
+                type="number"
+                min="0"
+                value={(timeline as any)[proc.key] ?? 5}
+                onChange={(e) =>
+                  setTimeline({ ...timeline, [proc.key]: Math.max(0, parseInt(e.target.value) || 0) })
+                }
+                disabled={loading}
+                className="w-12 rounded-lg border border-gray-300 px-1 py-1 text-center text-sm font-medium focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              />
+              <button
+                type="button"
+                onClick={() => cambiarDias(proc.key, 1)}
+                disabled={loading}
+                className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-600 transition-colors hover:bg-gray-100 disabled:opacity-40 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+              >
+                +
+              </button>
+              <span className="w-8 text-right text-xs text-gray-400">días</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Footer */}
+      <div className="mt-6 flex items-center justify-between border-t border-gray-200 pt-4 dark:border-gray-700">
         <button
           onClick={() => setMostrarRechazo(true)}
           disabled={loading}
@@ -2211,8 +2113,6 @@ function TimelineModalContent({
           </svg>
           Rechazar
         </button>
-
-        {/* Botones Cancelar y Guardar */}
         <div className="flex items-center gap-3">
           <button
             onClick={onCancel}
@@ -2221,16 +2121,12 @@ function TimelineModalContent({
           >
             Cancelar
           </button>
-
           <button
             onClick={handleSave}
             disabled={loading}
-            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors ${loading ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
-              }`}
+            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors ${loading ? "cursor-not-allowed bg-blue-400" : "bg-blue-600 hover:bg-blue-700"}`}
           >
-            {loading && (
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-            )}
+            {loading && <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>}
             {loading ? "Guardando..." : "Guardar Configuración"}
           </button>
         </div>
