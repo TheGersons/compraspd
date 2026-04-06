@@ -56,6 +56,7 @@ const navItems: NavItem[] = [
       { name: "Mis cotizaciónes", path: "/quotes/my-quotes", pro: false },
       { name: "Seguimiento", path: "/quotes/follow-ups", pro: false, roles: ["ADMIN", "SUPERVISOR", "COMERCIAL"] },
       { name: "Rechazadas", path: "/quotes/rejected", pro: false, roles: ["ADMIN", "SUPERVISOR"] },
+      { name: "Reportes", path: "/quotes/reportes", pro: false, roles: ["ADMIN", "SUPERVISOR"] },
       { name: "Historial", path: "/quotes/history", pro: false },
     ],
   },

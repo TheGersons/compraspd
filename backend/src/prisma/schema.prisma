@@ -189,6 +189,7 @@ model Usuario {
   licitacionProductos      LicitacionProducto[]    @relation("ResponsableLicitacion")
   ofertasArchivadas        Oferta[]                @relation("OfertaArchivadaPor")
   ofertaProductos          OfertaProducto[]        @relation("ResponsableOferta")
+  reporteCompraLogs        ReporteCompraLog[]      @relation("ReporteCompraLogUsuario")
 
   @@index([email])
   @@index([rolId])
@@ -458,6 +459,7 @@ model Compra {
   detalles         CompraDetalle[]
   seguimientos     Seguimiento[]    @relation("SeguimientoCompra")
   estadosProductos EstadoProducto[]
+  reporte          ReporteCompra?
 
   @@index([cotizacionId])
   @@index([estado])
@@ -1030,4 +1032,54 @@ model OfertaProducto {
 
   @@index([ofertaId])
   @@map("oferta_producto")
+}
+
+// ============================================
+// REPORTES DE COMPRAS
+// ============================================
+
+model ReporteCompra {
+  id                   String    @id @default(uuid()) @db.Uuid
+  compraId             String    @unique @map("compra_id") @db.Uuid
+  numeroPO             String?   @default("-") @map("numero_po")
+  proveedor            String?
+  origen               String?
+  epdEps               String?   @map("epd_eps")
+  totalPrice           Decimal?  @map("total_price") @db.Decimal(12, 2)
+  fechaContratoFirmado DateTime? @map("fecha_contrato_firmado")
+  terminosPago         String?   @map("terminos_pago")
+  observaciones        String?   @db.Text
+  pago1                Decimal?  @map("pago_1") @db.Decimal(12, 2)
+  fechaPago1           DateTime? @map("fecha_pago_1")
+  pago2                Decimal?  @map("pago_2") @db.Decimal(12, 2)
+  fechaPago2           DateTime? @map("fecha_pago_2")
+  pago3                Decimal?  @map("pago_3") @db.Decimal(12, 2)
+  fechaPago3           DateTime? @map("fecha_pago_3")
+  pago4                Decimal?  @map("pago_4") @db.Decimal(12, 2)
+  fechaPago4           DateTime? @map("fecha_pago_4")
+  comentarios          String?   @db.Text
+  creado               DateTime  @default(now())
+  actualizado          DateTime  @updatedAt
+
+  compra Compra             @relation(fields: [compraId], references: [id], onDelete: Cascade)
+  logs   ReporteCompraLog[]
+
+  @@map("reporte_compra")
+}
+
+model ReporteCompraLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  reporteId     String   @map("reporte_id") @db.Uuid
+  campo         String   @db.VarChar(100)
+  valorAnterior String?  @map("valor_anterior") @db.Text
+  valorNuevo    String?  @map("valor_nuevo") @db.Text
+  usuarioId     String   @map("usuario_id") @db.Uuid
+  creado        DateTime @default(now())
+
+  reporte ReporteCompra @relation(fields: [reporteId], references: [id], onDelete: Cascade)
+  usuario Usuario       @relation("ReporteCompraLogUsuario", fields: [usuarioId], references: [id], onDelete: Restrict)
+
+  @@index([reporteId])
+  @@index([usuarioId])
+  @@map("reporte_compra_log")
 }

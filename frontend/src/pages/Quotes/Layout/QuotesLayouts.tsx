@@ -9,6 +9,7 @@ const allTabs = [
   { to: "/quotes/my-quotes", label: "Mis cotizaciónes" },
   { to: "/quotes/follow-ups", label: "Seguimiento", roles: ['ADMIN', 'SUPERVISOR', 'COMERCIAL'] },
   { to: "/quotes/rejected", label: "Rechazadas", roles: ['ADMIN', 'SUPERVISOR'] },
+  { to: "/quotes/reportes", label: "Reportes", roles: ['ADMIN', 'SUPERVISOR'] },
   { to: "/quotes/history", label: "Historial" },
 ];
 

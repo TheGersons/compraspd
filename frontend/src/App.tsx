@@ -57,6 +57,7 @@ import Documents from "./pages/Shopping/Documents";
 import Proveedores from "./pages/Proveedores/Proveedores";
 import AprobacionCompras from "./pages/Shopping/AprobacionCompras";
 import RejectedQuotes from "./pages/Quotes/Rejectedquotes";
+import Reports from "./pages/Quotes/Reports";
 import Licitaciones from "./pages/Licitaciones/Licitaciones";
 import Archivadas from "./pages/Licitaciones/Archivadas";
 import OfertasArchivadas from "./pages/Ofertas/OfertasArchivadas";
@@ -196,6 +197,14 @@ export default function App() {
                   element={
                     <ProtectedRoute roles={STAFF_ROLES}>
                       <RejectedQuotes />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="reportes"
+                  element={
+                    <ProtectedRoute roles={STAFF_ROLES}>
+                      <Reports />
                     </ProtectedRoute>
                   }
                 />
