@@ -86,7 +86,6 @@ export class ReportesService {
           select: {
             descripcionProducto: true,
             cantidad: true,
-            proveedor: { select: { nombre: true } },
           },
           orderBy: { descripcionProducto: 'asc' },
         },
@@ -199,7 +198,7 @@ export class ReportesService {
       .map((d: any) => `${d.descripcionProducto} (x${d.cantidad})`)
       .join(' | ');
 
-    const proveedorAuto = c.detalles?.[0]?.proveedor?.nombre ?? null;
+    const proveedorAuto = null; // CotizacionDetalle no tiene relación directa con proveedor
 
     const pagos = [r.pago1, r.pago2, r.pago3, r.pago4]
       .filter((p: any) => p != null)
