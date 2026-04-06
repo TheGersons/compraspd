@@ -23,29 +23,6 @@ export class MailService {
     });
   }
 
-  /**
-   * Devuelve la URL base del frontend según el entorno activo.
-   * Si existe FRONTEND_URL_SANDBOX se considera entorno sandbox.
-   */
-  private getFrontendUrl(): string {
-    const sandbox = process.env.FRONTEND_URL_SANDBOX;
-    if (sandbox) return sandbox;
-    return process.env.FRONTEND_URL || 'http://localhost:5173';
-  }
-
-  /**
-   * En entorno sandbox (FRONTEND_URL_SANDBOX definida), redirige todos los
-   * correos a la cuenta de prueba para evitar confusiones.
-   */
-  private resolveRecipient(to: string): string {
-    if (process.env.FRONTEND_URL_SANDBOX) {
-      this.logger.warn(
-        `[SANDBOX] Redirigiendo correo de "${to}" → solucionestecnologicas@energiapd.com`,
-      );
-      return 'solucionestecnologicas@energiapd.com';
-    }
-    return to;
-  }
 
   /**
    * Logo SVG de la empresa en base64 para emails
@@ -201,7 +178,7 @@ export class MailService {
 
     const mailOptions = {
       from: `"Energía PD" <${process.env.MAIL_USER || 'noreply@energiapd.com'}>`,
-      to: this.resolveRecipient(to),
+      to: to,
       subject: `Nuevo mensaje de ${senderName} - Energía PD`,
       html: `
         <!DOCTYPE html>
@@ -280,7 +257,7 @@ export class MailService {
   ): Promise<boolean> {
     const mailOptions = {
       from: `"Energía PD" <${process.env.MAIL_USER || 'noreply@energiapd.com'}>`,
-      to: this.resolveRecipient(to),
+      to: to,
       subject: `Nueva cotización pendiente: ${quotationName} - Energía PD`,
       html: `
         <!DOCTYPE html>
@@ -371,12 +348,12 @@ export class MailService {
     tempPassword: string,
     userName: string,
   ): Promise<boolean> {
-    const frontendUrl = this.getFrontendUrl();
+    const frontendUrl = process.env.FRONTEND_URL_SANDBOX || process.env.FRONTEND_URL || 'http://localhost:5173';
     const changePasswordUrl = `${frontendUrl}/change-password-required`;
 
     const mailOptions = {
       from: `"Energía PD" <${process.env.MAIL_USER || 'noreply@energiapd.com'}>`,
-      to: this.resolveRecipient(to),
+      to: to,
       subject: 'Restablecimiento de Contraseña - Energía PD',
       html: `
         <!DOCTYPE html>
