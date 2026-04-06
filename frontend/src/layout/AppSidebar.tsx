@@ -382,7 +382,7 @@ const AppSidebar: React.FC = () => {
           {isExpanded || isHovered || isMobileOpen ? (
             <LogoPD
               variant="full"
-              className="h-14 w-auto text-gray-900 dark:text-white"
+              className="h-[18px] w-auto text-gray-900 dark:text-white"
             />
           ) : (
             <LogoPD
