@@ -24,14 +24,23 @@ export class MailService {
   }
 
   /**
-   * En entorno de prueba (FRONTEND_URL con puerto 6080), redirige todos los
+   * Devuelve la URL base del frontend según el entorno activo.
+   * Si existe FRONTEND_URL_SANDBOX se considera entorno sandbox.
+   */
+  private getFrontendUrl(): string {
+    const sandbox = process.env.FRONTEND_URL_SANDBOX;
+    if (sandbox) return sandbox;
+    return process.env.FRONTEND_URL || 'http://localhost:5173';
+  }
+
+  /**
+   * En entorno sandbox (FRONTEND_URL_SANDBOX definida), redirige todos los
    * correos a la cuenta de prueba para evitar confusiones.
    */
   private resolveRecipient(to: string): string {
-    const frontendUrl = process.env.FRONTEND_URL || '';
-    if (frontendUrl.includes(':6080')) {
+    if (process.env.FRONTEND_URL_SANDBOX) {
       this.logger.warn(
-        `[TEST ENV] Redirigiendo correo de "${to}" → solucionestecnologicas@energiapd.com`,
+        `[SANDBOX] Redirigiendo correo de "${to}" → solucionestecnologicas@energiapd.com`,
       );
       return 'solucionestecnologicas@energiapd.com';
     }
@@ -362,7 +371,7 @@ export class MailService {
     tempPassword: string,
     userName: string,
   ): Promise<boolean> {
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const frontendUrl = this.getFrontendUrl();
     const changePasswordUrl = `${frontendUrl}/change-password-required`;
 
     const mailOptions = {

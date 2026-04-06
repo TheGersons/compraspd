@@ -594,7 +594,7 @@ export class MessagesService {
     senderId: string,
     messageContent: string,
   ): Promise<void> {
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const frontendUrl = process.env.FRONTEND_URL_SANDBOX || process.env.FRONTEND_URL || 'http://localhost:5173';
 
     // Obtener todos los participantes actuales con sus datos de usuario
     const participantes = await this.prisma.participantesChat.findMany({

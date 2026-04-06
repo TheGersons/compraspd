@@ -193,7 +193,7 @@ export class QuotationsService {
     quotationName: string,
     requesterName: string,
   ): Promise<void> {
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const frontendUrl = process.env.FRONTEND_URL_SANDBOX || process.env.FRONTEND_URL || 'http://localhost:5173';
     const quotationUrl = `${frontendUrl}/quotes/${cotizacionId}`;
 
     // Obtener todos los usuarios con rol SUPERVISOR activos
