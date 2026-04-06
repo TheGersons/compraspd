@@ -149,6 +149,11 @@ export class FollowUpsService {
       ).length;
       const productosPendientes = totalProductos - productosAprobados;
 
+      // Responsable de seguimiento asignado (primer estadoProducto que lo tenga)
+      const responsableAsignado =
+        cot.estadosProductos.find((ep) => ep.responsableSeguimiento)
+          ?.responsableSeguimiento ?? null;
+
       return {
         id: cot.id,
         nombreCotizacion: cot.nombreCotizacion,
@@ -159,6 +164,7 @@ export class FollowUpsService {
         todosProductosAprobados: cot.todosProductosAprobados,
         solicitante: cot.solicitante,
         supervisorResponsable: cot.supervisorResponsable,
+        responsableAsignado,
         proyecto: cot.proyecto,
         chatId: cot.chatId,
         totalProductos,

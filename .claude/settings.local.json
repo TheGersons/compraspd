@@ -11,7 +11,11 @@
       "Bash(xargs grep:*)",
       "Bash(find /c/Repo/admin-dashboard-main -name *.gateway.ts -o -name *socket* -o -name *ws*)",
       "Bash(npm install:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(find /c/Repo/admin-dashboard-main/frontend/src/pages -name *.tsx)",
+      "Bash(grep -r \"solucionestecnologicas\\\\|test.*env\\\\|NODE_ENV\\\\|VITE_ENV\\\\|6080\\\\|5173\" /c/Repo/admin-dashboard-main/frontend --include=*.ts --include=*.tsx --include=*.env* -l)",
+      "Bash(ls /c/Repo/admin-dashboard-main/backend/.env*)",
+      "Bash(ls /c/Repo/admin-dashboard-main/frontend/.env*)"
     ]
   }
 }

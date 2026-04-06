@@ -24,6 +24,21 @@ export class MailService {
   }
 
   /**
+   * En entorno de prueba (FRONTEND_URL con puerto 6080), redirige todos los
+   * correos a la cuenta de prueba para evitar confusiones.
+   */
+  private resolveRecipient(to: string): string {
+    const frontendUrl = process.env.FRONTEND_URL || '';
+    if (frontendUrl.includes(':6080')) {
+      this.logger.warn(
+        `[TEST ENV] Redirigiendo correo de "${to}" → solucionestecnologicas@energiapd.com`,
+      );
+      return 'solucionestecnologicas@energiapd.com';
+    }
+    return to;
+  }
+
+  /**
    * Logo SVG de la empresa en base64 para emails
    */
   private getLogoSvg(): string {
@@ -177,7 +192,7 @@ export class MailService {
 
     const mailOptions = {
       from: `"Energía PD" <${process.env.MAIL_USER || 'noreply@energiapd.com'}>`,
-      to,
+      to: this.resolveRecipient(to),
       subject: `Nuevo mensaje de ${senderName} - Energía PD`,
       html: `
         <!DOCTYPE html>
@@ -256,7 +271,7 @@ export class MailService {
   ): Promise<boolean> {
     const mailOptions = {
       from: `"Energía PD" <${process.env.MAIL_USER || 'noreply@energiapd.com'}>`,
-      to,
+      to: this.resolveRecipient(to),
       subject: `Nueva cotización pendiente: ${quotationName} - Energía PD`,
       html: `
         <!DOCTYPE html>
@@ -352,7 +367,7 @@ export class MailService {
 
     const mailOptions = {
       from: `"Energía PD" <${process.env.MAIL_USER || 'noreply@energiapd.com'}>`,
-      to,
+      to: this.resolveRecipient(to),
       subject: 'Restablecimiento de Contraseña - Energía PD',
       html: `
         <!DOCTYPE html>

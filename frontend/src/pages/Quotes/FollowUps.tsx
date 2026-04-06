@@ -88,6 +88,10 @@ type Cotizacion = {
     nombre: string;
     email: string;
   };
+  responsableAsignado?: {
+    id: string;
+    nombre: string;
+  } | null;
   proyecto?: {
     id: string;
     nombre: string;
@@ -497,6 +501,7 @@ export default function FollowUps() {
   // Estados de filtros
   const [searchTerm, setSearchTerm] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState<string>("TODOS");
+  const [responsableFiltro, setResponsableFiltro] = useState<string>("TODOS");
 
   // Estados del chat
   const [mensajes, setMensajes] = useState<ChatMessage[]>([]);
@@ -910,7 +915,13 @@ export default function FollowUps() {
       cot.nombreCotizacion.toLowerCase().includes(searchTerm.toLowerCase()) ||
       cot.solicitante.nombre.toLowerCase().includes(searchTerm.toLowerCase());
 
-    return matchesSearch;
+    const matchesResponsable =
+      responsableFiltro === "TODOS" ||
+      (responsableFiltro === "SIN_ASIGNAR"
+        ? !cot.responsableAsignado
+        : cot.responsableAsignado?.id === responsableFiltro);
+
+    return matchesSearch && matchesResponsable;
   });
 
 
@@ -1301,6 +1312,26 @@ export default function FollowUps() {
               </button>
             ))}
           </div>
+          {/* Filtro por responsable asignado */}
+          <div className="mt-3">
+            <select
+              value={responsableFiltro}
+              onChange={(e) => setResponsableFiltro(e.target.value)}
+              className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+            >
+              <option value="TODOS">Todos los responsables</option>
+              <option value="SIN_ASIGNAR">Sin asignar</option>
+              {Array.from(
+                new Map(
+                  cotizaciones
+                    .filter((c) => c.responsableAsignado)
+                    .map((c) => [c.responsableAsignado!.id, c.responsableAsignado!])
+                ).values()
+              ).map((r) => (
+                <option key={r.id} value={r.id}>{r.nombre}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* Lista de cotizaciones con acordeón */}
@@ -1342,6 +1373,11 @@ export default function FollowUps() {
                           {cot.solicitante.nombre}
                           {cot.solicitante.departamento && <span className="text-gray-500"> • {cot.solicitante.departamento.nombre}</span>}
                         </p>
+                        {cot.responsableAsignado && (
+                          <p className="text-xs text-blue-600 dark:text-blue-400">
+                            👤 {cot.responsableAsignado.nombre}
+                          </p>
+                        )}
                       </div>
                       <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 shrink-0">
                         <span>{cot.totalProductos} productos</span>

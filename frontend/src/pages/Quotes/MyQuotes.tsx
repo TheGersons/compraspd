@@ -943,6 +943,9 @@ export default function MyQuotes() {
                                                     <div className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
                                                         <p>📦 {cot.totalProductos} productos</p>
                                                         {cot.proyecto && <p>🏗️ {cot.proyecto.nombre}</p>}
+                                                        {cot.supervisorResponsable && (
+                                                            <p className="text-blue-600 dark:text-blue-400">👤 {cot.supervisorResponsable.nombre}</p>
+                                                        )}
                                                     </div>
 
                                                     {/* Progreso según vista */}
