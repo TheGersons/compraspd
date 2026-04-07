@@ -170,16 +170,32 @@ export class MailService {
     senderName: string,
     messagePreview: string,
     chatUrl: string,
+    cotizacionNombre?: string,
+    cotizacionId?: string,
   ): Promise<boolean> {
     const preview =
       messagePreview.length > 120
         ? messagePreview.substring(0, 120) + '...'
         : messagePreview;
 
+    const subjectCotizacion = cotizacionNombre
+      ? ` en cotización "${cotizacionNombre}"`
+      : '';
+    const subject = `Nuevo mensaje de ${senderName}${subjectCotizacion} - Energía PD`;
+
+    const cotizacionBlock = cotizacionNombre
+      ? `
+        <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 12px; padding: 20px 24px; margin-bottom: 24px;">
+          <p style="margin: 0 0 6px; color: #0369a1; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Cotización relacionada</p>
+          <p style="margin: 0; color: #0c4a6e; font-size: 16px; font-weight: 600;">${cotizacionNombre}</p>
+          ${cotizacionId ? `<p style="margin: 4px 0 0; color: #64748b; font-size: 12px;">ID: ${cotizacionId}</p>` : ''}
+        </div>`
+      : '';
+
     const mailOptions = {
       from: `"Energía PD" <${process.env.MAIL_USER || 'noreply@energiapd.com'}>`,
       to: to,
-      subject: `Nuevo mensaje de ${senderName} - Energía PD`,
+      subject,
       html: `
         <!DOCTYPE html>
         <html lang="es">
@@ -205,7 +221,9 @@ export class MailService {
                       <p style="margin: 0 0 32px; color: #64748b; font-size: 15px; text-align: center; line-height: 1.6;">
                         Hola <strong style="color: #334155;">${recipientName}</strong>, tienes un nuevo mensaje de <strong style="color: #334155;">${senderName}</strong>.
                       </p>
+                      ${cotizacionBlock}
                       <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #0D76B8; border-radius: 8px; padding: 20px 24px; margin-bottom: 32px;">
+                        <p style="margin: 0 0 6px; color: #94a3b8; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Mensaje</p>
                         <p style="margin: 0; color: #334155; font-size: 15px; line-height: 1.6; font-style: italic;">"${preview}"</p>
                       </div>
                       <div style="text-align: center; margin-bottom: 32px;">
