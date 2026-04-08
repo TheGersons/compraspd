@@ -12,15 +12,19 @@ export const PROYECTOS_TECNICA: Proyecto[] = [
     fechaLimite: '2025-03-31',
     resumen: {
       totalProductos: 68,
-      cotizados: 64,
+      cotizado: 64,
       conDescuento: 24,
-      comprados: 58,
-      pagados: 53,
+      aprobacionCompra: 0,
+      comprado: 58,
+      pagado: 53,
+      aprobacionPlanos: 0,
       primerSeguimiento: 47,
       enFOB: 41,
+      cotizacionFleteInternacional: 0,
       conBL: 36,
       segundoSeguimiento: 33,
-      enCIF: 29
+      enCIF: 29,
+      recibido: 0,
     }
   },
   {
@@ -33,15 +37,19 @@ export const PROYECTOS_TECNICA: Proyecto[] = [
     fechaLimite: '2025-02-28',
     resumen: {
       totalProductos: 82,
-      cotizados: 71,
+      cotizado: 71,
       conDescuento: 31,
-      comprados: 59,
-      pagados: 49,
+      aprobacionCompra: 0,
+      comprado: 59,
+      pagado: 49,
+      aprobacionPlanos: 0,
       primerSeguimiento: 41,
       enFOB: 33,
+      cotizacionFleteInternacional: 0,
       conBL: 26,
       segundoSeguimiento: 22,
-      enCIF: 18
+      enCIF: 18,
+      recibido: 0,
     }
   },
   {
@@ -54,15 +62,19 @@ export const PROYECTOS_TECNICA: Proyecto[] = [
     fechaLimite: '2025-10-31',
     resumen: {
       totalProductos: 45,
-      cotizados: 44,
+      cotizado: 44,
       conDescuento: 15,
-      comprados: 42,
-      pagados: 41,
+      aprobacionCompra: 0,
+      comprado: 42,
+      pagado: 41,
+      aprobacionPlanos: 0,
       primerSeguimiento: 40,
       enFOB: 38,
+      cotizacionFleteInternacional: 0,
       conBL: 37,
       segundoSeguimiento: 36,
-      enCIF: 35
+      enCIF: 35,
+      recibido: 0,
     }
   },
   {
@@ -75,15 +87,19 @@ export const PROYECTOS_TECNICA: Proyecto[] = [
     fechaLimite: '2024-12-31',
     resumen: {
       totalProductos: 91,
-      cotizados: 73,
+      cotizado: 73,
       conDescuento: 35,
-      comprados: 58,
-      pagados: 44,
+      aprobacionCompra: 0,
+      comprado: 58,
+      pagado: 44,
+      aprobacionPlanos: 0,
       primerSeguimiento: 33,
       enFOB: 24,
+      cotizacionFleteInternacional: 0,
       conBL: 17,
       segundoSeguimiento: 12,
-      enCIF: 8
+      enCIF: 8,
+      recibido: 0,
     }
   },
   {
@@ -96,15 +112,19 @@ export const PROYECTOS_TECNICA: Proyecto[] = [
     fechaLimite: '2025-04-15',
     resumen: {
       totalProductos: 54,
-      cotizados: 48,
+      cotizado: 48,
       conDescuento: 18,
-      comprados: 41,
-      pagados: 35,
+      aprobacionCompra: 0,
+      comprado: 41,
+      pagado: 35,
+      aprobacionPlanos: 0,
       primerSeguimiento: 29,
       enFOB: 24,
+      cotizacionFleteInternacional: 0,
       conBL: 19,
       segundoSeguimiento: 16,
-      enCIF: 13
+      enCIF: 13,
+      recibido: 0,
     }
   },
   {
@@ -117,15 +137,19 @@ export const PROYECTOS_TECNICA: Proyecto[] = [
     fechaLimite: '2025-05-31',
     resumen: {
       totalProductos: 76,
-      cotizados: 71,
+      cotizado: 71,
       conDescuento: 28,
-      comprados: 65,
-      pagados: 60,
+      aprobacionCompra: 0,
+      comprado: 65,
+      pagado: 60,
+      aprobacionPlanos: 0,
       primerSeguimiento: 54,
       enFOB: 48,
+      cotizacionFleteInternacional: 0,
       conBL: 43,
       segundoSeguimiento: 40,
-      enCIF: 36
+      enCIF: 36,
+      recibido: 0,
     }
   }
 ];
