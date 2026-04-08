@@ -7,10 +7,11 @@ import { useAuth } from "../../context/AuthContext";
 import toast from "react-hot-toast";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import DescuentoActions from "./components/DescuentoActions";
-import DatePicker, { registerLocale } from "react-datepicker";
+import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import "../../components/common/datepicker.css";
-registerLocale("es", es);
+import { Calendar as CalendarIcon } from "lucide-react";
+import { Calendar } from "../../components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/popover";
 
 // ============================================================================
 // TYPES
@@ -1447,43 +1448,67 @@ export default function FollowUps() {
           {/* Selector de rango de fechas personalizado */}
           {fechaFiltro === "PERSONALIZADO" && (
             <div className="mt-3 flex flex-wrap items-center gap-3">
+              {/* Desde */}
               <div className="flex items-center gap-2">
-                <label className="shrink-0 text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Desde:
-                </label>
-                <DatePicker
-                  locale="es"
-                  selected={fechaDesde}
-                  onChange={(date) => { setFechaDesde(date); setCurrentPage(1); }}
-                  selectsStart
-                  startDate={fechaDesde}
-                  endDate={fechaHasta}
-                  maxDate={fechaHasta ?? undefined}
-                  dateFormat="dd/MM/yyyy"
-                  placeholderText="Seleccionar fecha"
-                  isClearable
-                  showPopperArrow={false}
-                  className="rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                />
+                <label className="shrink-0 text-sm font-medium text-gray-700 dark:text-gray-300">Desde:</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button className="flex items-center gap-2 rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors hover:bg-gray-50 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600 min-w-[160px]">
+                      <CalendarIcon className="h-4 w-4 text-gray-400 shrink-0" />
+                      <span className={fechaDesde ? "text-gray-900 dark:text-white" : "text-gray-400"}>
+                        {fechaDesde ? format(fechaDesde, "dd 'de' MMM, yyyy", { locale: es }) : "Seleccionar fecha"}
+                      </span>
+                      {fechaDesde && (
+                        <span
+                          role="button"
+                          onClick={(e) => { e.stopPropagation(); setFechaDesde(null); setCurrentPage(1); }}
+                          className="ml-auto text-gray-400 hover:text-red-500"
+                        >✕</span>
+                      )}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={fechaDesde ?? undefined}
+                      onSelect={(date) => { setFechaDesde(date ?? null); setCurrentPage(1); }}
+                      disabled={(date) => !!(fechaHasta && date > fechaHasta)}
+                      locale={es}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
+              {/* Hasta */}
               <div className="flex items-center gap-2">
-                <label className="shrink-0 text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Hasta:
-                </label>
-                <DatePicker
-                  locale="es"
-                  selected={fechaHasta}
-                  onChange={(date) => { setFechaHasta(date); setCurrentPage(1); }}
-                  selectsEnd
-                  startDate={fechaDesde}
-                  endDate={fechaHasta}
-                  minDate={fechaDesde ?? undefined}
-                  dateFormat="dd/MM/yyyy"
-                  placeholderText="Seleccionar fecha"
-                  isClearable
-                  showPopperArrow={false}
-                  className="rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                />
+                <label className="shrink-0 text-sm font-medium text-gray-700 dark:text-gray-300">Hasta:</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button className="flex items-center gap-2 rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors hover:bg-gray-50 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600 min-w-[160px]">
+                      <CalendarIcon className="h-4 w-4 text-gray-400 shrink-0" />
+                      <span className={fechaHasta ? "text-gray-900 dark:text-white" : "text-gray-400"}>
+                        {fechaHasta ? format(fechaHasta, "dd 'de' MMM, yyyy", { locale: es }) : "Seleccionar fecha"}
+                      </span>
+                      {fechaHasta && (
+                        <span
+                          role="button"
+                          onClick={(e) => { e.stopPropagation(); setFechaHasta(null); setCurrentPage(1); }}
+                          className="ml-auto text-gray-400 hover:text-red-500"
+                        >✕</span>
+                      )}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={fechaHasta ?? undefined}
+                      onSelect={(date) => { setFechaHasta(date ?? null); setCurrentPage(1); }}
+                      disabled={(date) => !!(fechaDesde && date < fechaDesde)}
+                      locale={es}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
           )}
