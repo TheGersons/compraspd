@@ -91,11 +91,11 @@ export default function ProyectoCarousel({
     }
   };
 
-  // Calcular progreso basado en CIF vs Total
+  // Calcular progreso basado en Recibidos vs Total
   const calcularProgreso = (proyecto: Proyecto): number => {
-    const { enCIF, totalProductos } = proyecto.resumen;
+    const { recibido, totalProductos } = proyecto.resumen;
     if (totalProductos === 0) return 0;
-    return Math.round((enCIF / totalProductos) * 100);
+    return Math.round((recibido / totalProductos) * 100);
   };
 
   // Calcular días restantes
@@ -193,7 +193,7 @@ export default function ProyectoCarousel({
                     <div>
                       <p className="text-gray-500 dark:text-gray-400">Productos</p>
                       <p className={`font-bold ${theme.text}`}>
-                        {proyecto.resumen.enCIF}/{proyecto.resumen.totalProductos}
+                        {proyecto.resumen.recibido}/{proyecto.resumen.totalProductos}
                       </p>
                     </div>
                     <div>

@@ -19,7 +19,8 @@
       "Bash(grep -n \"followup\\\\|FollowUp\\\\|followups\\\\|quotes\\\\|Messages\\\\|messages\" /c/Repo/admin-dashboard-main/frontend/src/router/*.tsx)",
       "Bash(grep -rn \"messages\\\\|Messages\" /c/Repo/admin-dashboard-main/frontend/src/App.tsx /c/Repo/admin-dashboard-main/frontend/src/router/*.tsx)",
       "Bash(find /c/Repo/admin-dashboard-main/frontend -type f -name *Sidebar* -o -name *Navigation* -o -name *Nav*)",
-      "Bash(npx prisma:*)"
+      "Bash(npx prisma:*)",
+      "Bash(echo \"EXIT_CODE=$?\")"
     ]
   }
 }

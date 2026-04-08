@@ -36,7 +36,7 @@ export default function GrupoCard({ proyecto, onClick }: GrupoCardProps) {
   };
 
   const theme = colors[proyecto.estado];
-  const progreso = Math.round((proyecto.resumen.enCIF / proyecto.resumen.totalProductos) * 100);
+  const progreso = proyecto.resumen.totalProductos > 0 ? Math.round((proyecto.resumen.recibido / proyecto.resumen.totalProductos) * 100) : 0;
 
   return (
     <button

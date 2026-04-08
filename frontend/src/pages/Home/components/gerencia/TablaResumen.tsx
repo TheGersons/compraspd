@@ -1,6 +1,28 @@
 // components/gerencia/TablaResumen.tsx - CON COLORES POR CRITICIDAD
-import { ResumenProcesos } from '../../types/gerencia.types';
-import { ProductoDetallado } from '../../types/gerencia.types';
+import { ResumenProcesos, ProductoDetallado } from '../../types/gerencia.types';
+
+// Labels para cada estado del proceso (tomados de ESTADO_LABELS del backend)
+const ESTADO_LABELS: Record<string, string> = {
+  cotizado: 'Cotizado',
+  conDescuento: 'Con Descuento',
+  aprobacionCompra: 'Aprobación de Compra',
+  comprado: 'Comprado',
+  pagado: 'Pagado',
+  aprobacionPlanos: 'Aprobación de Planos',
+  primerSeguimiento: '1er Seguimiento / Estado de producto',
+  enFOB: 'Incoterms',
+  cotizacionFleteInternacional: 'Cotización Flete Int.',
+  conBL: 'Documentos de importación',
+  segundoSeguimiento: '2do Seg. / En Tránsito',
+  enCIF: 'Proceso de aduana',
+  recibido: 'Recibido',
+};
+
+const ESTADOS_INTERNACIONAL: string[] = [
+  'cotizado', 'conDescuento', 'aprobacionCompra', 'comprado', 'pagado',
+  'aprobacionPlanos', 'primerSeguimiento', 'enFOB', 'cotizacionFleteInternacional',
+  'conBL', 'segundoSeguimiento', 'enCIF', 'recibido',
+];
 
 interface TablaResumenProps {
   resumen: ResumenProcesos;
@@ -40,51 +62,34 @@ export default function TablaResumen({
    */
   const getColorPorCriticidad = (etapaKey: string): string => {
     if (etapaKey === 'total') {
-      // Para total, revisar si hay algún producto atrasado en cualquier etapa
-      const hayAtrasados = productosDetallados.some(p => {
-        const etapas = ['cotizado', 'conDescuento', 'comprado', 'pagado', 'primerSeguimiento', 'enFOB', 'conBL', 'segundoSeguimiento', 'enCIF', 'recibido'];
-        return etapas.some(e => p[e as keyof ProductoDetallado] === 'atrasado');
-      });
-      
-      const hayEnProceso = productosDetallados.some(p => {
-        const etapas = ['cotizado', 'conDescuento', 'comprado', 'pagado', 'primerSeguimiento', 'enFOB', 'conBL', 'segundoSeguimiento', 'enCIF', 'recibido'];
-        return etapas.some(e => p[e as keyof ProductoDetallado] === 'en_proceso');
-      });
-
+      const hayAtrasados = productosDetallados.some(p =>
+        ESTADOS_INTERNACIONAL.some(e => p.estados[e] === 'atrasado')
+      );
+      const hayEnProceso = productosDetallados.some(p =>
+        ESTADOS_INTERNACIONAL.some(e => p.estados[e] === 'en_proceso')
+      );
       if (hayAtrasados) return 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20';
       if (hayEnProceso) return 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20';
       return 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20';
     }
 
-    // Para etapas específicas
-    const hayAtrasados = productosDetallados.some(p => 
-      p[etapaKey as keyof ProductoDetallado] === 'atrasado'
-    );
+    const hayAtrasados = productosDetallados.some(p => p.estados[etapaKey] === 'atrasado');
+    const hayEnProceso = productosDetallados.some(p => p.estados[etapaKey] === 'en_proceso');
 
-    const hayEnProceso = productosDetallados.some(p => 
-      p[etapaKey as keyof ProductoDetallado] === 'en_proceso'
-    );
-
-    if (hayAtrasados) {
-      return 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20';
-    } else if (hayEnProceso) {
-      return 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20';
-    } else {
-      return 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20';
-    }
+    if (hayAtrasados) return 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20';
+    if (hayEnProceso) return 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20';
+    return 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20';
   };
 
+  // Construir filas dinámicamente usando todos los 13 estados
   const filas: FilaProceso[] = [
     { nombre: 'Total productos', valor: resumen.totalProductos, total: resumen.totalProductos, esTotal: true, etapaKey: 'total' },
-    { nombre: 'Cotizados', valor: resumen.cotizados, total: resumen.totalProductos, etapaKey: 'cotizado' },
-    { nombre: 'Con solicitud de descuento', valor: resumen.conDescuento, total: resumen.totalProductos, etapaKey: 'conDescuento' },
-    { nombre: 'Comprados', valor: resumen.comprados, total: resumen.totalProductos, etapaKey: 'comprado' },
-    { nombre: 'Pagados', valor: resumen.pagados, total: resumen.totalProductos, etapaKey: 'pagado' },
-    { nombre: 'Con primer seguimiento', valor: resumen.primerSeguimiento, total: resumen.totalProductos, etapaKey: 'primerSeguimiento' },
-    { nombre: 'En FOB', valor: resumen.enFOB, total: resumen.totalProductos, etapaKey: 'enFOB' },
-    { nombre: 'Con BL', valor: resumen.conBL, total: resumen.totalProductos, etapaKey: 'conBL' },
-    { nombre: 'Con segundo seguimiento', valor: resumen.segundoSeguimiento, total: resumen.totalProductos, etapaKey: 'segundoSeguimiento' },
-    { nombre: 'En CIF', valor: resumen.enCIF, total: resumen.totalProductos, etapaKey: 'enCIF' }
+    ...ESTADOS_INTERNACIONAL.map(key => ({
+      nombre: ESTADO_LABELS[key] || key,
+      valor: (resumen as any)[key] || 0,
+      total: resumen.totalProductos,
+      etapaKey: key,
+    })),
   ];
 
   return (

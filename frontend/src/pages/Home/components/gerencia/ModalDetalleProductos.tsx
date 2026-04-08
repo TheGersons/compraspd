@@ -2,6 +2,28 @@
 import { useMemo, useState } from 'react';
 import { ProductoDetallado, EtapaDetalle } from '../../types/gerencia.types';
 
+const ESTADO_LABELS: Record<string, string> = {
+  cotizado: 'Cotizado',
+  conDescuento: 'Con Descuento',
+  aprobacionCompra: 'Aprob. Compra',
+  comprado: 'Comprado',
+  pagado: 'Pagado',
+  aprobacionPlanos: 'Aprob. Planos',
+  primerSeguimiento: '1er Seg.',
+  enFOB: 'Incoterms',
+  cotizacionFleteInternacional: 'Cot. Flete',
+  conBL: 'Doc. Import.',
+  segundoSeguimiento: '2do Seg.',
+  enCIF: 'Aduana',
+  recibido: 'Recibido',
+};
+
+const ESTADOS_INTERNACIONAL: string[] = [
+  'cotizado', 'conDescuento', 'aprobacionCompra', 'comprado', 'pagado',
+  'aprobacionPlanos', 'primerSeguimiento', 'enFOB', 'cotizacionFleteInternacional',
+  'conBL', 'segundoSeguimiento', 'enCIF', 'recibido',
+];
+
 interface ModalDetalleProductosProps {
   isOpen: boolean;
   onClose: () => void;
@@ -32,62 +54,30 @@ export default function ModalDetalleProductos({
 
     // FILTRADO (solo para vista específica)
     if (!esVistaTotal) {
-      resultado = resultado.filter(p => {
-        const estadoEtapa = p[etapa as keyof ProductoDetallado] as EstadoProducto;
-        return estadoEtapa !== 'pendiente';
-      });
+      resultado = resultado.filter(p => p.estados[etapa] !== 'pendiente');
     }
 
     // ORDENAMIENTO
     resultado.sort((a, b) => {
       if (ordenColumna === 'default') {
-        // ORDEN PREDETERMINADO PARA AMBAS VISTAS:
-        // Calcular estado más crítico del producto (considerando TODAS las etapas)
-        
         const getEstadoMasCritico = (producto: ProductoDetallado): EstadoProducto => {
-          const etapas: Array<keyof ProductoDetallado> = [
-            'cotizado', 'conDescuento', 'comprado', 'pagado', 
-            'primerSeguimiento', 'enFOB', 'conBL', 'segundoSeguimiento', 
-            'enCIF', 'recibido'
-          ];
-          
-          // Si tiene alguna etapa atrasada, es atrasado
-          if (etapas.some(e => producto[e] === 'atrasado')) return 'atrasado';
-          // Si tiene alguna en proceso, es en proceso
-          if (etapas.some(e => producto[e] === 'en_proceso')) return 'en_proceso';
-          // Si todas están completadas o pendientes, es completado
+          if (ESTADOS_INTERNACIONAL.some(e => producto.estados[e] === 'atrasado')) return 'atrasado';
+          if (ESTADOS_INTERNACIONAL.some(e => producto.estados[e] === 'en_proceso')) return 'en_proceso';
           return 'completado';
         };
 
-        const estadoA = esVistaTotal ? getEstadoMasCritico(a) : (a[etapa as keyof ProductoDetallado] as EstadoProducto);
-        const estadoB = esVistaTotal ? getEstadoMasCritico(b) : (b[etapa as keyof ProductoDetallado] as EstadoProducto);
+        const estadoA = esVistaTotal ? getEstadoMasCritico(a) : (a.estados[etapa] as EstadoProducto);
+        const estadoB = esVistaTotal ? getEstadoMasCritico(b) : (b.estados[etapa] as EstadoProducto);
 
-        const prioridadEstado: Record<EstadoProducto, number> = {
-          atrasado: 1,
-          en_proceso: 2,
-          completado: 3,
-          pendiente: 4
-        };
-
+        const prioridadEstado: Record<EstadoProducto, number> = { atrasado: 1, en_proceso: 2, completado: 3, pendiente: 4 };
         const prioA = prioridadEstado[estadoA] || 4;
         const prioB = prioridadEstado[estadoB] || 4;
-
         if (prioA !== prioB) return prioA - prioB;
 
-        // Si tienen mismo estado crítico, ordenar por días de atraso total
-        const getDiasAtrasoTotal = (producto: ProductoDetallado): number => {
-          const campos = [
-            'diasAtrasoCotizado', 'diasAtrasoDescuento', 'diasAtrasoComprado',
-            'diasAtrasoPagado', 'diasAtrasoPrimerSeguimiento', 'diasAtrasoFOB',
-            'diasAtrasoBL', 'diasAtrasoSegundoSeguimiento', 'diasAtrasoCIF',
-            'diasAtrasoRecibido'
-          ];
-          return Math.max(...campos.map(c => (producto[c as keyof ProductoDetallado] as number) || 0));
-        };
+        const getDiasAtrasoMax = (p: ProductoDetallado): number =>
+          Math.max(...Object.values(p.diasAtraso).map(v => v || 0), 0);
 
-        const atrasoA = getDiasAtrasoTotal(a);
-        const atrasoB = getDiasAtrasoTotal(b);
-        return atrasoB - atrasoA;
+        return getDiasAtrasoMax(b) - getDiasAtrasoMax(a);
       } else if (ordenColumna === 'sku') {
         const compare = a.sku.localeCompare(b.sku);
         return direccionOrden === 'asc' ? compare : -compare;
@@ -95,24 +85,15 @@ export default function ModalDetalleProductos({
         const compare = a.descripcion.localeCompare(b.descripcion);
         return direccionOrden === 'asc' ? compare : -compare;
       } else if (ordenColumna === 'estado' && !esVistaTotal) {
-        const estadoA = a[etapa as keyof ProductoDetallado] as EstadoProducto;
-        const estadoB = b[etapa as keyof ProductoDetallado] as EstadoProducto;
-        const prioridadEstado: Record<EstadoProducto, number> = {
-          atrasado: 1,
-          en_proceso: 2,
-          completado: 3,
-          pendiente: 4
-        };
-        const compare = (prioridadEstado[estadoA] || 4) - (prioridadEstado[estadoB] || 4);
+        const prioridadEstado: Record<EstadoProducto, number> = { atrasado: 1, en_proceso: 2, completado: 3, pendiente: 4 };
+        const compare = (prioridadEstado[a.estados[etapa] as EstadoProducto] || 4) - (prioridadEstado[b.estados[etapa] as EstadoProducto] || 4);
         return direccionOrden === 'asc' ? compare : -compare;
       } else if (ordenColumna === 'dias' && !esVistaTotal) {
-        const campoAtraso = `diasAtraso${etapa.charAt(0).toUpperCase() + etapa.slice(1)}` as keyof ProductoDetallado;
-        const atrasoA = (a[campoAtraso] as number) || 0;
-        const atrasoB = (b[campoAtraso] as number) || 0;
+        const atrasoA = a.diasAtraso[`diasAtraso_${etapa}`] || 0;
+        const atrasoB = b.diasAtraso[`diasAtraso_${etapa}`] || 0;
         const compare = atrasoA - atrasoB;
         return direccionOrden === 'asc' ? compare : -compare;
       }
-
       return 0;
     });
 
@@ -130,18 +111,9 @@ export default function ModalDetalleProductos({
     }
   };
 
-  const nombresEtapas: Record<EtapaDetalle, string> = {
+  const nombresEtapas: Record<string, string> = {
     total: 'Todos los productos',
-    cotizado: 'Cotizados',
-    conDescuento: 'Con descuento',
-    comprado: 'Comprados',
-    pagado: 'Pagados',
-    primerSeguimiento: 'Primer seguimiento',
-    enFOB: 'En FOB',
-    conBL: 'Con BL',
-    segundoSeguimiento: 'Segundo seguimiento',
-    enCIF: 'En CIF',
-    recibido: 'Recibidos'
+    ...ESTADO_LABELS,
   };
 
   const getEstadoBadge = (estado: EstadoProducto) => {
@@ -197,18 +169,10 @@ export default function ModalDetalleProductos({
     );
   };
 
-  const todasLasEtapas: Array<{ key: keyof ProductoDetallado; label: string }> = [
-    { key: 'cotizado', label: 'Cotizado' },
-    { key: 'conDescuento', label: 'Descuento' },
-    { key: 'comprado', label: 'Comprado' },
-    { key: 'pagado', label: 'Pagado' },
-    { key: 'primerSeguimiento', label: '1° Seg.' },
-    { key: 'enFOB', label: 'FOB' },
-    { key: 'conBL', label: 'BL' },
-    { key: 'segundoSeguimiento', label: '2° Seg.' },
-    { key: 'enCIF', label: 'CIF' },
-    { key: 'recibido', label: 'Recibido' }
-  ];
+  const todasLasEtapas = ESTADOS_INTERNACIONAL.map(key => ({
+    key,
+    label: ESTADO_LABELS[key] || key,
+  }));
 
   return (
     <div className="fixed inset-0 z-9950 flex items-center justify-center bg-black/50 p-4">
@@ -290,7 +254,7 @@ export default function ModalDetalleProductos({
                         <div className="max-w-xs">{producto.descripcion}</div>
                       </td>
                       {todasLasEtapas.map(({ key }) => {
-                        const estado = producto[key] as EstadoProducto;
+                        const estado = (producto.estados[key] || 'pendiente') as EstadoProducto;
                         const badge = getEstadoBadge(estado);
                         return (
                           <td key={key} className="px-3 py-3 text-center">
@@ -326,10 +290,9 @@ export default function ModalDetalleProductos({
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                   {productosFiltrados.map((producto) => {
-                    const estado = producto[etapa as keyof ProductoDetallado] as EstadoProducto;
+                    const estado = (producto.estados[etapa] || 'pendiente') as EstadoProducto;
                     const badge = getEstadoBadge(estado);
-                    const campoAtraso = `diasAtraso${etapa.charAt(0).toUpperCase() + etapa.slice(1)}` as keyof ProductoDetallado;
-                    const diasAtraso = (producto[campoAtraso] as number) || 0;
+                    const diasAtraso = producto.diasAtraso[`diasAtraso_${etapa}`] || 0;
 
                     return (
                       <tr key={producto.id} className="transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50">

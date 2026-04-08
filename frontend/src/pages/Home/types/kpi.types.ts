@@ -52,4 +52,5 @@ export interface SummaryData {
   lastUpdate: string;
   trend: string;
   additionalInfo?: Record<string, any>;
+  apiValue?: string | number;
 }

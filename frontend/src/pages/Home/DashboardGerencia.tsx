@@ -1,35 +1,17 @@
-// DashboardGerencia.tsx - MODIFICADO
-import { useState } from 'react';
-import { NavegacionContext, Area, Proyecto, EtapaDetalle } from './types/gerencia.types';
+// DashboardGerencia.tsx - CONECTADO AL API
+import { useState, useEffect, useCallback } from 'react';
+import { NavegacionContext, Area, Proyecto, EtapaDetalle, ProductoDetallado } from './types/gerencia.types';
+import { getToken } from '../../lib/api';
 import Breadcrumbs from './components/gerencia/Breadcrumbs';
 import AreaCard from './components/gerencia/AreaCard';
 import ProyectoCarousel from './components/gerencia/ProyectoCarousel';
 import PanelProyectos from './components/gerencia/PanelProyectos';
 import TablaResumen from './components/gerencia/TablaResumen';
-import DetalleTabla from './components/gerencia/DetalleTabla';
 import GraficoComparativo from './components/gerencia/GraficoComparativo';
 import ModalDetalleProductos from './components/gerencia/ModalDetalleProductos';
-
-// Mocks
-import { AREAS_PRINCIPALES } from './mocks/mocks_areas';
-import {
-  PROYECTOS_ORDENADOS as PROYECTOS_PROYECTOS,
-  DETALLE_PRODUCTOS_PROYECTOS
-} from './mocks/mocks_proyectos';
-import {
-  PROYECTOS_COMERCIAL_ORDENADOS,
-  DETALLE_PRODUCTOS_COMERCIAL
-} from './mocks/mocks_comercial';
-import {
-  PROYECTOS_TECNICA_ORDENADOS,
-  DETALLE_PRODUCTOS_TECNICA
-} from './mocks/mocks_tecnica';
-import {
-  PROYECTOS_OPERATIVA_ORDENADOS,
-  DETALLE_PRODUCTOS_OPERATIVA
-} from './mocks/mocks_operativa';
-import { getProductosDetalladosPorArea } from './mocks/mocks_productos_detallados';
 import Button from '../../components/ui/button/Button';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 
 export default function DashboardGerencia() {
@@ -42,78 +24,71 @@ export default function DashboardGerencia() {
   const [modalAbierto, setModalAbierto] = useState(false);
   const [etapaModal, setEtapaModal] = useState<EtapaDetalle>('total');
 
+  // Datos del API
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [proyectos, setProyectos] = useState<Proyecto[]>([]);
+  const [productosDetallados, setProductosDetallados] = useState<ProductoDetallado[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Cargar datos del API
+  const cargarDatos = useCallback(async () => {
+    try {
+      setLoading(true);
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/v1/dashboard/gerencia`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error('Error cargando dashboard');
+      const data = await response.json();
+
+      setAreas(data.areas || []);
+      setProyectos(data.proyectos || []);
+      setProductosDetallados(data.productosDetallados || []);
+    } catch (error) {
+      console.error('Error cargando dashboard gerencia:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    cargarDatos();
+  }, [cargarDatos]);
+
   // Obtener proyectos según área
   const getProyectosPorArea = () => {
     if (!navegacion.area) return [];
-    switch (navegacion.area.tipo) {
-      case 'proyectos':
-        return PROYECTOS_PROYECTOS;
-      case 'comercial':
-        return PROYECTOS_COMERCIAL_ORDENADOS;
-      case 'tecnica':
-        return PROYECTOS_TECNICA_ORDENADOS;
-      case 'operativa':
-        return PROYECTOS_OPERATIVA_ORDENADOS;
-      default:
-        return [];
-    }
+    return proyectos.filter((p: any) => p.areaTipo === navegacion.area?.tipo || p.areaId === navegacion.area?.id);
   };
 
-  // Obtener productos detallados según área
-  const getProductosPorArea = () => {
+  // Obtener productos detallados para el área actual
+  const getProductosDetalladosArea = (): ProductoDetallado[] => {
     if (!navegacion.area) return [];
-    switch (navegacion.area.tipo) {
-      case 'proyectos':
-        return DETALLE_PRODUCTOS_PROYECTOS;
-      case 'comercial':
-        return DETALLE_PRODUCTOS_COMERCIAL;
-      case 'tecnica':
-        return DETALLE_PRODUCTOS_TECNICA;
-      case 'operativa':
-        return DETALLE_PRODUCTOS_OPERATIVA;
-      default:
-        return [];
-    }
+    return productosDetallados.filter((p: any) => p.areaId === navegacion.area?.id);
   };
 
-  // Obtener productos detallados para modal
-  const getProductosDetalladosModal = () => {
-    if (!navegacion.area) return [];
-    return getProductosDetalladosPorArea(navegacion.area.tipo);
+  // Obtener productos detallados para el proyecto seleccionado
+  const getProductosDetalladosProyecto = (): ProductoDetallado[] => {
+    if (!proyectoSeleccionado) return [];
+    return productosDetallados.filter((p: any) => p.proyectoId === proyectoSeleccionado.id);
   };
 
   // Obtener todos los proyectos para el carrusel
   const getTodosProyectos = () => {
-    const todos = [
-      ...PROYECTOS_PROYECTOS,
-      ...PROYECTOS_COMERCIAL_ORDENADOS,
-      ...PROYECTOS_TECNICA_ORDENADOS,
-      ...PROYECTOS_OPERATIVA_ORDENADOS
-    ];
-    return todos.sort((a, b) => b.criticidad - a.criticidad);
+    return [...proyectos].sort((a, b) => b.criticidad - a.criticidad);
+  };
+
+  // Obtener proyectos por tipo de área
+  const getProyectosPorAreaTipo = (tipo: string) => {
+    return proyectos.filter((p: any) => p.areaTipo === tipo);
   };
 
   // Handlers de navegación
   const handleSelectArea = (area: Area) => {
     setNavegacion({ nivel: 2, area });
-    const proyectosArea = getProyectosPorAreaDirecto(area.tipo);
+    const proyectosArea = proyectos.filter((p: any) => p.areaTipo === area.tipo || p.areaId === area.id);
     if (proyectosArea.length > 0) {
       setProyectoSeleccionado(proyectosArea[0]);
-    }
-  };
-
-  const getProyectosPorAreaDirecto = (tipo: string) => {
-    switch (tipo) {
-      case 'proyectos':
-        return PROYECTOS_PROYECTOS;
-      case 'comercial':
-        return PROYECTOS_COMERCIAL_ORDENADOS;
-      case 'tecnica':
-        return PROYECTOS_TECNICA_ORDENADOS;
-      case 'operativa':
-        return PROYECTOS_OPERATIVA_ORDENADOS;
-      default:
-        return [];
     }
   };
 
@@ -154,6 +129,17 @@ export default function DashboardGerencia() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex h-96 items-center justify-center">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600" />
+          <p className="text-gray-600 dark:text-gray-400">Cargando dashboard gerencial...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -186,7 +172,7 @@ export default function DashboardGerencia() {
         <div className="space-y-8">
           {/* Áreas Principales - Grid 2x2 - SOLO CARDS */}
           <div className="grid gap-6 lg:grid-cols-2">
-            {AREAS_PRINCIPALES.map((area) => (
+            {areas.map((area) => (
               <AreaCard key={area.id} area={area} onClick={() => handleSelectArea(area)} />
             ))}
           </div>
@@ -208,10 +194,10 @@ export default function DashboardGerencia() {
 
           {/* Gráfico Comparativo */}
           <GraficoComparativo
-            proyectosProyectos={PROYECTOS_PROYECTOS}
-            proyectosComercial={PROYECTOS_COMERCIAL_ORDENADOS}
-            proyectosTecnica={PROYECTOS_TECNICA_ORDENADOS}
-            proyectosOperativa={PROYECTOS_OPERATIVA_ORDENADOS}
+            proyectosProyectos={getProyectosPorAreaTipo('proyectos')}
+            proyectosComercial={getProyectosPorAreaTipo('comercial')}
+            proyectosTecnica={getProyectosPorAreaTipo('tecnica')}
+            proyectosOperativa={getProyectosPorAreaTipo('operativa')}
           />
         </div>
       )}
@@ -225,6 +211,7 @@ export default function DashboardGerencia() {
             proyectos={getProyectosPorArea()}
             proyectoSeleccionado={proyectoSeleccionado}
             onSelectProyecto={handleSelectProyecto}
+            productosDetallados={getProductosDetalladosArea()}
           />
 
           {/* Contenido principal */}
@@ -254,7 +241,7 @@ export default function DashboardGerencia() {
                   titulo="Resumen de Procesos"
                   subtitulo={`Distribución de ${proyectoSeleccionado.resumen.totalProductos} productos en las diferentes etapas`}
                   onVerDetalle={handleVerDetalleEtapa}
-                  productosDetallados={getProductosDetalladosModal()}
+                  productosDetallados={getProductosDetalladosProyecto()}
                 />
               </>
             ) : (
@@ -268,7 +255,7 @@ export default function DashboardGerencia() {
         </div>
       )}
 
-      {/* NIVEL 3: Tabla de detalle completa */}
+      {/* NIVEL 3: Detalle completo del proyecto - Tabla de resumen + productos */}
       {navegacion.nivel === 3 && proyectoSeleccionado && (
         <div className="space-y-6">
           {/* Info del proyecto */}
@@ -281,13 +268,14 @@ export default function DashboardGerencia() {
             </p>
           </div>
 
-          {/* Tabla detallada */}
-          <div className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-md dark:border-gray-700 dark:bg-gray-800">
-            <DetalleTabla
-              productos={getProductosPorArea()}
-              titulo="Detalle de Productos"
-            />
-          </div>
+          {/* Tabla de resumen con detalle */}
+          <TablaResumen
+            resumen={proyectoSeleccionado.resumen}
+            titulo="Resumen de Procesos"
+            subtitulo={`Distribución de ${proyectoSeleccionado.resumen.totalProductos} productos en las diferentes etapas`}
+            onVerDetalle={handleVerDetalleEtapa}
+            productosDetallados={getProductosDetalladosProyecto()}
+          />
         </div>
       )}
 
@@ -296,7 +284,7 @@ export default function DashboardGerencia() {
         isOpen={modalAbierto}
         onClose={() => setModalAbierto(false)}
         etapa={etapaModal}
-        productos={getProductosDetalladosModal()}
+        productos={getProductosDetalladosProyecto()}
         nombreProyecto={proyectoSeleccionado?.nombre || ''}
       />
     </div>

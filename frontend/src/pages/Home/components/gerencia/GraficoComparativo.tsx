@@ -16,6 +16,25 @@ import {
 } from 'recharts';
 import { Proyecto, AreaType } from '../../types/gerencia.types';
 
+const ESTADOS_KEYS = [
+  'cotizado', 'conDescuento', 'aprobacionCompra', 'comprado', 'pagado',
+  'aprobacionPlanos', 'primerSeguimiento', 'enFOB', 'cotizacionFleteInternacional',
+  'conBL', 'segundoSeguimiento', 'enCIF', 'recibido',
+];
+
+const ESTADO_LABELS_CHART: Record<string, string> = {
+  cotizado: 'Cotizado', conDescuento: 'Con Descuento', aprobacionCompra: 'Aprob. Compra',
+  comprado: 'Comprado', pagado: 'Pagado', aprobacionPlanos: 'Aprob. Planos',
+  primerSeguimiento: '1er Seg.', enFOB: 'Incoterms', cotizacionFleteInternacional: 'Cot. Flete',
+  conBL: 'Doc. Import.', segundoSeguimiento: '2do Seg.', enCIF: 'Aduana', recibido: 'Recibido',
+};
+
+const ESTADO_ABREV: Record<string, string> = {
+  cotizado: 'COT', conDescuento: 'DESC', aprobacionCompra: 'AC', comprado: 'COMP',
+  pagado: 'PAG', aprobacionPlanos: 'AP', primerSeguimiento: '1ER', enFOB: 'FOB',
+  cotizacionFleteInternacional: 'CFI', conBL: 'BL', segundoSeguimiento: '2DO', enCIF: 'CIF', recibido: 'REC',
+};
+
 interface GraficoComparativoProps {
     proyectosProyectos: Proyecto[];
     proyectosComercial: Proyecto[];
@@ -71,8 +90,8 @@ export default function GraficoComparativo({
     // Preparar datos para el gráfico general
     const datosGenerales: DataPoint[] = useMemo(() => {
         return proyectosFiltrados.map((proyecto) => {
-            const { enCIF, totalProductos } = proyecto.resumen;
-            const porcentaje = totalProductos > 0 ? Math.round((enCIF / totalProductos) * 100) : 0;
+            const { recibido, totalProductos } = proyecto.resumen;
+            const porcentaje = totalProductos > 0 ? Math.round((recibido / totalProductos) * 100) : 0;
 
             return {
                 nombre: proyecto.nombre.length > 30 ? proyecto.nombre.substring(0, 30) + '...' : proyecto.nombre,
@@ -85,62 +104,16 @@ export default function GraficoComparativo({
 
     // Preparar datos para drill-down
     const datosDrillDown: DataProceso[] = proyectoSeleccionado
-        ? [
-            {
-                proceso: 'Cotizados',
-                valor: proyectoSeleccionado.resumen.cotizados,
-                total: proyectoSeleccionado.resumen.totalProductos,
-                porcentaje: Math.round((proyectoSeleccionado.resumen.cotizados / proyectoSeleccionado.resumen.totalProductos) * 100)
-            },
-            {
-                proceso: 'Con Descuento',
-                valor: proyectoSeleccionado.resumen.conDescuento,
-                total: proyectoSeleccionado.resumen.totalProductos,
-                porcentaje: Math.round((proyectoSeleccionado.resumen.conDescuento / proyectoSeleccionado.resumen.totalProductos) * 100)
-            },
-            {
-                proceso: 'Comprados',
-                valor: proyectoSeleccionado.resumen.comprados,
-                total: proyectoSeleccionado.resumen.totalProductos,
-                porcentaje: Math.round((proyectoSeleccionado.resumen.comprados / proyectoSeleccionado.resumen.totalProductos) * 100)
-            },
-            {
-                proceso: 'Pagados',
-                valor: proyectoSeleccionado.resumen.pagados,
-                total: proyectoSeleccionado.resumen.totalProductos,
-                porcentaje: Math.round((proyectoSeleccionado.resumen.pagados / proyectoSeleccionado.resumen.totalProductos) * 100)
-            },
-            {
-                proceso: '1er Seguimiento',
-                valor: proyectoSeleccionado.resumen.primerSeguimiento,
-                total: proyectoSeleccionado.resumen.totalProductos,
-                porcentaje: Math.round((proyectoSeleccionado.resumen.primerSeguimiento / proyectoSeleccionado.resumen.totalProductos) * 100)
-            },
-            {
-                proceso: 'En FOB',
-                valor: proyectoSeleccionado.resumen.enFOB,
-                total: proyectoSeleccionado.resumen.totalProductos,
-                porcentaje: Math.round((proyectoSeleccionado.resumen.enFOB / proyectoSeleccionado.resumen.totalProductos) * 100)
-            },
-            {
-                proceso: 'Con BL',
-                valor: proyectoSeleccionado.resumen.conBL,
-                total: proyectoSeleccionado.resumen.totalProductos,
-                porcentaje: Math.round((proyectoSeleccionado.resumen.conBL / proyectoSeleccionado.resumen.totalProductos) * 100)
-            },
-            {
-                proceso: '2do Seguimiento',
-                valor: proyectoSeleccionado.resumen.segundoSeguimiento,
-                total: proyectoSeleccionado.resumen.totalProductos,
-                porcentaje: Math.round((proyectoSeleccionado.resumen.segundoSeguimiento / proyectoSeleccionado.resumen.totalProductos) * 100)
-            },
-            {
-                proceso: 'En CIF',
-                valor: proyectoSeleccionado.resumen.enCIF,
-                total: proyectoSeleccionado.resumen.totalProductos,
-                porcentaje: Math.round((proyectoSeleccionado.resumen.enCIF / proyectoSeleccionado.resumen.totalProductos) * 100)
-            }
-        ]
+        ? ESTADOS_KEYS.map(key => {
+            const valor = (proyectoSeleccionado.resumen as any)[key] || 0;
+            const total = proyectoSeleccionado.resumen.totalProductos;
+            return {
+                proceso: ESTADO_LABELS_CHART[key] || key,
+                valor,
+                total,
+                porcentaje: total > 0 ? Math.round((valor / total) * 100) : 0,
+            };
+        })
         : [];
 
     // Colores
@@ -207,7 +180,7 @@ export default function GraficoComparativo({
                                 </span>
                             </p>
                             <p>
-                                {data.proyecto.resumen.enCIF} de {data.proyecto.resumen.totalProductos} completados
+                                {data.proyecto.resumen.recibido} de {data.proyecto.resumen.totalProductos} completados
                             </p>
                         </div>
                         <p className="mt-2 text-2xl font-extrabold text-blue-600 dark:text-blue-400">
@@ -242,18 +215,12 @@ export default function GraficoComparativo({
     // Generar leyenda para el panel lateral
 const getLeyendaItems = () => {
   if (proyectoSeleccionado) {
-    // Drill-down: Abreviaciones estáticas para procesos
-    return [
-      { abrev: 'COT', nombre: 'Cotizados', color: getColorByPorcentaje(datosDrillDown[0]?.porcentaje || 0) },
-      { abrev: 'DESC', nombre: 'Con Descuento', color: getColorByPorcentaje(datosDrillDown[1]?.porcentaje || 0) },
-      { abrev: 'COMP', nombre: 'Comprados', color: getColorByPorcentaje(datosDrillDown[2]?.porcentaje || 0) },
-      { abrev: 'PAG', nombre: 'Pagados', color: getColorByPorcentaje(datosDrillDown[3]?.porcentaje || 0) },
-      { abrev: '1ER', nombre: '1er Seguimiento', color: getColorByPorcentaje(datosDrillDown[4]?.porcentaje || 0) },
-      { abrev: 'FOB', nombre: 'En FOB', color: getColorByPorcentaje(datosDrillDown[5]?.porcentaje || 0) },
-      { abrev: 'BL', nombre: 'Con BL', color: getColorByPorcentaje(datosDrillDown[6]?.porcentaje || 0) },
-      { abrev: '2DO', nombre: '2do Seguimiento', color: getColorByPorcentaje(datosDrillDown[7]?.porcentaje || 0) },
-      { abrev: 'CIF', nombre: 'En CIF', color: getColorByPorcentaje(datosDrillDown[8]?.porcentaje || 0) }
-    ];
+    // Drill-down: Abreviaciones dinámicas para los 13 procesos
+    return ESTADOS_KEYS.map((key, index) => ({
+      abrev: ESTADO_ABREV[key] || key,
+      nombre: ESTADO_LABELS_CHART[key] || key,
+      color: getColorByPorcentaje(datosDrillDown[index]?.porcentaje || 0),
+    }));
   } else {
     // Vista general: Abreviaciones dinámicas de proyectos
     return datosGenerales.map((item) => {
@@ -493,7 +460,7 @@ const getLeyendaItems = () => {
                         {proyectoSeleccionado
                             ? `Distribución de ${proyectoSeleccionado.resumen.totalProductos} productos en las diferentes etapas del proceso`
                             : `${datosGenerales.length} proyecto${datosGenerales.length !== 1 ? 's' : ''} ${areaSeleccionada === 'todas' ? 'en todas las áreas' : `del área de ${areaSeleccionada}`
-                            } • Porcentaje de completitud (productos en CIF vs Total)`}
+                            } • Porcentaje de completitud (productos recibidos vs Total)`}
                     </p>
                 </div>
 
@@ -687,12 +654,12 @@ const getLeyendaItems = () => {
                     </div>
                     <div className="text-center">
                         <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                            {proyectoSeleccionado ? 'Completados (CIF)' : 'Proyectos Críticos'}
+                            {proyectoSeleccionado ? 'Recibidos' : 'Proyectos Críticos'}
                         </p>
                         <p className="mt-1 text-3xl font-extrabold text-rose-600 dark:text-rose-400">
                             {proyectoSeleccionado
-                                ? `${proyectoSeleccionado.resumen.enCIF} (${Math.round(
-                                    (proyectoSeleccionado.resumen.enCIF / proyectoSeleccionado.resumen.totalProductos) * 100
+                                ? `${proyectoSeleccionado.resumen.recibido} (${Math.round(
+                                    (proyectoSeleccionado.resumen.recibido / proyectoSeleccionado.resumen.totalProductos) * 100
                                 )}%)`
                                 : datosGenerales.filter((d) => d.criticidad >= 8).length}
                         </p>

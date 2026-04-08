@@ -1,20 +1,27 @@
 // components/gerencia/PanelProyectos.tsx
 import { Proyecto } from '../../types/gerencia.types';
 import { ProductoDetallado } from '../../types/gerencia.types';
-import { getProductosDetalladosPorArea } from '../../mocks/mocks_productos_detallados';
+
+const ESTADOS_KEYS = [
+  'cotizado', 'conDescuento', 'aprobacionCompra', 'comprado', 'pagado',
+  'aprobacionPlanos', 'primerSeguimiento', 'enFOB', 'cotizacionFleteInternacional',
+  'conBL', 'segundoSeguimiento', 'enCIF', 'recibido',
+];
 
 interface PanelProyectosProps {
   proyectos: Proyecto[];
   proyectoSeleccionado: Proyecto | null;
   onSelectProyecto: (proyecto: Proyecto) => void;
   tipoArea: string;
+  productosDetallados?: ProductoDetallado[];
 }
 
 export default function PanelProyectos({
   proyectos,
   proyectoSeleccionado,
   onSelectProyecto,
-  tipoArea
+  tipoArea,
+  productosDetallados = []
 }: PanelProyectosProps) {
   const colors = {
     success: {
@@ -37,80 +44,17 @@ export default function PanelProyectos({
     }
   };
 
-  // Obtener TODOS los productos detallados del área
-  const productosDetallados = getProductosDetalladosPorArea(tipoArea);
-
-  /**
-   * Función para generar el identificador de cotización desde el nombre del proyecto
-   * 
-   * Ejemplos de mapeo:
-   * "Ampliación Planta Norte" → "PROY" (primera palabra relevante)
-   * "Modernización Sistema SCADA" → "SCADA" (palabra clave)
-   * "Renovación Equipos Protección" → "PROT" (abreviación)
-   * 
-   * Los productos tienen cotizacionNombre como: "COT-PROY-001", "COT-SCADA-001", etc.
-   */
-  const getCotizacionPrefixFromProyecto = (nombreProyecto: string): string => {
-    const nombre = nombreProyecto.toLowerCase();
-    
-    // Mapeo específico de nombres de proyecto a prefijos de cotización
-    if (nombre.includes('ampliación') || nombre.includes('planta')) return 'proy';
-    if (nombre.includes('scada') || nombre.includes('modernización')) return 'scada';
-    if (nombre.includes('renovación') || nombre.includes('protección')) return 'prot';
-    if (nombre.includes('transmisión') || nombre.includes('230kv')) return 'trans';
-    if (nombre.includes('subestación') || nombre.includes('instalación')) return 'sub';
-    if (nombre.includes('automatización') || nombre.includes('líneas')) return 'auto';
-    
-    // Área Comercial
-    if (nombre.includes('equipamiento') || nombre.includes('oficinas')) return 'ofic';
-    if (nombre.includes('mobiliario') || nombre.includes('sucursal')) return 'mob';
-    if (nombre.includes('flota') || nombre.includes('vehículos')) return 'flota';
-    if (nombre.includes('punto') || nombre.includes('venta')) return 'pos';
-    
-    // Área Técnica
-    if (nombre.includes('laboratorio') || nombre.includes('calibración')) return 'lab';
-    if (nombre.includes('instrumental') || nombre.includes('medición')) return 'inst';
-    if (nombre.includes('herramientas especializadas')) return 'herr';
-    
-    // Área Operativa
-    if (nombre.includes('taller')) return 'tall';
-    if (nombre.includes('maquinaria') || nombre.includes('pesada')) return 'maq';
-    if (nombre.includes('herramientas manuales')) return 'man';
-    if (nombre.includes('seguridad') || nombre.includes('industrial')) return 'seg';
-    if (nombre.includes('vehículos utilitarios')) return 'util';
-    
-    // Fallback: usar primeras letras
-    return nombreProyecto.substring(0, 4).toLowerCase();
-  };
-
   /**
    * Función para contar productos críticos (naranja/rojo) por proyecto
+   * Usa los productosDetallados pasados como prop desde el API
    */
-  const contarProductosCriticos = (proyecto: Proyecto): { total: number; atrasados: number; enProceso: number } => {
-    // Obtener el prefijo de cotización para este proyecto
-    const cotizacionPrefix = getCotizacionPrefixFromProyecto(proyecto.nombre);
-    
-    // Filtrar productos que pertenecen a este proyecto
-    // usando el cotizacionNombre que contiene el prefijo
-    const productosProyecto = productosDetallados.filter(p => 
-      p.cotizacionNombre.toLowerCase().includes(`-${cotizacionPrefix}-`)
-    );
-
-    // Contar productos con problemas
+  const contarProductosCriticos = (_proyecto: Proyecto): { total: number; atrasados: number; enProceso: number } => {
     let atrasados = 0;
     let enProceso = 0;
 
-    productosProyecto.forEach(producto => {
-      const etapas: Array<keyof ProductoDetallado> = [
-        'cotizado', 'conDescuento', 'comprado', 'pagado',
-        'primerSeguimiento', 'enFOB', 'conBL', 'segundoSeguimiento',
-        'enCIF', 'recibido'
-      ];
-
-      // Si tiene alguna etapa atrasada
-      const tieneAtraso = etapas.some(e => producto[e] === 'atrasado');
-      // Si tiene alguna etapa en proceso (sin contar los atrasados)
-      const tieneEnProceso = !tieneAtraso && etapas.some(e => producto[e] === 'en_proceso');
+    productosDetallados.forEach(producto => {
+      const tieneAtraso = ESTADOS_KEYS.some(e => producto.estados[e] === 'atrasado');
+      const tieneEnProceso = !tieneAtraso && ESTADOS_KEYS.some(e => producto.estados[e] === 'en_proceso');
 
       if (tieneAtraso) {
         atrasados++;
@@ -230,7 +174,7 @@ export default function PanelProyectos({
                   <div>
                     <span className="text-gray-500 dark:text-gray-500">Progreso:</span>
                     <span className={`ml-1 font-semibold ${theme.text}`}>
-                      {Math.round((proyecto.resumen.enCIF / proyecto.resumen.totalProductos) * 100)}%
+                      {proyecto.resumen.totalProductos > 0 ? Math.round((proyecto.resumen.recibido / proyecto.resumen.totalProductos) * 100) : 0}%
                     </span>
                   </div>
                 </div>

@@ -1,0 +1,489 @@
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+import {
+  EstadoProceso,
+  ESTADOS_NACIONAL,
+  ESTADOS_INTERNACIONAL,
+  ESTADO_LABELS,
+} from '../estado-producto/dto/estado-producto.dto';
+
+// Mapeo de EstadoProceso a campo de fecha límite
+const ESTADO_A_FECHA_LIMITE: Record<string, string> = {
+  cotizado: 'fechaLimiteCotizado',
+  conDescuento: 'fechaLimiteConDescuento',
+  aprobacionCompra: 'fechaLimiteAprobacionCompra',
+  comprado: 'fechaLimiteComprado',
+  pagado: 'fechaLimitePagado',
+  aprobacionPlanos: 'fechaLimiteAprobacionPlanos',
+  primerSeguimiento: 'fechaLimitePrimerSeguimiento',
+  enFOB: 'fechaLimiteEnFOB',
+  cotizacionFleteInternacional: 'fechaLimiteCotizacionFleteInternacional',
+  conBL: 'fechaLimiteConBL',
+  segundoSeguimiento: 'fechaLimiteSegundoSeguimiento',
+  enCIF: 'fechaLimiteEnCIF',
+  recibido: 'fechaLimiteRecibido',
+};
+
+const ESTADO_A_FECHA: Record<string, string> = {
+  cotizado: 'fechaCotizado',
+  conDescuento: 'fechaConDescuento',
+  aprobacionCompra: 'fechaAprobacionCompra',
+  comprado: 'fechaComprado',
+  pagado: 'fechaPagado',
+  aprobacionPlanos: 'fechaAprobacionPlanos',
+  primerSeguimiento: 'fechaPrimerSeguimiento',
+  enFOB: 'fechaEnFOB',
+  cotizacionFleteInternacional: 'fechaCotizacionFleteInternacional',
+  conBL: 'fechaConBL',
+  segundoSeguimiento: 'fechaSegundoSeguimiento',
+  enCIF: 'fechaEnCIF',
+  recibido: 'fechaRecibido',
+};
+
+@Injectable()
+export class DashboardService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  // ============================================================================
+  // DASHBOARD GERENCIA
+  // ============================================================================
+
+  async getGerencia() {
+    // 1. Cargar todas las áreas
+    const areas = await this.prisma.area.findMany({
+      orderBy: { creado: 'asc' },
+    });
+
+    // 2. Cargar todos los proyectos activos con su área
+    const proyectos = await this.prisma.proyecto.findMany({
+      where: { estado: true },
+      include: {
+        area: { select: { id: true, tipo: true } },
+      },
+      orderBy: { criticidad: 'desc' },
+    });
+
+    // 3. Cargar TODOS los EstadoProducto aprobados con relaciones necesarias
+    const productos = await this.prisma.estadoProducto.findMany({
+      where: {
+        aprobadoPorSupervisor: true,
+        rechazado: false,
+      },
+      include: {
+        proyecto: { select: { id: true, nombre: true, areaId: true } },
+        cotizacion: {
+          select: {
+            id: true,
+            nombreCotizacion: true,
+            tipoCompra: true,
+            fechaSolicitud: true,
+            fechaLimite: true,
+            solicitante: { select: { nombre: true } },
+          },
+        },
+      },
+    });
+
+    // 4. Agrupar productos por área y por proyecto
+    const productosPorArea: Record<string, typeof productos> = {};
+    const productosPorProyecto: Record<string, typeof productos> = {};
+
+    for (const p of productos) {
+      const areaId = p.proyecto?.areaId;
+      if (areaId) {
+        if (!productosPorArea[areaId]) productosPorArea[areaId] = [];
+        productosPorArea[areaId].push(p);
+      }
+      if (p.proyectoId) {
+        if (!productosPorProyecto[p.proyectoId])
+          productosPorProyecto[p.proyectoId] = [];
+        productosPorProyecto[p.proyectoId].push(p);
+      }
+    }
+
+    // 5. Construir respuesta de áreas
+    const areasConResumen = areas.map((area) => {
+      const productosArea = productosPorArea[area.id] || [];
+      return {
+        id: area.id,
+        nombre: area.nombreArea,
+        tipo: area.tipo,
+        icono: area.icono || '📦',
+        resumen: this.calcularResumen(productosArea),
+        totalProyectos: proyectos.filter((p) => p.area?.id === area.id).length,
+      };
+    });
+
+    // 6. Construir proyectos con resumen
+    const proyectosConResumen = proyectos.map((proy) => {
+      const productosProyecto = productosPorProyecto[proy.id] || [];
+      const estadoVisual = this.calcularEstadoProyecto(productosProyecto);
+
+      return {
+        id: proy.id,
+        nombre: proy.nombre,
+        estado: estadoVisual,
+        criticidad: proy.criticidad,
+        resumen: this.calcularResumen(productosProyecto),
+        responsable: productosProyecto[0]?.responsable || 'Sin asignar',
+        fechaInicio: proy.creado.toISOString(),
+        fechaLimite:
+          productosProyecto[0]?.cotizacion?.fechaLimite?.toISOString() ||
+          proy.actualizado.toISOString(),
+        areaId: proy.areaId,
+        areaTipo: proy.area?.tipo,
+      };
+    });
+
+    // 7. Construir productos detallados
+    const productosDetallados = productos.map((p) => {
+      const tipoCompra = p.cotizacion?.tipoCompra || 'INTERNACIONAL';
+      const estadosAplicables =
+        tipoCompra === 'NACIONAL' ? ESTADOS_NACIONAL : ESTADOS_INTERNACIONAL;
+
+      return {
+        id: p.id,
+        sku: p.sku,
+        descripcion: p.descripcion,
+        cotizacionNombre:
+          p.cotizacion?.nombreCotizacion || 'Sin cotización',
+        tipoCompra,
+        proyectoId: p.proyectoId,
+        areaId: p.proyecto?.areaId,
+        ...this.calcularEstadosDetallados(p, estadosAplicables),
+      };
+    });
+
+    return {
+      areas: areasConResumen,
+      proyectos: proyectosConResumen,
+      productosDetallados,
+    };
+  }
+
+  // ============================================================================
+  // DASHBOARD KPIs (OPERATIVO)
+  // ============================================================================
+
+  async getKpis() {
+    const now = new Date();
+    const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1);
+    const hace30Dias = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    // Queries en paralelo
+    const [
+      cotizacionesPorEstado,
+      cotizacionesSinResponsable,
+      productosAprobados,
+      productosConRetraso,
+      cotizacionesTotal,
+    ] = await Promise.all([
+      // Conteo de cotizaciones por estado
+      this.prisma.cotizacion.groupBy({
+        by: ['estado'],
+        _count: { id: true },
+      }),
+
+      // Cotizaciones sin responsable (supervisorResponsableId null)
+      this.prisma.cotizacion.count({
+        where: {
+          supervisorResponsableId: null,
+          estado: { notIn: ['COMPLETADA', 'CANCELADA'] },
+        },
+      }),
+
+      // Todos los EstadoProducto aprobados
+      this.prisma.estadoProducto.findMany({
+        where: {
+          aprobadoPorSupervisor: true,
+          rechazado: false,
+        },
+        include: {
+          cotizacion: {
+            select: {
+              tipoCompra: true,
+              nombreCotizacion: true,
+              fechaSolicitud: true,
+              fechaLimite: true,
+              solicitante: {
+                select: { nombre: true, departamento: { select: { nombre: true } } },
+              },
+              supervisorResponsable: { select: { nombre: true } },
+            },
+          },
+          proyecto: { select: { nombre: true } },
+        },
+      }),
+
+      // Productos con retraso
+      this.prisma.estadoProducto.count({
+        where: {
+          aprobadoPorSupervisor: true,
+          rechazado: false,
+          diasRetrasoActual: { gt: 0 },
+        },
+      }),
+
+      // Total cotizaciones activas
+      this.prisma.cotizacion.count({
+        where: { estado: { notIn: ['COMPLETADA', 'CANCELADA'] } },
+      }),
+    ]);
+
+    // Calcular resumen de productos por etapa
+    const resumenEtapas: Record<string, number> = {};
+    for (const ep of Object.values(EstadoProceso)) {
+      resumenEtapas[ep] = productosAprobados.filter((p) => p[ep]).length;
+    }
+
+    // Productos sin descuento (cotizados pero sin descuento)
+    const sinDescuento = productosAprobados.filter(
+      (p) => p.cotizado && !p.conDescuento,
+    ).length;
+
+    // Productos sin cotizar
+    const sinCotizar = productosAprobados.filter((p) => !p.cotizado).length;
+
+    // Cotizaciones vencidas (fecha límite pasada, no completadas)
+    const cotizacionesVencidas = await this.prisma.cotizacion.findMany({
+      where: {
+        fechaLimite: { lt: now },
+        estado: { notIn: ['COMPLETADA', 'CANCELADA'] },
+      },
+      include: {
+        solicitante: {
+          select: { nombre: true, departamento: { select: { nombre: true } } },
+        },
+        supervisorResponsable: { select: { nombre: true } },
+        proyecto: { select: { nombre: true } },
+        _count: { select: { detalles: true } },
+      },
+      orderBy: { fechaLimite: 'asc' },
+    });
+
+    // Cotizaciones rechazadas (con productos rechazados)
+    const productosRechazados = await this.prisma.estadoProducto.findMany({
+      where: {
+        rechazado: true,
+        fechaRechazo: { gte: hace30Dias },
+      },
+      include: {
+        cotizacion: { select: { nombreCotizacion: true } },
+      },
+      orderBy: { fechaRechazo: 'desc' },
+    });
+
+    // Promedio de días desde solicitud hasta aprobación
+    const cotizacionesAprobadas = await this.prisma.cotizacion.findMany({
+      where: {
+        estado: { in: ['APROBADA_PARCIAL', 'APROBADA_COMPLETA'] },
+        fechaAprobacion: { not: null },
+      },
+      select: { fechaSolicitud: true, fechaAprobacion: true },
+    });
+
+    let promedioDias = 0;
+    if (cotizacionesAprobadas.length > 0) {
+      const totalDias = cotizacionesAprobadas.reduce((sum, c) => {
+        const diff =
+          (c.fechaAprobacion!.getTime() - c.fechaSolicitud.getTime()) /
+          (1000 * 60 * 60 * 24);
+        return sum + diff;
+      }, 0);
+      promedioDias =
+        Math.round((totalDias / cotizacionesAprobadas.length) * 10) / 10;
+    }
+
+    // Monto total de precios seleccionados en cotizaciones activas
+    const montosResult = await this.prisma.precios.aggregate({
+      _sum: { precio: true },
+      where: {
+        cotizacionDetalle: {
+          cotizacion: { estado: { notIn: ['CANCELADA'] } },
+        },
+        cotizacionDetalleSeleccionado: { some: {} },
+      },
+    });
+
+    const montoTotal = Number(montosResult._sum.precio || 0);
+
+    // Construir KPIs de cotizaciones
+    const cotizacionesKpis = {
+      totalEnCurso: cotizacionesTotal,
+      porEstado: cotizacionesPorEstado.reduce(
+        (acc, e) => {
+          acc[e.estado] = e._count.id;
+          return acc;
+        },
+        {} as Record<string, number>,
+      ),
+      sinResponsable: cotizacionesSinResponsable,
+      sinDescuento,
+      sinCotizar,
+      vencidas: cotizacionesVencidas.map((c) => ({
+        ordenCotizacion: c.nombreCotizacion,
+        area: c.proyecto?.nombre || 'Sin proyecto',
+        tipo: (c as any).tipoCompra || 'Nacional',
+        asignado: c.supervisorResponsable?.nombre || 'Sin asignar',
+        proveedor: '-',
+        cantidadItems: c._count.detalles,
+        diasVencida: Math.ceil(
+          (now.getTime() - c.fechaLimite.getTime()) / (1000 * 60 * 60 * 24),
+        ),
+        prioridad:
+          Math.ceil(
+            (now.getTime() - c.fechaLimite.getTime()) / (1000 * 60 * 60 * 24),
+          ) > 7
+            ? 'Alta'
+            : 'Media',
+        solicitoDescuento: '-',
+        status: c.estado,
+      })),
+      rechazados: productosRechazados.map((p) => ({
+        ordenCotizacion: p.cotizacion?.nombreCotizacion || p.sku,
+        motivoRechazo: p.motivoRechazo || 'Sin motivo',
+        fechaRechazo: p.fechaRechazo
+          ? p.fechaRechazo.toLocaleDateString('es-HN')
+          : '-',
+        rechazadoPor: p.responsable || 'Sistema',
+      })),
+      montoTotal,
+      promedioDias,
+    };
+
+    // KPIs de compras (basados en EstadoProducto)
+    const comprasKpis = {
+      resumenEtapas,
+      totalProductos: productosAprobados.length,
+      productosConRetraso,
+      retrasados: productosAprobados
+        .filter((p) => p.diasRetrasoActual > 0)
+        .sort((a, b) => b.diasRetrasoActual - a.diasRetrasoActual)
+        .slice(0, 20)
+        .map((p) => ({
+          ordenCompra: p.cotizacion?.nombreCotizacion || p.sku,
+          item: p.descripcion,
+          estadoActual: this.obtenerEstadoActual(p),
+          fechaEstimada: p.cotizacion?.fechaLimite
+            ? p.cotizacion.fechaLimite.toLocaleDateString('es-HN')
+            : '-',
+          diasRetraso: p.diasRetrasoActual,
+          motivoRetraso: p.observaciones || 'Sin detalle',
+        })),
+    };
+
+    return {
+      cotizaciones: cotizacionesKpis,
+      compras: comprasKpis,
+    };
+  }
+
+  // ============================================================================
+  // HELPERS
+  // ============================================================================
+
+  private calcularResumen(productos: any[]) {
+    const resumen: Record<string, number> = {
+      totalProductos: productos.length,
+    };
+    for (const ep of Object.values(EstadoProceso)) {
+      resumen[ep] = productos.filter((p) => p[ep]).length;
+    }
+    return resumen;
+  }
+
+  private calcularEstadoProyecto(
+    productos: any[],
+  ): 'success' | 'warn' | 'danger' {
+    if (productos.length === 0) return 'success';
+
+    const now = new Date();
+    let hasDanger = false;
+    let hasWarn = false;
+
+    for (const p of productos) {
+      const tipoCompra = p.cotizacion?.tipoCompra || 'INTERNACIONAL';
+      const estadosAplicables =
+        tipoCompra === 'NACIONAL' ? ESTADOS_NACIONAL : ESTADOS_INTERNACIONAL;
+
+      for (const estadoKey of estadosAplicables) {
+        if (p[estadoKey]) continue; // Ya completado → skip
+
+        const fechaLimiteKey = ESTADO_A_FECHA_LIMITE[estadoKey];
+        const fechaLimite = p[fechaLimiteKey];
+        if (!fechaLimite) continue;
+
+        const limite = new Date(fechaLimite);
+        if (now > limite) {
+          hasDanger = true;
+          break;
+        }
+
+        // Calcular 30% del tiempo restante
+        const fechaKey = ESTADO_A_FECHA[estadoKey];
+        const fechaInicio = p[fechaKey] || p.creado;
+        const totalMs = limite.getTime() - new Date(fechaInicio).getTime();
+        const restanteMs = limite.getTime() - now.getTime();
+        if (totalMs > 0 && restanteMs / totalMs < 0.3) {
+          hasWarn = true;
+        }
+
+        break; // Solo evaluar el primer estado no completado
+      }
+
+      if (hasDanger) break;
+    }
+
+    if (hasDanger) return 'danger';
+    if (hasWarn) return 'warn';
+    return 'success';
+  }
+
+  private calcularEstadosDetallados(producto: any, estadosAplicables: EstadoProceso[]) {
+    const now = new Date();
+    const estados: Record<string, string> = {};
+    const diasAtraso: Record<string, number | undefined> = {};
+
+    for (const estadoKey of estadosAplicables) {
+      const completado = producto[estadoKey];
+      const fechaLimiteKey = ESTADO_A_FECHA_LIMITE[estadoKey];
+      const fechaLimite = producto[fechaLimiteKey];
+
+      if (completado) {
+        estados[estadoKey] = 'completado';
+      } else if (fechaLimite) {
+        const limite = new Date(fechaLimite);
+        if (now > limite) {
+          estados[estadoKey] = 'atrasado';
+          diasAtraso[`diasAtraso_${estadoKey}`] = Math.ceil(
+            (now.getTime() - limite.getTime()) / (1000 * 60 * 60 * 24),
+          );
+        } else {
+          const fechaKey = ESTADO_A_FECHA[estadoKey];
+          const fechaInicio = producto[fechaKey] || producto.creado;
+          const totalMs = limite.getTime() - new Date(fechaInicio).getTime();
+          const restanteMs = limite.getTime() - now.getTime();
+          if (totalMs > 0 && restanteMs / totalMs < 0.3) {
+            estados[estadoKey] = 'en_proceso';
+          } else {
+            estados[estadoKey] = 'pendiente';
+          }
+        }
+      } else {
+        estados[estadoKey] = completado ? 'completado' : 'pendiente';
+      }
+    }
+
+    return { estados, diasAtraso };
+  }
+
+  private obtenerEstadoActual(producto: any): string {
+    const estados = ESTADOS_INTERNACIONAL;
+    for (let i = estados.length - 1; i >= 0; i--) {
+      if (producto[estados[i]]) {
+        return ESTADO_LABELS[estados[i]];
+      }
+    }
+    return 'Sin iniciar';
+  }
+}

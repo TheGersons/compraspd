@@ -7,19 +7,7 @@ interface AreaCardProps {
 }
 
 export function contarProyectos(area: Area): number {
-    // Lógica para contar proyectos según el área
-    switch (area.tipo) {
-      case 'proyectos':
-        return 6;
-      case 'comercial':
-        return 4;
-      case 'tecnica':
-        return 3;
-      case 'operativa':
-        return 5;
-      default:
-        return 0;
-    }
+    return area.totalProyectos || 0;
   }
 
 export default function AreaCard({ area, onClick }: AreaCardProps) {

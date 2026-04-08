@@ -36,6 +36,7 @@ import { LicitacionesModule } from './modules/licitaciones/licitaciones.module';
 import { OfertasModule } from './modules/ofertas/ofertas.module';
 import { ReportesModule } from './modules/reportes/reportes.module';
 import { CronServicesModule } from './modules/cron-services/cron.service.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -73,6 +74,7 @@ import { CronServicesModule } from './modules/cron-services/cron.service.module'
     LicitacionesModule,
     OfertasModule,
     ReportesModule,
+    DashboardModule,
   ],
   providers: [SessionCleanupService],
 })

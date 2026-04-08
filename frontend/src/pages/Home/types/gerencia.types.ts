@@ -11,20 +11,25 @@ export interface Area {
   tipo: AreaType;
   icono: string;
   resumen: ResumenProcesos;
+  totalProyectos?: number;
 }
 
-// Resumen de procesos para tabla
+// Resumen de procesos para tabla - 13 estados del proceso
 export interface ResumenProcesos {
   totalProductos: number;
-  cotizados: number;
+  cotizado: number;
   conDescuento: number;
-  comprados: number;
-  pagados: number;
+  aprobacionCompra: number;
+  comprado: number;
+  pagado: number;
+  aprobacionPlanos: number;
   primerSeguimiento: number;
   enFOB: number;
+  cotizacionFleteInternacional: number;
   conBL: number;
   segundoSeguimiento: number;
   enCIF: number;
+  recibido: number;
 }
 
 // Proyecto con estado y resumen
@@ -75,39 +80,26 @@ export interface ProductoDetallado {
   descripcion: string;
   cotizacionNombre: string;
   
-  // Estados por etapa (boolean con 3 estados: completado, en proceso, atrasado)
-  cotizado: 'completado' | 'en_proceso' | 'atrasado' | 'pendiente';
-  conDescuento: 'completado' | 'en_proceso' | 'atrasado' | 'pendiente';
-  comprado: 'completado' | 'en_proceso' | 'atrasado' | 'pendiente';
-  pagado: 'completado' | 'en_proceso' | 'atrasado' | 'pendiente';
-  primerSeguimiento: 'completado' | 'en_proceso' | 'atrasado' | 'pendiente';
-  enFOB: 'completado' | 'en_proceso' | 'atrasado' | 'pendiente';
-  conBL: 'completado' | 'en_proceso' | 'atrasado' | 'pendiente';
-  segundoSeguimiento: 'completado' | 'en_proceso' | 'atrasado' | 'pendiente';
-  enCIF: 'completado' | 'en_proceso' | 'atrasado' | 'pendiente';
-  recibido: 'completado' | 'en_proceso' | 'atrasado' | 'pendiente';
-  
+  tipoCompra: 'NACIONAL' | 'INTERNACIONAL';
+
+  // Estados por etapa
+  estados: Record<string, 'completado' | 'en_proceso' | 'atrasado' | 'pendiente'>;
+
   // Días de atraso por etapa
-  diasAtrasoCotizado?: number;
-  diasAtrasoDescuento?: number;
-  diasAtrasoComprado?: number;
-  diasAtrasoPagado?: number;
-  diasAtrasoPrimerSeguimiento?: number;
-  diasAtrasoFOB?: number;
-  diasAtrasoBL?: number;
-  diasAtrasoSegundoSeguimiento?: number;
-  diasAtrasoCIF?: number;
-  diasAtrasoRecibido?: number;
+  diasAtraso: Record<string, number | undefined>;
 }
 
 // Para el modal
-export type EtapaDetalle = 
+export type EtapaDetalle =
   | 'cotizado'
   | 'conDescuento'
+  | 'aprobacionCompra'
   | 'comprado'
   | 'pagado'
+  | 'aprobacionPlanos'
   | 'primerSeguimiento'
   | 'enFOB'
+  | 'cotizacionFleteInternacional'
   | 'conBL'
   | 'segundoSeguimiento'
   | 'enCIF'
