@@ -1291,6 +1291,9 @@ export class FollowUpsService {
       this.prisma.cotizacion.count({
         where: {
           supervisorResponsableId: null,
+          estadosProductos: {
+            none: { responsableSeguimientoId: { not: null } },
+          },
           estado: { notIn: ['APROBADA', 'RECHAZADA'] },
         },
       }),
