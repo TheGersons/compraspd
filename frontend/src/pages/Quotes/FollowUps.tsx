@@ -1477,7 +1477,6 @@ export default function FollowUps() {
               )}
             </div>
           )}
-          </div>
         </div>
 
         {/* Lista de cotizaciones con acordeón */}
