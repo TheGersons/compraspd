@@ -7,6 +7,10 @@ import { useAuth } from "../../context/AuthContext";
 import toast from "react-hot-toast";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import DescuentoActions from "./components/DescuentoActions";
+import DatePicker, { registerLocale } from "react-datepicker";
+import { es } from "date-fns/locale";
+import "../../components/common/datepicker.css";
+registerLocale("es", es);
 
 // ============================================================================
 // TYPES
@@ -503,8 +507,8 @@ export default function FollowUps() {
   const [responsableFiltro, setResponsableFiltro] = useState<string>("TODOS");
   const [solicitanteFiltro, setSolicitanteFiltro] = useState<string>("TODOS");
   const [fechaFiltro, setFechaFiltro] = useState<string>("TODOS");
-  const [fechaDesde, setFechaDesde] = useState<string>("");
-  const [fechaHasta, setFechaHasta] = useState<string>("");
+  const [fechaDesde, setFechaDesde] = useState<Date | null>(null);
+  const [fechaHasta, setFechaHasta] = useState<Date | null>(null);
 
   // Paginación
   const [currentPage, setCurrentPage] = useState(1);
@@ -964,11 +968,11 @@ export default function FollowUps() {
         const fechaSolicitud = new Date(cot.fechaSolicitud);
         if (fechaFiltro === "PERSONALIZADO") {
           if (fechaDesde) {
-            const desde = new Date(fechaDesde + "T00:00:00");
+            const desde = new Date(fechaDesde); desde.setHours(0, 0, 0, 0);
             if (fechaSolicitud < desde) return false;
           }
           if (fechaHasta) {
-            const hasta = new Date(fechaHasta + "T23:59:59");
+            const hasta = new Date(fechaHasta); hasta.setHours(23, 59, 59, 999);
             if (fechaSolicitud > hasta) return false;
           }
           return !!(fechaDesde || fechaHasta);
@@ -1425,8 +1429,8 @@ export default function FollowUps() {
                   setFechaFiltro(e.target.value);
                   setCurrentPage(1);
                   if (e.target.value !== "PERSONALIZADO") {
-                    setFechaDesde("");
-                    setFechaHasta("");
+                    setFechaDesde(null);
+                    setFechaHasta(null);
                   }
                 }}
                 className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
@@ -1447,34 +1451,40 @@ export default function FollowUps() {
                 <label className="shrink-0 text-sm font-medium text-gray-700 dark:text-gray-300">
                   Desde:
                 </label>
-                <input
-                  type="date"
-                  value={fechaDesde}
-                  onChange={(e) => { setFechaDesde(e.target.value); setCurrentPage(1); }}
-                  max={fechaHasta || undefined}
-                  className="rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+                <DatePicker
+                  locale="es"
+                  selected={fechaDesde}
+                  onChange={(date) => { setFechaDesde(date); setCurrentPage(1); }}
+                  selectsStart
+                  startDate={fechaDesde}
+                  endDate={fechaHasta}
+                  maxDate={fechaHasta ?? undefined}
+                  dateFormat="dd/MM/yyyy"
+                  placeholderText="Seleccionar fecha"
+                  isClearable
+                  showPopperArrow={false}
+                  className="rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                 />
               </div>
               <div className="flex items-center gap-2">
                 <label className="shrink-0 text-sm font-medium text-gray-700 dark:text-gray-300">
                   Hasta:
                 </label>
-                <input
-                  type="date"
-                  value={fechaHasta}
-                  onChange={(e) => { setFechaHasta(e.target.value); setCurrentPage(1); }}
-                  min={fechaDesde || undefined}
-                  className="rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+                <DatePicker
+                  locale="es"
+                  selected={fechaHasta}
+                  onChange={(date) => { setFechaHasta(date); setCurrentPage(1); }}
+                  selectsEnd
+                  startDate={fechaDesde}
+                  endDate={fechaHasta}
+                  minDate={fechaDesde ?? undefined}
+                  dateFormat="dd/MM/yyyy"
+                  placeholderText="Seleccionar fecha"
+                  isClearable
+                  showPopperArrow={false}
+                  className="rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                 />
               </div>
-              {(fechaDesde || fechaHasta) && (
-                <button
-                  onClick={() => { setFechaDesde(""); setFechaHasta(""); setCurrentPage(1); }}
-                  className="rounded-lg px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
-                >
-                  Limpiar
-                </button>
-              )}
             </div>
           )}
         </div>
