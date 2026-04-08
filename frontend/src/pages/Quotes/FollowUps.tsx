@@ -503,6 +503,8 @@ export default function FollowUps() {
   const [responsableFiltro, setResponsableFiltro] = useState<string>("TODOS");
   const [solicitanteFiltro, setSolicitanteFiltro] = useState<string>("TODOS");
   const [fechaFiltro, setFechaFiltro] = useState<string>("TODOS");
+  const [fechaDesde, setFechaDesde] = useState<string>("");
+  const [fechaHasta, setFechaHasta] = useState<string>("");
 
   // Paginación
   const [currentPage, setCurrentPage] = useState(1);
@@ -960,6 +962,17 @@ export default function FollowUps() {
         if (fechaFiltro === "TODOS") return true;
         const now = new Date();
         const fechaSolicitud = new Date(cot.fechaSolicitud);
+        if (fechaFiltro === "PERSONALIZADO") {
+          if (fechaDesde) {
+            const desde = new Date(fechaDesde + "T00:00:00");
+            if (fechaSolicitud < desde) return false;
+          }
+          if (fechaHasta) {
+            const hasta = new Date(fechaHasta + "T23:59:59");
+            if (fechaSolicitud > hasta) return false;
+          }
+          return !!(fechaDesde || fechaHasta);
+        }
         const diffMs = now.getTime() - fechaSolicitud.getTime();
         const diffDays = diffMs / (1000 * 60 * 60 * 24);
         switch (fechaFiltro) {
@@ -1408,7 +1421,14 @@ export default function FollowUps() {
               </label>
               <select
                 value={fechaFiltro}
-                onChange={(e) => { setFechaFiltro(e.target.value); setCurrentPage(1); }}
+                onChange={(e) => {
+                  setFechaFiltro(e.target.value);
+                  setCurrentPage(1);
+                  if (e.target.value !== "PERSONALIZADO") {
+                    setFechaDesde("");
+                    setFechaHasta("");
+                  }
+                }}
                 className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
               >
                 <option value="TODOS">Todas las fechas</option>
@@ -1416,8 +1436,47 @@ export default function FollowUps() {
                 <option value="3_DIAS">Últimos 3 días</option>
                 <option value="7_DIAS">Últimos 7 días</option>
                 <option value="MES">Último mes</option>
+                <option value="PERSONALIZADO">Personalizado</option>
               </select>
             </div>
+          </div>
+          {/* Selector de rango de fechas personalizado */}
+          {fechaFiltro === "PERSONALIZADO" && (
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <label className="shrink-0 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Desde:
+                </label>
+                <input
+                  type="date"
+                  value={fechaDesde}
+                  onChange={(e) => { setFechaDesde(e.target.value); setCurrentPage(1); }}
+                  max={fechaHasta || undefined}
+                  className="rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="shrink-0 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Hasta:
+                </label>
+                <input
+                  type="date"
+                  value={fechaHasta}
+                  onChange={(e) => { setFechaHasta(e.target.value); setCurrentPage(1); }}
+                  min={fechaDesde || undefined}
+                  className="rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+                />
+              </div>
+              {(fechaDesde || fechaHasta) && (
+                <button
+                  onClick={() => { setFechaDesde(""); setFechaHasta(""); setCurrentPage(1); }}
+                  className="rounded-lg px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                >
+                  Limpiar
+                </button>
+              )}
+            </div>
+          )}
           </div>
         </div>
 
