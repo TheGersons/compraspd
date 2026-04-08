@@ -1289,7 +1289,10 @@ export class FollowUpsService {
       misAsignadas,
     ] = await Promise.all([
       this.prisma.cotizacion.count({
-        where: { estado: 'PENDIENTE' },
+        where: {
+          supervisorResponsableId: null,
+          estado: { notIn: ['APROBADA', 'RECHAZADA'] },
+        },
       }),
       this.prisma.cotizacion.count({
         where: { estado: 'EN_CONFIGURACION' },
