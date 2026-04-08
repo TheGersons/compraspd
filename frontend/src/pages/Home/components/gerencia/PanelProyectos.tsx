@@ -45,14 +45,15 @@ export default function PanelProyectos({
   };
 
   /**
-   * Función para contar productos críticos (naranja/rojo) por proyecto
-   * Usa los productosDetallados pasados como prop desde el API
+   * Contar productos atrasados y en proceso para un proyecto específico
    */
-  const contarProductosCriticos = (_proyecto: Proyecto): { total: number; atrasados: number; enProceso: number } => {
+  const contarProductosCriticos = (proyecto: Proyecto): { total: number; atrasados: number; enProceso: number } => {
     let atrasados = 0;
     let enProceso = 0;
 
-    productosDetallados.forEach(producto => {
+    const productosProyecto = productosDetallados.filter((p: any) => p.proyectoId === proyecto.id);
+
+    productosProyecto.forEach(producto => {
       const tieneAtraso = ESTADOS_KEYS.some(e => producto.estados[e] === 'atrasado');
       const tieneEnProceso = !tieneAtraso && ESTADOS_KEYS.some(e => producto.estados[e] === 'en_proceso');
 
@@ -135,13 +136,13 @@ export default function PanelProyectos({
                   }
                 `}
               >
-                {/* Badge con cantidad de productos críticos */}
+                {/* Badge con cantidad de productos atrasados */}
                 <div className="absolute right-2 top-2 flex items-center gap-1">
                   <span
                     className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${badgeColor}`}
-                    title={`${total} productos con problemas (${atrasados} atrasados, ${enProceso} en proceso)`}
+                    title={`${atrasados} productos atrasados, ${enProceso} en proceso`}
                   >
-                    {total}
+                    {atrasados}
                   </span>
                 </div>
 
