@@ -164,12 +164,12 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 const api = {
   // Cotizaciones
-  async getCotizacionesPendientes(filters?: { estado?: string; search?: string; page?: number }) {
+  async getCotizacionesPendientes(filters?: { search?: string; page?: number; pageSize?: number }) {
     const token = getToken();
     const params = new URLSearchParams();
-    if (filters?.estado) params.append("estado", filters.estado);
     if (filters?.search) params.append("search", filters.search);
     if (filters?.page) params.append("page", filters.page.toString());
+    if (filters?.pageSize) params.append("pageSize", filters.pageSize.toString());
 
     const response = await fetch(`${API_BASE_URL}/api/v1/followups?${params}`, {
       credentials: "include",
@@ -500,8 +500,13 @@ export default function FollowUps() {
 
   // Estados de filtros
   const [searchTerm, setSearchTerm] = useState("");
-  const [estadoFiltro, setEstadoFiltro] = useState<string>("TODOS");
   const [responsableFiltro, setResponsableFiltro] = useState<string>("TODOS");
+  const [solicitanteFiltro, setSolicitanteFiltro] = useState<string>("TODOS");
+  const [fechaFiltro, setFechaFiltro] = useState<string>("TODOS");
+
+  // Paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   // Estados del chat
   const [mensajes, setMensajes] = useState<ChatMessage[]>([]);
@@ -575,7 +580,7 @@ export default function FollowUps() {
     cargarPaises();
     asignarUsuario();
     api.getSupervisores().then(setSupervisores).catch(() => { });
-  }, [estadoFiltro]);
+  }, []);
 
   // Cargar mensajes cuando cambia la cotización seleccionada
   useEffect(() => {
@@ -614,11 +619,7 @@ export default function FollowUps() {
   const cargarCotizaciones = async () => {
     try {
       setLoading(true);
-      const filters: any = {};
-
-      if (estadoFiltro !== "TODOS") {
-        filters.estado = estadoFiltro;
-      }
+      const filters: any = { pageSize: 100 };
 
       if (searchTerm) {
         filters.search = searchTerm;
@@ -939,19 +940,52 @@ export default function FollowUps() {
     return labels[estado] || estado;
   };
 
-  const filteredCotizaciones = cotizaciones.filter((cot) => {
-    const matchesSearch =
-      cot.nombreCotizacion.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      cot.solicitante.nombre.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredCotizaciones = (() => {
+    const filtered = cotizaciones.filter((cot) => {
+      const matchesSearch =
+        cot.nombreCotizacion.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        cot.solicitante.nombre.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesResponsable =
-      responsableFiltro === "TODOS" ||
-      (responsableFiltro === "SIN_ASIGNAR"
-        ? !cot.responsableAsignado
-        : cot.responsableAsignado?.id === responsableFiltro);
+      const matchesResponsable =
+        responsableFiltro === "TODOS" ||
+        (responsableFiltro === "SIN_ASIGNAR"
+          ? !cot.responsableAsignado
+          : cot.responsableAsignado?.id === responsableFiltro);
 
-    return matchesSearch && matchesResponsable;
-  });
+      const matchesSolicitante =
+        solicitanteFiltro === "TODOS" ||
+        cot.solicitante.id === solicitanteFiltro;
+
+      const matchesFecha = (() => {
+        if (fechaFiltro === "TODOS") return true;
+        const now = new Date();
+        const fechaSolicitud = new Date(cot.fechaSolicitud);
+        const diffMs = now.getTime() - fechaSolicitud.getTime();
+        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+        switch (fechaFiltro) {
+          case "HOY":
+            return fechaSolicitud.toDateString() === now.toDateString();
+          case "3_DIAS":
+            return diffDays <= 3;
+          case "7_DIAS":
+            return diffDays <= 7;
+          case "MES":
+            return diffDays <= 30;
+          default:
+            return true;
+        }
+      })();
+
+      return matchesSearch && matchesResponsable && matchesSolicitante && matchesFecha;
+    });
+    return filtered;
+  })();
+
+  const totalPages = Math.ceil(filteredCotizaciones.length / PAGE_SIZE);
+  const paginatedCotizaciones = filteredCotizaciones.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
 
 
   const cargarProveedores = async () => {
@@ -1306,14 +1340,9 @@ export default function FollowUps() {
       <PageMeta description="Seguimiento de cotizaciones" title="Seguimiento de Cotizaciones" />
 
       <div className="max-w-full space-y-4">
-        {/* Header */}
-        <div className="rounded-lg border-2 border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Seguimientos</h1>
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Cotizaciones pendientes de aprobación</p>
-        </div>
-
         {/* Filtros */}
         <div className="rounded-lg border-2 border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+          {/* Barra de búsqueda */}
           <div className="relative mb-3">
             <input
               type="text"
@@ -1327,42 +1356,68 @@ export default function FollowUps() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
           </div>
-          <div className="flex gap-2">
-            {["TODOS", "PENDIENTE", "EN_CONFIGURACION", "APROBADA_PARCIAL"].map((estado) => (
-              <button
-                key={estado}
-                onClick={() => setEstadoFiltro(estado)}
-                className={`flex-1 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${estadoFiltro === estado
-                  ? "bg-blue-600 text-white dark:bg-blue-500"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-                  }`}
+          {/* Filtros en fila */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Filtro por solicitante */}
+            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+              <label className="shrink-0 text-sm font-medium text-gray-700 dark:text-gray-300">
+                Solicitante:
+              </label>
+              <select
+                value={solicitanteFiltro}
+                onChange={(e) => { setSolicitanteFiltro(e.target.value); setCurrentPage(1); }}
+                className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
               >
-                {estado === "TODOS" ? "Todos" : getEstadoLabel(estado).split(" ")[0]}
-              </button>
-            ))}
-          </div>
-          {/* Filtro por responsable asignado */}
-          <div className="mt-3 flex items-center gap-2">
-            <label className="shrink-0 text-sm font-medium text-gray-700 dark:text-gray-300">
-              Filtrar responsable:
-            </label>
-            <select
-              value={responsableFiltro}
-              onChange={(e) => setResponsableFiltro(e.target.value)}
-              className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
-            >
-              <option value="TODOS">Todos los responsables</option>
-              <option value="SIN_ASIGNAR">Sin asignar</option>
-              {Array.from(
-                new Map(
-                  cotizaciones
-                    .filter((c) => c.responsableAsignado)
-                    .map((c) => [c.responsableAsignado!.id, c.responsableAsignado!])
-                ).values()
-              ).map((r) => (
-                <option key={r.id} value={r.id}>{r.nombre}</option>
-              ))}
-            </select>
+                <option value="TODOS">Todos los solicitantes</option>
+                {Array.from(
+                  new Map(
+                    cotizaciones.map((c) => [c.solicitante.id, c.solicitante])
+                  ).values()
+                ).map((s) => (
+                  <option key={s.id} value={s.id}>{s.nombre}</option>
+                ))}
+              </select>
+            </div>
+            {/* Filtro por responsable asignado */}
+            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+              <label className="shrink-0 text-sm font-medium text-gray-700 dark:text-gray-300">
+                Responsable:
+              </label>
+              <select
+                value={responsableFiltro}
+                onChange={(e) => { setResponsableFiltro(e.target.value); setCurrentPage(1); }}
+                className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+              >
+                <option value="TODOS">Todos los responsables</option>
+                <option value="SIN_ASIGNAR">Sin asignar</option>
+                {Array.from(
+                  new Map(
+                    cotizaciones
+                      .filter((c) => c.responsableAsignado)
+                      .map((c) => [c.responsableAsignado!.id, c.responsableAsignado!])
+                  ).values()
+                ).map((r) => (
+                  <option key={r.id} value={r.id}>{r.nombre}</option>
+                ))}
+              </select>
+            </div>
+            {/* Filtro por fecha */}
+            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+              <label className="shrink-0 text-sm font-medium text-gray-700 dark:text-gray-300">
+                Fecha:
+              </label>
+              <select
+                value={fechaFiltro}
+                onChange={(e) => { setFechaFiltro(e.target.value); setCurrentPage(1); }}
+                className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+              >
+                <option value="TODOS">Todas las fechas</option>
+                <option value="HOY">Hoy</option>
+                <option value="3_DIAS">Últimos 3 días</option>
+                <option value="7_DIAS">Últimos 7 días</option>
+                <option value="MES">Último mes</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -1377,11 +1432,11 @@ export default function FollowUps() {
               <svg className="mb-4 h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              <p className="text-gray-600 dark:text-gray-400">No hay cotizaciones {estadoFiltro !== "TODOS" && "con este estado"}</p>
+              <p className="text-gray-600 dark:text-gray-400">No hay cotizaciones con los filtros seleccionados</p>
             </div>
           ) : (
             <div className="divide-y divide-gray-200 dark:divide-gray-700">
-              {filteredCotizaciones.map((cot) => (
+              {paginatedCotizaciones.map((cot) => (
                 <div
                   key={cot.id}
                   ref={el => { accordionRefs.current[cot.id] = el; }}
@@ -1883,6 +1938,44 @@ export default function FollowUps() {
             </div>
           )}
         </div>
+
+        {/* Paginación */}
+        {!loading && filteredCotizaciones.length > PAGE_SIZE && (
+          <div className="flex items-center justify-between rounded-lg border-2 border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Mostrando {((currentPage - 1) * PAGE_SIZE) + 1}-{Math.min(currentPage * PAGE_SIZE, filteredCotizaciones.length)} de {filteredCotizaciones.length} cotizaciones
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+              >
+                Anterior
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                    currentPage === page
+                      ? "bg-blue-600 text-white dark:bg-blue-500"
+                      : "border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                  }`}
+                >
+                  {page}
+                </button>
+              ))}
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* MODAL DE CONFIGURACIÓN DE TIMELINE */}
         {showTimelineModal && productoConfigurando && (
