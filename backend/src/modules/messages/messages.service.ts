@@ -595,6 +595,7 @@ export class MessagesService {
     messageContent: string,
   ): Promise<void> {
     const frontendUrl = 'http://89.167.20.163:8080';
+    const SUPERVISOR_EMAIL = 'lmartinez@energiapd.com';
 
     // Obtener todos los participantes actuales con sus datos de usuario
     const participantes = await this.prisma.participantesChat.findMany({
@@ -614,6 +615,9 @@ export class MessagesService {
       select: {
         id: true,
         nombreCotizacion: true,
+        solicitante: {
+          select: { id: true, nombre: true, email: true, activo: true },
+        },
         supervisorResponsable: {
           select: { id: true, nombre: true, email: true, activo: true },
         },
@@ -656,13 +660,14 @@ export class MessagesService {
       });
     }
 
-    // Obtener el nombre del emisor
+    // Obtener datos del emisor (nombre + email para determinar rol)
     const emisor = await this.prisma.usuario.findUnique({
       where: { id: senderId },
-      select: { nombre: true },
+      select: { nombre: true, email: true },
     });
 
     const senderName = emisor?.nombre || 'Un usuario';
+    const senderEmail = emisor?.email || '';
     const chatUrl = `${frontendUrl}/messages/${chatId}`;
     const preview =
       messageContent.length > 100
@@ -678,16 +683,38 @@ export class MessagesService {
       ? `${senderName}: ${preview}`
       : preview;
 
-    // Destinatarios = participantes originales (sin el emisor) + responsables externos activos
-    const destinatarios: UsuarioBasico[] = [
+    // Destinatarios de notificaciones (BD + SSE) = todos los participantes excepto el emisor
+    const destinatariosNotif: UsuarioBasico[] = [
       ...participantes
         .filter((p) => p.usuario.id !== senderId && p.usuario.activo)
         .map((p) => p.usuario),
       ...responsablesExternos.filter((r) => r.activo),
     ];
 
+    // Destinatario de EMAIL:
+    // - Si manda el supervisor (lmartinez) → email solo al solicitante
+    // - Si manda el solicitante u otro → email solo a lmartinez@energiapd.com
+    let emailDestinatario: UsuarioBasico | null = null;
+
+    if (senderEmail === SUPERVISOR_EMAIL) {
+      // El supervisor manda → notificar al solicitante
+      const solicitante = cotizacion?.solicitante as UsuarioBasico | undefined;
+      if (solicitante?.activo && solicitante.email) {
+        emailDestinatario = solicitante;
+      }
+    } else {
+      // El solicitante (u otro) manda → notificar a lmartinez
+      const supervisora = await this.prisma.usuario.findFirst({
+        where: { email: SUPERVISOR_EMAIL, activo: true },
+        select: { id: true, nombre: true, email: true, activo: true },
+      });
+      if (supervisora) {
+        emailDestinatario = supervisora as UsuarioBasico;
+      }
+    }
+
     await Promise.allSettled(
-      destinatarios.map(async (usuario) => {
+      destinatariosNotif.map(async (usuario) => {
         const notifData = {
           tipo: 'COMENTARIO_NUEVO',
           titulo,
@@ -706,20 +733,20 @@ export class MessagesService {
           chatId,
           cotizacionId: cotizacion?.id ?? null,
         });
-
-        // 3. Email
-        if (usuario.email) {
-          return this.mailService.sendNewMessageNotification(
-            usuario.email,
-            usuario.nombre,
-            senderName,
-            messageContent,
-            chatUrl,
-            cotizacion?.nombreCotizacion ?? undefined,
-            cotizacion?.id ?? undefined,
-          );
-        }
       }),
     );
+
+    // 3. Email — solo al destinatario determinado arriba
+    if (emailDestinatario) {
+      this.mailService.sendNewMessageNotification(
+        emailDestinatario.email,
+        emailDestinatario.nombre,
+        senderName,
+        messageContent,
+        chatUrl,
+        cotizacion?.nombreCotizacion ?? undefined,
+        cotizacion?.id ?? undefined,
+      ).catch(() => {});
+    }
   }
 }

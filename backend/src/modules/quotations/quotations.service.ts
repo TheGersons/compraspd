@@ -193,8 +193,9 @@ export class QuotationsService {
     quotationName: string,
     requesterName: string,
   ): Promise<void> {
-    const frontendUrl = process.env.FRONTEND_URL_SANDBOX || process.env.FRONTEND_URL || 'http://localhost:5173';
+    const frontendUrl = 'http://89.167.20.163:8080';
     const quotationUrl = `${frontendUrl}/quotes/${cotizacionId}`;
+    const SUPERVISOR_EMAIL = 'lmartinez@energiapd.com';
 
     // Obtener todos los usuarios con rol SUPERVISOR activos
     const supervisores = await this.prisma.usuario.findMany({
@@ -205,14 +206,15 @@ export class QuotationsService {
       select: { id: true, nombre: true, email: true },
     });
 
+    const notifData = {
+      tipo: 'COMPRA_CREADA',
+      titulo: 'Nueva cotización pendiente',
+      descripcion: `"${quotationName}" solicitada por ${requesterName}`,
+    };
+
+    // Notificaciones BD + SSE para todos los supervisores (sin cambios)
     await Promise.allSettled(
       supervisores.map(async (s) => {
-        const notifData = {
-          tipo: 'COMPRA_CREADA',
-          titulo: 'Nueva cotización pendiente',
-          descripcion: `"${quotationName}" solicitada por ${requesterName}`,
-        };
-
         // 1. Crear notificación en BD
         const notif = await this.notificacionService.create({
           userId: s.id,
@@ -224,19 +226,20 @@ export class QuotationsService {
           ...notif,
           cotizacionId,
         });
-
-        // 3. Email
-        if (s.email) {
-          return this.mailService.sendNewQuotationNotification(
-            s.email,
-            s.nombre,
-            quotationName,
-            requesterName,
-            quotationUrl,
-          );
-        }
       }),
     );
+
+    // 3. Email solo a lmartinez@energiapd.com
+    const supervisora = supervisores.find((s) => s.email === SUPERVISOR_EMAIL);
+    if (supervisora) {
+      this.mailService.sendNewQuotationNotification(
+        supervisora.email,
+        supervisora.nombre,
+        quotationName,
+        requesterName,
+        quotationUrl,
+      ).catch(() => {});
+    }
   }
 
   /**
