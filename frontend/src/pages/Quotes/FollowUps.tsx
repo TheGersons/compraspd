@@ -1343,6 +1343,22 @@ export default function FollowUps() {
   const confirmarPrecioFinal = async (detalle: Producto, estadoProductoId: string, confirmar: boolean) => {
     if (!cotizacionSeleccionada) return;
     try {
+      // Si hay valor en el input sin guardar, guardarlo y seleccionarlo primero
+      const valorEditando = precioEditando[detalle.id];
+      if (valorEditando !== undefined) {
+        const precio = parseFloat(valorEditando);
+        if (precio > 0) {
+          await guardarPrecioProducto(detalle, valorEditando);
+        }
+      } else {
+        // Si el precio existe pero no está seleccionado, seleccionarlo
+        const precioActual = preciosPorProducto[detalle.id]?.[0];
+        if (precioActual && !precioActual.seleccionado && precioActual.precio > 0) {
+          await api.selectPrecio(precioActual.id);
+          await cargarPreciosProducto(detalle.id);
+        }
+      }
+
       await api.aprobarProductos(cotizacionSeleccionada.id, [{ estadoProductoId, aprobado: confirmar }]);
       toast.success(confirmar ? "Precio final confirmado" : "Confirmación removida");
       await seleccionarCotizacion(cotizacionSeleccionada);
