@@ -443,8 +443,21 @@ export class QuotationsService {
       !dto.proyectoId &&
       !dto.fechaEntregaNacional;
 
+    // Fecha de entrega nacional se puede actualizar en cualquier estado por supervisores
+    const soloFechaEntregaNacional =
+      dto.fechaEntregaNacional &&
+      !dto.nombreCotizacion &&
+      !dto.tipoCompra &&
+      !dto.lugarEntrega &&
+      !dto.fechaLimite &&
+      !dto.fechaEstimada &&
+      !dto.tipoId &&
+      !dto.proyectoId &&
+      !dto.comentarios;
+
     const canEdit =
       (soloNombre && isSupervisor) ||
+      (soloFechaEntregaNacional && isSupervisor) ||
       (isOwner && current.estado === 'ENVIADA') ||
       (isSupervisor && ['ENVIADA', 'EN_REVISION'].includes(current.estado));
 
