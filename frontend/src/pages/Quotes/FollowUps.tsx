@@ -704,6 +704,15 @@ export default function FollowUps() {
     }
   };
 
+  const TIMELINE_NACIONAL_1DIA = {
+    diasCotizadoADescuento: 1,
+    diasDescuentoAAprobacionCompra: 1,
+    diasAprobacionCompraAComprado: 1,
+    diasCompradoAPagado: 1,
+    diasCifARecibido: 1,
+  };
+  const HONDURAS_ID = '53b360e4-f5fe-4f27-beba-90bc79390f07';
+
   const seleccionarCotizacion = async (cotizacion: Cotizacion) => {
     // Toggle: collapse if already selected
     if (cotizacionSeleccionada?.id === cotizacion.id) {
@@ -712,7 +721,31 @@ export default function FollowUps() {
     }
     try {
       setLoadingDetalle(true);
-      const detalle = await api.getCotizacionDetalle(cotizacion.id);
+      let detalle = await api.getCotizacionDetalle(cotizacion.id);
+
+      // Auto-configurar compras nacionales con 1 día por punto si algún producto no tiene timeline
+      if (detalle.tipoCompra === 'NACIONAL' && detalle.detalles?.length) {
+        const productosValidos = detalle.detalles.filter((p: Producto) => !p.estadoProducto?.rechazado);
+        const sinConfigurar = productosValidos.some((p: Producto) => !p.estadoProducto?.medioTransporte);
+        if (sinConfigurar && productosValidos.length > 0) {
+          try {
+            await api.configurarTimeline(
+              detalle.id,
+              productosValidos.map((p: Producto) => ({
+                sku: p.sku,
+                paisOrigenId: HONDURAS_ID,
+                medioTransporte: 'TERRESTRE',
+                timeline: TIMELINE_NACIONAL_1DIA,
+                notas: '',
+              })),
+            );
+            detalle = await api.getCotizacionDetalle(detalle.id);
+          } catch (e) {
+            console.error('Error auto-configurando timeline nacional:', e);
+          }
+        }
+      }
+
       setCotizacionSeleccionada(detalle);
       setVistaActiva("detalle");
       // Load prices for all products immediately
@@ -1849,8 +1882,8 @@ export default function FollowUps() {
                                   )}
                                   {cotizacionSeleccionada.detalles && cotizacionSeleccionada.detalles.length > 0 ? (
                                     <div className="overflow-x-auto">
-                                      {/* Botón "aplicar a todos" — solo cuando hay 2+ productos y el usuario puede configurar */}
-                                      {!isComercial && cotizacionSeleccionada.detalles.filter(p => !p.estadoProducto?.rechazado).length > 1 && (
+                                      {/* Botón "aplicar a todos" — solo cuando hay 2+ productos, el usuario puede configurar, y no es NACIONAL */}
+                                      {!isComercial && cotizacionSeleccionada.tipoCompra !== 'NACIONAL' && cotizacionSeleccionada.detalles.filter(p => !p.estadoProducto?.rechazado).length > 1 && (
                                         <div className="mb-3 flex justify-end">
                                           <button
                                             onClick={configurarTodosProductos}
@@ -1871,7 +1904,7 @@ export default function FollowUps() {
                                             <th className="pb-3 pr-3 font-semibold text-gray-700 dark:text-gray-300">Precio</th>
                                             <th className="pb-3 pr-3 font-semibold text-gray-700 dark:text-gray-300">Comprobante</th>
                                             <th className="pb-3 pr-3 text-center font-semibold text-gray-700 dark:text-gray-300">Confirmar precio final</th>
-                                            {!isComercial && <th className="pb-3 font-semibold text-gray-700 dark:text-gray-300">Acciones</th>}
+                                            {!isComercial && cotizacionSeleccionada.tipoCompra !== 'NACIONAL' && <th className="pb-3 font-semibold text-gray-700 dark:text-gray-300">Acciones</th>}
                                           </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-100 dark:divide-gray-700/50">
@@ -1982,7 +2015,7 @@ export default function FollowUps() {
                                                       className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 cursor-pointer disabled:cursor-not-allowed"
                                                     />
                                                   </td>
-                                                  {!isComercial && (
+                                                  {!isComercial && cotizacionSeleccionada.tipoCompra !== 'NACIONAL' && (
                                                     <td className="py-3">
                                                       <button
                                                         onClick={() => configurarProducto(producto)}
