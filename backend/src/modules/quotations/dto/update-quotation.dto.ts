@@ -42,4 +42,8 @@ export class UpdateQuotationDto {
   @IsOptional()
   @IsString()
   comentarios?: string;
+
+  @IsOptional()
+  @IsDateString()
+  fechaEntregaNacional?: string;
 }

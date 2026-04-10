@@ -102,7 +102,7 @@ type Cotizacion = {
     nombre: string;
   };
   chatId: string;
-  fechaEstimada?: string;
+  fechaEntregaNacional?: string;
   totalProductos: number;
   productosAprobados: number;
   productosPendientes: number;
@@ -498,13 +498,13 @@ const api = {
     return response.json();
   },
 
-  async actualizarFechaEstimada(id: string, fechaEstimada: string) {
+  async actualizarFechaEntregaNacional(id: string, fechaEntregaNacional: string) {
     const token = getToken();
     const response = await fetch(`${API_BASE_URL}/api/v1/quotations/${id}`, {
       method: "PATCH",
       credentials: "include",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ fechaEstimada }),
+      body: JSON.stringify({ fechaEntregaNacional }),
     });
     if (!response.ok) throw new Error("Error al actualizar fecha estimada");
     return response.json();
@@ -1818,8 +1818,8 @@ export default function FollowUps() {
                                               >
                                                 <CalendarIcon className="h-3.5 w-3.5 text-blue-500 shrink-0" />
                                                 <span className="text-gray-700 dark:text-gray-300">
-                                                  {cotizacionSeleccionada.fechaEstimada
-                                                    ? format(new Date(cotizacionSeleccionada.fechaEstimada), "dd 'de' MMM, yyyy", { locale: es })
+                                                  {cotizacionSeleccionada.fechaEntregaNacional
+                                                    ? format(new Date(cotizacionSeleccionada.fechaEntregaNacional), "dd 'de' MMM, yyyy", { locale: es })
                                                     : <span className="text-gray-400">Sin fecha</span>}
                                                 </span>
                                               </button>
@@ -1827,14 +1827,14 @@ export default function FollowUps() {
                                             <PopoverContent className="w-auto p-0" align="start">
                                               <Calendar
                                                 mode="single"
-                                                selected={cotizacionSeleccionada.fechaEstimada ? new Date(cotizacionSeleccionada.fechaEstimada) : undefined}
+                                                selected={cotizacionSeleccionada.fechaEntregaNacional ? new Date(cotizacionSeleccionada.fechaEntregaNacional) : undefined}
                                                 onSelect={async (date) => {
                                                   if (!date) return;
                                                   const iso = date.toISOString();
                                                   try {
-                                                    await api.actualizarFechaEstimada(cotizacionSeleccionada.id, iso);
-                                                    setCotizacionSeleccionada({ ...cotizacionSeleccionada, fechaEstimada: iso });
-                                                    setCotizaciones(prev => prev.map(c => c.id === cotizacionSeleccionada.id ? { ...c, fechaEstimada: iso } : c));
+                                                    await api.actualizarFechaEntregaNacional(cotizacionSeleccionada.id, iso);
+                                                    setCotizacionSeleccionada({ ...cotizacionSeleccionada, fechaEntregaNacional: iso });
+                                                    setCotizaciones(prev => prev.map(c => c.id === cotizacionSeleccionada.id ? { ...c, fechaEntregaNacional: iso } : c));
                                                     toast.success("Fecha estimada guardada");
                                                   } catch { toast.error("Error al guardar fecha"); }
                                                 }}
@@ -2015,7 +2015,26 @@ export default function FollowUps() {
 
                               {/* TAB 2: CHAT */}
                               {vistaActiva === "chat" && (
-                                <div className="flex h-[400px] flex-col">
+                                <div
+                                  className={`relative flex h-[400px] flex-col transition-colors ${isDragging ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}
+                                  onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                                  onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragging(false); }}
+                                  onDrop={(e) => {
+                                    e.preventDefault();
+                                    setIsDragging(false);
+                                    const files = Array.from(e.dataTransfer.files);
+                                    if (files.length) enviarArchivos(files);
+                                  }}
+                                >
+                                  {isDragging && (
+                                    <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-blue-400 bg-blue-50/80 dark:bg-blue-900/50">
+                                      <svg className="mb-2 h-10 w-10 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                      </svg>
+                                      <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">Suelta los archivos aquí</span>
+                                      <span className="mt-1 text-xs text-blue-500 dark:text-blue-500">Máx. 30MB por archivo</span>
+                                    </div>
+                                  )}
                                   <div className="flex-1 overflow-y-auto space-y-4 mb-4">
                                     {loadingChat ? (
                                       <div className="flex h-full items-center justify-center">
@@ -2082,22 +2101,7 @@ export default function FollowUps() {
                                       </>
                                     )}
                                   </div>
-                                  <div
-                                    className={`relative flex gap-2 border-t border-gray-200 pt-4 dark:border-gray-700 rounded-b-lg transition-colors ${isDragging ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}
-                                    onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                                    onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragging(false); }}
-                                    onDrop={(e) => {
-                                      e.preventDefault();
-                                      setIsDragging(false);
-                                      const files = Array.from(e.dataTransfer.files);
-                                      if (files.length) enviarArchivos(files);
-                                    }}
-                                  >
-                                    {isDragging && (
-                                      <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg border-2 border-dashed border-blue-400 bg-blue-50/80 dark:bg-blue-900/40 z-10">
-                                        <span className="text-sm font-medium text-blue-600 dark:text-blue-400">Suelta los archivos aquí</span>
-                                      </div>
-                                    )}
+                                  <div className="flex gap-2 border-t border-gray-200 pt-4 dark:border-gray-700">
                                     <input ref={chatFileRef} type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,.rar"
                                       onChange={(e) => { const files = Array.from(e.target.files || []); if (files.length) enviarArchivos(files); }} className="hidden" />
                                     <button onClick={() => chatFileRef.current?.click()} disabled={sendingFile || sendingMessage}

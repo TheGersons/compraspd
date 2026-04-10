@@ -440,7 +440,8 @@ export class QuotationsService {
       !dto.fechaLimite &&
       !dto.fechaEstimada &&
       !dto.tipoId &&
-      !dto.proyectoId;
+      !dto.proyectoId &&
+      !dto.fechaEntregaNacional;
 
     const canEdit =
       (soloNombre && isSupervisor) ||
@@ -489,6 +490,9 @@ export class QuotationsService {
         comentarios: dto.comentarios ?? current.comentarios,
         tipoId: dto.tipoId ?? current.tipoId,
         proyectoId: dto.proyectoId ?? current.proyectoId,
+        fechaEntregaNacional: dto.fechaEntregaNacional
+          ? new Date(dto.fechaEntregaNacional)
+          : current.fechaEntregaNacional,
       },
       include: {
         detalles: true,
@@ -725,6 +729,7 @@ export class QuotationsService {
         fechaSolicitud: cot.fechaSolicitud,
         fechaLimite: cot.fechaLimite,
         fechaEstimada: cot.fechaEstimada,
+        fechaEntregaNacional: cot.fechaEntregaNacional,
         aprobadaParcialmente: cot.aprobadaParcialmente,
         todosProductosAprobados: cot.todosProductosAprobados,
         comentarios: cot.comentarios,

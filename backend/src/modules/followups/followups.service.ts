@@ -186,6 +186,7 @@ export class FollowUpsService {
         licitacion: cot.licitacion ?? null,
         oferta: cot.oferta ?? null,
         chatId: cot.chatId,
+        fechaEntregaNacional: cot.fechaEntregaNacional,
         totalProductos,
         productosAprobados,
         productosPendientes,

@@ -288,11 +288,12 @@ model Cotizacion {
   // ========================================
   // NUEVOS CAMPOS
   // ========================================
-  supervisorResponsableId String?   @map("supervisor_responsable_id") @db.Uuid
-  chatId                  String?   @unique @map("chat_id") @db.Uuid
-  aprobadaParcialmente    Boolean   @default(false) @map("aprobada_parcialmente")
-  todosProductosAprobados Boolean   @default(false) @map("todos_productos_aprobados")
-  fechaAprobacion         DateTime? @map("fecha_aprobacion")
+  supervisorResponsableId  String?   @map("supervisor_responsable_id") @db.Uuid
+  chatId                   String?   @unique @map("chat_id") @db.Uuid
+  aprobadaParcialmente     Boolean   @default(false) @map("aprobada_parcialmente")
+  todosProductosAprobados  Boolean   @default(false) @map("todos_productos_aprobados")
+  fechaAprobacion          DateTime? @map("fecha_aprobacion")
+  fechaEntregaNacional     DateTime? @map("fecha_entrega_nacional")
 
   // Relaciones existentes
   tipo        Tipo      @relation(fields: [tipoId], references: [id], onDelete: Restrict)
