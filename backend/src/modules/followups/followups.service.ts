@@ -938,16 +938,18 @@ export class FollowUpsService {
           );
         }
 
-        // VALIDACIÓN 2: Debe tener comprobante de descuento solicitado
+        // VALIDACIÓN 2: Debe indicar si aplica o no aplica comprobante de descuento
         if (!precioSeleccionado.ComprobanteDescuento) {
           throw new BadRequestException(
-            `El producto "${estadoProducto.sku}" debe tener una solicitud de descuento con comprobante antes de aprobarlo. ` +
-              `Por favor, solicite el descuento primero.`,
+            `El producto "${estadoProducto.sku}" requiere indicar si aplica o no aplica comprobante de descuento antes de aprobarlo.`,
           );
         }
 
-        // VALIDACIÓN 3: Debe tener resultado de descuento (aprobado o denegado)
-        if (precioSeleccionado.precioDescuento === null) {
+        // VALIDACIÓN 3: Solo si aplica comprobante (no es 'no_aplica'), debe tener resultado de descuento
+        if (
+          precioSeleccionado.ComprobanteDescuento !== 'no_aplica' &&
+          precioSeleccionado.precioDescuento === null
+        ) {
           throw new BadRequestException(
             `El producto "${estadoProducto.sku}" debe tener el resultado del descuento (aprobado o denegado) antes de aprobarlo. ` +
               `Por favor, agregue el resultado del descuento.`,
