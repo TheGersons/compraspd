@@ -22,7 +22,8 @@
       "Bash(npx prisma:*)",
       "Bash(echo \"EXIT_CODE=$?\")",
       "Bash(pnpm build:*)",
-      "Bash(echo \"EXIT=$?\")"
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(npx skills:*)"
     ]
   }
 }

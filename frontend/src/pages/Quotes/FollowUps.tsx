@@ -102,6 +102,7 @@ type Cotizacion = {
     nombre: string;
   };
   chatId: string;
+  fechaEstimada?: string;
   totalProductos: number;
   productosAprobados: number;
   productosPendientes: number;
@@ -473,6 +474,18 @@ const api = {
     return response.json();
   },
 
+  async updatePrecio(id: string, data: { precio?: number; comprobanteDescuento?: string }) {
+    const token = getToken();
+    const response = await fetch(`${API_BASE_URL}/api/v1/precios/${id}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error("Error al actualizar precio");
+    return response.json();
+  },
+
   async actualizarNombreCotizacion(id: string, nombreCotizacion: string) {
     const token = getToken();
     const response = await fetch(`${API_BASE_URL}/api/v1/quotations/${id}`, {
@@ -482,6 +495,18 @@ const api = {
       body: JSON.stringify({ nombreCotizacion }),
     });
     if (!response.ok) throw new Error("Error al actualizar nombre");
+    return response.json();
+  },
+
+  async actualizarFechaEstimada(id: string, fechaEstimada: string) {
+    const token = getToken();
+    const response = await fetch(`${API_BASE_URL}/api/v1/quotations/${id}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ fechaEstimada }),
+    });
+    if (!response.ok) throw new Error("Error al actualizar fecha estimada");
     return response.json();
   },
 };
@@ -522,6 +547,7 @@ export default function FollowUps() {
   const [sendingMessage, setSendingMessage] = useState(false);
   const chatFileRef = useRef<HTMLInputElement>(null);
   const [sendingFile, setSendingFile] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [imagenModal, setImagenModal] = useState<{ src: string; nombre: string; downloadUrl: string } | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const [notasAbiertas, setNotasAbiertas] = useState<string | null>(null);
@@ -775,13 +801,22 @@ export default function FollowUps() {
     }
   };
 
-  const enviarArchivo = async (file: File) => {
-    if (!file || !cotizacionSeleccionada?.chatId) return;
+  const MAX_FILE_SIZE = 30 * 1024 * 1024; // 30MB
+
+  const enviarArchivos = async (files: File[]) => {
+    if (!files.length || !cotizacionSeleccionada?.chatId) return;
+    const tooLarge = files.filter(f => f.size > MAX_FILE_SIZE);
+    if (tooLarge.length > 0) {
+      toast.error(`Archivo(s) superan 30MB: ${tooLarge.map(f => f.name).join(', ')}`);
+      return;
+    }
     try {
       setSendingFile(true);
-      await api.sendMessageWithFile(cotizacionSeleccionada.chatId, file);
+      for (const file of files) {
+        await api.sendMessageWithFile(cotizacionSeleccionada.chatId, file);
+      }
       await cargarMensajes(cotizacionSeleccionada.chatId);
-      addNotification("success", "Archivo enviado", file.name);
+      addNotification("success", files.length === 1 ? "Archivo enviado" : `${files.length} archivos enviados`, files.map(f => f.name).join(', '));
     } catch (error: any) {
       console.error("Error al enviar archivo:", error);
       addNotification("danger", "Error", error.message || "Error al enviar archivo");
@@ -790,6 +825,8 @@ export default function FollowUps() {
       if (chatFileRef.current) chatFileRef.current.value = "";
     }
   };
+
+  const enviarArchivo = async (file: File) => enviarArchivos([file]);
 
   const handleAsignarResponsableCotizacion = async (responsableId: string | null) => {
     if (!cotizacionSeleccionada?.estadosProductos) return;
@@ -1024,10 +1061,16 @@ export default function FollowUps() {
   const cargarPreciosProducto = async (detalleId: string) => {
     try {
       const data = await api.getPreciosByDetalle(detalleId);
+      const precios = Array.isArray(data) ? data : [];
       setPreciosPorProducto(prev => ({
         ...prev,
-        [detalleId]: Array.isArray(data) ? data : []
+        [detalleId]: precios
       }));
+      const primer = precios[0];
+      if (primer?.ComprobanteDescuento) {
+        const status = primer.ComprobanteDescuento === 'no_aplica' ? 'no_aplica' : 'aplica';
+        setComprobanteStatus(prev => ({ ...prev, [detalleId]: status }));
+      }
     } catch (error) {
       console.error("Error al cargar precios:", error);
       // No limpiar los precios existentes en caso de error
@@ -1252,7 +1295,8 @@ export default function FollowUps() {
       for (const p of existingPrecios) {
         await api.deletePrecio(p.id);
       }
-      await api.createPrecioDirecto({ cotizacionDetalleId: detalle.id, precio });
+      const nuevoPrecio = await api.createPrecioDirecto({ cotizacionDetalleId: detalle.id, precio });
+      await api.selectPrecio(nuevoPrecio.id);
       await cargarPreciosProducto(detalle.id);
       setPrecioEditando(prev => { const n = { ...prev }; delete n[detalle.id]; return n; });
       toast.success("Precio guardado");
@@ -1755,10 +1799,52 @@ export default function FollowUps() {
                               {/* TAB 1: PRODUCTOS Y PRECIOS */}
                               {vistaActiva === "detalle" && (
                                 <div className="space-y-4">
-                                  {(cotizacionSeleccionada as any).comentarios && (
-                                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20">
-                                      <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">💬 Comentarios de la solicitud:</p>
-                                      <p className="text-sm text-amber-800 dark:text-amber-300">{(cotizacionSeleccionada as any).comentarios}</p>
+                                  {((cotizacionSeleccionada as any).comentarios || cotizacionSeleccionada.tipoCompra === 'NACIONAL') && (
+                                    <div className="flex gap-3 items-stretch">
+                                      {(cotizacionSeleccionada as any).comentarios && (
+                                        <div className="flex-1 rounded-lg border border-amber-200 bg-amber-50 p-2 dark:border-amber-800 dark:bg-amber-900/20">
+                                          <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-0.5">💬 Comentarios de la solicitud:</p>
+                                          <p className="text-sm text-amber-800 dark:text-amber-300 leading-snug">{(cotizacionSeleccionada as any).comentarios}</p>
+                                        </div>
+                                      )}
+                                      {cotizacionSeleccionada.tipoCompra === 'NACIONAL' && (
+                                        <div className="shrink-0 rounded-lg border border-blue-200 bg-blue-50 p-2 dark:border-blue-800 dark:bg-blue-900/20 flex flex-col gap-1 min-w-[180px]">
+                                          <p className="text-xs font-medium text-blue-700 dark:text-blue-400">📅 Entrega estimada:</p>
+                                          <Popover>
+                                            <PopoverTrigger asChild>
+                                              <button
+                                                disabled={isComercial}
+                                                className="flex items-center gap-1.5 rounded border border-blue-300 bg-white px-2 py-1 text-sm text-left hover:border-blue-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed dark:border-blue-700 dark:bg-gray-800 dark:text-white"
+                                              >
+                                                <CalendarIcon className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                                <span className="text-gray-700 dark:text-gray-300">
+                                                  {cotizacionSeleccionada.fechaEstimada
+                                                    ? format(new Date(cotizacionSeleccionada.fechaEstimada), "dd 'de' MMM, yyyy", { locale: es })
+                                                    : <span className="text-gray-400">Sin fecha</span>}
+                                                </span>
+                                              </button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-auto p-0" align="start">
+                                              <Calendar
+                                                mode="single"
+                                                selected={cotizacionSeleccionada.fechaEstimada ? new Date(cotizacionSeleccionada.fechaEstimada) : undefined}
+                                                onSelect={async (date) => {
+                                                  if (!date) return;
+                                                  const iso = date.toISOString();
+                                                  try {
+                                                    await api.actualizarFechaEstimada(cotizacionSeleccionada.id, iso);
+                                                    setCotizacionSeleccionada({ ...cotizacionSeleccionada, fechaEstimada: iso });
+                                                    setCotizaciones(prev => prev.map(c => c.id === cotizacionSeleccionada.id ? { ...c, fechaEstimada: iso } : c));
+                                                    toast.success("Fecha estimada guardada");
+                                                  } catch { toast.error("Error al guardar fecha"); }
+                                                }}
+                                                disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                                                initialFocus
+                                              />
+                                            </PopoverContent>
+                                          </Popover>
+                                        </div>
+                                      )}
                                     </div>
                                   )}
                                   {cotizacionSeleccionada.detalles && cotizacionSeleccionada.detalles.length > 0 ? (
@@ -1848,7 +1934,17 @@ export default function FollowUps() {
                                                     <div className="flex flex-col gap-1.5">
                                                       <select
                                                         value={comprobanteStatus[producto.id] ?? ''}
-                                                        onChange={(e) => setComprobanteStatus(prev => ({ ...prev, [producto.id]: e.target.value as 'aplica' | 'no_aplica' | '' }))}
+                                                        onChange={async (e) => {
+                                                          const val = e.target.value as 'aplica' | 'no_aplica' | '';
+                                                          setComprobanteStatus(prev => ({ ...prev, [producto.id]: val }));
+                                                          if (val === 'no_aplica' && precioActual) {
+                                                            try {
+                                                              await api.updatePrecio(precioActual.id, { comprobanteDescuento: 'no_aplica' });
+                                                            } catch {
+                                                              toast.error("Error al guardar estado comprobante");
+                                                            }
+                                                          }
+                                                        }}
                                                         disabled={yaAprobado}
                                                         className="rounded border border-gray-300 bg-white px-2 py-1 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
                                                       >
@@ -1986,11 +2082,26 @@ export default function FollowUps() {
                                       </>
                                     )}
                                   </div>
-                                  <div className="flex gap-2 border-t border-gray-200 pt-4 dark:border-gray-700">
-                                    <input ref={chatFileRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,.rar"
-                                      onChange={(e) => { const file = e.target.files?.[0]; if (file) enviarArchivo(file); }} className="hidden" />
+                                  <div
+                                    className={`relative flex gap-2 border-t border-gray-200 pt-4 dark:border-gray-700 rounded-b-lg transition-colors ${isDragging ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}
+                                    onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                                    onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragging(false); }}
+                                    onDrop={(e) => {
+                                      e.preventDefault();
+                                      setIsDragging(false);
+                                      const files = Array.from(e.dataTransfer.files);
+                                      if (files.length) enviarArchivos(files);
+                                    }}
+                                  >
+                                    {isDragging && (
+                                      <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg border-2 border-dashed border-blue-400 bg-blue-50/80 dark:bg-blue-900/40 z-10">
+                                        <span className="text-sm font-medium text-blue-600 dark:text-blue-400">Suelta los archivos aquí</span>
+                                      </div>
+                                    )}
+                                    <input ref={chatFileRef} type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,.rar"
+                                      onChange={(e) => { const files = Array.from(e.target.files || []); if (files.length) enviarArchivos(files); }} className="hidden" />
                                     <button onClick={() => chatFileRef.current?.click()} disabled={sendingFile || sendingMessage}
-                                      className="rounded-lg border-2 border-gray-300 px-3 py-2 text-gray-500 transition-colors hover:border-blue-400 hover:text-blue-500 disabled:opacity-50 dark:border-gray-600 dark:text-gray-400 dark:hover:border-blue-500 dark:hover:text-blue-400" title="Adjuntar archivo">
+                                      className="rounded-lg border-2 border-gray-300 px-3 py-2 text-gray-500 transition-colors hover:border-blue-400 hover:text-blue-500 disabled:opacity-50 dark:border-gray-600 dark:text-gray-400 dark:hover:border-blue-500 dark:hover:text-blue-400" title="Adjuntar archivos (máx. 30MB c/u)">
                                       {sendingFile ? (
                                         <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
                                       ) : (
@@ -2001,7 +2112,7 @@ export default function FollowUps() {
                                     </button>
                                     <input type="text" value={nuevoMensaje} onChange={(e) => setNuevoMensaje(e.target.value)}
                                       onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && enviarMensaje()}
-                                      placeholder="Escribe un mensaje..." disabled={sendingMessage || sendingFile}
+                                      placeholder="Escribe un mensaje o arrastra archivos aquí..." disabled={sendingMessage || sendingFile}
                                       className="flex-1 rounded-lg border-2 border-gray-300 bg-white px-4 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400" />
                                     <button onClick={enviarMensaje} disabled={!nuevoMensaje.trim() || sendingMessage}
                                       className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600">

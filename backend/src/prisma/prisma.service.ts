@@ -1,16 +1,24 @@
 // backend/src/prisma/prisma.service.ts
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { PrismaClient, Prisma } from '@prisma/client';
 
 @Injectable()
-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+export class PrismaService
+  extends PrismaClient
+  implements OnModuleInit, OnModuleDestroy
+{
   private readonly logger = new Logger('Prisma');
 
   constructor() {
     super({
       log: [
         { level: 'error', emit: 'event' },
-        { level: 'warn',  emit: 'event' },
+        { level: 'warn', emit: 'event' },
         // { level: 'query', emit: 'event' },
         // { level: 'info',  emit: 'event' },
       ],
@@ -18,13 +26,13 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
     // Forzar la firma de $on para evitar "never"
     const on = this.$on.bind(this) as unknown as {
-      (event: 'error'|'warn', cb: (e: Prisma.LogEvent) => void): void;
+      (event: 'error' | 'warn', cb: (e: Prisma.LogEvent) => void): void;
       (event: 'query', cb: (e: Prisma.QueryEvent) => void): void;
-      (event: 'info',  cb: (e: Prisma.LogEvent) => void): void;
+      (event: 'info', cb: (e: Prisma.LogEvent) => void): void;
     };
 
     on('error', (e) => this.logger.error(`[${e.target}] ${e.message}`));
-    on('warn',  (e) => this.logger.warn(`[${e.target}] ${e.message}`));
+    on('warn', (e) => this.logger.warn(`[${e.target}] ${e.message}`));
     // on('query', (e) => this.logger.log(`${e.query} :: ${e.duration}ms`));
     // on('info',  (e) => this.logger.log(e.message));
   }

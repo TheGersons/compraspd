@@ -114,6 +114,7 @@ type Cotizacion = {
     comentarios?: string;
     tipoCompra: 'NACIONAL' | 'INTERNACIONAL';
     lugarEntrega: string;
+    fechaEstimada?: string;
     solicitante: {
         id: string;
         nombre: string;
@@ -1110,6 +1111,21 @@ export default function MyQuotes() {
                                             </div>
                                         )}
                                     </div>
+
+                                    {/* Fecha estimada de entrega - solo compras nacionales */}
+                                    {cotizacionSeleccionada.tipoCompra === 'NACIONAL' && cotizacionSeleccionada.fechaEstimada && (
+                                        <div className="flex items-center gap-3 rounded-xl border-2 border-blue-300 bg-gradient-to-r from-blue-50 to-blue-100 px-4 py-3 dark:border-blue-700 dark:from-blue-900/30 dark:to-blue-900/20">
+                                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-500 text-white text-lg shadow">
+                                                📅
+                                            </div>
+                                            <div>
+                                                <p className="text-xs font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400">Entrega Estimada</p>
+                                                <p className="text-base font-bold text-blue-800 dark:text-blue-200">
+                                                    {new Date(cotizacionSeleccionada.fechaEstimada).toLocaleDateString('es-HN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {/* Resumen de progreso - calculado dinámicamente */}
                                     {(vistaActual === 'enCompras' || vistaActual === 'completadas') && (() => {

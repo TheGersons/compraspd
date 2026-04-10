@@ -1061,7 +1061,7 @@ model ReporteCompra {
   creado               DateTime  @default(now())
   actualizado          DateTime  @updatedAt
 
-  cotizacion Cotizacion        @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  cotizacion Cotizacion         @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
   logs       ReporteCompraLog[]
 
   @@map("reporte_compra")
