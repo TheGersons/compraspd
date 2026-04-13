@@ -3,6 +3,9 @@ set -e
 
 corepack enable
 
+echo "Sincronizando dependencias..."
+pnpm install --no-frozen-lockfile
+
 echo "Esperando DB..."
 until nc -z db 5432; do sleep 1; done
 
