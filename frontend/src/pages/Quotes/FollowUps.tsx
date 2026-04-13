@@ -258,7 +258,10 @@ const api = {
       },
       body: JSON.stringify({ productos }),
     });
-    if (!response.ok) throw new Error("Error al aprobar productos");
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.message || "Error al aprobar productos");
+    }
     return response.json();
   },
 
@@ -388,11 +391,14 @@ const api = {
   async selectPrecio(precioId: string) {
     const token = getToken();
     const response = await fetch(`${API_BASE_URL}/api/v1/precios/${precioId}/select`, {
-      method: "POST",  // ← Tu backend usa POST, no PATCH
+      method: "POST",
       credentials: "include",
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!response.ok) throw new Error("Error al seleccionar precio");
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.message || "Error al seleccionar precio");
+    }
     return response.json();
   },
 
@@ -404,7 +410,10 @@ const api = {
       credentials: "include",
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!response.ok) throw new Error("Error al eliminar precio");
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.message || "Error al eliminar precio");
+    }
     return response.json();
   },
 
@@ -577,6 +586,12 @@ export default function FollowUps() {
   const [productoConfigurando, setProductoConfigurando] = useState<Producto | null>(null);
   const [aplicarATodos, setAplicarATodos] = useState(false);
   const [paises, setPaises] = useState<Pais[]>([]);
+  // Confirmación pendiente para ejecutar tras configurar timeline en INTERNACIONAL
+  const [pendingConfirmacion, setPendingConfirmacion] = useState<{
+    detalle: Producto;
+    estadoProductoId: string;
+    confirmar: boolean;
+  } | null>(null);
 
   // Estados de historial
   const [historial, setHistorial] = useState<HistorialCambio[]>([]);
@@ -933,10 +948,45 @@ export default function FollowUps() {
 
       setShowTimelineModal(false);
       setAplicarATodos(false);
+      setProductoConfigurando(null);
+
+      // Recargar para que el detalle tenga medioTransporte actualizado
       await seleccionarCotizacion(cotizacionSeleccionada);
+
+      // Si había una confirmación pendiente (caso INTERNACIONAL sin timeline),
+      // ejecutarla ahora que el timeline ya está configurado.
+      if (pendingConfirmacion) {
+        const pending = pendingConfirmacion;
+        setPendingConfirmacion(null);
+        // Pequeño delay para que el estado del detalle se actualice
+        setTimeout(async () => {
+          try {
+            const precioActual = preciosPorProducto[pending.detalle.id]?.[0];
+            if (precioActual && !precioActual.seleccionado && precioActual.precio > 0) {
+              await api.selectPrecio(precioActual.id);
+              await cargarPreciosProducto(pending.detalle.id);
+            }
+            await api.aprobarProductos(cotizacionSeleccionada.id, [{
+              estadoProductoId: pending.estadoProductoId,
+              aprobado: pending.confirmar,
+            }]);
+            toast.success(pending.confirmar ? "Precio final confirmado" : "Confirmación removida");
+            await seleccionarCotizacion(cotizacionSeleccionada);
+            await cargarCotizaciones();
+          } catch (e: any) {
+            const msg: string = e.message || '';
+            if (msg.includes('comprobante de descuento') || msg.includes('requiere indicar')) {
+              toast.error("Selecciona 'Aplica' o 'No Aplica' en la columna Comprobante antes de confirmar");
+            } else {
+              toast.error(msg || "Error al confirmar precio");
+            }
+          }
+        }, 500);
+      }
     } catch (error) {
       console.error("Error al configurar timeline:", error);
       addNotification("danger", "Error al configurar timeline", "Error al configurar timeline");
+      setPendingConfirmacion(null);
       throw error;
     }
   };
@@ -1325,16 +1375,39 @@ export default function FollowUps() {
     setSavingPrecio(detalle.id);
     try {
       const existingPrecios = preciosPorProducto[detalle.id] || [];
-      for (const p of existingPrecios) {
-        await api.deletePrecio(p.id);
-      }
+      const oldIds = existingPrecios.map(p => p.id);
+
+      // 1. Crear el precio nuevo primero
       const nuevoPrecio = await api.createPrecioDirecto({ cotizacionDetalleId: detalle.id, precio });
-      await api.selectPrecio(nuevoPrecio.id);
+
+      // 2. Seleccionarlo (puede fallar en INTERNACIONAL sin timeline configurado)
+      try {
+        await api.selectPrecio(nuevoPrecio.id);
+      } catch (selErr: any) {
+        const msg: string = selErr.message || '';
+        // Si falla porque la cotización no está en estado correcto,
+        // el precio queda guardado pero no seleccionado — el usuario
+        // necesita configurar el timeline primero.
+        if (msg.includes('EN_REVISION') || msg.includes('EN_CONFIGURACION')) {
+          toast.error("Precio guardado. Configura el timeline antes de seleccionarlo.");
+        } else {
+          toast.error(msg || "Error al seleccionar precio");
+        }
+        await cargarPreciosProducto(detalle.id);
+        setPrecioEditando(prev => { const n = { ...prev }; delete n[detalle.id]; return n; });
+        return; // no borrar viejos si no se pudo seleccionar
+      }
+
+      // 3. Ahora que el nuevo está seleccionado, borrar los viejos
+      for (const oldId of oldIds) {
+        try { await api.deletePrecio(oldId); } catch { /* ignorar si ya no existe */ }
+      }
+
       await cargarPreciosProducto(detalle.id);
       setPrecioEditando(prev => { const n = { ...prev }; delete n[detalle.id]; return n; });
       toast.success("Precio guardado");
-    } catch {
-      toast.error("Error al guardar precio");
+    } catch (e: any) {
+      toast.error(e.message || "Error al guardar precio");
     } finally {
       setSavingPrecio(null);
     }
@@ -1342,6 +1415,27 @@ export default function FollowUps() {
 
   const confirmarPrecioFinal = async (detalle: Producto, estadoProductoId: string, confirmar: boolean) => {
     if (!cotizacionSeleccionada) return;
+
+    // ── Para compras INTERNACIONALES: el timeline es obligatorio ──────────────
+    // Si el producto no tiene medioTransporte asignado, el timeline no fue
+    // configurado → la cotización sigue en ENVIADA → selectPrecio y aprobar fallan.
+    // Interceptamos aquí y abrimos el modal de configuración automáticamente.
+    if (
+      confirmar &&
+      cotizacionSeleccionada.tipoCompra === 'INTERNACIONAL' &&
+      !detalle.estadoProducto?.medioTransporte
+    ) {
+      toast("Configura el timeline del producto antes de confirmar", {
+        icon: "⚙️",
+        duration: 4000,
+      });
+      setPendingConfirmacion({ detalle, estadoProductoId, confirmar });
+      setAplicarATodos(false);
+      setProductoConfigurando(detalle);
+      setShowTimelineModal(true);
+      return;
+    }
+
     try {
       // Si hay valor en el input sin guardar, guardarlo y seleccionarlo primero
       const valorEditando = precioEditando[detalle.id];
@@ -1364,10 +1458,15 @@ export default function FollowUps() {
       await seleccionarCotizacion(cotizacionSeleccionada);
       await cargarCotizaciones();
     } catch (e: any) {
-      if (e.message === "Error al aprobar productos") {
-        toast.error("Guardar un precio primero antes de confirmar");
+      const msg: string = e.message || '';
+      if (msg.includes('comprobante de descuento') || msg.includes('requiere indicar')) {
+        toast.error("Selecciona 'Aplica' o 'No Aplica' en la columna Comprobante antes de confirmar");
+      } else if (msg.includes('precio seleccionado') || msg.includes('preciosId')) {
+        toast.error("Guarda un precio primero antes de confirmar");
+      } else if (msg.includes('EN_CONFIGURACION') || msg.includes('EN_REVISION')) {
+        toast.error("Configura el timeline del producto antes de confirmar");
       } else {
-        toast.error("Error al confirmar precio");
+        toast.error(msg || "Error al confirmar precio");
       }
     }
   };
@@ -2248,7 +2347,7 @@ export default function FollowUps() {
                         : productoConfigurando.descripcionProducto}
                     </p>
                   </div>
-                  <button onClick={() => { setShowTimelineModal(false); setProductoConfigurando(null); setAplicarATodos(false); }}
+                  <button onClick={() => { setShowTimelineModal(false); setProductoConfigurando(null); setAplicarATodos(false); setPendingConfirmacion(null); }}
                     className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300">
                     <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -2261,7 +2360,7 @@ export default function FollowUps() {
                 paises={paises}
                 tipoCompra={cotizacionSeleccionada?.tipoCompra || 'NACIONAL'}
                 onSave={guardarConfiguracion}
-                onCancel={() => { setShowTimelineModal(false); setProductoConfigurando(null); setAplicarATodos(false); }}
+                onCancel={() => { setShowTimelineModal(false); setProductoConfigurando(null); setAplicarATodos(false); setPendingConfirmacion(null); }}
                 onReject={async (motivoRechazo) => {
                   if (!cotizacionSeleccionada || !productoConfigurando) return;
                   try {

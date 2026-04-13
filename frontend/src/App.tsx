@@ -62,6 +62,7 @@ import Licitaciones from "./pages/Licitaciones/Licitaciones";
 import Archivadas from "./pages/Licitaciones/Archivadas";
 import OfertasArchivadas from "./pages/Ofertas/OfertasArchivadas";
 import Ofertas from "./pages/Ofertas/Ofertas";
+import OdooOportunidades from "./pages/Odoo/OdooOportunidades";
 
 const SHOPPING_MANAGER_ROLES = ["ADMIN", "SUPERVISOR"];
 const QUOTES_SUPERVISOR_ROLES = ["SUPERVISOR", "ADMIN"];
@@ -283,6 +284,16 @@ export default function App() {
                   </ProtectedRoute>
                 } />
               </Route>
+
+              {/* ODOO - Solo STAFF */}
+              <Route
+                path="/odoo/oportunidades"
+                element={
+                  <ProtectedRoute roles={STAFF_ROLES}>
+                    <OdooOportunidades />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* REPORTES - Solo STAFF */}
               <Route

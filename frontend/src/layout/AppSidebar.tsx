@@ -7,7 +7,8 @@ import {
   UtilityPole,
   Building2,
   BadgeDollarSign,
-  ShoppingBag
+  ShoppingBag,
+  Link2,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
@@ -125,6 +126,12 @@ const navItems: NavItem[] = [
 ];
 
 const othersItems: NavItem[] = [
+  {
+    icon: <Link2 size={20} />,
+    name: "Odoo CRM",
+    roles: ["ADMIN", "SUPERVISOR"],
+    path: "/odoo/oportunidades",
+  },
   /*{
     icon: <PieChartIcon />,
     name: "Charts",
