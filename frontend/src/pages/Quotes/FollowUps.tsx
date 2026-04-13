@@ -728,6 +728,32 @@ export default function FollowUps() {
   };
   const HONDURAS_ID = '53b360e4-f5fe-4f27-beba-90bc79390f07';
 
+  // Refresca solo el detalle y los contadores del listado sin mostrar spinner
+  // ni recargar precios — para usar después de confirmar/desconfirmar precios.
+  const refrescarCotizacionSilente = async (cotizacionId: string) => {
+    try {
+      const detalle = await api.getCotizacionDetalle(cotizacionId);
+      setCotizacionSeleccionada(detalle);
+      setCotizaciones(prev =>
+        prev.map(c =>
+          c.id === cotizacionId
+            ? {
+                ...c,
+                estado: detalle.estado,
+                aprobadaParcialmente: detalle.aprobadaParcialmente,
+                todosProductosAprobados: detalle.todosProductosAprobados,
+                productosAprobados: detalle.productosAprobados,
+                productosPendientes: detalle.productosPendientes,
+                porcentajeAprobado: detalle.porcentajeAprobado,
+              }
+            : c,
+        ),
+      );
+    } catch (e) {
+      console.error('Error al refrescar cotización:', e);
+    }
+  };
+
   const seleccionarCotizacion = async (cotizacion: Cotizacion) => {
     // Toggle: collapse if already selected
     if (cotizacionSeleccionada?.id === cotizacion.id) {
@@ -951,7 +977,7 @@ export default function FollowUps() {
       setProductoConfigurando(null);
 
       // Recargar para que el detalle tenga medioTransporte actualizado
-      await seleccionarCotizacion(cotizacionSeleccionada);
+      await refrescarCotizacionSilente(cotizacionSeleccionada.id);
 
       // Si había una confirmación pendiente (caso INTERNACIONAL sin timeline),
       // ejecutarla ahora que el timeline ya está configurado.
@@ -971,8 +997,7 @@ export default function FollowUps() {
               aprobado: pending.confirmar,
             }]);
             toast.success(pending.confirmar ? "Precio final confirmado" : "Confirmación removida");
-            await seleccionarCotizacion(cotizacionSeleccionada);
-            await cargarCotizaciones();
+            await refrescarCotizacionSilente(cotizacionSeleccionada.id);
           } catch (e: any) {
             const msg: string = e.message || '';
             if (msg.includes('comprobante de descuento') || msg.includes('requiere indicar')) {
@@ -1004,11 +1029,7 @@ export default function FollowUps() {
         "success"
       );
 
-      // Recargar detalle
-      await seleccionarCotizacion(cotizacionSeleccionada);
-
-      // Recargar lista
-      await cargarCotizaciones();
+      await refrescarCotizacionSilente(cotizacionSeleccionada.id);
     } catch (error) {
       console.error("Error al aprobar producto:", error.message);
 
@@ -1455,8 +1476,7 @@ export default function FollowUps() {
 
       await api.aprobarProductos(cotizacionSeleccionada.id, [{ estadoProductoId, aprobado: confirmar }]);
       toast.success(confirmar ? "Precio final confirmado" : "Confirmación removida");
-      await seleccionarCotizacion(cotizacionSeleccionada);
-      await cargarCotizaciones();
+      await refrescarCotizacionSilente(cotizacionSeleccionada.id);
     } catch (e: any) {
       const msg: string = e.message || '';
       if (msg.includes('comprobante de descuento') || msg.includes('requiere indicar')) {
@@ -2369,8 +2389,7 @@ export default function FollowUps() {
                     addNotification("success", "Producto rechazado", "El solicitante será notificado");
                     setShowTimelineModal(false);
                     setProductoConfigurando(null);
-                    await seleccionarCotizacion(cotizacionSeleccionada);
-                    await cargarCotizaciones();
+                    await refrescarCotizacionSilente(cotizacionSeleccionada.id);
                   } catch (error) {
                     console.error("Error al rechazar producto:", error);
                     addNotification("danger", "Error al rechazar producto", "Intenta de nuevo");
