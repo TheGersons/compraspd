@@ -335,6 +335,7 @@ export default function Reports() {
   const [search, setSearch] = useState("");
   const [desde, setDesde] = useState(defaultDesde());
   const [hasta, setHasta] = useState(defaultHasta());
+  const [page, setPage] = useState(1);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -391,6 +392,11 @@ export default function Reports() {
         r.area?.toLowerCase().includes(q)
       );
     });
+
+  const PAGE_SIZE = 15;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   // ─── Export helpers ────────────────────────────────────────────────────────
 
@@ -506,7 +512,7 @@ export default function Reports() {
           <input
             type="date"
             value={desde}
-            onChange={(e) => setDesde(e.target.value)}
+            onChange={(e) => { setDesde(e.target.value); setPage(1); }}
             className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs outline-none focus:border-blue-400 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           />
         </div>
@@ -515,7 +521,7 @@ export default function Reports() {
           <input
             type="date"
             value={hasta}
-            onChange={(e) => setHasta(e.target.value)}
+            onChange={(e) => { setHasta(e.target.value); setPage(1); }}
             className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs outline-none focus:border-blue-400 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           />
         </div>
@@ -525,12 +531,12 @@ export default function Reports() {
             type="text"
             placeholder="Buscar por nombre, #PO, proveedor, área…"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             className="w-56 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs outline-none focus:border-blue-400 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-500"
           />
         </div>
         <button
-          onClick={() => { setDesde(defaultDesde()); setHasta(defaultHasta()); setSearch(""); }}
+          onClick={() => { setDesde(defaultDesde()); setHasta(defaultHasta()); setSearch(""); setPage(1); }}
           className="ml-auto rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
         >
           Resetear
@@ -552,7 +558,9 @@ export default function Reports() {
         <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
           {/* Leyenda */}
           <div className="flex items-center gap-4 border-b border-gray-100 px-4 py-3 text-xs text-gray-400 dark:border-gray-800 dark:text-gray-500">
-            <span>{filtered.length} registro{filtered.length !== 1 ? "s" : ""}</span>
+            <span>
+              {filtered.length === 0 ? "0 registros" : `${(safePage - 1) * PAGE_SIZE + 1}–${Math.min(safePage * PAGE_SIZE, filtered.length)} de ${filtered.length} registro${filtered.length !== 1 ? "s" : ""}`}
+            </span>
             <span className="flex items-center gap-1.5">
               <span className="inline-block h-2 w-2 rounded-full bg-blue-400" />
               Celdas azules = editables
@@ -596,7 +604,7 @@ export default function Reports() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((r) => {
+                {paginated.map((r) => {
                   const ocCfg = r.statusOC ? (STATUS_OC[r.statusOC] ?? { label: r.statusOC, cls: "bg-gray-100 text-gray-600" }) : null;
                   const pagoCfg = STATUS_PAGO[r.statusPago] ?? STATUS_PAGO.SIN_PAGOS;
 
@@ -780,6 +788,74 @@ export default function Reports() {
               </tbody>
             </table>
           </div>
+
+          {/* Paginación */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-1 border-t border-gray-100 px-4 py-3 dark:border-gray-800">
+              <button
+                onClick={() => setPage(1)}
+                disabled={safePage === 1}
+                className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs text-gray-500 hover:bg-gray-50 disabled:opacity-30 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+                title="Primera página"
+              >
+                «
+              </button>
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={safePage === 1}
+                className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs text-gray-500 hover:bg-gray-50 disabled:opacity-30 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+              >
+                ‹
+              </button>
+
+              {/* Números de página (máx 7 visibles) */}
+              {(() => {
+                const pages: (number | "…")[] = [];
+                if (totalPages <= 7) {
+                  for (let i = 1; i <= totalPages; i++) pages.push(i);
+                } else {
+                  pages.push(1);
+                  if (safePage > 3) pages.push("…");
+                  for (let i = Math.max(2, safePage - 1); i <= Math.min(totalPages - 1, safePage + 1); i++) pages.push(i);
+                  if (safePage < totalPages - 2) pages.push("…");
+                  pages.push(totalPages);
+                }
+                return pages.map((p, i) =>
+                  p === "…" ? (
+                    <span key={`ellipsis-${i}`} className="px-1 text-xs text-gray-400">…</span>
+                  ) : (
+                    <button
+                      key={p}
+                      onClick={() => setPage(p)}
+                      className={`min-w-[32px] rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
+                        p === safePage
+                          ? "border-blue-500 bg-blue-600 text-white"
+                          : "border-gray-200 text-gray-500 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  )
+                );
+              })()}
+
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={safePage === totalPages}
+                className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs text-gray-500 hover:bg-gray-50 disabled:opacity-30 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+              >
+                ›
+              </button>
+              <button
+                onClick={() => setPage(totalPages)}
+                disabled={safePage === totalPages}
+                className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs text-gray-500 hover:bg-gray-50 disabled:opacity-30 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+                title="Última página"
+              >
+                »
+              </button>
+            </div>
+          )}
         </div>
       )}
 
