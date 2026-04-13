@@ -5,14 +5,9 @@ import PageMeta from "../../components/common/PageMeta";
 import { getToken } from "../../lib/api";
 import { useNotifications } from "../Notifications/context/NotificationContext";
 import toast from "react-hot-toast";
-import { Download, Eye, X, FileText, CalendarIcon, MoreVertical, UserCheck, Users, ChevronDown } from "lucide-react";
+import { Download, Eye, X, FileText, MoreVertical, UserCheck } from "lucide-react";
 
-import { PopoverTrigger, PopoverContent, Popover } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import TimelineItem from "./components/TimeLineItem";
 
 // ============================================================================
@@ -405,6 +400,51 @@ const api = {
     if (!response.ok) { const e = await response.json(); throw new Error(e.message || "Error al asignar"); }
     return response.json();
   },
+
+  async getCotizacionDetalle(id: string) {
+    const token = getToken();
+    const response = await fetch(`${API_BASE_URL}/api/v1/followups/${id}`, {
+      credentials: "include",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error("Error al cargar detalle de cotización");
+    return response.json();
+  },
+
+  async getChatMessages(chatId: string) {
+    const token = getToken();
+    const response = await fetch(`${API_BASE_URL}/api/v1/messages/${chatId}/messages`, {
+      credentials: "include",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error("Error al cargar mensajes");
+    return response.json();
+  },
+
+  async sendMessage(chatId: string, contenido: string) {
+    const token = getToken();
+    const response = await fetch(`${API_BASE_URL}/api/v1/messages/${chatId}/messages`, {
+      method: "POST", credentials: "include",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ chatId, contenido }),
+    });
+    if (!response.ok) throw new Error("Error al enviar mensaje");
+    return response.json();
+  },
+
+  async sendMessageWithFile(chatId: string, file: File, contenido?: string) {
+    const token = getToken();
+    const formData = new FormData();
+    formData.append("file", file);
+    if (contenido?.trim()) formData.append("contenido", contenido);
+    const response = await fetch(`${API_BASE_URL}/api/v1/messages/${chatId}/upload`, {
+      method: "POST", credentials: "include",
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+    if (!response.ok) { const e = await response.json().catch(() => ({})); throw new Error(e.message || "Error al enviar archivo"); }
+    return response.json();
+  },
 };
 
 // ============================================================================
@@ -490,14 +530,11 @@ export default function ShoppingFollowUps() {
 
   // Responsables / Supervisores
   const [supervisores, setSupervisores] = useState<{ id: string; nombre: string; email: string; rol: { nombre: string } }[]>([]);
-  const [filtroResponsables, setFiltroResponsables] = useState<string[]>([]);
-  const [showResponsableDropdown, setShowResponsableDropdown] = useState(false);
+  const [filtroResponsable, setFiltroResponsable] = useState<string>("");
   const [filtroSolicitante, setFiltroSolicitante] = useState<string>("");
-  const [showSolicitanteDropdown, setShowSolicitanteDropdown] = useState(false);
   const [menuAbierto, setMenuAbierto] = useState<string | null>(null); // id del producto con menú abierto
 
   // Vista agrupada por cotización
-  const [vistaAgrupada, setVistaAgrupada] = useState(true);
   const [grupoExpandido, setGrupoExpandido] = useState<string | null>(null);
 
   // Avance masivo
@@ -516,11 +553,26 @@ export default function ShoppingFollowUps() {
   const [nombreCotEditado, setNombreCotEditado] = useState("");
   const [menuGrupoAbierto, setMenuGrupoAbierto] = useState<string | null>(null);
 
-  const fileInputRef = useRef<HTMLInputElement>(null); // Se mantiene por si TimelineItem lo usa
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Chat
+  const [mensajes, setMensajes] = useState<any[]>([]);
+  const [nuevoMensaje, setNuevoMensaje] = useState("");
+  const [loadingChat, setLoadingChat] = useState(false);
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [sendingFile, setSendingFile] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [chatIdActivo, setChatIdActivo] = useState<string | null>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatFileRef = useRef<HTMLInputElement>(null);
+
+  // Vista activa del acordeón expandido
+  const [vistaActivaGrupo, setVistaActivaGrupo] = useState<'productos' | 'chat'>('productos');
+  const acordeonRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // Cerrar dropdowns al hacer click fuera
   useEffect(() => {
-    const handleClickOutside = () => { setMenuAbierto(null); setShowResponsableDropdown(false); setShowSolicitanteDropdown(false); setMenuGrupoAbierto(null); };
+    const handleClickOutside = () => { setMenuAbierto(null); setMenuGrupoAbierto(null); };
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
@@ -679,9 +731,8 @@ export default function ShoppingFollowUps() {
     }
 
     // Filtro por responsable
-    if (filtroResponsables.length > 0) {
-      const respId = p.responsableSeguimiento?.id;
-      if (!respId || !filtroResponsables.includes(respId)) return false;
+    if (filtroResponsable) {
+      if (p.responsableSeguimiento?.id !== filtroResponsable) return false;
     }
 
     // Filtro por solicitante
@@ -728,12 +779,13 @@ export default function ShoppingFollowUps() {
         cotizacionId: key,
         nombre: p.cotizacion?.nombreCotizacion || 'Sin cotización',
         tipoCompra: p.cotizacion?.tipoCompra || p.tipoCompra,
+        solicitante: p.cotizacion?.solicitante || null,
         productos: [],
       };
     }
     acc[key].productos.push(p);
     return acc;
-  }, {} as Record<string, { cotizacionId: string; nombre: string; tipoCompra: string; productos: EstadoProducto[] }>);
+  }, {} as Record<string, { cotizacionId: string; nombre: string; tipoCompra: string; solicitante: { id: string; nombre: string } | null; productos: EstadoProducto[] }>);
 
   const gruposOrdenados = Object.values(productosAgrupados).sort((a, b) => a.nombre.localeCompare(b.nombre));
 
@@ -843,6 +895,75 @@ export default function ShoppingFollowUps() {
 
   const requiereSeleccionFobCif = productoSeleccionado?.siguienteEstado === 'enFOB';
 
+  // Handler para expandir/colapsar grupo en el acordeón
+  const handleToggleGrupo = async (cotizacionId: string) => {
+    if (grupoExpandido === cotizacionId) {
+      setGrupoExpandido(null);
+      setChatIdActivo(null);
+      setMensajes([]);
+      setProductoSeleccionado(null);
+      setTimeline(null);
+      return;
+    }
+    setGrupoExpandido(cotizacionId);
+    setVistaActivaGrupo('productos');
+    setProductoSeleccionado(null);
+    setTimeline(null);
+    setChatIdActivo(null);
+    setMensajes([]);
+    // Scroll al acordeón
+    setTimeout(() => {
+      acordeonRefs.current[cotizacionId]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
+    // Obtener chatId de la cotización
+    try {
+      const detalle = await api.getCotizacionDetalle(cotizacionId);
+      if (detalle?.chatId) {
+        setChatIdActivo(detalle.chatId);
+      }
+    } catch {
+      // silencioso si no hay chat
+    }
+  };
+
+  // Chat handlers
+  const cargarChat = async (chatId: string) => {
+    try {
+      setLoadingChat(true);
+      const data = await api.getChatMessages(chatId);
+      setMensajes(Array.isArray(data) ? data : (data.messages || []));
+      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+    } catch { /* silencioso */ }
+    finally { setLoadingChat(false); }
+  };
+
+  const enviarMensaje = async () => {
+    if (!nuevoMensaje.trim() || !chatIdActivo) return;
+    try {
+      setSendingMessage(true);
+      await api.sendMessage(chatIdActivo, nuevoMensaje.trim());
+      setNuevoMensaje("");
+      await cargarChat(chatIdActivo);
+    } catch (e: any) { toast.error(e.message || "Error al enviar"); }
+    finally { setSendingMessage(false); }
+  };
+
+  const enviarArchivoChat = async (files: File[]) => {
+    if (!chatIdActivo || !files.length) return;
+    try {
+      setSendingFile(true);
+      for (const f of files) await api.sendMessageWithFile(chatIdActivo, f);
+      await cargarChat(chatIdActivo);
+    } catch (e: any) { toast.error(e.message || "Error al enviar archivo"); }
+    finally { setSendingFile(false); if (chatFileRef.current) chatFileRef.current.value = ""; }
+  };
+
+  // Cuando se activa la vista de chat, cargar mensajes
+  const handleActivarChat = () => {
+    setVistaActivaGrupo('chat');
+    if (chatIdActivo) cargarChat(chatIdActivo);
+  };
+
   // ============================================================================
   // RENDER
   // ============================================================================
@@ -865,672 +986,593 @@ export default function ShoppingFollowUps() {
         </div>
 
         {/* Filtros */}
-        <div className="flex flex-wrap items-center gap-4">
-          {/* Toggle Pendientes / Completados */}
-          <div className="flex rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden">
-            <button
-              onClick={() => setVerCompletados(false)}
-              className={`px-4 py-2 text-sm font-medium transition-colors ${!verCompletados
-                ? "bg-blue-600 text-white"
-                : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-                }`}
-            >
-              📋 En Proceso ({totalPendientes})
-            </button>
-            <button
-              onClick={() => setVerCompletados(true)}
-              className={`px-4 py-2 text-sm font-medium transition-colors ${verCompletados
-                ? "bg-green-600 text-white"
-                : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-                }`}
-            >
-              ✅ Completados ({totalCompletados})
-            </button>
-          </div>
-
-          {/* Búsqueda */}
-          <div className="flex-1 min-w-[200px]">
-            <input
-              type="text"
-              placeholder="Buscar por SKU, descripción o proveedor..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-            />
-          </div>
-
-          {/* Filtro Tipo Compra - ACTUALIZADO */}
-          <select
-            value={filtroTipoCompra}
-            onChange={(e) => setFiltroTipoCompra(e.target.value)}
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-          >
-            <option value="">Todos los tipos</option>
-            <option value="NACIONAL">🇭🇳 Nacional (6 etapas)</option>
-            <option value="INTERNACIONAL">🌍 Internacional (13 etapas)</option>
-          </select>
-
-          {/* Filtro Criticidad */}
-          <select
-            value={filtroNivel}
-            onChange={(e) => setFiltroNivel(e.target.value)}
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-          >
-            <option value="">Todas las criticidades</option>
-            <option value="BAJO">🟢 Bajo</option>
-            <option value="MEDIO">🟡 Medio</option>
-            <option value="ALTO">🔴 Alto</option>
-          </select>
-
-          {/* Filtro por Responsable */}
-          <div className="relative">
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowResponsableDropdown(!showResponsableDropdown); }}
-              className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm transition-colors ${filtroResponsables.length > 0
-                ? "border-blue-400 bg-blue-50 text-blue-700 dark:border-blue-600 dark:bg-blue-900/20 dark:text-blue-300"
-                : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
-                }`}
-            >
-              {/*flecha hacia abajo*/}
-
-              <Users size={14} />
-              {filtroResponsables.length === 0 ? "Todos los encargados" : `${filtroResponsables.length} seleccionado${filtroResponsables.length > 1 ? 's' : ''}`}
-              <ChevronDown size={14} />
-            </button>
-            {showResponsableDropdown && (
-              <div className="absolute top-full left-0 z-50 mt-1 w-64 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
-                <div className="max-h-60 overflow-y-auto p-2">
-                  <button
-                    onClick={() => { setFiltroResponsables([]); setShowResponsableDropdown(false); }}
-                    className={`w-full rounded-md px-3 py-2 text-left text-sm transition-colors ${filtroResponsables.length === 0
-                      ? "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
-                      : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
-                      }`}
-                  >
-                    👥 Ver todos
-                  </button>
-                  <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
-                  {supervisores.map(sup => {
-                    const isChecked = filtroResponsables.includes(sup.id);
-                    return (
-                      <label key={sup.id} className="flex items-center gap-2 rounded-md px-3 py-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => {
-                            setFiltroResponsables(prev =>
-                              isChecked ? prev.filter(id => id !== sup.id) : [...prev, sup.id]
-                            );
-                          }}
-                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <span className="text-gray-900 dark:text-white">{sup.nombre}</span>
-                        <span className="ml-auto text-xs text-gray-400">{sup.rol.nombre}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Filtro por Solicitante */}
-          <div className="relative">
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowSolicitanteDropdown(!showSolicitanteDropdown); }}
-              className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm transition-colors ${filtroSolicitante
-                ? "border-purple-400 bg-purple-50 text-purple-700 dark:border-purple-600 dark:bg-purple-900/20 dark:text-purple-300"
-                : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
-                }`}
-            >
-              <UserCheck size={14} />
-              {filtroSolicitante
-                ? (solicitantesUnicos.find(s => s.id === filtroSolicitante)?.nombre ?? "Solicitante")
-                : "Todos los solicitantes"}
-              <ChevronDown size={14} />
-            </button>
-            {showSolicitanteDropdown && (
-              <div className="absolute top-full left-0 z-50 mt-1 w-64 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
-                <div className="max-h-60 overflow-y-auto p-2">
-                  <button
-                    onClick={() => { setFiltroSolicitante(""); setShowSolicitanteDropdown(false); }}
-                    className={`w-full rounded-md px-3 py-2 text-left text-sm transition-colors ${!filtroSolicitante
-                      ? "bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300"
-                      : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
-                      }`}
-                  >
-                    👥 Ver todos
-                  </button>
-                  <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
-                  {solicitantesUnicos.length === 0 && (
-                    <p className="px-3 py-2 text-xs text-gray-400">Sin solicitantes disponibles</p>
-                  )}
-                  {solicitantesUnicos.map(sol => (
-                    <button
-                      key={sol.id}
-                      onClick={() => { setFiltroSolicitante(sol.id); setShowSolicitanteDropdown(false); }}
-                      className={`w-full rounded-md px-3 py-2 text-left text-sm transition-colors ${filtroSolicitante === sol.id
-                        ? "bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300"
-                        : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
-                        }`}
-                    >
-                      👤 {sol.nombre}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Layout principal */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          {/* Lista de productos */}
-          <div className="lg:col-span-1">
-            <div className="rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-              <div className="border-b border-gray-200 p-4 dark:border-gray-700">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-gray-900 dark:text-white">
-                    {verCompletados ? "✅ Completados" : "📋 En Proceso"} ({productosFiltrados.length})
-                  </h3>
-                  <button
-                    onClick={() => setVistaAgrupada(!vistaAgrupada)}
-                    className={`rounded-md px-2 py-1 text-xs font-medium transition-colors ${vistaAgrupada
-                      ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-                      : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400"
-                      }`}
-                    title={vistaAgrupada ? "Vista individual" : "Agrupar por cotización"}
-                  >
-                    {vistaAgrupada ? "📁 Agrupado" : "📄 Individual"}
-                  </button>
-                </div>
-              </div>
-
-              <div className="max-h-[600px] overflow-y-auto">
-                {loading ? (
-                  <div className="flex h-32 items-center justify-center">
-                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
-                  </div>
-                ) : productosFiltrados.length === 0 ? (
-                  <div className="p-6 text-center text-gray-500 dark:text-gray-400">
-                    {verCompletados
-                      ? "No hay productos completados"
-                      : "No hay productos en proceso"}
-                  </div>
-                ) : (
-                  <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {vistaAgrupada ? (
-                      /* ===== VISTA AGRUPADA POR COTIZACIÓN ===== */
-                      gruposOrdenados.map((grupo) => (
-                        <div key={grupo.cotizacionId || 'sin'}>
-                          {/* Header del grupo */}
-                          <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800">
-                            <span className="text-xs cursor-pointer" onClick={() => setGrupoExpandido(grupoExpandido === grupo.cotizacionId ? null : grupo.cotizacionId)}>
-                              {grupoExpandido === grupo.cotizacionId ? '▼' : '▶'}
-                            </span>
-                            <div className="flex-1 min-w-0" onClick={() => setGrupoExpandido(grupoExpandido === grupo.cotizacionId ? null : grupo.cotizacionId)}>
-                              {editandoCotizacion === grupo.cotizacionId ? (
-                                <input type="text" value={nombreCotEditado} autoFocus
-                                  onClick={(e) => e.stopPropagation()}
-                                  onChange={(e) => setNombreCotEditado(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') handleGuardarNombreCotizacion(grupo.cotizacionId);
-                                    if (e.key === 'Escape') setEditandoCotizacion(null);
-                                  }}
-                                  onBlur={() => setEditandoCotizacion(null)}
-                                  className="text-sm font-semibold border-b border-blue-500 bg-transparent text-gray-900 dark:text-white outline-none w-full" />
-                              ) : (
-                                <div className="flex items-center gap-1.5 cursor-pointer">
-                                  <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{grupo.nombre}</p>
-                                  {!isComercial && <button onClick={(e) => { e.stopPropagation(); setEditandoCotizacion(grupo.cotizacionId); setNombreCotEditado(grupo.nombre); }}
-                                    className="text-gray-400 hover:text-blue-500 transition-colors flex-shrink-0" title="Editar nombre">
-                                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                                  </button>}
-                                </div>
-                              )}
-                              <p className="text-[10px] text-gray-500">{grupo.productos.length} producto(s) • {grupo.tipoCompra}</p>
-                            </div>
-                            {grupo.productos.some(p => p.progreso < 100 && p.siguienteEstado) && (
-                              <button
-                                onClick={(e) => { e.stopPropagation(); abrirAvanceMasivo(grupo.cotizacionId, grupo.productos); }}
-                                className="rounded-md bg-indigo-600 px-2 py-1 text-[10px] font-medium text-white hover:bg-indigo-700 whitespace-nowrap"
-                                title="Avanzar todos los productos de esta compra al siguiente estado"
-                              >
-                                ▶▶ Avanzar todos
-                              </button>
-                            )}
-                            {/* Menú asignar responsable al grupo */}
-                            {canAsignarResponsable && (
-                            <div className="relative" onClick={(e) => e.stopPropagation()}>
-                              <button onClick={() => setMenuGrupoAbierto(menuGrupoAbierto === grupo.cotizacionId ? null : grupo.cotizacionId)}
-                                className="rounded-md p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300 transition-colors"
-                                title="Asignar responsable al grupo">
-                                <MoreVertical size={14} />
-                              </button>
-                              {menuGrupoAbierto === grupo.cotizacionId && (
-                                <div className="absolute right-0 top-full z-50 mt-1 w-52 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
-                                  <div className="p-1.5">
-                                    <p className="px-2 py-1 text-[10px] font-semibold text-gray-400 uppercase">Asignar a todo el grupo:</p>
-                                    {supervisores.map(sup => (
-                                      <button key={sup.id}
-                                        onClick={() => handleAsignarResponsableGrupo(grupo.cotizacionId, sup.id)}
-                                        className="w-full rounded-md px-2 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800 transition-colors">
-                                        {sup.nombre}
-                                      </button>
-                                    ))}
-                                    <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
-                                    <button
-                                      onClick={() => handleAsignarResponsableGrupo(grupo.cotizacionId, null)}
-                                      className="w-full rounded-md px-2 py-1.5 text-left text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
-                                      Quitar responsable de todos
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                            )}
-                          </div>
-                          {/* Productos del grupo */}
-                          {grupoExpandido === grupo.cotizacionId && grupo.productos.map((producto) => (
-                            <div key={producto.id}
-                              className={`flex items-center gap-2 p-3 pl-8 border-l-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${productoSeleccionado?.id === producto.id ? "bg-blue-50 dark:bg-blue-900/20 border-l-blue-600" : "border-l-transparent"}`}>
-                              <div className="flex-1 min-w-0 cursor-pointer" onClick={() => seleccionarProducto(producto.id)}>
-                                <div className="flex items-center gap-1.5">
-                                  {editandoSku === producto.id ? (
-                                    <input type="text" value={skuEditado} autoFocus
-                                      onClick={(e) => e.stopPropagation()}
-                                      onChange={(e) => setSkuEditado(e.target.value)}
-                                      onKeyDown={(e) => {
-                                        if (e.key === 'Enter') handleGuardarSku(producto.id);
-                                        if (e.key === 'Escape') setEditandoSku(null);
-                                      }}
-                                      onBlur={() => setEditandoSku(null)}
-                                      className="text-xs font-medium font-mono border-b border-blue-500 bg-transparent text-gray-900 dark:text-white outline-none w-24" />
-                                  ) : (
-                                    <>
-                                      <p className="text-xs font-medium text-gray-900 dark:text-white truncate">{producto.sku}</p>
-                                      <button onClick={(e) => { e.stopPropagation(); setEditandoSku(producto.id); setSkuEditado(producto.sku); }}
-                                        className="text-gray-400 hover:text-blue-500 transition-colors flex-shrink-0" title="Editar SKU">
-                                        <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                                      </button>
-                                    </>
-                                  )}
-                                </div>
-                                <p className="text-[10px] text-gray-500 truncate">{producto.descripcion}</p>
-                                <p className="text-[10px] text-gray-400 mt-0.5">
-                                  {ESTADOS_ICONOS[producto.estadoActual || 'cotizado']} {ESTADOS_LABELS[producto.estadoActual || 'cotizado']}
-                                </p>
-                              </div>
-                              <span className={`text-sm font-bold ${producto.progreso === 100 ? 'text-green-600' : 'text-gray-900 dark:text-white'}`}>
-                                {producto.progreso}%
-                              </span>
-                              {/* Responsable individual */}
-                              {canAsignarResponsable && (
-                              <div className="relative" onClick={(e) => e.stopPropagation()}>
-                                <button onClick={() => setMenuAbierto(menuAbierto === producto.id ? null : producto.id)}
-                                  className="rounded p-0.5 text-gray-400 hover:text-blue-500 transition-colors" title="Asignar responsable">
-                                  {producto.responsableSeguimiento ? (
-                                    <span className="flex items-center gap-0.5 text-[10px] text-blue-600 dark:text-blue-400">
-                                      <UserCheck size={10} />{producto.responsableSeguimiento.nombre.split(' ')[0]}
-                                    </span>
-                                  ) : <MoreVertical size={12} />}
-                                </button>
-                                {menuAbierto === producto.id && (
-                                  <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
-                                    <div className="p-1.5">
-                                      <p className="px-2 py-1 text-[10px] font-semibold text-gray-400 uppercase">Asignar a:</p>
-                                      {supervisores.map(sup => (
-                                        <button key={sup.id}
-                                          onClick={() => handleAsignarResponsable(producto.id, sup.id)}
-                                          className={`w-full rounded-md px-2 py-1.5 text-left text-xs transition-colors ${producto.responsableSeguimiento?.id === sup.id
-                                            ? "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
-                                            : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
-                                            }`}>
-                                          {sup.nombre}
-                                        </button>
-                                      ))}
-                                      {producto.responsableSeguimiento && (
-                                        <>
-                                          <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
-                                          <button onClick={() => handleAsignarResponsable(producto.id, null)}
-                                            className="w-full rounded-md px-2 py-1.5 text-left text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
-                                            Quitar responsable
-                                          </button>
-                                        </>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      ))
-                    ) : (
-                      /* ===== VISTA INDIVIDUAL (ORIGINAL) ===== */
-                      productosFiltrados.map((producto) => (
-                        <button
-                          key={producto.id}
-                          onClick={() => seleccionarProducto(producto.id)}
-                          className={`w-full p-4 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${productoSeleccionado?.id === producto.id
-                            ? "bg-blue-50 dark:bg-blue-900/20"
-                            : ""
-                            }`}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="font-mono text-sm font-medium text-gray-900 dark:text-white">
-                                  {producto.sku}
-                                </span>
-                                <span className={`rounded-full px-1.5 py-0.5 text-xs font-medium ${getCriticidadBg(producto.nivelCriticidad)}`}>
-                                  {getCriticidadBadge(producto.nivelCriticidad)}
-                                </span>
-                              </div>
-                              <p className="mt-1 truncate text-sm text-gray-600 dark:text-gray-400">
-                                {producto.descripcion}
-                              </p>
-                              <div className="mt-2 flex items-center gap-2">
-                                {producto.progreso === 100 && (
-                                  <span className="rounded px-1.5 py-0.5 text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                                    ✅ Completado
-                                  </span>
-                                )}
-                                <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${producto.tipoCompra === 'NACIONAL'
-                                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                  : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                                  }`}>
-                                  {producto.tipoCompra === 'NACIONAL' ? '🇭🇳 Nacional' : '🌍 Internacional'}
-                                </span>
-                                <span className="text-xs text-gray-500 dark:text-gray-500">
-                                  {ESTADOS_ICONOS[producto.estadoActual || 'cotizado']} {ESTADOS_LABELS[producto.estadoActual || 'cotizado']}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="text-right flex flex-col items-end gap-1">
-                              <span className={`text-lg font-bold ${producto.progreso === 100
-                                ? 'text-green-600 dark:text-green-400'
-                                : 'text-gray-900 dark:text-white'
-                                }`}>
-                                {producto.progreso}%
-                              </span>
-                              {/* Responsable badge + menú */}
-                              <div className="relative">
-                                <div
-                                  role="button"
-                                  onClick={canAsignarResponsable ? (e) => { e.stopPropagation(); setMenuAbierto(menuAbierto === producto.id ? null : producto.id); } : undefined}
-                                  className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] transition-colors ${canAsignarResponsable ? 'hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer' : 'cursor-default'}`}
-                                  title={canAsignarResponsable ? "Asignar responsable" : undefined}
-                                >
-                                  {producto.responsableSeguimiento ? (
-                                    <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
-                                      <UserCheck size={10} />
-                                      {producto.responsableSeguimiento.nombre.split(' ')[0]}
-                                    </span>
-                                  ) : (
-                                    <span className="text-gray-400"><MoreVertical size={12} /></span>
-                                  )}
-                                </div>
-                                {canAsignarResponsable && menuAbierto === producto.id && (
-                                  <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900"
-                                    onClick={(e) => e.stopPropagation()}>
-                                    <div className="p-1.5">
-                                      <p className="px-2 py-1 text-[10px] font-semibold text-gray-400 uppercase">Asignar a:</p>
-                                      {supervisores.map(sup => (
-                                        <button key={sup.id}
-                                          onClick={() => handleAsignarResponsable(producto.id, sup.id)}
-                                          className={`w-full rounded-md px-2 py-1.5 text-left text-xs transition-colors ${producto.responsableSeguimiento?.id === sup.id
-                                            ? "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
-                                            : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
-                                            }`}>
-                                          {sup.nombre}
-                                        </button>
-                                      ))}
-                                      {producto.responsableSeguimiento && (
-                                        <>
-                                          <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
-                                          <button
-                                            onClick={() => handleAsignarResponsable(producto.id, null)}
-                                            className="w-full rounded-md px-2 py-1.5 text-left text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
-                                            Quitar responsable
-                                          </button>
-                                        </>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          {/* Barra de progreso */}
-                          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-                            <div
-                              className={`h-full rounded-full transition-all ${producto.progreso === 100
-                                ? "bg-green-600"
-                                : producto.nivelCriticidad === "ALTO"
-                                  ? "bg-red-600"
-                                  : producto.nivelCriticidad === "MEDIO"
-                                    ? "bg-yellow-500"
-                                    : "bg-green-600"
-                                }`}
-                              style={{ width: `${producto.progreso}%` }}
-                            />
-                          </div>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
+        <div className="rounded-lg border-2 border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+          {/* Toggle + Búsqueda */}
+          <div className="flex items-center gap-3 mb-3">
+            <div className="flex rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden shrink-0">
+              <button
+                onClick={() => setVerCompletados(false)}
+                className={`px-3 py-2 text-sm font-medium transition-colors ${!verCompletados
+                  ? "bg-blue-600 text-white"
+                  : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                  }`}
+              >
+                En Proceso ({totalPendientes})
+              </button>
+              <button
+                onClick={() => setVerCompletados(true)}
+                className={`px-3 py-2 text-sm font-medium transition-colors ${verCompletados
+                  ? "bg-green-600 text-white"
+                  : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                  }`}
+              >
+                Completados ({totalCompletados})
+              </button>
+            </div>
+            <div className="relative flex-1">
+              <input
+                type="text"
+                placeholder="Buscar por SKU, descripción o proveedor..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 pl-10 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+              />
+              <svg className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
             </div>
           </div>
-
-          {/* Detalle del producto */}
-          <div className="lg:col-span-2">
-            {loadingDetalle ? (
-              <div className="flex h-64 items-center justify-center rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-                <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
-              </div>
-            ) : productoSeleccionado ? (
-              <div className="space-y-6">
-                {/* Info del producto */}
-                <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-3">
-                        <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                          {productoSeleccionado.sku}
-                        </h3>
-                        <span className={`rounded-full px-2 py-1 text-xs font-medium ${getCriticidadBg(productoSeleccionado.nivelCriticidad)}`}>
-                          {getCriticidadBadge(productoSeleccionado.nivelCriticidad)}
-                        </span>
-                        {/* Mostrar si es FOB o CIF cuando aplique */}
-                        {productoSeleccionado.tipoEntrega && (
-                          <span className="rounded-full px-2 py-1 text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
-                            {productoSeleccionado.tipoEntrega === 'FOB' ? '🚢 FOB' : '📦 CIF'}
-                          </span>
-                        )}
-                      </div>
-                      <p className="mt-1 text-gray-600 dark:text-gray-400">
-                        {productoSeleccionado.descripcion}
-                      </p>
-                      <div className="mt-3 flex flex-wrap gap-4 text-sm text-gray-500">
-                        {productoSeleccionado.proveedor && (
-                          <span>🏢 {productoSeleccionado.proveedor}</span>
-                        )}
-                        {productoSeleccionado.proyecto && (
-                          <span>📁 {productoSeleccionado.proyecto.nombre}</span>
-                        )}
-                        {productoSeleccionado.paisOrigen && (
-                          <span>🌍 {productoSeleccionado.paisOrigen.nombre}</span>
-                        )}
-                        {productoSeleccionado.medioTransporte && (
-                          <span>
-                            {productoSeleccionado.medioTransporte === 'MARITIMO' && '🚢'}
-                            {productoSeleccionado.medioTransporte === 'AEREO' && '✈️'}
-                            {productoSeleccionado.medioTransporte === 'TERRESTRE' && '🚛'}
-                            {' '}{productoSeleccionado.medioTransporte}
-                          </span>
-                        )}
-                        <Button
-                          asChild
-                          size="lg"
-                          className="bg-[#4169E1] hover:bg-[#3154B8] text-white rounded-xl text-base font-semibold shadow-md transition-colors"
-                        >
-                          <Link to={`/shopping/documents?producto=${productoSeleccionado.id}`}>
-                            📄 Ver Documentos
-                          </Link>
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Siguiente estado y botón avanzar */}
-                {productoSeleccionado.siguienteEstado && productoSeleccionado.progreso !== 100 && (
-                  <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm text-blue-600 dark:text-blue-400">Siguiente estado</p>
-                        <p className="mt-1 text-lg font-semibold text-blue-900 dark:text-blue-100">
-                          {ESTADOS_ICONOS[productoSeleccionado.siguienteEstado]} {ESTADOS_LABELS[productoSeleccionado.siguienteEstado]}
-                        </p>
-                      </div>
-                      <div className="flex flex-col gap-2 shrink-0">
-                        <button
-                          onClick={abrirModalAvanzar}
-                          disabled={loadingAccion}
-                          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap"
-                        >
-                          ▶ Avanzar Estado
-                        </button>
-                        {productoSeleccionado.cotizacionId && (() => {
-                          const grupoProductos = productos.filter(p => p.cotizacionId === productoSeleccionado.cotizacionId);
-                          const elegibles = grupoProductos.filter(p => p.progreso < 100 && p.siguienteEstado && !p.rechazado);
-                          return elegibles.length > 1 ? (
-                            <button
-                              onClick={() => abrirAvanceMasivo(productoSeleccionado.cotizacionId!, grupoProductos)}
-                              disabled={loadingAccion}
-                              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 whitespace-nowrap"
-                              title="Avanzar todos los productos de esta compra al siguiente estado"
-                            >
-                              ▶▶ Avanzar todos ({elegibles.length})
-                            </button>
-                          ) : null;
-                        })()}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Timeline - ACTUALIZADO */}
-                {timeline && (
-                  <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
-                    <h4 className="mb-6 text-lg font-semibold text-gray-900 dark:text-white">
-                      Timeline del Proceso ({productoSeleccionado.tipoCompra === 'NACIONAL' ? '5' : '11'} Etapas)
-                    </h4>
-
-                    <div className="space-y-4">
-                      {timeline.timeline?.map((item: TimelineItemType, index: number) => {
-                        const diasRetraso = item.diasRetraso || 0;
-                        const isRetrasado = diasRetraso > 0;
-                        const isCompletado = item.completado;
-
-                        return (
-                          <div
-                            key={index}
-                            className={`relative rounded-lg border p-4 ${isCompletado
-                              ? isRetrasado
-                                ? "border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-900/10"
-                                : "border-green-300 bg-green-50 dark:border-green-800 dark:bg-green-900/10"
-                              : "border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50"
-                              }`}
-                          >
-                            <div className="flex items-start justify-between">
-                              <div className="flex items-center gap-3">
-                                <div
-                                  className={`flex h-10 w-10 items-center justify-center rounded-full text-lg ${isCompletado
-                                    ? isRetrasado
-                                      ? "bg-red-200 dark:bg-red-800"
-                                      : "bg-green-200 dark:bg-green-800"
-                                    : "bg-gray-200 dark:bg-gray-700"
-                                    }`}
-                                >
-                                  {ESTADOS_ICONOS[item.estado] || "📌"}
-                                </div>
-
-                                <TimelineItem
-                                  item={item}
-                                  producto={productoSeleccionado}
-                                  sku={productoSeleccionado.sku}
-                                  onRefresh={() => seleccionarProducto(productoSeleccionado.id)}
-                                />
-
-                              </div>
-
-                              <div className="text-right">
-                                {isCompletado ? (
-                                  isRetrasado ? (
-                                    <span className="inline-flex items-center gap-1 rounded-full bg-red-600 px-3 py-1 text-xs font-medium text-white">
-                                      ⏰ {diasRetraso} días retraso
-                                    </span>
-                                  ) : (
-                                    <span className="inline-flex items-center gap-1 rounded-full bg-green-600 px-3 py-1 text-xs font-medium text-white">
-                                      ✅ En tiempo
-                                    </span>
-                                  )
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 rounded-full bg-gray-300 px-3 py-1 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-300">
-                                    ⏳ Pendiente
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Resumen */}
-                    <div className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50">
-                      <div className="grid grid-cols-3 gap-4 text-center text-sm">
-                        <div>
-                          <p className="text-gray-600 dark:text-gray-400">Criticidad</p>
-                          <p className={`mt-1 text-lg font-semibold ${getCriticidadColor(timeline.nivelCriticidad)}`}>
-                            {timeline.criticidad}/10
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-gray-600 dark:text-gray-400">Progreso</p>
-                          <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-                            {timeline.progreso}%
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-gray-600 dark:text-gray-400">Retraso Total</p>
-                          <p className={`mt-1 text-lg font-semibold ${timeline.diasRetrasoTotal > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
-                            {timeline.diasRetrasoTotal} días
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="flex h-64 flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-700">
-                <svg className="h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
-                <p className="mt-4 text-gray-600 dark:text-gray-400">
-                  Selecciona un producto para ver su detalle
-                </p>
-              </div>
-            )}
+          {/* Filtros en fila */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Solicitante */}
+            <div className="flex items-center gap-2 flex-1 min-w-[180px]">
+              <label className="shrink-0 text-sm font-medium text-gray-700 dark:text-gray-300">Solicitante:</label>
+              <select
+                value={filtroSolicitante}
+                onChange={(e) => setFiltroSolicitante(e.target.value)}
+                className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+              >
+                <option value="">Todos los solicitantes</option>
+                {solicitantesUnicos.map(s => (
+                  <option key={s.id} value={s.id}>{s.nombre}</option>
+                ))}
+              </select>
+            </div>
+            {/* Responsable */}
+            <div className="flex items-center gap-2 flex-1 min-w-[180px]">
+              <label className="shrink-0 text-sm font-medium text-gray-700 dark:text-gray-300">Responsable:</label>
+              <select
+                value={filtroResponsable}
+                onChange={(e) => setFiltroResponsable(e.target.value)}
+                className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+              >
+                <option value="">Todos los responsables</option>
+                {supervisores.map(s => (
+                  <option key={s.id} value={s.id}>{s.nombre}</option>
+                ))}
+              </select>
+            </div>
+            {/* Tipo de compra */}
+            <div className="flex items-center gap-2 flex-1 min-w-[180px]">
+              <label className="shrink-0 text-sm font-medium text-gray-700 dark:text-gray-300">Tipo:</label>
+              <select
+                value={filtroTipoCompra}
+                onChange={(e) => setFiltroTipoCompra(e.target.value)}
+                className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+              >
+                <option value="">Todos los tipos</option>
+                <option value="NACIONAL">Nacional</option>
+                <option value="INTERNACIONAL">Internacional</option>
+              </select>
+            </div>
           </div>
         </div>
 
+        {/* Lista de compras — acordeón */}
+        <div className="rounded-lg border-2 border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+          <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+            <h3 className="font-semibold text-gray-900 dark:text-white text-sm">
+              {verCompletados ? "✅ Completados" : "📋 En Proceso"} ({gruposOrdenados.length} compra{gruposOrdenados.length !== 1 ? 's' : ''}, {productosFiltrados.length} producto{productosFiltrados.length !== 1 ? 's' : ''})
+            </h3>
+          </div>
+          {/* Accordion */}
+          {loading ? (
+            <div className="flex h-32 items-center justify-center">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+            </div>
+          ) : gruposOrdenados.length === 0 ? (
+            <div className="p-6 text-center text-gray-500 dark:text-gray-400">
+              {verCompletados ? 'No hay compras completadas' : 'No hay compras en proceso'}
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-200 dark:divide-gray-700">
+              {gruposOrdenados.map((grupo) => {
+                const estaExpandido = grupoExpandido === grupo.cotizacionId;
+                const progresoPromedio = grupo.productos.length > 0
+                  ? Math.round(grupo.productos.reduce((sum, p) => sum + (p.progreso || 0), 0) / grupo.productos.length)
+                  : 0;
+                return (
+                  <div
+                    key={grupo.cotizacionId}
+                    ref={(el) => { acordeonRefs.current[grupo.cotizacionId] = el; }}
+                    className={`transition-all ${estaExpandido ? 'border-l-4 border-blue-500' : 'border-l-4 border-transparent'}`}
+                  >
+                    {/* Header */}
+                    <button
+                      onClick={() => handleToggleGrupo(grupo.cotizacionId)}
+                      className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {editandoCotizacion === grupo.cotizacionId ? (
+                            <input type="text" value={nombreCotEditado} autoFocus
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => setNombreCotEditado(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleGuardarNombreCotizacion(grupo.cotizacionId);
+                                if (e.key === 'Escape') setEditandoCotizacion(null);
+                              }}
+                              onBlur={() => setEditandoCotizacion(null)}
+                              className="text-sm font-semibold border-b border-blue-500 bg-transparent text-gray-900 dark:text-white outline-none" />
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              <p className="font-semibold text-gray-900 dark:text-white text-sm truncate">{grupo.nombre}</p>
+                              {!isComercial && (
+                                <button onClick={(e) => { e.stopPropagation(); setEditandoCotizacion(grupo.cotizacionId); setNombreCotEditado(grupo.nombre); }}
+                                  className="text-gray-400 hover:text-blue-500 transition-colors flex-shrink-0" title="Editar nombre">
+                                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                </button>
+                              )}
+                            </div>
+                          )}
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                            grupo.tipoCompra === 'NACIONAL'
+                              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                              : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                          }`}>
+                            {grupo.tipoCompra === 'NACIONAL' ? 'Nacional' : 'Internacional'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                          <span>{grupo.productos.length} producto{grupo.productos.length !== 1 ? 's' : ''}</span>
+                          {grupo.solicitante && <span>• {grupo.solicitante.nombre}</span>}
+                          <span>• {progresoPromedio}% promedio</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0 ml-3">
+                        <div className="w-16 h-1.5 rounded-full bg-gray-200 dark:bg-gray-700 hidden sm:block">
+                          <div
+                            className={`h-full rounded-full ${progresoPromedio === 100 ? 'bg-green-500' : 'bg-blue-500'}`}
+                            style={{ width: `${progresoPromedio}%` }}
+                          />
+                        </div>
+                        {canAsignarResponsable && (
+                          <div className="relative" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={() => setMenuGrupoAbierto(menuGrupoAbierto === grupo.cotizacionId ? null : grupo.cotizacionId)}
+                              className="rounded-md p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300 transition-colors"
+                              title="Asignar responsable al grupo"
+                            >
+                              <MoreVertical size={14} />
+                            </button>
+                            {menuGrupoAbierto === grupo.cotizacionId && (
+                              <div className="absolute right-0 top-full z-50 mt-1 w-52 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
+                                <div className="p-1.5">
+                                  <p className="px-2 py-1 text-[10px] font-semibold text-gray-400 uppercase">Asignar a todo el grupo:</p>
+                                  {supervisores.map(sup => (
+                                    <button key={sup.id}
+                                      onClick={() => handleAsignarResponsableGrupo(grupo.cotizacionId, sup.id)}
+                                      className="w-full rounded-md px-2 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800 transition-colors">
+                                      {sup.nombre}
+                                    </button>
+                                  ))}
+                                  <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
+                                  <button
+                                    onClick={() => handleAsignarResponsableGrupo(grupo.cotizacionId, null)}
+                                    className="w-full rounded-md px-2 py-1.5 text-left text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
+                                    Quitar responsable de todos
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        <svg
+                          className={`h-4 w-4 text-gray-500 transition-transform duration-200 ${estaExpandido ? 'rotate-180' : ''}`}
+                          fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                    </button>
+
+                    {/* Expanded body */}
+                    {estaExpandido && (
+                      <div className="border-t border-gray-200 dark:border-gray-700">
+                        {/* Tabs */}
+                        <div className="flex border-b border-gray-200 dark:border-gray-700 px-4">
+                          <button
+                            onClick={() => setVistaActivaGrupo('productos')}
+                            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+                              vistaActivaGrupo === 'productos'
+                                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                            }`}
+                          >
+                            Productos ({grupo.productos.length})
+                          </button>
+                          <button
+                            onClick={handleActivarChat}
+                            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+                              vistaActivaGrupo === 'chat'
+                                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                            }`}
+                          >
+                            Chat
+                            {mensajes.length > 0 && (
+                              <span className="ml-1.5 inline-flex items-center rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                                {mensajes.length}
+                              </span>
+                            )}
+                          </button>
+                        </div>
+
+                        {/* Tab: Productos */}
+                        {vistaActivaGrupo === 'productos' && (
+                          <div className="divide-y divide-gray-100 dark:divide-gray-700/50">
+                            {grupo.productos.map((producto) => {
+                              const esProdExpandido = productoSeleccionado?.id === producto.id;
+                              return (
+                                <div key={producto.id} className={`transition-colors ${esProdExpandido ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}>
+                                  {/* Product row */}
+                                  <div
+                                    className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/30"
+                                    onClick={() => esProdExpandido ? setProductoSeleccionado(null) : seleccionarProducto(producto.id)}
+                                  >
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2">
+                                        {editandoSku === producto.id ? (
+                                          <input type="text" value={skuEditado} autoFocus
+                                            onClick={(e) => e.stopPropagation()}
+                                            onChange={(e) => setSkuEditado(e.target.value)}
+                                            onKeyDown={(e) => {
+                                              if (e.key === 'Enter') handleGuardarSku(producto.id);
+                                              if (e.key === 'Escape') setEditandoSku(null);
+                                            }}
+                                            onBlur={() => setEditandoSku(null)}
+                                            className="text-sm font-medium font-mono border-b border-blue-500 bg-transparent text-gray-900 dark:text-white outline-none w-24" />
+                                        ) : (
+                                          <div className="flex items-center gap-1">
+                                            <span className="font-mono text-sm font-medium text-gray-900 dark:text-white">{producto.sku}</span>
+                                            <button onClick={(e) => { e.stopPropagation(); setEditandoSku(producto.id); setSkuEditado(producto.sku); }}
+                                              className="text-gray-400 hover:text-blue-500 transition-colors" title="Editar SKU">
+                                              <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                            </button>
+                                          </div>
+                                        )}
+                                        <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${getCriticidadBg(producto.nivelCriticidad)}`}>
+                                          {getCriticidadBadge(producto.nivelCriticidad)}
+                                        </span>
+                                      </div>
+                                      <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 truncate">{producto.descripcion}</p>
+                                      <p className="mt-0.5 text-[10px] text-gray-400 dark:text-gray-500">
+                                        {ESTADOS_ICONOS[producto.estadoActual || 'cotizado']} {ESTADOS_LABELS[producto.estadoActual || 'cotizado']}
+                                      </p>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      {canAsignarResponsable && (
+                                        <div className="relative" onClick={(e) => e.stopPropagation()}>
+                                          <button onClick={() => setMenuAbierto(menuAbierto === producto.id ? null : producto.id)}
+                                            className="rounded p-0.5 text-gray-400 hover:text-blue-500 transition-colors" title="Asignar responsable">
+                                            {producto.responsableSeguimiento ? (
+                                              <span className="flex items-center gap-0.5 text-[10px] text-blue-600 dark:text-blue-400">
+                                                <UserCheck size={10} />{producto.responsableSeguimiento.nombre.split(' ')[0]}
+                                              </span>
+                                            ) : <MoreVertical size={12} />}
+                                          </button>
+                                          {menuAbierto === producto.id && (
+                                            <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900"
+                                              onClick={(e) => e.stopPropagation()}>
+                                              <div className="p-1.5">
+                                                <p className="px-2 py-1 text-[10px] font-semibold text-gray-400 uppercase">Asignar a:</p>
+                                                {supervisores.map(sup => (
+                                                  <button key={sup.id}
+                                                    onClick={() => handleAsignarResponsable(producto.id, sup.id)}
+                                                    className={`w-full rounded-md px-2 py-1.5 text-left text-xs transition-colors ${producto.responsableSeguimiento?.id === sup.id
+                                                      ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
+                                                      : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800'
+                                                    }`}>
+                                                    {sup.nombre}
+                                                  </button>
+                                                ))}
+                                                {producto.responsableSeguimiento && (
+                                                  <>
+                                                    <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
+                                                    <button onClick={() => handleAsignarResponsable(producto.id, null)}
+                                                      className="w-full rounded-md px-2 py-1.5 text-left text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
+                                                      Quitar responsable
+                                                    </button>
+                                                  </>
+                                                )}
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+                                      <span className={`text-sm font-bold ${producto.progreso === 100 ? 'text-green-600' : 'text-gray-700 dark:text-gray-300'}`}>
+                                        {producto.progreso}%
+                                      </span>
+                                      <svg className={`h-3.5 w-3.5 text-gray-400 transition-transform duration-200 ${esProdExpandido ? 'rotate-180' : ''}`}
+                                        fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                      </svg>
+                                    </div>
+                                  </div>
+
+                                  {/* Product detail inline */}
+                                  {esProdExpandido && (
+                                    <div className="px-4 pb-4 space-y-3 bg-gray-50/50 dark:bg-gray-800/30">
+                                      {loadingDetalle ? (
+                                        <div className="flex h-20 items-center justify-center">
+                                          <div className="h-6 w-6 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+                                        </div>
+                                      ) : productoSeleccionado && (
+                                        <>
+                                          <div className="pt-2 flex flex-wrap gap-3 text-sm text-gray-500 dark:text-gray-400">
+                                            {productoSeleccionado.proveedor && <span>🏢 {productoSeleccionado.proveedor}</span>}
+                                            {productoSeleccionado.proyecto && <span>📁 {productoSeleccionado.proyecto.nombre}</span>}
+                                            {productoSeleccionado.paisOrigen && <span>🌍 {productoSeleccionado.paisOrigen.nombre}</span>}
+                                            {productoSeleccionado.tipoEntrega && (
+                                              <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                                                {productoSeleccionado.tipoEntrega === 'FOB' ? '🚢 FOB' : '📦 CIF'}
+                                              </span>
+                                            )}
+                                            <Button asChild size="sm" className="bg-[#4169E1] hover:bg-[#3154B8] text-white rounded-lg text-xs">
+                                              <Link to={`/shopping/documents?producto=${productoSeleccionado.id}`}>📄 Ver Documentos</Link>
+                                            </Button>
+                                          </div>
+
+                                          {productoSeleccionado.siguienteEstado && productoSeleccionado.progreso !== 100 && (
+                                            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-900/20">
+                                              <div className="flex items-center justify-between gap-3">
+                                                <div>
+                                                  <p className="text-xs text-blue-600 dark:text-blue-400">Siguiente estado</p>
+                                                  <p className="mt-0.5 text-sm font-semibold text-blue-900 dark:text-blue-100">
+                                                    {ESTADOS_ICONOS[productoSeleccionado.siguienteEstado]} {ESTADOS_LABELS[productoSeleccionado.siguienteEstado]}
+                                                  </p>
+                                                </div>
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                  <button
+                                                    onClick={abrirModalAvanzar}
+                                                    disabled={loadingAccion}
+                                                    className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap"
+                                                  >
+                                                    Avanzar Estado
+                                                  </button>
+                                                  {productoSeleccionado.cotizacionId && (() => {
+                                                    const grupoProductos = productos.filter(p => p.cotizacionId === productoSeleccionado.cotizacionId);
+                                                    const eligiblesAvance = grupoProductos.filter(p => p.progreso < 100 && p.siguienteEstado && !p.rechazado);
+                                                    return eligiblesAvance.length > 1 ? (
+                                                      <button
+                                                        onClick={() => abrirAvanceMasivo(productoSeleccionado.cotizacionId!, grupoProductos)}
+                                                        disabled={loadingAccion}
+                                                        className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50 whitespace-nowrap"
+                                                        title="Avanzar todos los productos de esta compra al siguiente estado"
+                                                      >
+                                                        Avanzar todos ({eligiblesAvance.length})
+                                                      </button>
+                                                    ) : null;
+                                                  })()}
+                                                </div>
+                                              </div>
+                                            </div>
+                                          )}
+
+                                          {timeline && (
+                                            <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+                                              <h4 className="mb-3 text-sm font-semibold text-gray-900 dark:text-white">
+                                                Timeline ({productoSeleccionado.tipoCompra === 'NACIONAL' ? '5' : '11'} Etapas)
+                                              </h4>
+                                              <div className="space-y-2">
+                                                {timeline.timeline?.map((item: TimelineItemType, index: number) => {
+                                                  const diasRetraso = item.diasRetraso || 0;
+                                                  const isRetrasado = diasRetraso > 0;
+                                                  const isCompletado = item.completado;
+                                                  return (
+                                                    <div key={index} className={`relative rounded-lg border p-3 ${isCompletado
+                                                      ? isRetrasado
+                                                        ? 'border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-900/10'
+                                                        : 'border-green-300 bg-green-50 dark:border-green-800 dark:bg-green-900/10'
+                                                      : 'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50'
+                                                    }`}>
+                                                      <div className="flex items-start justify-between">
+                                                        <div className="flex items-center gap-2">
+                                                          <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm ${isCompletado
+                                                            ? isRetrasado ? 'bg-red-200 dark:bg-red-800' : 'bg-green-200 dark:bg-green-800'
+                                                            : 'bg-gray-200 dark:bg-gray-700'
+                                                          }`}>
+                                                            {ESTADOS_ICONOS[item.estado] || '📌'}
+                                                          </div>
+                                                          <TimelineItem
+                                                            item={item}
+                                                            producto={productoSeleccionado}
+                                                            sku={productoSeleccionado.sku}
+                                                            onRefresh={() => seleccionarProducto(productoSeleccionado.id)}
+                                                          />
+                                                        </div>
+                                                        <div className="text-right shrink-0 ml-2">
+                                                          {isCompletado ? (
+                                                            isRetrasado ? (
+                                                              <span className="inline-flex items-center gap-1 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-medium text-white">
+                                                                ⏰ {diasRetraso}d retraso
+                                                              </span>
+                                                            ) : (
+                                                              <span className="inline-flex items-center gap-1 rounded-full bg-green-600 px-2 py-0.5 text-[10px] font-medium text-white">
+                                                                ✅ En tiempo
+                                                              </span>
+                                                            )
+                                                          ) : (
+                                                            <span className="inline-flex items-center gap-1 rounded-full bg-gray-300 px-2 py-0.5 text-[10px] font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+                                                              ⏳ Pendiente
+                                                            </span>
+                                                          )}
+                                                        </div>
+                                                      </div>
+                                                    </div>
+                                                  );
+                                                })}
+                                              </div>
+                                              <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/50">
+                                                <div className="grid grid-cols-3 gap-3 text-center text-sm">
+                                                  <div>
+                                                    <p className="text-xs text-gray-500">Criticidad</p>
+                                                    <p className={`mt-0.5 font-semibold ${getCriticidadColor(timeline.nivelCriticidad)}`}>{timeline.criticidad}/10</p>
+                                                  </div>
+                                                  <div>
+                                                    <p className="text-xs text-gray-500">Progreso</p>
+                                                    <p className="mt-0.5 font-semibold text-gray-900 dark:text-white">{timeline.progreso}%</p>
+                                                  </div>
+                                                  <div>
+                                                    <p className="text-xs text-gray-500">Retraso</p>
+                                                    <p className={`mt-0.5 font-semibold ${timeline.diasRetrasoTotal > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                                                      {timeline.diasRetrasoTotal}d
+                                                    </p>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          )}
+                                        </>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Tab: Chat */}
+                        {vistaActivaGrupo === 'chat' && (
+                          <div
+                            className={`flex flex-col h-[500px] ${isDragging ? 'ring-2 ring-blue-400' : ''}`}
+                            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                            onDragLeave={() => setIsDragging(false)}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              setIsDragging(false);
+                              const files = Array.from(e.dataTransfer.files);
+                              if (files.length) enviarArchivoChat(files);
+                            }}
+                          >
+                            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                              {loadingChat ? (
+                                <div className="flex h-full items-center justify-center">
+                                  <div className="h-6 w-6 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+                                </div>
+                              ) : mensajes.length === 0 ? (
+                                <div className="flex h-full flex-col items-center justify-center text-center text-gray-500 dark:text-gray-400">
+                                  <svg className="mb-3 h-10 w-10 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                  </svg>
+                                  <p className="text-sm">No hay mensajes aún</p>
+                                  {!chatIdActivo && <p className="text-xs mt-1 text-gray-400">Chat no disponible para esta compra</p>}
+                                </div>
+                              ) : (
+                                mensajes.map((msg: any) => (
+                                  <div key={msg.id} className={`flex ${msg.esPropio ? 'justify-end' : 'justify-start'}`}>
+                                    <div className={`max-w-[70%] rounded-xl px-3 py-2 ${msg.esPropio
+                                      ? 'bg-blue-600 text-white'
+                                      : 'bg-gray-100 text-gray-900 dark:bg-gray-700 dark:text-white'
+                                    }`}>
+                                      {!msg.esPropio && (
+                                        <p className="mb-0.5 text-[10px] font-semibold opacity-70">{msg.usuario?.nombre || 'Usuario'}</p>
+                                      )}
+                                      {msg.tipo === 'ARCHIVO' || msg.archivo ? (
+                                        <a href={msg.archivo || msg.contenido} target="_blank" rel="noopener noreferrer"
+                                          className="flex items-center gap-1.5 text-xs underline opacity-90 hover:opacity-100">
+                                          <FileText size={12} />
+                                          {msg.nombreArchivo || msg.contenido || 'Archivo adjunto'}
+                                        </a>
+                                      ) : (
+                                        <p className="text-sm leading-snug">{msg.contenido}</p>
+                                      )}
+                                      <p className={`mt-0.5 text-[10px] opacity-60 ${msg.esPropio ? 'text-right' : ''}`}>
+                                        {msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString('es-HN', { hour: '2-digit', minute: '2-digit' }) : ''}
+                                      </p>
+                                    </div>
+                                  </div>
+                                ))
+                              )}
+                              <div ref={chatEndRef} />
+                            </div>
+                            {chatIdActivo && (
+                              <div className="border-t border-gray-200 dark:border-gray-700 p-3">
+                                <div className="flex items-end gap-2">
+                                  <input
+                                    ref={chatFileRef}
+                                    type="file"
+                                    className="hidden"
+                                    multiple
+                                    onChange={(e) => {
+                                      const files = Array.from(e.target.files || []);
+                                      if (files.length) enviarArchivoChat(files);
+                                    }}
+                                  />
+                                  <button
+                                    onClick={() => chatFileRef.current?.click()}
+                                    disabled={sendingFile}
+                                    className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors"
+                                    title="Adjuntar archivo"
+                                  >
+                                    {sendingFile ? (
+                                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-transparent" />
+                                    ) : (
+                                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                      </svg>
+                                    )}
+                                  </button>
+                                  <textarea
+                                    value={nuevoMensaje}
+                                    onChange={(e) => setNuevoMensaje(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarMensaje(); }
+                                    }}
+                                    placeholder="Escribe un mensaje... (Enter para enviar)"
+                                    rows={1}
+                                    className="flex-1 resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                                  />
+                                  <button
+                                    onClick={enviarMensaje}
+                                    disabled={sendingMessage || !nuevoMensaje.trim()}
+                                    className="rounded-lg bg-blue-600 p-2 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                                  >
+                                    {sendingMessage ? (
+                                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                                    ) : (
+                                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                      </svg>
+                                    )}
+                                  </button>
+                                </div>
+                                {isDragging && (
+                                  <p className="mt-2 text-center text-xs text-blue-500">Suelta los archivos aquí para adjuntarlos</p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
         {/* Modal Avanzar Estado - ACTUALIZADO con selector FOB/CIF */}
         {showAvanzarModal && productoSeleccionado && (
           <div className="fixed inset-0 z-[5000] flex items-center justify-center bg-black/50 p-4">
