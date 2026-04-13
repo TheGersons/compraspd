@@ -495,6 +495,48 @@ const api = {
     return response.json();
   },
 
+  async uploadComprobanteDescuento(file: File, cotizacionId: string, sku: string, proveedorNombre: string) {
+    const token = getToken();
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('cotizacionId', cotizacionId);
+    formData.append('sku', sku);
+    formData.append('proveedorNombre', proveedorNombre);
+    formData.append('tipo', 'comprobantes_descuento');
+    const response = await fetch(`${API_BASE_URL}/api/v1/storage/upload`, {
+      method: 'POST', credentials: 'include',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+    if (!response.ok) {
+      const e = await response.json().catch(() => ({}));
+      throw new Error(e.message || 'Error al subir comprobante');
+    }
+    return response.json();
+  },
+
+  async solicitarDescuento(precioId: string, comprobanteDescuento: string) {
+    const token = getToken();
+    const response = await fetch(`${API_BASE_URL}/api/v1/precios/${precioId}/solicitar-descuento`, {
+      method: 'POST', credentials: 'include',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ comprobanteDescuento }),
+    });
+    if (!response.ok) throw new Error('Error al registrar comprobante');
+    return response.json();
+  },
+
+  async registrarResultadoDescuento(precioId: string, precioDescuento: number) {
+    const token = getToken();
+    const response = await fetch(`${API_BASE_URL}/api/v1/precios/${precioId}/resultado-descuento`, {
+      method: 'POST', credentials: 'include',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ precioDescuento }),
+    });
+    if (!response.ok) throw new Error('Error al registrar precio con descuento');
+    return response.json();
+  },
+
   async actualizarNombreCotizacion(id: string, nombreCotizacion: string) {
     const token = getToken();
     const response = await fetch(`${API_BASE_URL}/api/v1/quotations/${id}`, {
@@ -617,6 +659,8 @@ export default function FollowUps() {
   const [precioEditando, setPrecioEditando] = useState<Record<string, string>>({});
   const [comprobanteStatus, setComprobanteStatus] = useState<Record<string, 'aplica' | 'no_aplica' | ''>>({});
   const [savingPrecio, setSavingPrecio] = useState<string | null>(null);
+  const [precioDescuentoEditando, setPrecioDescuentoEditando] = useState<Record<string, string>>({});
+  const [subiendoComprobante, setSubiendoComprobante] = useState<string | null>(null);
 
   // ============================================================================
   // EFFECTS
@@ -1175,6 +1219,9 @@ export default function FollowUps() {
         const status = primer.ComprobanteDescuento === 'no_aplica' ? 'no_aplica' : 'aplica';
         setComprobanteStatus(prev => ({ ...prev, [detalleId]: status }));
       }
+      if (primer?.precioDescuento != null) {
+        setPrecioDescuentoEditando(prev => ({ ...prev, [detalleId]: String(primer.precioDescuento) }));
+      }
     } catch (error) {
       console.error("Error al cargar precios:", error);
       // No limpiar los precios existentes en caso de error
@@ -1313,6 +1360,55 @@ export default function FollowUps() {
 
     // Llamar a la función original
     await toggleAprobarProducto(estadoProductoId, aprobar);
+  };
+
+  const subirComprobanteDescuento = async (file: File, producto: Producto) => {
+    if (!cotizacionSeleccionada) return;
+    const precioActual = preciosPorProducto[producto.id]?.[0];
+    if (!precioActual) {
+      toast.error("Guarda un precio primero antes de subir el comprobante");
+      return;
+    }
+    try {
+      setSubiendoComprobante(producto.id);
+      const { url, fileName } = await api.uploadComprobanteDescuento(
+        file,
+        cotizacionSeleccionada.id,
+        producto.sku,
+        precioActual.proveedor?.nombre || 'desconocido'
+      );
+      await api.solicitarDescuento(precioActual.id, url || fileName);
+      toast.success("Comprobante subido correctamente");
+      await cargarPreciosProducto(producto.id);
+    } catch (e: any) {
+      toast.error(e.message || "Error al subir comprobante");
+    } finally {
+      setSubiendoComprobante(null);
+    }
+  };
+
+  const guardarPrecioConDescuento = async (producto: Producto, value: string) => {
+    const num = parseFloat(value);
+    if (isNaN(num) || num <= 0) {
+      toast.error("Ingresa un precio con descuento válido");
+      return;
+    }
+    const precioActual = preciosPorProducto[producto.id]?.[0];
+    if (!precioActual) {
+      toast.error("Guarda un precio primero");
+      return;
+    }
+    if (num > Number(precioActual.precio)) {
+      toast.error("El precio con descuento no puede ser mayor al precio original");
+      return;
+    }
+    try {
+      await api.registrarResultadoDescuento(precioActual.id, num);
+      toast.success("Precio con descuento guardado");
+      await cargarPreciosProducto(producto.id);
+    } catch (e: any) {
+      toast.error(e.message || "Error al guardar precio con descuento");
+    }
   };
 
   const manejarArchivo = async (precio: Precio, sku: string, mode: 'inline' | 'attachment') => {
@@ -2037,7 +2133,7 @@ export default function FollowUps() {
                                             <th className="pb-3 pr-3 font-semibold text-gray-700 dark:text-gray-300">Descripción / SKU</th>
                                             <th className="pb-3 pr-3 font-semibold text-gray-700 dark:text-gray-300">Cantidad</th>
                                             <th className="pb-3 pr-3 font-semibold text-gray-700 dark:text-gray-300">Precio</th>
-                                            <th className="pb-3 pr-3 font-semibold text-gray-700 dark:text-gray-300">Comprobante</th>
+                                            <th className="pb-3 pr-3 font-semibold text-gray-700 dark:text-gray-300">Descuento</th>
                                             <th className="pb-3 pr-3 text-center font-semibold text-gray-700 dark:text-gray-300">Confirmar precio final</th>
                                             {!isComercial && cotizacionSeleccionada.tipoCompra !== 'NACIONAL' && <th className="pb-3 font-semibold text-gray-700 dark:text-gray-300">Acciones</th>}
                                           </tr>
@@ -2117,27 +2213,68 @@ export default function FollowUps() {
                                                         className="rounded border border-gray-300 bg-white px-2 py-1 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
                                                       >
                                                         <option value="">Seleccionar</option>
-                                                        <option value="aplica">Aplica</option>
+                                                        <option value="aplica">Aplica descuento</option>
                                                         <option value="no_aplica">No Aplica</option>
                                                       </select>
-                                                      {comprobanteStatus[producto.id] === 'aplica' && !yaAprobado && (
-                                                        <label className="flex items-center gap-1.5 cursor-pointer rounded border border-dashed border-gray-300 bg-gray-50 px-2 py-1 text-xs text-gray-600 hover:border-blue-400 hover:bg-blue-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:border-blue-500">
-                                                          <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                                                          </svg>
-                                                          <span className="truncate max-w-[100px]">Subir comprobante</span>
-                                                          <input
-                                                            type="file"
-                                                            accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx"
-                                                            className="hidden"
-                                                            onChange={(e) => {
-                                                              const file = e.target.files?.[0];
-                                                              if (file && cotizacionSeleccionada?.chatId) {
-                                                                enviarArchivo(file);
-                                                              }
-                                                            }}
-                                                          />
-                                                        </label>
+                                                      {comprobanteStatus[producto.id] === 'aplica' && (
+                                                        <div className="flex flex-col gap-1">
+                                                          {/* Comprobante: upload o indicador de subido */}
+                                                          {precioActual?.ComprobanteDescuento && precioActual.ComprobanteDescuento !== 'no_aplica' ? (
+                                                            <button
+                                                              type="button"
+                                                              onClick={() => precioActual && manejarArchivo(precioActual, producto.sku, 'inline')}
+                                                              className="inline-flex items-center gap-1 rounded border border-green-300 bg-green-50 px-2 py-0.5 text-xs text-green-700 hover:bg-green-100 dark:border-green-700 dark:bg-green-900/20 dark:text-green-400"
+                                                              title="Ver comprobante"
+                                                            >
+                                                              ✓ Comprobante subido
+                                                            </button>
+                                                          ) : !yaAprobado && (
+                                                            <label className={`flex items-center gap-1.5 cursor-pointer rounded border border-dashed px-2 py-1 text-xs transition-colors ${subiendoComprobante === producto.id ? 'border-blue-400 bg-blue-50 text-blue-600' : 'border-gray-300 bg-gray-50 text-gray-600 hover:border-blue-400 hover:bg-blue-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400'}`}>
+                                                              {subiendoComprobante === producto.id ? (
+                                                                <div className="h-3 w-3 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+                                                              ) : (
+                                                                <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                                                </svg>
+                                                              )}
+                                                              <span className="truncate max-w-[110px]">{subiendoComprobante === producto.id ? 'Subiendo...' : 'Subir comprobante'}</span>
+                                                              <input
+                                                                type="file"
+                                                                accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx"
+                                                                className="hidden"
+                                                                disabled={!!subiendoComprobante}
+                                                                onChange={(e) => {
+                                                                  const file = e.target.files?.[0];
+                                                                  if (file) subirComprobanteDescuento(file, producto);
+                                                                  e.target.value = '';
+                                                                }}
+                                                              />
+                                                            </label>
+                                                          )}
+                                                          {/* Precio final con descuento */}
+                                                          <div className="flex items-center gap-1 mt-0.5">
+                                                            <input
+                                                              type="number"
+                                                              step="0.01"
+                                                              min="0"
+                                                              placeholder="Precio c/desc."
+                                                              disabled={yaAprobado}
+                                                              value={precioDescuentoEditando[producto.id] ?? (precioActual?.precioDescuento != null ? String(precioActual.precioDescuento) : '')}
+                                                              onChange={(e) => setPrecioDescuentoEditando(prev => ({ ...prev, [producto.id]: e.target.value }))}
+                                                              onBlur={() => {
+                                                                const val = precioDescuentoEditando[producto.id];
+                                                                if (val !== undefined && val !== '') guardarPrecioConDescuento(producto, val);
+                                                              }}
+                                                              onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') {
+                                                                  const val = precioDescuentoEditando[producto.id];
+                                                                  if (val !== undefined && val !== '') guardarPrecioConDescuento(producto, val);
+                                                                }
+                                                              }}
+                                                              className="w-28 rounded border border-green-300 bg-white px-2 py-1 text-xs focus:border-green-500 focus:outline-none dark:border-green-700 dark:bg-gray-700 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                                                            />
+                                                          </div>
+                                                        </div>
                                                       )}
                                                     </div>
                                                   </td>

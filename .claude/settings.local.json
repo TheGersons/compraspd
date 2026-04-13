@@ -23,7 +23,15 @@
       "Bash(echo \"EXIT_CODE=$?\")",
       "Bash(pnpm build:*)",
       "Bash(echo \"EXIT=$?\")",
-      "Bash(npx skills:*)"
+      "Bash(npx skills:*)",
+      "Bash(npx ts-node:*)",
+      "Bash(git push:*)",
+      "Bash(docker compose:*)",
+      "Bash(docker-compose ps:*)",
+      "Bash(docker exec:*)",
+      "Bash(npx --prefix \"C:/Repo/admin-dashboard-main/frontend\" tsc -p \"C:/Repo/admin-dashboard-main/frontend/tsconfig.json\" --noEmit)",
+      "Bash(cmd /c \"npx tsc --noEmit 2>&1\")",
+      "Bash(cmd /c \"cd /d C:\\\\Repo\\\\admin-dashboard-main\\\\frontend && npx tsc --noEmit\")"
     ]
   }
 }

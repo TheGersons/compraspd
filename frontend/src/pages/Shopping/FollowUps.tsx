@@ -129,6 +129,7 @@ export type EstadoProducto = {
     id: string;
     nombreCotizacion: string;
     tipoCompra: 'NACIONAL' | 'INTERNACIONAL';
+    solicitante?: { id: string; nombre: string; email?: string } | null;
   };
   paisOrigen?: {
     id: string;
@@ -491,6 +492,8 @@ export default function ShoppingFollowUps() {
   const [supervisores, setSupervisores] = useState<{ id: string; nombre: string; email: string; rol: { nombre: string } }[]>([]);
   const [filtroResponsables, setFiltroResponsables] = useState<string[]>([]);
   const [showResponsableDropdown, setShowResponsableDropdown] = useState(false);
+  const [filtroSolicitante, setFiltroSolicitante] = useState<string>("");
+  const [showSolicitanteDropdown, setShowSolicitanteDropdown] = useState(false);
   const [menuAbierto, setMenuAbierto] = useState<string | null>(null); // id del producto con menú abierto
 
   // Vista agrupada por cotización
@@ -517,7 +520,7 @@ export default function ShoppingFollowUps() {
 
   // Cerrar dropdowns al hacer click fuera
   useEffect(() => {
-    const handleClickOutside = () => { setMenuAbierto(null); setShowResponsableDropdown(false); setMenuGrupoAbierto(null); };
+    const handleClickOutside = () => { setMenuAbierto(null); setShowResponsableDropdown(false); setShowSolicitanteDropdown(false); setMenuGrupoAbierto(null); };
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
@@ -681,6 +684,11 @@ export default function ShoppingFollowUps() {
       if (!respId || !filtroResponsables.includes(respId)) return false;
     }
 
+    // Filtro por solicitante
+    if (filtroSolicitante) {
+      if (p.cotizacion?.solicitante?.id !== filtroSolicitante) return false;
+    }
+
     const estaCompletado = p.progreso === 100;
     if (verCompletados) {
       return estaCompletado;
@@ -692,6 +700,16 @@ export default function ShoppingFollowUps() {
   const productosActivos = productos.filter(p => !p.rechazado);
   const totalPendientes = productosActivos.filter(p => p.progreso !== 100).length;
   const totalCompletados = productosActivos.filter(p => p.progreso === 100).length;
+
+  // Solicitantes únicos derivados de los productos cargados
+  const solicitantesUnicos = (() => {
+    const map = new Map<string, string>();
+    productos.forEach(p => {
+      const sol = p.cotizacion?.solicitante;
+      if (sol?.id) map.set(sol.id, sol.nombre || sol.id);
+    });
+    return Array.from(map.entries()).map(([id, nombre]) => ({ id, nombre }));
+  })();
 
   const handleAsignarResponsable = async (productoId: string, responsableId: string | null) => {
     try {
@@ -955,6 +973,54 @@ export default function ShoppingFollowUps() {
               </div>
             )}
           </div>
+
+          {/* Filtro por Solicitante */}
+          <div className="relative">
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowSolicitanteDropdown(!showSolicitanteDropdown); }}
+              className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm transition-colors ${filtroSolicitante
+                ? "border-purple-400 bg-purple-50 text-purple-700 dark:border-purple-600 dark:bg-purple-900/20 dark:text-purple-300"
+                : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
+                }`}
+            >
+              <UserCheck size={14} />
+              {filtroSolicitante
+                ? (solicitantesUnicos.find(s => s.id === filtroSolicitante)?.nombre ?? "Solicitante")
+                : "Todos los solicitantes"}
+              <ChevronDown size={14} />
+            </button>
+            {showSolicitanteDropdown && (
+              <div className="absolute top-full left-0 z-50 mt-1 w-64 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
+                <div className="max-h-60 overflow-y-auto p-2">
+                  <button
+                    onClick={() => { setFiltroSolicitante(""); setShowSolicitanteDropdown(false); }}
+                    className={`w-full rounded-md px-3 py-2 text-left text-sm transition-colors ${!filtroSolicitante
+                      ? "bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300"
+                      : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
+                      }`}
+                  >
+                    👥 Ver todos
+                  </button>
+                  <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
+                  {solicitantesUnicos.length === 0 && (
+                    <p className="px-3 py-2 text-xs text-gray-400">Sin solicitantes disponibles</p>
+                  )}
+                  {solicitantesUnicos.map(sol => (
+                    <button
+                      key={sol.id}
+                      onClick={() => { setFiltroSolicitante(sol.id); setShowSolicitanteDropdown(false); }}
+                      className={`w-full rounded-md px-3 py-2 text-left text-sm transition-colors ${filtroSolicitante === sol.id
+                        ? "bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300"
+                        : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
+                        }`}
+                    >
+                      👤 {sol.nombre}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Layout principal */}
@@ -1027,10 +1093,10 @@ export default function ShoppingFollowUps() {
                             {grupo.productos.some(p => p.progreso < 100 && p.siguienteEstado) && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); abrirAvanceMasivo(grupo.cotizacionId, grupo.productos); }}
-                                className="rounded-md bg-blue-600 px-2 py-1 text-[10px] font-medium text-white hover:bg-blue-700 whitespace-nowrap"
-                                title="Avanzar todos los productos de esta cotización"
+                                className="rounded-md bg-indigo-600 px-2 py-1 text-[10px] font-medium text-white hover:bg-indigo-700 whitespace-nowrap"
+                                title="Avanzar todos los productos de esta compra al siguiente estado"
                               >
-                                ▶ Avanzar grupo
+                                ▶▶ Avanzar todos
                               </button>
                             )}
                             {/* Menú asignar responsable al grupo */}
@@ -1324,20 +1390,36 @@ export default function ShoppingFollowUps() {
                 {/* Siguiente estado y botón avanzar */}
                 {productoSeleccionado.siguienteEstado && productoSeleccionado.progreso !== 100 && (
                   <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-sm text-blue-600 dark:text-blue-400">Siguiente estado</p>
                         <p className="mt-1 text-lg font-semibold text-blue-900 dark:text-blue-100">
                           {ESTADOS_ICONOS[productoSeleccionado.siguienteEstado]} {ESTADOS_LABELS[productoSeleccionado.siguienteEstado]}
                         </p>
                       </div>
-                      <button
-                        onClick={abrirModalAvanzar}
-                        disabled={loadingAccion}
-                        className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-                      >
-                        Avanzar Estado
-                      </button>
+                      <div className="flex flex-col gap-2 shrink-0">
+                        <button
+                          onClick={abrirModalAvanzar}
+                          disabled={loadingAccion}
+                          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap"
+                        >
+                          ▶ Avanzar Estado
+                        </button>
+                        {productoSeleccionado.cotizacionId && (() => {
+                          const grupoProductos = productos.filter(p => p.cotizacionId === productoSeleccionado.cotizacionId);
+                          const elegibles = grupoProductos.filter(p => p.progreso < 100 && p.siguienteEstado && !p.rechazado);
+                          return elegibles.length > 1 ? (
+                            <button
+                              onClick={() => abrirAvanceMasivo(productoSeleccionado.cotizacionId!, grupoProductos)}
+                              disabled={loadingAccion}
+                              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 whitespace-nowrap"
+                              title="Avanzar todos los productos de esta compra al siguiente estado"
+                            >
+                              ▶▶ Avanzar todos ({elegibles.length})
+                            </button>
+                          ) : null;
+                        })()}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1617,7 +1699,7 @@ export default function ShoppingFollowUps() {
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-xl bg-white p-6 dark:bg-gray-900">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">▶ Avanzar productos en grupo</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">▶▶ Avanzar todos los productos de esta compra</h3>
               <button onClick={() => setShowAvanceMasivoModal(false)} className="text-gray-400 hover:text-red-500">✕</button>
             </div>
 
