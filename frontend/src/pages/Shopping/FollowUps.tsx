@@ -124,6 +124,7 @@ export type EstadoProducto = {
     id: string;
     nombreCotizacion: string;
     tipoCompra: 'NACIONAL' | 'INTERNACIONAL';
+    chatId?: string | null;
     solicitante?: { id: string; nombre: string; email?: string } | null;
   };
   paisOrigen?: {
@@ -565,6 +566,7 @@ export default function ShoppingFollowUps() {
   const [chatIdActivo, setChatIdActivo] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const chatFileRef = useRef<HTMLInputElement>(null);
+  const chatMessagesContainerRef = useRef<HTMLDivElement>(null);
 
   // Vista activa del acordeón expandido
   const [vistaActivaGrupo, setVistaActivaGrupo] = useState<'productos' | 'chat'>('productos');
@@ -779,13 +781,14 @@ export default function ShoppingFollowUps() {
         cotizacionId: key,
         nombre: p.cotizacion?.nombreCotizacion || 'Sin cotización',
         tipoCompra: p.cotizacion?.tipoCompra || p.tipoCompra,
+        chatId: p.cotizacion?.chatId || null,
         solicitante: p.cotizacion?.solicitante || null,
         productos: [],
       };
     }
     acc[key].productos.push(p);
     return acc;
-  }, {} as Record<string, { cotizacionId: string; nombre: string; tipoCompra: string; solicitante: { id: string; nombre: string } | null; productos: EstadoProducto[] }>);
+  }, {} as Record<string, { cotizacionId: string; nombre: string; tipoCompra: string; chatId: string | null; solicitante: { id: string; nombre: string } | null; productos: EstadoProducto[] }>);
 
   const gruposOrdenados = Object.values(productosAgrupados).sort((a, b) => a.nombre.localeCompare(b.nombre));
 
@@ -896,7 +899,7 @@ export default function ShoppingFollowUps() {
   const requiereSeleccionFobCif = productoSeleccionado?.siguienteEstado === 'enFOB';
 
   // Handler para expandir/colapsar grupo en el acordeón
-  const handleToggleGrupo = async (cotizacionId: string) => {
+  const handleToggleGrupo = (cotizacionId: string) => {
     if (grupoExpandido === cotizacionId) {
       setGrupoExpandido(null);
       setChatIdActivo(null);
@@ -905,24 +908,17 @@ export default function ShoppingFollowUps() {
       setTimeline(null);
       return;
     }
+    // Establecer chatId inmediatamente desde los datos del grupo (mismo chat que Cotizaciones)
+    const chatIdDelGrupo = productosAgrupados[cotizacionId]?.chatId || null;
     setGrupoExpandido(cotizacionId);
     setVistaActivaGrupo('productos');
     setProductoSeleccionado(null);
     setTimeline(null);
-    setChatIdActivo(null);
+    setChatIdActivo(chatIdDelGrupo);
     setMensajes([]);
-    // Scroll al acordeón
-    setTimeout(() => {
-      acordeonRefs.current[cotizacionId]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 50);
-    // Obtener chatId de la cotización
-    try {
-      const detalle = await api.getCotizacionDetalle(cotizacionId);
-      if (detalle?.chatId) {
-        setChatIdActivo(detalle.chatId);
-      }
-    } catch {
-      // silencioso si no hay chat
+    // Agregar usuario como participante en background (sin bloquear la UI)
+    if (chatIdDelGrupo) {
+      api.getCotizacionDetalle(cotizacionId).catch(() => { /* silencioso */ });
     }
   };
 
@@ -932,7 +928,12 @@ export default function ShoppingFollowUps() {
       setLoadingChat(true);
       const data = await api.getChatMessages(chatId);
       setMensajes(Array.isArray(data) ? data : (data.messages || []));
-      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+      // Scroll dentro del contenedor de mensajes, sin mover la página
+      setTimeout(() => {
+        if (chatMessagesContainerRef.current) {
+          chatMessagesContainerRef.current.scrollTop = chatMessagesContainerRef.current.scrollHeight;
+        }
+      }, 50);
     } catch { /* silencioso */ }
     finally { setLoadingChat(false); }
   };
@@ -1466,7 +1467,7 @@ export default function ShoppingFollowUps() {
                               if (files.length) enviarArchivoChat(files);
                             }}
                           >
-                            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                            <div ref={chatMessagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3">
                               {loadingChat ? (
                                 <div className="flex h-full items-center justify-center">
                                   <div className="h-6 w-6 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
