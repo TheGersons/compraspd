@@ -89,6 +89,7 @@ export class FollowUpsController {
     @Query('search') search?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
+    @Query('allEstados') allEstados?: string,
   ) {
     return this.followupsService.listCotizacionesPendientes(user, {
       estado,
@@ -96,6 +97,7 @@ export class FollowUpsController {
       search,
       page: page ? parseInt(page) : undefined,
       pageSize: pageSize ? parseInt(pageSize) : undefined,
+      allEstados: allEstados === 'true',
     });
   }
 

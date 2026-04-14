@@ -180,6 +180,7 @@ const api = {
     if (filters?.search) params.append("search", filters.search);
     if (filters?.page) params.append("page", filters.page.toString());
     if (filters?.pageSize) params.append("pageSize", filters.pageSize.toString());
+    params.append("allEstados", "true"); // logística muestra todos los estados
 
     const response = await fetch(`${API_BASE_URL}/api/v1/followups?${params}`, {
       credentials: "include",

@@ -37,6 +37,7 @@ export class FollowUpsService {
       search?: string;
       page?: number;
       pageSize?: number;
+      allEstados?: boolean;
     },
   ) {
     // Verificar que el usuario es supervisor
@@ -62,9 +63,12 @@ export class FollowUpsService {
 
     // Construir filtros
     const where: any = {
-      estado: {
-        in: ['ENVIADA', 'PENDIENTE', 'EN_CONFIGURACION', 'APROBADA_PARCIAL'],
-      },
+      // Si allEstados=true no filtrar por estado (usado por módulo logística)
+      ...(!filters?.allEstados && {
+        estado: {
+          in: ['ENVIADA', 'PENDIENTE', 'EN_CONFIGURACION', 'APROBADA_PARCIAL', 'APROBADA_COMPLETA'],
+        },
+      }),
       // COMERCIAL solo ve cotizaciones vinculadas a licitaciones u ofertas
       ...(esComercial && {
         OR: [{ licitacion: { isNot: null } }, { oferta: { isNot: null } }],
