@@ -44,19 +44,10 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   {
-    icon: <UtilityPole />,
-    name: "Logística",
-    roles: ["ADMIN", "SUPERVISOR", "COMERCIAL"],
-    subItems: [
-      { name: "Cotizaciones / Seguimiento", path: "/quotes/logistica/follow-ups", pro: false },
-      { name: "Compras / Documentos", path: "/shopping/logistica/documents", pro: false },
-    ],
-  },
-  {
     icon: <PieChartIcon />,
     name: "Inicio",
     path: "/dashboard",
-    roles: ["ADMIN", "SUPERVISOR"], // USUARIO no ve esto
+    roles: ["ADMIN", "SUPERVISOR"],
   },
   {
     icon: <DocsIcon />,
@@ -84,6 +75,15 @@ const navItems: NavItem[] = [
     ],
   },
   {
+    icon: <UtilityPole />,
+    name: "Logística",
+    roles: ["ADMIN", "SUPERVISOR", "COMERCIAL"],
+    subItems: [
+      { name: "Cotizaciones / Seguimiento", path: "/quotes/logistica/follow-ups", pro: false },
+      { name: "Compras / Documentos", path: "/shopping/logistica/documents", pro: false },
+    ],
+  },
+  {
     icon: <BadgeDollarSign />,
     name: "Licitaciones",
     roles: ["ADMIN", "SUPERVISOR", "COMERCIAL"],
@@ -107,6 +107,9 @@ const navItems: NavItem[] = [
     roles: ["ADMIN", "SUPERVISOR"],
     path: "/reportes",
   },
+];
+
+const othersItems: NavItem[] = [
   {
     icon: <Building2 />,
     name: "Proveedores",
@@ -116,7 +119,7 @@ const navItems: NavItem[] = [
   {
     icon: <UtilityPole />,
     name: "Proyectos",
-    roles: ["ADMIN", "SUPERVISOR"], // USUARIO no ve esto
+    roles: ["ADMIN", "SUPERVISOR"],
     subItems: [
       { name: "ver Proyectos", path: "/projects", pro: false },
       { name: "Nuevo Proyecto", path: "/projects/new", pro: false },
@@ -125,16 +128,13 @@ const navItems: NavItem[] = [
   {
     icon: <User />,
     name: "Usuarios",
-    roles: ["ADMIN"], // Solo ADMIN
+    roles: ["ADMIN"],
     subItems: [
       { name: "Gestión de Usuarios", path: "/profiles", pro: false },
       { name: "Configuración", path: "/settings", pro: false },
       { name: "Roles", path: "/roles", pro: false },
     ],
   },
-];
-
-const othersItems: NavItem[] = [
   {
     icon: <Link2 size={20} />,
     name: "Odoo CRM",
