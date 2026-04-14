@@ -7,56 +7,69 @@ import { useCallback } from 'react';
 // Definir qué rutas requieren qué roles (array vacío = todos los autenticados)
 const ROUTE_PERMISSIONS: Record<string, string[]> = {
   // Dashboard
-  '/dashboard': ['ADMIN', 'SUPERVISOR'],
-  '/home': ['ADMIN', 'SUPERVISOR'],
-  
+  '/dashboard': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'],
+  '/home': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'],
+
   // Quotes
-  '/quotes': ['ADMIN', 'SUPERVISOR', 'COMERCIAL'],
+  '/quotes': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS', 'COMERCIAL'],
   '/quotes/new': [],
   '/quotes/my-quotes': [],
   '/quotes/history': [],
-  '/reportes': ['ADMIN', 'SUPERVISOR'],
-  '/quotes/follow-ups': ['ADMIN', 'SUPERVISOR', 'COMERCIAL'],
-  '/quotes/assignment': ['ADMIN', 'SUPERVISOR'],
-  
+  '/reportes': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'],
+  '/quotes/follow-ups': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS', 'COMERCIAL'],
+  '/quotes/assignment': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'],
+  '/quotes/rejected': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'],
+
   // Shopping
-  '/shopping': ['ADMIN', 'SUPERVISOR', 'COMERCIAL'],
-  '/shopping/follow-ups': ['ADMIN', 'SUPERVISOR', 'COMERCIAL'],
-  '/shopping/history': ['ADMIN', 'SUPERVISOR', 'COMERCIAL'],
-  '/shopping/documents': ['ADMIN', 'SUPERVISOR', 'COMERCIAL'],
-  '/shopping/aprobacion': ['ADMIN', 'SUPERVISOR', 'COMERCIAL'],
-  '/shopping/assignment': ['ADMIN', 'SUPERVISOR'],
-  
+  '/shopping': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS', 'COMERCIAL'],
+  '/shopping/follow-ups': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS', 'COMERCIAL'],
+  '/shopping/history': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS', 'COMERCIAL'],
+  '/shopping/documents': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS', 'COMERCIAL'],
+  '/shopping/aprobacion': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS', 'COMERCIAL'],
+  '/shopping/assignment': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'],
+
+  // Logística
+  '/logistica': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS', 'COMERCIAL'],
+  '/logistica/cotizaciones': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS', 'COMERCIAL'],
+  '/logistica/historial': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS', 'COMERCIAL'],
+  '/logistica/rechazadas': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'],
+  '/logistica/compras': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS', 'COMERCIAL'],
+  '/logistica/documentos': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS', 'COMERCIAL'],
+
   // Licitaciones y Ofertas
-  '/licitaciones': ['ADMIN', 'SUPERVISOR', 'COMERCIAL'],
-  '/licitaciones/archivo': ['ADMIN', 'SUPERVISOR', 'COMERCIAL'],
-  '/ofertas': ['ADMIN', 'SUPERVISOR', 'COMERCIAL'],
-  '/ofertas/archivo': ['ADMIN', 'SUPERVISOR', 'COMERCIAL'],
+  '/licitaciones': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS', 'COMERCIAL'],
+  '/licitaciones/archivo': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS', 'COMERCIAL'],
+  '/ofertas': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS', 'COMERCIAL'],
+  '/ofertas/archivo': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS', 'COMERCIAL'],
 
   // Projects
-  '/projects': ['ADMIN', 'SUPERVISOR'],
-  '/projects/new': ['ADMIN', 'SUPERVISOR'],
-  '/projects/edit': ['ADMIN', 'SUPERVISOR'],
-  
+  '/projects': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'],
+  '/projects/new': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'],
+  '/projects/edit': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'],
+
   // Users
-  '/profiles': ['ADMIN'],
-  '/settings': ['ADMIN', 'SUPERVISOR'],
+  '/profiles': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'],
+  '/settings': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'],
   '/roles': ['ADMIN'],
   '/profile': [],
-  
+
+  // Providers / Odoo
+  '/providers': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'],
+  '/odoo': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'],
+
   // Calendar y otros
-  '/calendar': ['ADMIN', 'SUPERVISOR'],
-  '/blank': ['ADMIN', 'SUPERVISOR'],
-  '/form-elements': ['ADMIN', 'SUPERVISOR'],
-  '/basic-tables': ['ADMIN', 'SUPERVISOR'],
-  '/alerts': ['ADMIN', 'SUPERVISOR'],
-  '/avatars': ['ADMIN', 'SUPERVISOR'],
-  '/badge': ['ADMIN', 'SUPERVISOR'],
-  '/buttons': ['ADMIN', 'SUPERVISOR'],
-  '/images': ['ADMIN', 'SUPERVISOR'],
-  '/videos': ['ADMIN', 'SUPERVISOR'],
-  '/line-chart': ['ADMIN', 'SUPERVISOR'],
-  '/bar-chart': ['ADMIN', 'SUPERVISOR'],
+  '/calendar': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'],
+  '/blank': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'],
+  '/form-elements': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'],
+  '/basic-tables': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'],
+  '/alerts': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'],
+  '/avatars': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'],
+  '/badge': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'],
+  '/buttons': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'],
+  '/images': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'],
+  '/videos': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'],
+  '/line-chart': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'],
+  '/bar-chart': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'],
 };
 
 // Ruta de fallback segura para cualquier usuario autenticado
@@ -137,7 +150,7 @@ export function useNavigateWithRole() {
   const getHomeRoute = useCallback((): string => {
     const userRole = user?.rol?.nombre;
 
-    if (userRole === 'ADMIN' || userRole === 'SUPERVISOR') {
+    if (userRole === 'ADMIN' || userRole === 'SUPERVISOR' || userRole === 'JEFE_COMPRAS') {
       return '/dashboard';
     }
 
