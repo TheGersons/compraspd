@@ -790,6 +790,42 @@ export class EstadoProductoService {
   /**
    * Actualizar SKU y/o descripción de un estado de producto
    */
+  async actualizarPrecio(
+    id: string,
+    data: { precioUnitario?: number | null; precioTotal?: number | null },
+    user: UserJwt,
+  ) {
+    if (!this.isSupervisorOrAdmin(user)) {
+      throw new ForbiddenException('Solo supervisores/admin pueden editar precios');
+    }
+    const estado = await this.prisma.estadoProducto.findUnique({ where: { id } });
+    if (!estado) throw new NotFoundException('Producto no encontrado');
+
+    const updateData: any = { actualizado: new Date() };
+    if (data.precioUnitario !== undefined) updateData.precioUnitario = data.precioUnitario;
+    if (data.precioTotal !== undefined) updateData.precioTotal = data.precioTotal;
+
+    return this.prisma.estadoProducto.update({ where: { id }, data: updateData });
+  }
+
+  async actualizarPrecioMasivo(
+    items: { id: string; precioUnitario?: number | null; precioTotal?: number | null }[],
+    user: UserJwt,
+  ) {
+    if (!this.isSupervisorOrAdmin(user)) {
+      throw new ForbiddenException('Solo supervisores/admin pueden editar precios');
+    }
+    const results = await Promise.all(
+      items.map(({ id, precioUnitario, precioTotal }) => {
+        const updateData: any = { actualizado: new Date() };
+        if (precioUnitario !== undefined) updateData.precioUnitario = precioUnitario;
+        if (precioTotal !== undefined) updateData.precioTotal = precioTotal;
+        return this.prisma.estadoProducto.update({ where: { id }, data: updateData });
+      }),
+    );
+    return { updated: results.length };
+  }
+
   async actualizarDatos(
     id: string,
     data: { sku?: string; descripcion?: string },

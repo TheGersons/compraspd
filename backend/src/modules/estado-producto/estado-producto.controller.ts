@@ -267,6 +267,28 @@ export class EstadoProductoController {
     return this.service.aprobarProducto(id, dto, user);
   }
 
+  @Patch('precio-masivo')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Actualizar precio final de múltiples productos' })
+  actualizarPrecioMasivo(
+    @Body() body: { items: { id: string; precioUnitario?: number | null; precioTotal?: number | null }[] },
+    @CurrentUser() user: UserJwt,
+  ) {
+    return this.service.actualizarPrecioMasivo(body.items, user);
+  }
+
+  @Patch(':id/precio')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Actualizar precio final de un producto' })
+  @ApiParam({ name: 'id', description: 'ID del estado de producto' })
+  actualizarPrecio(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { precioUnitario?: number | null; precioTotal?: number | null },
+    @CurrentUser() user: UserJwt,
+  ) {
+    return this.service.actualizarPrecio(id, body, user);
+  }
+
   @Patch(':id/datos')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Actualizar SKU y/o descripción del producto' })

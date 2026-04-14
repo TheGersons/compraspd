@@ -403,6 +403,17 @@ const api = {
     return response.json();
   },
 
+  async actualizarPrecioMasivo(items: { id: string; precioUnitario?: number | null; precioTotal?: number | null }[]) {
+    const token = getToken();
+    const response = await fetch(`${API_BASE_URL}/api/v1/estado-productos/precio-masivo`, {
+      method: "PATCH", credentials: "include",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ items }),
+    });
+    if (!response.ok) { const e = await response.json(); throw new Error(e.message || "Error al actualizar precios"); }
+    return response.json();
+  },
+
   async getCotizacionDetalle(id: string) {
     const token = getToken();
     const response = await fetch(`${API_BASE_URL}/api/v1/followups/${id}`, {
@@ -547,6 +558,11 @@ export default function ShoppingFollowUps() {
   const [observacionMasiva, setObservacionMasiva] = useState("");
   const [verificacionMasiva, setVerificacionMasiva] = useState<Record<string, { completo: boolean; faltantes: string[] }>>({});
   const [loadingVerificacionMasiva, setLoadingVerificacionMasiva] = useState(false);
+
+  // Modal editar precios
+  const [editPrecioGrupoId, setEditPrecioGrupoId] = useState<string | null>(null);
+  const [preciosEnEdicion, setPreciosEnEdicion] = useState<{ id: string; sku: string; descripcion: string; precioUnitario: string; cantidad: number | null; precioTotal: string }[]>([]);
+  const [savingPrecios, setSavingPrecios] = useState(false);
 
   // Edición inline
   const [editandoSku, setEditandoSku] = useState<string | null>(null);
@@ -891,6 +907,36 @@ export default function ShoppingFollowUps() {
     } catch (e: any) { toast.error(e.message); }
   };
 
+  const abrirEditarPrecios = (cotizacionId: string) => {
+    const grupo = productosAgrupados[cotizacionId];
+    if (!grupo) return;
+    setPreciosEnEdicion(grupo.productos.map(p => ({
+      id: p.id,
+      sku: p.sku,
+      descripcion: p.descripcion,
+      precioUnitario: p.precioUnitario != null ? String(p.precioUnitario) : "",
+      cantidad: p.cantidad ?? null,
+      precioTotal: p.precioTotal != null ? String(p.precioTotal) : "",
+    })));
+    setEditPrecioGrupoId(cotizacionId);
+  };
+
+  const handleGuardarPrecios = async () => {
+    const items = preciosEnEdicion.map(p => ({
+      id: p.id,
+      precioUnitario: p.precioUnitario !== "" ? parseFloat(p.precioUnitario) : null,
+      precioTotal: p.precioTotal !== "" ? parseFloat(p.precioTotal) : null,
+    }));
+    setSavingPrecios(true);
+    try {
+      await api.actualizarPrecioMasivo(items);
+      toast.success("Precios actualizados");
+      setEditPrecioGrupoId(null);
+      await cargarProductos();
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSavingPrecios(false); }
+  };
+
   const handleAsignarResponsableGrupo = async (cotizacionId: string, responsableId: string | null) => {
     const grupo = productosAgrupados[cotizacionId];
     if (!grupo) return;
@@ -1169,6 +1215,17 @@ export default function ShoppingFollowUps() {
                             style={{ width: `${progresoPromedio}%` }}
                           />
                         </div>
+                        {/* Botón editar precios */}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); abrirEditarPrecios(grupo.cotizacionId); }}
+                          className="flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-medium text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-400 dark:hover:bg-amber-900/30 transition-colors"
+                          title="Editar precio(s)"
+                        >
+                          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          {grupo.productos.length > 1 ? "Precios" : "Precio"}
+                        </button>
                         {canAsignarResponsable && (
                           <div className="relative" onClick={(e) => e.stopPropagation()}>
                             <button
@@ -1783,6 +1840,83 @@ export default function ShoppingFollowUps() {
       </div>
 
       {/* Modal Avance Masivo */}
+      {/* ── Modal Editar Precios ── */}
+      {editPrecioGrupoId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-2xl rounded-xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900">
+            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3 dark:border-gray-700">
+              <h3 className="font-semibold text-gray-900 dark:text-white">
+                Editar {preciosEnEdicion.length === 1 ? "precio" : "precios"} — {productosAgrupados[editPrecioGrupoId]?.nombre}
+              </h3>
+              <button onClick={() => setEditPrecioGrupoId(null)} className="rounded p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="max-h-[60vh] overflow-y-auto px-5 py-4">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 dark:border-gray-800">
+                    <th className="pb-2 text-left text-xs font-medium text-gray-500">SKU</th>
+                    <th className="pb-2 text-left text-xs font-medium text-gray-500">Descripción</th>
+                    <th className="pb-2 text-right text-xs font-medium text-gray-500">Precio Unit.</th>
+                    <th className="pb-2 text-right text-xs font-medium text-gray-500">Cant.</th>
+                    <th className="pb-2 text-right text-xs font-medium text-gray-500">Precio Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
+                  {preciosEnEdicion.map((p, i) => (
+                    <tr key={p.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/30">
+                      <td className="py-2 pr-3 font-mono text-xs text-gray-600 dark:text-gray-400 align-middle">{p.sku}</td>
+                      <td className="py-2 pr-3 text-xs text-gray-700 dark:text-gray-300 max-w-[180px] truncate align-middle" title={p.descripcion}>{p.descripcion}</td>
+                      <td className="py-2 pr-2 align-middle">
+                        <input
+                          type="number" min="0" step="0.01"
+                          value={p.precioUnitario}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setPreciosEnEdicion(prev => prev.map((item, idx) => {
+                              if (idx !== i) return item;
+                              const newPU = val;
+                              const cant = item.cantidad ?? 1;
+                              const newTotal = val !== "" ? String(parseFloat(val) * cant) : item.precioTotal;
+                              return { ...item, precioUnitario: newPU, precioTotal: newTotal };
+                            }));
+                          }}
+                          className="w-24 rounded border border-gray-200 bg-gray-50 px-2 py-1 text-right text-xs outline-none focus:border-amber-400 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                          placeholder="0.00"
+                        />
+                      </td>
+                      <td className="py-2 pr-2 text-right text-xs text-gray-500 align-middle">{p.cantidad ?? "—"}</td>
+                      <td className="py-2 align-middle">
+                        <input
+                          type="number" min="0" step="0.01"
+                          value={p.precioTotal}
+                          onChange={(e) => setPreciosEnEdicion(prev => prev.map((item, idx) => idx === i ? { ...item, precioTotal: e.target.value } : item))}
+                          className="w-28 rounded border border-gray-200 bg-gray-50 px-2 py-1 text-right text-xs outline-none focus:border-amber-400 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                          placeholder="0.00"
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-gray-200 px-5 py-3 dark:border-gray-700">
+              <button onClick={() => setEditPrecioGrupoId(null)} className="rounded-lg border border-gray-200 px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300">
+                Cancelar
+              </button>
+              <button
+                onClick={handleGuardarPrecios}
+                disabled={savingPrecios}
+                className="rounded-lg bg-amber-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50"
+              >
+                {savingPrecios ? "Guardando..." : "Guardar precios"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showAvanceMasivoModal && cotizacionParaAvance && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-xl bg-white p-6 dark:bg-gray-900">
