@@ -426,10 +426,10 @@ export default function AprobacionCompras() {
                 ) : (
                     <div className="space-y-4">
                         {Object.entries(porCotizacion).map(([cotId, prods]) => (
-                            <div key={cotId} className="rounded-xl border border-gray-200 bg-white overflow-hidden dark:border-gray-700 dark:bg-gray-900">
+                            <div key={cotId} className={`rounded-xl overflow-hidden border-2 transition-all bg-white dark:bg-gray-900 ${expandedCotizacion === cotId ? 'border-blue-500 shadow-md shadow-blue-100 dark:shadow-blue-900/20' : 'border-gray-200 dark:border-gray-700'}`}>
                                 {/* Header cotización */}
                                 <button onClick={() => cotId !== "sin-cotizacion" && cargarCotizacion(cotId)}
-                                    className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                                    className={`w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors border-l-4 ${expandedCotizacion === cotId ? 'border-l-blue-500 bg-blue-50/30 dark:bg-blue-900/10' : 'border-l-transparent'}`}>
                                     <div className="flex items-center gap-3 flex-1 min-w-0">
                                         <FileText size={20} className="text-blue-500 flex-shrink-0" />
                                         <div className="text-left min-w-0 flex-1">
