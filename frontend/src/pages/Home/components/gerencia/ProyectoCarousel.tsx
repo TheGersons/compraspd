@@ -148,21 +148,14 @@ export default function ProyectoCarousel({
               return (
                 <div
                   key={uniqueKey}
-                  className={`rounded-lg border-2 p-4 shadow-md ${theme.bg} ${theme.border}`}
+                  className={`rounded-lg border p-3 shadow-sm ${theme.bg} ${theme.border}`}
                 >
-                  {/* Header con criticidad */}
-                  <div className="mb-3 flex items-start justify-between">
-                    <div className="flex-1">
-                      <h4 className={`text-sm font-semibold ${theme.text} line-clamp-2 min-h-[2.5rem]`}>
-                        {proyecto.nombre}
-                      </h4>
-                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        {proyecto.responsable}
-                      </p>
-                    </div>
-                    {/* Badge criticidad */}
+                  <div className="mb-2 flex items-start justify-between gap-2">
+                    <h4 className={`text-xs font-semibold ${theme.text} line-clamp-2 flex-1`}>
+                      {proyecto.nombre}
+                    </h4>
                     <span
-                      className={`ml-2 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                      className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
                         proyecto.criticidad >= 8
                           ? 'bg-rose-500 text-white'
                           : proyecto.criticidad >= 5
@@ -174,13 +167,12 @@ export default function ProyectoCarousel({
                     </span>
                   </div>
 
-                  {/* Progress bar */}
-                  <div className="mb-3">
-                    <div className="mb-1 flex items-center justify-between text-xs">
-                      <span className="text-gray-600 dark:text-gray-400">Progreso</span>
+                  <div className="mb-2">
+                    <div className="mb-1 flex items-center justify-between text-[10px]">
+                      <span className="text-gray-500 dark:text-gray-400">Progreso</span>
                       <span className={`font-semibold ${theme.text}`}>{progreso}%</span>
                     </div>
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
                       <div
                         className={`h-full transition-all duration-300 ${theme.progress}`}
                         style={{ width: `${progreso}%` }}
@@ -188,18 +180,17 @@ export default function ProyectoCarousel({
                     </div>
                   </div>
 
-                  {/* Stats */}
-                  <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="grid grid-cols-2 gap-1 text-[10px]">
                     <div>
-                      <p className="text-gray-500 dark:text-gray-400">Productos</p>
+                      <p className="text-gray-500 dark:text-gray-400">Recibidos</p>
                       <p className={`font-bold ${theme.text}`}>
                         {proyecto.resumen.recibido}/{proyecto.resumen.totalProductos}
                       </p>
                     </div>
                     <div>
-                      <p className="text-gray-500 dark:text-gray-400">Días restantes</p>
+                      <p className="text-gray-500 dark:text-gray-400">Días rest.</p>
                       <p className={`font-bold ${theme.text}`}>
-                        {diasRestantes > 0 ? diasRestantes : `${Math.abs(diasRestantes)} retraso`}
+                        {diasRestantes > 0 ? diasRestantes : `${Math.abs(diasRestantes)}d atr.`}
                       </p>
                     </div>
                   </div>

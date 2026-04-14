@@ -171,28 +171,33 @@ export default function DashboardGerencia() {
   const resumenFiltrado = proyectoSeleccionado ? computeResumen(productosProyectoFiltrados) : null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white">
-            Vista Gerencial
-          </h1>
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Panel ejecutivo de seguimiento de cotizaciones y compras
-          </p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Vista Gerencial</h1>
+        <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
+          Panel ejecutivo de seguimiento de cotizaciones y compras
+        </p>
       </div>
 
-      {/* Barra de Filtros */}
-      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-        {/* Tipo de compra */}
-        <div className="flex items-center gap-1 rounded-lg border border-gray-200 bg-gray-50 p-0.5 dark:border-gray-600 dark:bg-gray-700/50">
+      {/* Barra única: breadcrumbs + filtros + volver */}
+      <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        {/* Breadcrumbs o label inicial */}
+        {navegacion.nivel > 1 ? (
+          <Breadcrumbs navegacion={navegacion} onNavigate={handleNavigate} />
+        ) : (
+          <span className="text-xs font-medium text-gray-400 dark:text-gray-500">Inicio</span>
+        )}
+
+        <div className="mx-1 h-4 w-px flex-shrink-0 bg-gray-200 dark:bg-gray-600" />
+
+        {/* Toggle Nacional / Internacional */}
+        <div className="flex items-center gap-0.5 rounded-md border border-gray-200 bg-gray-50 p-0.5 dark:border-gray-600 dark:bg-gray-700/50">
           {(['INTERNACIONAL', 'NACIONAL'] as const).map((opt) => (
             <button
               key={opt}
               onClick={() => setFiltroTipoCompra(opt)}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              className={`rounded px-2.5 py-1 text-[11px] font-medium transition-colors ${
                 filtroTipoCompra === opt
                   ? opt === 'NACIONAL'
                     ? 'bg-emerald-500 text-white shadow-sm'
@@ -205,48 +210,47 @@ export default function DashboardGerencia() {
           ))}
         </div>
 
-        {/* Separador */}
-        <div className="h-6 w-px bg-gray-200 dark:bg-gray-600" />
+        <div className="mx-1 h-4 w-px flex-shrink-0 bg-gray-200 dark:bg-gray-600" />
 
-        {/* Rango de fechas */}
-        <div className="flex items-center gap-2">
-          <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Desde</label>
+        {/* Fechas */}
+        <div className="flex items-center gap-1.5">
+          <label className="text-[11px] font-medium text-gray-400 dark:text-gray-500">Desde</label>
           <input
             type="date"
             value={desde}
             onChange={(e) => setDesde(e.target.value)}
-            className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs outline-none focus:border-blue-400 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            className="rounded border border-gray-200 bg-gray-50 px-1.5 py-1 text-[11px] outline-none focus:border-blue-400 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           />
         </div>
-        <div className="flex items-center gap-2">
-          <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Hasta</label>
+        <div className="flex items-center gap-1.5">
+          <label className="text-[11px] font-medium text-gray-400 dark:text-gray-500">Hasta</label>
           <input
             type="date"
             value={hasta}
             onChange={(e) => setHasta(e.target.value)}
-            className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs outline-none focus:border-blue-400 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            className="rounded border border-gray-200 bg-gray-50 px-1.5 py-1 text-[11px] outline-none focus:border-blue-400 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           />
         </div>
         <button
           onClick={() => { setDesde(defaultDesde()); setHasta(defaultHasta()); setFiltroTipoCompra('INTERNACIONAL'); }}
-          className="ml-auto rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
+          className="rounded border border-gray-200 px-2 py-1 text-[11px] text-gray-400 hover:bg-gray-50 hover:text-gray-600 dark:border-gray-600 dark:text-gray-500 dark:hover:bg-gray-700"
         >
-          Resetear
+          ↺
         </button>
-      </div>
 
-      {/* Breadcrumbs y botón volver */}
-      {navegacion.nivel > 1 && (
-        <div className="flex items-center justify-between">
-          <Breadcrumbs navegacion={navegacion} onNavigate={handleNavigate} />
-          <Button onClick={handleVolver} variant="secondary" size="sm">
-            <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Volver
-          </Button>
-        </div>
-      )}
+        {/* Volver */}
+        {navegacion.nivel > 1 && (
+          <>
+            <div className="ml-auto h-4 w-px flex-shrink-0 bg-gray-200 dark:bg-gray-600" />
+            <Button onClick={handleVolver} variant="secondary" size="sm">
+              <svg className="mr-1.5 h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Volver
+            </Button>
+          </>
+        )}
+      </div>
 
       {/* NIVEL 1: Vista General con Áreas */}
       {navegacion.nivel === 1 && (
@@ -257,13 +261,13 @@ export default function DashboardGerencia() {
             ))}
           </div>
 
-          <div className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-            <div className="mb-4">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <div className="mb-3">
+              <h2 className="text-sm font-bold text-gray-900 dark:text-white">
                 Proyectos Activos
               </h2>
-              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                Estado general de todos los proyectos (ordenados por criticidad)
+              <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                Ordenados por criticidad
               </p>
             </div>
             <ProyectoCarousel proyectos={getTodosProyectos()} />

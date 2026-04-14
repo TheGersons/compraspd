@@ -101,39 +101,39 @@ export default function TablaResumen({
   ];
 
   return (
-    <div className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-md dark:border-gray-700 dark:bg-gray-800">
+    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
       {/* Header */}
-      <div className="mb-4">
-        <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+      <div className="mb-3">
+        <h3 className="text-base font-bold text-gray-900 dark:text-white">
           {titulo}
         </h3>
         {subtitulo && (
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+          <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
             {subtitulo}
           </p>
         )}
       </div>
 
       {/* Tabla */}
-      <div className="overflow-hidden rounded-lg border-2 border-gray-200 dark:border-gray-700">
+      <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
         <table className="w-full">
-          <thead className="bg-gray-100 dark:bg-gray-700">
+          <thead className="bg-gray-50 dark:bg-gray-700/60">
             <tr>
-              <th className="px-6 py-3 text-left text-sm font-bold text-gray-700 dark:text-gray-200">
+              <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300">
                 Proceso
               </th>
-              <th className="px-6 py-3 text-center text-sm font-bold text-gray-700 dark:text-gray-200">
+              <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-300">
                 Productos
               </th>
-              <th className="px-6 py-3 text-center text-sm font-bold text-gray-700 dark:text-gray-200">
-                Porcentaje
+              <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-300">
+                %
               </th>
-              <th className="px-6 py-3 text-center text-sm font-bold text-gray-700 dark:text-gray-200">
+              <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-300">
                 Acción
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+          <tbody className="divide-y divide-gray-100 dark:divide-gray-700/60">
             {filas.map((fila, idx) => {
               const porcentaje = calcularPorcentaje(fila.valor, fila.total);
               const colorClass = getColorPorCriticidad(fila.etapaKey);
@@ -141,27 +141,25 @@ export default function TablaResumen({
               return (
                 <tr
                   key={idx}
-                  className={`transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
-                    fila.esTotal
-                      ? 'bg-blue-100 font-semibold dark:bg-blue-900/30'
-                      : ''
+                  className={`transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/30 ${
+                    fila.esTotal ? 'bg-blue-50 font-semibold dark:bg-blue-900/20' : ''
                   }`}
                 >
-                  <td className="px-6 py-3 text-base text-gray-900 dark:text-white">
+                  <td className="px-4 py-2 text-xs text-gray-900 dark:text-white">
                     {fila.nombre}
                   </td>
-                  <td className="px-6 py-3 text-center text-base text-gray-700 dark:text-gray-300">
+                  <td className="px-4 py-2 text-center text-xs text-gray-700 dark:text-gray-300">
                     {fila.esTotal ? (
-                      <span className="font-bold text-lg">{fila.valor}</span>
+                      <span className="font-bold text-sm">{fila.valor}</span>
                     ) : (
                       <>
                         <span className="font-semibold">{fila.valor}</span>
-                        <span className="text-gray-500 dark:text-gray-500">/{fila.total}</span>
+                        <span className="text-gray-400 dark:text-gray-500">/{fila.total}</span>
                       </>
                     )}
                   </td>
-                  <td className="px-6 py-3 text-center">
-                    <span className={`inline-block rounded-full px-4 py-1 text-base font-bold ${colorClass}`}>
+                  <td className="px-4 py-2 text-center">
+                    <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold ${colorClass}`}>
                       {porcentaje}%
                     </span>
                   </td>
@@ -194,18 +192,18 @@ export default function TablaResumen({
       </div>
 
       {/* Leyenda de colores */}
-      <div className="mt-4 flex items-center gap-6 text-xs text-gray-600 dark:text-gray-400">
-        <div className="flex items-center gap-2">
-          <span className="inline-block h-3 w-3 rounded-full bg-rose-500"></span>
-          <span>Con productos atrasados</span>
+      <div className="mt-3 flex items-center gap-4 text-[10px] text-gray-500 dark:text-gray-400">
+        <div className="flex items-center gap-1.5">
+          <span className="inline-block h-2 w-2 rounded-full bg-rose-500"></span>
+          <span>Atrasados</span>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="inline-block h-3 w-3 rounded-full bg-amber-500"></span>
-          <span>En proceso (a tiempo)</span>
+        <div className="flex items-center gap-1.5">
+          <span className="inline-block h-2 w-2 rounded-full bg-amber-500"></span>
+          <span>En proceso</span>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="inline-block h-3 w-3 rounded-full bg-emerald-500"></span>
-          <span>Completado o a tiempo</span>
+        <div className="flex items-center gap-1.5">
+          <span className="inline-block h-2 w-2 rounded-full bg-emerald-500"></span>
+          <span>Completado</span>
         </div>
       </div>
     </div>

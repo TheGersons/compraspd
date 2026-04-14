@@ -56,34 +56,23 @@ export default function AreaCard({ area, onClick }: AreaCardProps) {
   return (
     <button
       onClick={onClick}
-      className={`group relative overflow-hidden rounded-2xl border-2 border-gray-200 bg-white p-8 shadow-lg transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl dark:border-gray-700 dark:bg-gray-800 ${theme.hover}`}
+      className={`group relative overflow-hidden rounded-xl border-2 border-gray-200 bg-white p-4 shadow-sm transition-all duration-300 hover:scale-[1.01] hover:shadow-lg dark:border-gray-700 dark:bg-gray-800 ${theme.hover}`}
     >
-      {/* Gradient background */}
       <div className={`absolute inset-0 bg-gradient-to-br ${theme.gradient} opacity-0 transition-opacity duration-300 group-hover:opacity-5`} />
-      
-      {/* Content */}
-      <div className="relative z-10 flex items-center gap-6">
-        {/* Icon */}
-        <div className={`flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${theme.gradient} text-4xl shadow-lg`}>
+      <div className="relative z-10 flex items-center gap-3">
+        <div className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${theme.gradient} text-2xl shadow-md`}>
           {theme.icon}
         </div>
-
-        {/* Info */}
         <div className="flex-1 text-left">
-          <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+          <h3 className="text-base font-bold text-gray-900 dark:text-white">
             {area.nombre}
           </h3>
-          <h2 className="mt-1 text-lg font-bold text-gray-600 dark:text-gray-400">
-            {/* contar el total de proyectos*/} 
+          <p className="mt-0.5 text-xs font-medium text-gray-500 dark:text-gray-400">
             {contarProyectos(area)} {tipoProyecto(area.tipo)}
-          </h2>
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            Click para ver proyectos
           </p>
         </div>
-        {/* Arrow icon */}
-        <div className="flex-shrink-0 text-gray-400 transition-transform duration-300 group-hover:translate-x-2 group-hover:text-gray-600 dark:group-hover:text-gray-200">
-          <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="flex-shrink-0 text-gray-400 transition-transform duration-300 group-hover:translate-x-1 group-hover:text-gray-600 dark:group-hover:text-gray-200">
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
           </svg>
         </div>

@@ -107,77 +107,55 @@ export default function PanelProyectos({
   const proyectosOrdenados = [...proyectos].sort((a, b) => b.criticidad - a.criticidad);
 
   return (
-    <div className="w-80 flex-shrink-0 space-y-3">
+    <div className="w-56 flex-shrink-0">
       <div className="sticky top-4">
-        <h3 className="mb-3 text-sm font-bold text-gray-700 dark:text-gray-300">
+        <p className="mb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
           Proyectos
-          <span className="ml-2 text-xs font-normal text-gray-500">
-            (Ordenados por criticidad)
-          </span>
-        </h3>
-        <div className="max-h-[calc(100vh-200px)] space-y-2 overflow-y-auto pr-2">
+        </p>
+        <div className="max-h-[calc(100vh-160px)] space-y-1.5 overflow-y-auto pr-1">
           {proyectosOrdenados.map((proyecto) => {
             const theme = colors[proyecto.estado];
             const isSelected = proyectoSeleccionado?.id === proyecto.id;
-            
-            // Contar productos críticos
-            const { total, atrasados, enProceso } = contarProductosCriticos(proyecto);
+            const { atrasados, enProceso } = contarProductosCriticos(proyecto);
             const badgeColor = getBadgeColor(atrasados, enProceso);
 
             return (
               <button
                 key={proyecto.id}
                 onClick={() => onSelectProyecto(proyecto)}
-                className={`
-                  group relative w-full rounded-lg border-2 p-3 text-left transition-all duration-200
-                  ${isSelected
-                    ? `${theme.bg} ${theme.border} shadow-md`
-                    : 'border-gray-200 bg-white hover:shadow-md dark:border-gray-700 dark:bg-gray-800'
-                  }
-                `}
+                className={`group relative w-full rounded-lg border p-2.5 text-left transition-all duration-200 ${
+                  isSelected
+                    ? `${theme.bg} ${theme.border} border-2 shadow-sm`
+                    : 'border-gray-200 bg-white hover:shadow-sm dark:border-gray-700 dark:bg-gray-800'
+                }`}
               >
-                {/* Badge con cantidad de productos atrasados */}
-                <div className="absolute right-2 top-2 flex items-center gap-1">
+                <div className="absolute right-2 top-2">
                   <span
-                    className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${badgeColor}`}
-                    title={`${atrasados} productos atrasados, ${enProceso} en proceso`}
+                    className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${badgeColor}`}
+                    title={`${atrasados} atrasados, ${enProceso} en proceso`}
                   >
                     {atrasados}
                   </span>
                 </div>
 
-                {/* Status dot */}
-                <div className="mb-2">
-                  <span className={`inline-block h-2 w-2 rounded-full ${theme.dot} mr-2`} />
-                  <span className={`text-xs font-medium ${theme.text}`}>
+                <div className="mb-1 flex items-center gap-1.5">
+                  <span className={`inline-block h-1.5 w-1.5 rounded-full ${theme.dot}`} />
+                  <span className={`text-[10px] font-medium ${theme.text}`}>
                     {getEstadoTexto(proyecto.estado)}
                   </span>
                 </div>
 
-                {/* Nombre proyecto */}
-                <h4 className="mb-1 pr-8 text-sm font-semibold text-gray-900 dark:text-white line-clamp-2">
+                <h4 className="pr-6 text-xs font-semibold text-gray-900 dark:text-white line-clamp-2">
                   {proyecto.nombre}
                 </h4>
 
-                {/* Responsable */}
-                <p className="text-xs text-gray-600 dark:text-gray-400">
-                  {proyecto.responsable}
-                </p>
-
-                {/* Stats mini */}
-                <div className="mt-2 flex items-center justify-between text-xs">
-                  <div>
-                    <span className="text-gray-500 dark:text-gray-500">Productos:</span>
-                    <span className="ml-1 font-semibold text-gray-900 dark:text-white">
-                      {proyecto.resumen.totalProductos}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500 dark:text-gray-500">Progreso:</span>
-                    <span className={`ml-1 font-semibold ${theme.text}`}>
-                      {proyecto.resumen.totalProductos > 0 ? Math.round((proyecto.resumen.recibido / proyecto.resumen.totalProductos) * 100) : 0}%
-                    </span>
-                  </div>
+                <div className="mt-1.5 flex items-center justify-between text-[10px]">
+                  <span className="text-gray-500">{proyecto.resumen.totalProductos} prods.</span>
+                  <span className={`font-semibold ${theme.text}`}>
+                    {proyecto.resumen.totalProductos > 0
+                      ? Math.round((proyecto.resumen.recibido / proyecto.resumen.totalProductos) * 100)
+                      : 0}%
+                  </span>
                 </div>
               </button>
             );
