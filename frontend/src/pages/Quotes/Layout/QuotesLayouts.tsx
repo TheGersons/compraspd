@@ -4,11 +4,11 @@ import { useAuth } from "../../../context/AuthContext";
 
 // Orden sincronizado con AppSidebar: Resumen, Nueva, Mis, Seguimiento, Rechazadas, Historial
 const allTabs = [
-  { to: "/quotes", label: "Resumen", end: true, roles: ['ADMIN', 'SUPERVISOR', 'COMERCIAL'] },
+  { to: "/quotes", label: "Resumen", end: true, roles: ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS', 'COMERCIAL'] },
   { to: "/quotes/new", label: "Nueva cotización" },
   { to: "/quotes/my-quotes", label: "Mis cotizaciónes" },
-  { to: "/quotes/follow-ups", label: "Seguimiento", roles: ['ADMIN', 'SUPERVISOR', 'COMERCIAL'] },
-  { to: "/quotes/rejected", label: "Rechazadas", roles: ['ADMIN', 'SUPERVISOR'] },
+  { to: "/quotes/follow-ups", label: "Seguimiento", roles: ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS', 'COMERCIAL'] },
+  { to: "/quotes/rejected", label: "Rechazadas", roles: ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'] },
   { to: "/quotes/history", label: "Historial" },
 ];
 
