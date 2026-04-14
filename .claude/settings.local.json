@@ -31,7 +31,9 @@
       "Bash(docker exec:*)",
       "Bash(npx --prefix \"C:/Repo/admin-dashboard-main/frontend\" tsc -p \"C:/Repo/admin-dashboard-main/frontend/tsconfig.json\" --noEmit)",
       "Bash(cmd /c \"npx tsc --noEmit 2>&1\")",
-      "Bash(cmd /c \"cd /d C:\\\\Repo\\\\admin-dashboard-main\\\\frontend && npx tsc --noEmit\")"
+      "Bash(cmd /c \"cd /d C:\\\\Repo\\\\admin-dashboard-main\\\\frontend && npx tsc --noEmit\")",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(echo \"EXIT:$?\")"
     ]
   }
 }

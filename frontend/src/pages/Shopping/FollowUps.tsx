@@ -567,6 +567,9 @@ export default function ShoppingFollowUps() {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const chatFileRef = useRef<HTMLInputElement>(null);
   const chatMessagesContainerRef = useRef<HTMLDivElement>(null);
+  const currentUserId = user?.id || '';
+  // Promise que resuelve cuando el usuario queda registrado como participante del chat activo
+  const participanteListoRef = useRef<Promise<void> | null>(null);
 
   // Vista activa del acordeón expandido
   const [vistaActivaGrupo, setVistaActivaGrupo] = useState<'productos' | 'chat'>('productos');
@@ -906,9 +909,10 @@ export default function ShoppingFollowUps() {
       setMensajes([]);
       setProductoSeleccionado(null);
       setTimeline(null);
+      participanteListoRef.current = null;
       return;
     }
-    // Establecer chatId inmediatamente desde los datos del grupo (mismo chat que Cotizaciones)
+    // Establecer chatId inmediatamente (mismo chat que Cotizaciones, sin esperar)
     const chatIdDelGrupo = productosAgrupados[cotizacionId]?.chatId || null;
     setGrupoExpandido(cotizacionId);
     setVistaActivaGrupo('productos');
@@ -916,10 +920,10 @@ export default function ShoppingFollowUps() {
     setTimeline(null);
     setChatIdActivo(chatIdDelGrupo);
     setMensajes([]);
-    // Agregar usuario como participante en background (sin bloquear la UI)
-    if (chatIdDelGrupo) {
-      api.getCotizacionDetalle(cotizacionId).catch(() => { /* silencioso */ });
-    }
+    // Registrar participante en background; guardamos la Promise para poder awaiterarla en handleActivarChat
+    participanteListoRef.current = chatIdDelGrupo
+      ? api.getCotizacionDetalle(cotizacionId).then(() => {}).catch(() => {})
+      : Promise.resolve();
   };
 
   // Chat handlers
@@ -927,14 +931,20 @@ export default function ShoppingFollowUps() {
     try {
       setLoadingChat(true);
       const data = await api.getChatMessages(chatId);
-      setMensajes(Array.isArray(data) ? data : (data.messages || []));
-      // Scroll dentro del contenedor de mensajes, sin mover la página
+      // Igual que Quotes: data.items o array directo, ordenado por creado asc
+      const lista = (data.items || data || []).sort((a: any, b: any) =>
+        new Date(a.creado).getTime() - new Date(b.creado).getTime()
+      );
+      setMensajes(lista);
+      // Scroll dentro del contenedor, sin mover la página
       setTimeout(() => {
         if (chatMessagesContainerRef.current) {
           chatMessagesContainerRef.current.scrollTop = chatMessagesContainerRef.current.scrollHeight;
         }
       }, 50);
-    } catch { /* silencioso */ }
+    } catch (err) {
+      console.error('Error al cargar chat:', err);
+    }
     finally { setLoadingChat(false); }
   };
 
@@ -959,10 +969,13 @@ export default function ShoppingFollowUps() {
     finally { setSendingFile(false); if (chatFileRef.current) chatFileRef.current.value = ""; }
   };
 
-  // Cuando se activa la vista de chat, cargar mensajes
-  const handleActivarChat = () => {
+  // Cuando se activa la vista de chat, esperar al registro de participante y luego cargar mensajes
+  const handleActivarChat = async () => {
     setVistaActivaGrupo('chat');
-    if (chatIdActivo) cargarChat(chatIdActivo);
+    if (!chatIdActivo) return;
+    // Esperar a que el usuario quede registrado como participante (generalmente < 300ms)
+    if (participanteListoRef.current) await participanteListoRef.current;
+    cargarChat(chatIdActivo);
   };
 
   // ============================================================================
@@ -1481,30 +1494,53 @@ export default function ShoppingFollowUps() {
                                   {!chatIdActivo && <p className="text-xs mt-1 text-gray-400">Chat no disponible para esta compra</p>}
                                 </div>
                               ) : (
-                                mensajes.map((msg: any) => (
-                                  <div key={msg.id} className={`flex ${msg.esPropio ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`max-w-[70%] rounded-xl px-3 py-2 ${msg.esPropio
-                                      ? 'bg-blue-600 text-white'
-                                      : 'bg-gray-100 text-gray-900 dark:bg-gray-700 dark:text-white'
-                                    }`}>
-                                      {!msg.esPropio && (
-                                        <p className="mb-0.5 text-[10px] font-semibold opacity-70">{msg.usuario?.nombre || 'Usuario'}</p>
-                                      )}
-                                      {msg.tipo === 'ARCHIVO' || msg.archivo ? (
-                                        <a href={msg.archivo || msg.contenido} target="_blank" rel="noopener noreferrer"
-                                          className="flex items-center gap-1.5 text-xs underline opacity-90 hover:opacity-100">
-                                          <FileText size={12} />
-                                          {msg.nombreArchivo || msg.contenido || 'Archivo adjunto'}
-                                        </a>
-                                      ) : (
-                                        <p className="text-sm leading-snug">{msg.contenido}</p>
-                                      )}
-                                      <p className={`mt-0.5 text-[10px] opacity-60 ${msg.esPropio ? 'text-right' : ''}`}>
-                                        {msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString('es-HN', { hour: '2-digit', minute: '2-digit' }) : ''}
-                                      </p>
+                                mensajes.map((msg: any) => {
+                                  const esPropio = msg.emisor?.id === currentUserId;
+                                  return (
+                                    <div key={msg.id} className={`flex ${esPropio ? 'justify-end' : 'justify-start'}`}>
+                                      <div className={`max-w-[70%] ${esPropio ? 'items-end' : 'items-start'} flex flex-col`}>
+                                        {!esPropio && (
+                                          <span className="mb-1 text-xs font-medium text-gray-600 dark:text-gray-400">
+                                            {msg.emisor?.nombre || 'Usuario'}
+                                          </span>
+                                        )}
+                                        <div className={`rounded-2xl px-4 py-2 ${esPropio ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white'}`}>
+                                          {msg.adjuntos && msg.adjuntos.length > 0 && (
+                                            <div className="mb-2">
+                                              {msg.adjuntos.map((adj: any) => {
+                                                const esImagen = adj.tipoArchivo?.startsWith('image/');
+                                                const nombre = adj.nombreArchivo || adj.direccionArchivo?.split('/').pop() || 'Archivo';
+                                                return (
+                                                  <div key={adj.id}>
+                                                    {esImagen ? (
+                                                      <a href={adj.direccionArchivo} target="_blank" rel="noopener noreferrer">
+                                                        <img src={adj.previewUrl || adj.direccionArchivo} alt={nombre}
+                                                          className="max-w-[240px] max-h-[180px] rounded-lg hover:opacity-90 transition-opacity" loading="lazy" />
+                                                      </a>
+                                                    ) : (
+                                                      <a href={adj.direccionArchivo} target="_blank" rel="noopener noreferrer"
+                                                        className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors ${esPropio ? 'border-blue-400 text-blue-100 hover:bg-blue-500' : 'border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-600'}`}>
+                                                        <FileText size={12} />
+                                                        <span className="max-w-[180px] truncate">{nombre}</span>
+                                                        {adj.tamanio ? <span className="text-[10px] opacity-70">{(Number(adj.tamanio) / 1024).toFixed(0)}KB</span> : null}
+                                                      </a>
+                                                    )}
+                                                  </div>
+                                                );
+                                              })}
+                                            </div>
+                                          )}
+                                          {msg.contenido && !(msg.tipoMensaje === 'ARCHIVO' && msg.adjuntos?.length > 0 && msg.contenido.startsWith('📎')) && (
+                                            <p className="text-sm whitespace-pre-wrap break-words">{msg.contenido}</p>
+                                          )}
+                                        </div>
+                                        <span className="mt-1 text-xs text-gray-500 dark:text-gray-500">
+                                          {msg.creado ? new Date(msg.creado).toLocaleTimeString('es-HN', { hour: '2-digit', minute: '2-digit' }) : ''}
+                                        </span>
+                                      </div>
                                     </div>
-                                  </div>
-                                ))
+                                  );
+                                })
                               )}
                               <div ref={chatEndRef} />
                             </div>
