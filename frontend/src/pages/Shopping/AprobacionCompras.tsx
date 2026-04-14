@@ -59,6 +59,10 @@ type ProductoResumen = {
     motivoRechazo?: string;
     cotizacionId?: string;
     precioTotal?: number;
+    nombreCotizacion?: string;
+    tipoCompra?: string;
+    solicitante?: { id: string; nombre: string } | null;
+    responsableSeguimiento?: { id: string; nombre: string } | null;
 };
 
 const api = {
@@ -176,6 +180,10 @@ export default function AprobacionCompras() {
                 motivoRechazo: p.motivoRechazo || undefined,
                 cotizacionId: p.cotizacionId,
                 precioTotal: p.precioTotal ? parseFloat(p.precioTotal) : undefined,
+                nombreCotizacion: p.cotizacion?.nombreCotizacion,
+                tipoCompra: p.cotizacion?.tipoCompra || p.tipoCompra,
+                solicitante: p.cotizacion?.solicitante || null,
+                responsableSeguimiento: p.responsableSeguimiento || null,
             }));
             setProductos(items);
         } catch {
@@ -204,6 +212,10 @@ export default function AprobacionCompras() {
                 motivoRechazo: p.motivoRechazo || undefined,
                 cotizacionId: p.cotizacionId,
                 precioTotal: p.precioTotal ? parseFloat(p.precioTotal) : undefined,
+                nombreCotizacion: p.cotizacion?.nombreCotizacion,
+                tipoCompra: p.cotizacion?.tipoCompra || p.tipoCompra,
+                solicitante: p.cotizacion?.solicitante || null,
+                responsableSeguimiento: p.responsableSeguimiento || null,
             }));
             setProductosRechazados(items);
         } catch {
@@ -236,7 +248,7 @@ export default function AprobacionCompras() {
         try {
             await api.aprobarCompra(productoId);
             toast.success("Compra aprobada", { id: toastId });
-            await cargarProductosAprobados();
+            setProductos(prev => prev.map(p => p.id === productoId ? { ...p, aprobadoCompra: true } : p));
         } catch (e: any) {
             toast.error(e.message, { id: toastId });
         } finally {
@@ -251,7 +263,7 @@ export default function AprobacionCompras() {
         try {
             await api.revocarAprobacion(productoId);
             toast.success("Aprobación revocada", { id: toastId });
-            await cargarProductosAprobados();
+            setProductos(prev => prev.map(p => p.id === productoId ? { ...p, aprobadoCompra: false } : p));
         } catch (e: any) {
             toast.error(e.message, { id: toastId });
         } finally {
@@ -266,9 +278,11 @@ export default function AprobacionCompras() {
         try {
             await api.rechazarCompra(showRechazoModal, motivoRechazo.trim());
             toast.success("Compra rechazada", { id: toastId });
+            const id = showRechazoModal;
+            const motivo = motivoRechazo.trim();
+            setProductos(prev => prev.map(p => p.id === id ? { ...p, rechazado: true, motivoRechazo: motivo } : p));
             setShowRechazoModal(null);
             setMotivoRechazo("");
-            await cargarProductosAprobados();
         } catch (e: any) {
             toast.error(e.message, { id: toastId });
         } finally {
@@ -283,11 +297,41 @@ export default function AprobacionCompras() {
         try {
             await api.revertirRechazo(productoId);
             toast.success("Rechazo revertido", { id: toastId });
-            await cargarProductosRechazados();
+            setProductosRechazados(prev => prev.map(p => p.id === productoId ? { ...p, rechazado: false, motivoRechazo: undefined } : p));
         } catch (e: any) {
             toast.error(e.message, { id: toastId });
         } finally {
             setActionLoading(null);
+        }
+    };
+
+    const handleAprobarTodos = async (prods: ProductoResumen[]) => {
+        const pendientes = prods.filter(p => !p.aprobadoCompra && !p.comprado && !p.rechazado);
+        if (!pendientes.length) return;
+        const toastId = toast.loading(`Aprobando ${pendientes.length} producto(s)...`);
+        try {
+            await Promise.all(pendientes.map(p => api.aprobarCompra(p.id)));
+            toast.success(`${pendientes.length} producto(s) aprobados`, { id: toastId });
+            const ids = new Set(pendientes.map(p => p.id));
+            setProductos(prev => prev.map(p => ids.has(p.id) ? { ...p, aprobadoCompra: true } : p));
+        } catch (e: any) {
+            toast.error(e.message || 'Error al aprobar', { id: toastId });
+        }
+    };
+
+    const handleRechazarTodos = async (prods: ProductoResumen[]) => {
+        const pendientes = prods.filter(p => !p.aprobadoCompra && !p.comprado && !p.rechazado);
+        if (!pendientes.length) return;
+        const motivo = window.prompt(`Motivo de rechazo para ${pendientes.length} producto(s):`);
+        if (!motivo?.trim()) return;
+        const toastId = toast.loading(`Rechazando ${pendientes.length} producto(s)...`);
+        try {
+            await Promise.all(pendientes.map(p => api.rechazarCompra(p.id, motivo.trim())));
+            toast.success(`${pendientes.length} producto(s) rechazados`, { id: toastId });
+            const ids = new Set(pendientes.map(p => p.id));
+            setProductos(prev => prev.map(p => ids.has(p.id) ? { ...p, rechazado: true, motivoRechazo: motivo.trim() } : p));
+        } catch (e: any) {
+            toast.error(e.message || 'Error al rechazar', { id: toastId });
         }
     };
 
@@ -337,7 +381,7 @@ export default function AprobacionCompras() {
             <PageMeta title="Aprobación de Compras" description="Revisión y aprobación de compras" />
             <div className="space-y-6">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">✅ Aprobación de Compras</h1>
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Aprobación de Compras</h1>
                     <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                         Revisión y aprobación de compras cotizadas
                     </p>
@@ -386,31 +430,66 @@ export default function AprobacionCompras() {
                                 {/* Header cotización */}
                                 <button onClick={() => cotId !== "sin-cotizacion" && cargarCotizacion(cotId)}
                                     className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                                    <div className="flex items-center gap-3">
-                                        <FileText size={20} className="text-blue-500" />
-                                        <div className="text-left">
-                                            <p className="font-semibold text-gray-900 dark:text-white">
-                                                {cotizacionesMap[cotId]?.nombreCotizacion || `Cotización ${cotId.substring(0, 8)}...`}
-                                            </p>
-                                            <p className="text-xs text-gray-500">
-                                                {prods.length} producto{prods.length > 1 ? "s" : ""} •
-                                                {prods.filter(p => p.aprobadoCompra).length}/{prods.length} aprobados
-                                            </p>
+                                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                                        <FileText size={20} className="text-blue-500 flex-shrink-0" />
+                                        <div className="text-left min-w-0 flex-1">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <p className="font-semibold text-gray-900 dark:text-white">
+                                                    {prods[0]?.nombreCotizacion || `Cotización ${cotId.substring(0, 8)}...`}
+                                                </p>
+                                                {prods[0]?.tipoCompra && (
+                                                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                                        prods[0].tipoCompra === 'NACIONAL'
+                                                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                                            : 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                                                    }`}>
+                                                        {prods[0].tipoCompra === 'NACIONAL' ? 'Nacional' : 'Internacional'}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-3 flex-wrap mt-0.5">
+                                                <p className="text-xs text-gray-500">
+                                                    {prods.length} producto{prods.length > 1 ? "s" : ""} • {prods.filter(p => p.aprobadoCompra).length}/{prods.length} aprobados
+                                                </p>
+                                                {prods[0]?.solicitante && (
+                                                    <p className="text-xs text-gray-500">Solicitante: <span className="font-medium text-gray-700 dark:text-gray-300">{prods[0].solicitante.nombre}</span></p>
+                                                )}
+                                                {prods[0]?.responsableSeguimiento && (
+                                                    <p className="text-xs text-gray-500">Responsable: <span className="font-medium text-gray-700 dark:text-gray-300">{prods[0].responsableSeguimiento.nombre}</span></p>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
-                                    {loadingCotizacion === cotId ? (
-                                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
-                                    ) : (
-                                        expandedCotizacion === cotId ? <ChevronDown size={18} className="text-gray-400" /> : <ChevronRight size={18} className="text-gray-400" />
-                                    )}
+                                    <div className="flex items-center gap-2 ml-2 flex-shrink-0">
+                                        {esAdmin && prods.some(p => !p.aprobadoCompra && !p.comprado && !p.rechazado) && (
+                                            <>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); handleAprobarTodos(prods); }}
+                                                    className="inline-flex items-center gap-1 rounded-lg bg-green-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-green-700 transition-colors">
+                                                    <ThumbsUp size={12} /> Aprobar todos
+                                                </button>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); handleRechazarTodos(prods); }}
+                                                    className="inline-flex items-center gap-1 rounded-lg bg-red-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-700 transition-colors">
+                                                    <ThumbsDown size={12} /> Rechazar todos
+                                                </button>
+                                            </>
+                                        )}
+                                        {loadingCotizacion === cotId ? (
+                                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+                                        ) : (
+                                            expandedCotizacion === cotId ? <ChevronDown size={18} className="text-gray-400" /> : <ChevronRight size={18} className="text-gray-400" />
+                                        )}
+                                    </div>
                                 </button>
 
-                                {/* Tabla productos */}
+                                {/* Tabla productos + detalle expandido */}
+                                {expandedCotizacion === cotId && (
+                                <>
                                 <div className="border-t border-gray-100 dark:border-gray-800">
                                     <table className="w-full text-sm">
                                         <thead>
                                             <tr className="bg-gray-50 dark:bg-gray-800">
-                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">SKU</th>
                                                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Descripción</th>
                                                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Proveedor</th>
                                                 <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Precio</th>
@@ -421,7 +500,6 @@ export default function AprobacionCompras() {
                                         <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                                             {prods.map((p) => (
                                                 <tr key={p.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/30">
-                                                    <td className="px-4 py-2.5 font-mono text-xs text-gray-700 dark:text-gray-300">{p.sku}</td>
                                                     <td className="px-4 py-2.5 text-gray-700 dark:text-gray-300 max-w-xs truncate">{p.descripcion}</td>
                                                     <td className="px-4 py-2.5">
                                                         <span className="inline-flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
@@ -524,7 +602,7 @@ export default function AprobacionCompras() {
                                 </div>
 
                                 {/* Detalle expandido de cotización */}
-                                {expandedCotizacion === cotId && cotizacionesMap[cotId] && (
+                                {cotizacionesMap[cotId] && expandedCotizacion === cotId && (
                                     <div className="border-t border-gray-200 bg-gray-50/50 p-4 dark:border-gray-700 dark:bg-gray-800/30">
                                         <div className="space-y-4">
                                             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -615,6 +693,8 @@ export default function AprobacionCompras() {
                                             </div>
                                         </div>
                                     </div>
+                                )}
+                                </>
                                 )}
                             </div>
                         ))}

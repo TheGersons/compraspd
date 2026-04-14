@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx";
 import PageMeta from "../../components/common/PageMeta";
@@ -176,6 +176,17 @@ const api = {
     return response.json();
   },
 
+  async actualizarComentarios(id: string, comentarios: string) {
+    const token = await getToken();
+    const r = await fetch(`${API_BASE_URL}/api/v1/quotations/${id}`, {
+      method: "PATCH", credentials: "include",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ comentarios }),
+    });
+    if (!r.ok) { const e = await r.json(); throw new Error(e.message || "Error al actualizar"); }
+    return r.json();
+  },
+
   async subirArchivosChat(chatId: string, archivos: File[]): Promise<{ ok: File[]; error: File[] }> {
     const ok: File[] = [];
     const error: File[] = [];
@@ -201,6 +212,90 @@ const api = {
     return { ok, error };
   },
 };
+
+// ============================================================================
+// ALIAS UNIDADES (shared between Excel import and PDF parsing)
+// ============================================================================
+
+const UNIDADES_ALIAS: Record<string, TipoUnidad> = {
+  UNIDAD: "UNIDAD", UNIDADES: "UNIDAD", UND: "UNIDAD", U: "UNIDAD",
+  CAJA: "CAJA", CAJAS: "CAJA",
+  PAQUETE: "PAQUETE", PAQUETES: "PAQUETE", PKT: "PAQUETE",
+  METRO: "METRO", METROS: "METRO", MT: "METRO", M: "METRO",
+  PIES: "Pies", PIE: "Pies", FT: "Pies",
+  KILOGRAMO: "KILOGRAMO", KILOGRAMOS: "KILOGRAMO", KG: "KILOGRAMO", KILO: "KILOGRAMO", KILOS: "KILOGRAMO",
+  LITRO: "LITRO", LITROS: "LITRO", LT: "LITRO", L: "LITRO",
+  OTRO: "OTRO", OTROS: "OTRO",
+};
+
+const normalizarUnidad = (s: string): TipoUnidad => {
+  const key = s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+  return UNIDADES_ALIAS[key] ?? "UNIDAD";
+};
+
+// ============================================================================
+// PDF REQUISA PARSER
+// ============================================================================
+
+interface RequisaData {
+  requisaNo?: string;
+  proyecto?: string;
+  creador?: string;
+  acuerdoCompra?: string;
+  presupuesto?: string;
+  docOrigen?: string;
+  items: Array<{ sku: string; descripcion: string; unidad: string; cantidad: number }>;
+}
+
+async function parseRequisa(file: File): Promise<RequisaData> {
+  const pdfjsLib = await import('pdfjs-dist');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+    'pdfjs-dist/build/pdf.worker.min.mjs',
+    import.meta.url
+  ).href;
+
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+  let fullText = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const tc = await page.getTextContent();
+    fullText += tc.items.map((it: any) => it.str).join(' ') + '\n';
+  }
+
+  // Normalize whitespace
+  const txt = fullText.replace(/\s+/g, ' ').trim();
+
+  const extract = (re: RegExp) => re.exec(txt)?.[1]?.trim();
+
+  const requisaNo = extract(/REQUISA\s+No[:\s]+([A-Z0-9/]+)/i);
+  const proyecto   = extract(/PROYECTO[:\s]+([\w\s\-.,()]+?)(?=\s+ACUERDO|\s+FECHA|\s+PRESUPUESTO)/i);
+  const creador    = extract(/CREADOR[:\s]+([\wáéíóúñÁÉÍÓÚÑ\s]+?)(?=\s+ITEM|\s+RECIBIDO|\s*$)/i);
+  const acuerdoCompra = extract(/ACUERDO\s+DE\s+COMPRA[:\s]+([A-Z0-9]+)/i);
+  const presupuesto   = extract(/PRESUPUESTO[:\s]+(\[[^\]]+\][\w\s]+?)(?=\s+DOCUMENTO|\s+CREADOR)/i);
+  const docOrigen     = extract(/DOCUMENTO\s+ORIGEN[:\s]+([A-Z0-9]+)/i);
+
+  // Parse items table: rows after "ITEM PRODUCTO DESCRIPCION UNIDAD DEMANDA HECHO"
+  const items: RequisaData['items'] = [];
+  const afterHeader = txt.split(/ITEM\s+PRODUCTO\s+DESCRIPCI[OÓ]N\s+UNIDAD\s+DEMANDA\s+HECHO/i)[1];
+  if (afterHeader) {
+    // Pattern: row_num  SKU_CODE  description_text  unit  demand  done
+    // SKU codes look like: CAB-00411, ELE-123, TUB-0001, etc.
+    const rowRe = /\b(\d+)\s+([A-Z]{2,}-\d+)\s+(.+?)\s+([A-Za-z]+)\s+([\d.]+)\s+[\d.]+/g;
+    let m: RegExpExecArray | null;
+    while ((m = rowRe.exec(afterHeader)) !== null) {
+      items.push({
+        sku: m[2].trim(),
+        descripcion: m[3].trim(),
+        unidad: m[4].trim(),
+        cantidad: parseFloat(m[5]),
+      });
+    }
+  }
+
+  return { requisaNo, proyecto, creador, acuerdoCompra, presupuesto, docOrigen, items };
+}
 
 // ============================================================================
 // MAIN COMPONENT
@@ -255,6 +350,28 @@ export default function New() {
   // Archivos adjuntos
   const [archivos, setArchivos] = useState<ArchivoAdjunto[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+
+  // Importar requisa PDF
+  const [importandoRequisa, setImportandoRequisa] = useState(false);
+  const requisaInputRef = useRef<HTMLInputElement>(null);
+
+  // Modal pre-importación (datos que faltan de la requisa)
+  const [showRequisaModal, setShowRequisaModal] = useState(false);
+  const [pendingRequisaFile, setPendingRequisaFile] = useState<File | null>(null);
+  const [modalTipoId, setModalTipoId] = useState("");
+  const [modalTipoCompra, setModalTipoCompra] = useState<TipoCompra | "">("");
+  const [modalFechaLimite, setModalFechaLimite] = useState<Date | null>(null);
+  const [creandoProyectoAuto, setCreandoProyectoAuto] = useState(false);
+
+  // Modal adjuntar archivos adicionales (post-creación vía requisa)
+  const [showAdjuntarModal, setShowAdjuntarModal] = useState(false);
+  const [adjuntarChatId, setAdjuntarChatId] = useState<string | null>(null);
+  const [adjuntarCotizacionId, setAdjuntarCotizacionId] = useState<string | null>(null);
+  const [archivosAdicionales, setArchivosAdicionales] = useState<ArchivoAdjunto[]>([]);
+  const [subiendoAdicionales, setSubiendoAdicionales] = useState(false);
+  const [isDraggingModal, setIsDraggingModal] = useState(false);
+  const [creacionViaRequisa, setCreacionViaRequisa] = useState(false);
+  const [comentariosModal, setComentariosModal] = useState("");
 
   // Estados de carga y errores
   const [loading, setLoading] = useState(false);
@@ -413,26 +530,7 @@ export default function New() {
           return;
         }
 
-        const UNIDADES: TipoUnidad[] = ["UNIDAD","CAJA","PAQUETE","METRO","Pies","KILOGRAMO","LITRO","OTRO"];
-
-        // Normaliza texto: quita acentos, pasa a mayúsculas, recorta espacios
-        const normalizar = (s: string) =>
-          s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
-
-        // Mapa de alias (valor normalizado → TipoUnidad exacto)
-        const ALIAS: Record<string, TipoUnidad> = {
-          UNIDAD: "UNIDAD", UNIDADES: "UNIDAD", UND: "UNIDAD", U: "UNIDAD",
-          CAJA: "CAJA", CAJAS: "CAJA",
-          PAQUETE: "PAQUETE", PAQUETES: "PAQUETE", PKT: "PAQUETE",
-          METRO: "METRO", METROS: "METRO", MT: "METRO", M: "METRO",
-          PIES: "Pies", PIE: "Pies", FT: "Pies",
-          KILOGRAMO: "KILOGRAMO", KILOGRAMOS: "KILOGRAMO", KG: "KILOGRAMO", KILO: "KILOGRAMO", KILOS: "KILOGRAMO",
-          LITRO: "LITRO", LITROS: "LITRO", LT: "LITRO", L: "LITRO",
-          OTRO: "OTRO", OTROS: "OTRO",
-        };
-
-        const resolveUnidad = (raw: string): TipoUnidad =>
-          ALIAS[normalizar(raw)] ?? "UNIDAD";
+        const resolveUnidad = (raw: string): TipoUnidad => normalizarUnidad(raw);
 
         const parsed: ItemCotizacion[] = dataRows.map((row) => ({
           numeroParte: String(row[0] ?? "").trim(),
@@ -482,6 +580,135 @@ export default function New() {
     XLSX.utils.book_append_sheet(wb, ws, "Items");
     XLSX.utils.book_append_sheet(wb, wsRef, "Tipos de Unidad");
     XLSX.writeFile(wb, "plantilla_cotizacion.xlsx");
+  };
+
+  // ─── Importar Requisa PDF ──────────────────────────────────────────────────
+  const handleConfirmarImportacion = async () => {
+    if (!pendingRequisaFile || !modalTipoId || !modalTipoCompra || !modalFechaLimite) return;
+
+    // Aplicar valores del modal al formulario
+    setTipoId(modalTipoId);
+    setTipoCompra(modalTipoCompra as TipoCompra);
+    setFechaLimite(modalFechaLimite);
+    setShowRequisaModal(false);
+
+    setImportandoRequisa(true);
+    try {
+      const data = await parseRequisa(pendingRequisaFile);
+
+      // Nombre desde Requisa No
+      if (data.requisaNo) setNombreBase(data.requisaNo);
+
+      // Proyecto: buscar match → si no existe, crear automáticamente
+      if (data.proyecto) {
+        const needle = data.proyecto.trim().toLowerCase();
+        const match = proyectos.find(p => {
+          const hay = p.nombre.toLowerCase();
+          return hay.includes(needle.substring(0, 15)) || needle.includes(hay.substring(0, 15));
+        });
+        if (match) {
+          setProyectoId(match.id);
+        } else {
+          // Crear proyecto automáticamente con el área del tipo seleccionado
+          const tipoSel = tipos.find(t => t.id === modalTipoId);
+          if (tipoSel?.area?.id) {
+            setCreandoProyectoAuto(true);
+            try {
+              const nuevo = await api.crearProyecto({ nombre: data.proyecto.trim(), areaId: tipoSel.area.id });
+              const proyectosActualizados = await api.getProyectos();
+              setProyectos((proyectosActualizados || []).filter((p: any) => p.estado));
+              setProyectoId(nuevo.id);
+              addNotification("info", "Proyecto creado", `Proyecto "${data.proyecto.trim()}" creado automáticamente.`);
+            } catch {
+              addNotification("warn", "Proyecto no creado", `No se pudo crear el proyecto "${data.proyecto.trim()}". Selecciónalo manualmente.`);
+            } finally {
+              setCreandoProyectoAuto(false);
+            }
+          }
+        }
+      }
+
+      // Comentarios con metadata
+      const metaLines = [
+        data.creador       && `Creador: ${data.creador}`,
+        data.acuerdoCompra && `Acuerdo de compra: ${data.acuerdoCompra}`,
+        data.presupuesto   && `Presupuesto: ${data.presupuesto}`,
+        data.docOrigen     && `Documento origen: ${data.docOrigen}`,
+      ].filter(Boolean) as string[];
+      if (metaLines.length > 0) setComentarios(metaLines.join('\n'));
+
+      // Items
+      if (data.items.length > 0) {
+        const parsed: ItemCotizacion[] = data.items.map(it => ({
+          numeroParte: it.sku,
+          descripcionProducto: it.descripcion,
+          cantidad: Math.max(1, Math.round(it.cantidad)),
+          tipoUnidad: normalizarUnidad(it.unidad),
+          notas: "",
+        }));
+        setItems([...parsed, emptyItem()]);
+      }
+
+      // Auto-adjuntar el PDF
+      setArchivos(prev => {
+        const sinAnterior = prev.filter(a => a.file.name !== pendingRequisaFile.name);
+        return [...sinAnterior, { file: pendingRequisaFile, id: `requisa-${Date.now()}`, estado: 'pendiente' as const }];
+      });
+      setCreacionViaRequisa(true);
+
+      addNotification("success", "Requisa importada", `Datos cargados${data.requisaNo ? ` (${data.requisaNo})` : ''}. Revisa y envía el formulario.`);
+    } catch (err) {
+      console.error('Error parsing requisa:', err);
+      addNotification("danger", "Error al leer requisa", "No se pudo extraer información del PDF. Verifica que sea una requisa válida.");
+    } finally {
+      setImportandoRequisa(false);
+      setPendingRequisaFile(null);
+    }
+  };
+
+  // ─── Modal adjuntar adicionales ────────────────────────────────────────────
+  const agregarArchivosAdicionales = (files: FileList | File[]) => {
+    const nuevos: ArchivoAdjunto[] = Array.from(files).map(f => ({
+      file: f,
+      id: `adicional-${f.name}-${Date.now()}-${Math.random()}`,
+      estado: 'pendiente' as const,
+    }));
+    setArchivosAdicionales(prev => [...prev, ...nuevos]);
+  };
+
+  const handleSubirAdicionales = async () => {
+    setSubiendoAdicionales(true);
+    try {
+      // PATCH comentarios si fueron editados
+      if (adjuntarCotizacionId && comentariosModal.trim() !== comentarios.trim()) {
+        try {
+          await api.actualizarComentarios(adjuntarCotizacionId, comentariosModal.trim());
+        } catch {
+          addNotification("warn", "Comentarios no guardados", "No se pudo actualizar los comentarios.");
+        }
+      }
+
+      // Subir archivos si hay
+      if (adjuntarChatId && archivosAdicionales.length > 0) {
+        setArchivosAdicionales(prev => prev.map(a => ({ ...a, estado: 'subiendo' as const })));
+        const { ok, error: errs } = await api.subirArchivosChat(
+          adjuntarChatId,
+          archivosAdicionales.map(a => a.file)
+        );
+        setArchivosAdicionales(prev =>
+          prev.map(a => ({ ...a, estado: errs.includes(a.file) ? 'error' as const : 'ok' as const }))
+        );
+        if (errs.length > 0) {
+          addNotification("warn", "Algunos archivos fallaron", `${ok.length} subidos, ${errs.length} fallaron.`);
+        } else if (ok.length > 0) {
+          addNotification("success", "Archivos adjuntados", `${ok.length} archivo(s) adjuntados al chat.`);
+        }
+      }
+
+      setTimeout(() => navigate("/quotes"), 600);
+    } finally {
+      setSubiendoAdicionales(false);
+    }
   };
 
   // Manejo de archivos adjuntos
@@ -625,10 +852,16 @@ export default function New() {
         }
       );
 
-      // Redirigir
-      setTimeout(() => {
-        navigate("/quotes");
-      }, 1500);
+      // Si se creó vía requisa, mostrar modal para adjuntar más archivos
+      if (creacionViaRequisa && resultado.chatId) {
+        setAdjuntarChatId(resultado.chatId);
+        setAdjuntarCotizacionId(resultado.id);
+        setComentariosModal(comentarios.trim());
+        setArchivosAdicionales([]);
+        setShowAdjuntarModal(true);
+      } else {
+        setTimeout(() => navigate("/quotes"), 1500);
+      }
     } catch (error: any) {
       console.error("Error al crear cotización:", error);
       addNotification(
@@ -667,13 +900,59 @@ export default function New() {
     <>
       <PageMeta title="Nueva Cotización" description="Crear una nueva cotización" />
 
-      <div className="mb-6">
-        <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white">
-          Nueva Cotización
-        </h1>
-        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-          Complete el formulario para crear una nueva solicitud de cotización
-        </p>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white">
+            Nueva Cotización
+          </h1>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            Complete el formulario para crear una nueva solicitud de cotización
+          </p>
+        </div>
+        <div>
+          <input
+            ref={requisaInputRef}
+            type="file"
+            accept="application/pdf"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) {
+                setPendingRequisaFile(f);
+                setModalTipoId("");
+                setModalTipoCompra("");
+                setModalFechaLimite(null);
+                setShowRequisaModal(true);
+              }
+              if (requisaInputRef.current) requisaInputRef.current.value = '';
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => requisaInputRef.current?.click()}
+            disabled={importandoRequisa || creandoProyectoAuto}
+            className="inline-flex items-center gap-2 rounded-xl border-2 border-orange-300 bg-orange-50 px-4 py-2.5 text-sm font-semibold text-orange-700 transition-colors hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-orange-600 dark:bg-orange-900/20 dark:text-orange-400 dark:hover:bg-orange-900/30"
+          >
+            {importandoRequisa ? (
+              <>
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-orange-600 border-t-transparent" />
+                Leyendo requisa...
+              </>
+            ) : creandoProyectoAuto ? (
+              <>
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-orange-600 border-t-transparent" />
+                Creando proyecto...
+              </>
+            ) : (
+              <>
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Importar Requisa
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -1220,6 +1499,234 @@ export default function New() {
           </button>
         </div>
       </form>
+
+      {/* Modal Pre-Importación Requisa */}
+      {showRequisaModal && pendingRequisaFile && (
+        <div className="fixed inset-0 z-[9000] flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl dark:bg-gray-900">
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Importar Requisa</h3>
+                <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400 truncate max-w-xs">{pendingRequisaFile.name}</p>
+              </div>
+              <button
+                onClick={() => { setShowRequisaModal(false); setPendingRequisaFile(null); }}
+                className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4 p-6">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Los siguientes datos no están en la requisa. Completa antes de continuar.
+              </p>
+
+              {/* Tipo de Compra */}
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Tipo de Compra <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={modalTipoCompra}
+                  onChange={(e) => setModalTipoCompra(e.target.value as TipoCompra | "")}
+                  className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                >
+                  <option value="">Seleccione tipo de compra</option>
+                  <option value="NACIONAL">Nacional</option>
+                  <option value="INTERNACIONAL">Internacional</option>
+                </select>
+              </div>
+
+              {/* Tipo/Categoría */}
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Tipo / Categoría <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={modalTipoId}
+                  onChange={(e) => setModalTipoId(e.target.value)}
+                  className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                >
+                  <option value="">Seleccione un tipo</option>
+                  {tipos.map(t => (
+                    <option key={t.id} value={t.id}>{t.nombre} — {t.area.nombreArea}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Fecha Límite */}
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Fecha Límite <span className="text-rose-500">*</span>
+                </label>
+                <DatePicker
+                  selected={modalFechaLimite}
+                  onChange={(d) => setModalFechaLimite(d)}
+                  minDate={minDate}
+                  placeholder="Seleccionar fecha límite"
+                />
+                <p className="mt-1 text-xs text-gray-500">Mínimo 5 días hábiles</p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-gray-200 px-6 py-4 dark:border-gray-700">
+              <button
+                type="button"
+                onClick={() => { setShowRequisaModal(false); setPendingRequisaFile(null); }}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmarImportacion}
+                disabled={!modalTipoId || !modalTipoCompra || !modalFechaLimite}
+                className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Leer Requisa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Adjuntar Archivos Adicionales (post-creación vía requisa) */}
+      {showAdjuntarModal && (
+        <div className="fixed inset-0 z-[9000] flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl dark:bg-gray-900">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Cotización creada</h3>
+                <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
+                  ¿Desea adjuntar archivos adicionales al chat de la cotización?
+                </p>
+              </div>
+              <button
+                onClick={() => { setShowAdjuntarModal(false); navigate("/quotes"); }}
+                className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Comentarios editables */}
+            <div className="px-6 pt-4">
+              <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Comentarios de la cotización
+              </label>
+              <textarea
+                value={comentariosModal}
+                onChange={(e) => setComentariosModal(e.target.value)}
+                rows={4}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                placeholder="Sin comentarios..."
+              />
+              <p className="mt-1 text-xs text-gray-400">Puedes editar o agregar información antes de continuar. Se guardará automáticamente.</p>
+            </div>
+
+            {/* Drop zone */}
+            <div className="px-6 pb-2 pt-4">
+              <p className="mb-3 text-sm font-medium text-gray-700 dark:text-gray-300">Archivos adicionales (opcional)</p>
+            </div>
+            <div className="px-6 pb-2">
+              <div
+                onDragOver={(e) => { e.preventDefault(); setIsDraggingModal(true); }}
+                onDragLeave={() => setIsDraggingModal(false)}
+                onDrop={(e) => { e.preventDefault(); setIsDraggingModal(false); if (e.dataTransfer.files.length > 0) agregarArchivosAdicionales(e.dataTransfer.files); }}
+                onClick={() => document.getElementById("adjuntar-modal-input")?.click()}
+                className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-8 transition-colors ${
+                  isDraggingModal
+                    ? "border-blue-400 bg-blue-50 dark:border-blue-500 dark:bg-blue-900/20"
+                    : "border-gray-300 bg-gray-50 hover:border-blue-400 hover:bg-blue-50/50 dark:border-gray-600 dark:bg-gray-700/50"
+                }`}
+              >
+                <input
+                  id="adjuntar-modal-input"
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => { if (e.target.files) { agregarArchivosAdicionales(e.target.files); e.target.value = ""; } }}
+                />
+                <svg className={`mb-2 h-9 w-9 ${isDraggingModal ? "text-blue-500" : "text-gray-400"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                  {isDraggingModal ? "Suelta los archivos aquí" : "Arrastra archivos o haz clic para seleccionar"}
+                </p>
+                <p className="mt-1 text-xs text-gray-400">PDF, imágenes, Excel — cualquier tipo</p>
+              </div>
+
+              {/* Lista archivos */}
+              {archivosAdicionales.length > 0 && (
+                <div className="mt-4 max-h-48 overflow-y-auto space-y-2">
+                  {archivosAdicionales.map((adj) => (
+                    <div key={adj.id} className={`flex items-center gap-3 rounded-lg border px-3 py-2 text-sm ${
+                      adj.estado === "ok" ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-900/20"
+                      : adj.estado === "error" ? "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20"
+                      : adj.estado === "subiendo" ? "border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20"
+                      : "border-gray-200 bg-white dark:border-gray-600 dark:bg-gray-800"
+                    }`}>
+                      <span className="text-base">
+                        {adj.file.type.startsWith("image/") ? "🖼️"
+                          : adj.file.type === "application/pdf" ? "📄"
+                          : adj.file.type.includes("spreadsheet") || adj.file.type.includes("excel") ? "📊"
+                          : "📎"}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs font-medium text-gray-800 dark:text-gray-200">{adj.file.name}</p>
+                      </div>
+                      {adj.estado === "subiendo" && <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />}
+                      {adj.estado === "ok" && <svg className="h-4 w-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>}
+                      {adj.estado === "error" && <span className="text-xs font-medium text-red-600">Error</span>}
+                      {adj.estado === "pendiente" && (
+                        <button type="button" onClick={() => setArchivosAdicionales(prev => prev.filter(a => a.id !== adj.id))}
+                          className="rounded p-1 text-gray-400 hover:bg-red-100 hover:text-red-500 dark:hover:bg-red-900/30 dark:hover:text-red-400">
+                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-6 py-4 dark:border-gray-700">
+              <button
+                type="button"
+                onClick={() => { setShowAdjuntarModal(false); navigate("/quotes"); }}
+                disabled={subiendoAdicionales}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+              >
+                Omitir
+              </button>
+              <button
+                type="button"
+                onClick={handleSubirAdicionales}
+                disabled={subiendoAdicionales}
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {subiendoAdicionales ? (
+                  <><div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" /> Guardando...</>
+                ) : archivosAdicionales.length > 0 ? (
+                  `Subir (${archivosAdicionales.length}) y continuar`
+                ) : (
+                  "Guardar y continuar"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Crear Proyecto Rápido */}
       {showNuevoProyecto && (
