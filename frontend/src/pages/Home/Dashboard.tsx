@@ -3,7 +3,6 @@ import PageMeta from "../../components/common/PageMeta";
 import Button from "../../components/ui/button/Button";
 import { useKpiGenerator } from "./hooks/useKpiGenerator";
 import { KpiData } from "./types/kpi.types";
-import { useKpiMonitor } from "./hooks/useKPIMonitor";
 import DashboardGerencia from "./DashboardGerencia";
 import KpiCard from "./components/KpiCard";
 
@@ -199,11 +198,8 @@ function KpiCarousel({
 
 export default function Dashboard() {
     const [selectedArea, setSelectedArea] = useState<Area | "Todas">("Todas");
-    const [vista, setVista] = useState<VistaType>("operativa");
+    const [vista, setVista] = useState<VistaType>("gerencial");
     const { cotizacionesKpis, comprasKpis, importExportKpis, loading } = useKpiGenerator();
-    
-    // Monitor de KPIs - genera notificaciones automáticas
-    useKpiMonitor(cotizacionesKpis, comprasKpis, importExportKpis);
 
     if (loading) {
         return (

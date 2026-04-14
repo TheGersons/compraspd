@@ -4,29 +4,42 @@ import { getToken } from '../../../lib/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
-// Cache para evitar múltiples llamadas al API
+// Cache con in-flight promise para evitar múltiples llamadas concurrentes
 let kpiCache: any = null;
 let cacheTimestamp = 0;
+let inFlightPromise: Promise<any> | null = null;
 const CACHE_TTL = 30000; // 30 segundos
 
 async function fetchKpisFromApi(): Promise<any> {
   const now = Date.now();
+
+  // Cache válida
   if (kpiCache && (now - cacheTimestamp) < CACHE_TTL) {
     return kpiCache;
   }
 
-  const token = getToken();
-  const response = await fetch(`${API_BASE_URL}/api/v1/dashboard/kpis`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-
-  if (!response.ok) {
-    throw new Error('Error cargando KPIs');
+  // Ya hay una petición en vuelo — reutilizarla
+  if (inFlightPromise) {
+    return inFlightPromise;
   }
 
-  kpiCache = await response.json();
-  cacheTimestamp = now;
-  return kpiCache;
+  // Primera petición: iniciarla y guardar la promesa
+  inFlightPromise = (async () => {
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/v1/dashboard/kpis`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error('Error cargando KPIs');
+      kpiCache = await response.json();
+      cacheTimestamp = Date.now();
+      return kpiCache;
+    } finally {
+      inFlightPromise = null;
+    }
+  })();
+
+  return inFlightPromise;
 }
 
 function formatMonto(valor: number): string {
