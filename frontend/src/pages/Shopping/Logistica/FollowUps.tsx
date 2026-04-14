@@ -502,7 +502,7 @@ export default function ShoppingFollowUps() {
   const { addNotification } = useNotifications();
   const { user } = useAuth();
   const isComercial = user?.rol?.nombre?.toUpperCase() === 'COMERCIAL';
-  const canAsignarResponsable = user?.email === 'lmartinez@energiapd.com';
+  const canAsignarResponsable = ['SUPERVISOR', 'JEFE_COMPRAS', 'ADMIN'].includes(user?.rol?.nombre?.toUpperCase() || '');
   const [searchParams] = useSearchParams();
 
   // Estados principales

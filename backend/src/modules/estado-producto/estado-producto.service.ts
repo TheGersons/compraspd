@@ -1046,7 +1046,7 @@ export class EstadoProductoService {
       where: {
         activo: true,
         rol: {
-          nombre: { in: ['SUPERVISOR', 'ADMIN'] },
+          nombre: { in: ['SUPERVISOR', 'ADMIN', 'JEFE_COMPRAS'] },
         },
       },
       select: {
@@ -1661,7 +1661,7 @@ export class EstadoProductoService {
    */
   private isSupervisorOrAdmin(user: UserJwt): boolean {
     const role = (user.role || '').toUpperCase();
-    return role === 'SUPERVISOR' || role === 'ADMIN' || role === 'COMERCIAL';
+    return role === 'SUPERVISOR' || role === 'ADMIN' || role === 'COMERCIAL' || role === 'JEFE_COMPRAS';
   }
 
   private isComercial(user: UserJwt): boolean {

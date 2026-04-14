@@ -47,49 +47,49 @@ const navItems: NavItem[] = [
     icon: <PieChartIcon />,
     name: "Inicio",
     path: "/dashboard",
-    roles: ["ADMIN", "SUPERVISOR"],
+    roles: ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS"],
   },
   {
     icon: <DocsIcon />,
     name: "Cotizaciones",
     subItems: [
-      { name: "Resumen", path: "/quotes", pro: false, roles: ["ADMIN", "SUPERVISOR", "COMERCIAL"] },
+      { name: "Resumen", path: "/quotes", pro: false, roles: ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS", "COMERCIAL"] },
       { name: "Nueva Cotización", path: "/quotes/new", pro: false },
       { name: "Mis cotizaciónes", path: "/quotes/my-quotes", pro: false },
-      { name: "Seguimiento", path: "/quotes/follow-ups", pro: false, roles: ["ADMIN", "SUPERVISOR", "COMERCIAL"] },
-      { name: "Rechazadas", path: "/quotes/rejected", pro: false, roles: ["ADMIN", "SUPERVISOR"] },
+      { name: "Seguimiento", path: "/quotes/follow-ups", pro: false, roles: ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS", "COMERCIAL"] },
+      { name: "Rechazadas", path: "/quotes/rejected", pro: false, roles: ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS"] },
       { name: "Historial", path: "/quotes/history", pro: false },
     ],
   },
   {
     icon: <ShoppingCart />,
     name: "Compras",
-    roles: ["ADMIN", "SUPERVISOR", "COMERCIAL"],
+    roles: ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS", "COMERCIAL"],
     subItems: [
       { name: "Resumen", path: "/shopping", pro: false },
       { name: "Seguimiento", path: "/shopping/follow-ups", pro: false },
       { name: "Aprobación de Compras", path: "/shopping/aprobacion", pro: false },
       { name: "Documentos", path: "/shopping/documents", pro: false },
       { name: "Historial", path: "/shopping/history", pro: false },
-      { name: "Asignación", path: "/shopping/assignment", pro: false, roles: ["ADMIN", "SUPERVISOR"] },
+      { name: "Asignación", path: "/shopping/assignment", pro: false, roles: ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS"] },
     ],
   },
   {
     icon: <UtilityPole />,
     name: "Logística",
-    roles: ["ADMIN", "SUPERVISOR", "COMERCIAL"],
+    roles: ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS", "COMERCIAL"],
     subItems: [
-      { name: "Cotizaciones", path: "/logistica/cotizaciones", pro: false, roles: ["ADMIN", "SUPERVISOR", "COMERCIAL"] },
+      { name: "Cotizaciones", path: "/logistica/cotizaciones", pro: false, roles: ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS", "COMERCIAL"] },
       { name: "Historial", path: "/logistica/historial", pro: false },
-      { name: "Rechazadas", path: "/logistica/rechazadas", pro: false, roles: ["ADMIN", "SUPERVISOR"] },
-      { name: "Compras", path: "/logistica/compras", pro: false, roles: ["ADMIN", "SUPERVISOR", "COMERCIAL"] },
-      { name: "Documentos", path: "/logistica/documentos", pro: false, roles: ["ADMIN", "SUPERVISOR", "COMERCIAL"] },
+      { name: "Rechazadas", path: "/logistica/rechazadas", pro: false, roles: ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS"] },
+      { name: "Compras", path: "/logistica/compras", pro: false, roles: ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS", "COMERCIAL"] },
+      { name: "Documentos", path: "/logistica/documentos", pro: false, roles: ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS", "COMERCIAL"] },
     ],
   },
   {
     icon: <BadgeDollarSign />,
     name: "Licitaciones",
-    roles: ["ADMIN", "SUPERVISOR", "COMERCIAL"],
+    roles: ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS", "COMERCIAL"],
     subItems: [
       { name: "Seguimiento", path: "/licitaciones", pro: false },
       { name: "Archivadas", path: "/licitaciones/archivo", pro: false },
@@ -98,7 +98,7 @@ const navItems: NavItem[] = [
   {
     icon: <ShoppingBag />,
     name: "Comercial",
-    roles: ["ADMIN", "SUPERVISOR", "COMERCIAL"],
+    roles: ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS", "COMERCIAL"],
     subItems: [
       { name: "Seguimiento", path: "/ofertas", pro: false },
       { name: "Archivadas", path: "/ofertas/archivo", pro: false },
@@ -107,7 +107,7 @@ const navItems: NavItem[] = [
   {
     icon: <BoxCubeIcon />,
     name: "Reportes",
-    roles: ["ADMIN", "SUPERVISOR"],
+    roles: ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS"],
     path: "/reportes",
   },
 ];
@@ -116,13 +116,13 @@ const othersItems: NavItem[] = [
   {
     icon: <Building2 />,
     name: "Proveedores",
-    roles: ["ADMIN", "SUPERVISOR"],
+    roles: ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS"],
     path: "/providers",
   },
   {
     icon: <UtilityPole />,
     name: "Proyectos",
-    roles: ["ADMIN", "SUPERVISOR"],
+    roles: ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS"],
     subItems: [
       { name: "ver Proyectos", path: "/projects", pro: false },
       { name: "Nuevo Proyecto", path: "/projects/new", pro: false },
@@ -131,7 +131,7 @@ const othersItems: NavItem[] = [
   {
     icon: <User />,
     name: "Usuarios",
-    roles: ["ADMIN", "SUPERVISOR"],
+    roles: ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS"],
     subItems: [
       { name: "Gestión de Usuarios", path: "/profiles", pro: false },
       { name: "Configuración", path: "/settings", pro: false },
@@ -141,7 +141,7 @@ const othersItems: NavItem[] = [
   {
     icon: <Link2 size={20} />,
     name: "Odoo CRM",
-    roles: ["ADMIN", "SUPERVISOR"],
+    roles: ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS"],
     path: "/odoo/oportunidades",
   },
   /*{

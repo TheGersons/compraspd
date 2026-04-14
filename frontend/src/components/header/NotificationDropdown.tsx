@@ -19,7 +19,7 @@ function resolveNotifUrl(
   userRole: string | undefined,
 ): string | null {
   const isSupervisorOrAbove =
-    userRole === "SUPERVISOR" || userRole === "ADMIN" || userRole === "COMERCIAL";
+    userRole === "SUPERVISOR" || userRole === "ADMIN" || userRole === "JEFE_COMPRAS" || userRole === "COMERCIAL";
 
   if (n.tipo === "COMPRA_CREADA") {
     if (n.cotizacionId)

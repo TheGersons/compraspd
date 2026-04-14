@@ -237,7 +237,7 @@ async function apiFetch<T>(path: string): Promise<T> {
 export default function Quotes() {
   const { user } = useAuth();
   const userRole = (user as any)?.rol?.nombre?.toUpperCase() as string | undefined;
-  const isSupervisor = userRole === "SUPERVISOR" || userRole === "ADMIN" || userRole === "COMERCIAL";
+  const isSupervisor = userRole === "SUPERVISOR" || userRole === "ADMIN" || userRole === "JEFE_COMPRAS" || userRole === "COMERCIAL";
 
   const [estadisticas, setEstadisticas] = useState<EstadisticasSupervisor | null>(null);
   const [cotizaciones, setCotizaciones] = useState<CotizacionItem[]>([]);

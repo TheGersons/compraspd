@@ -595,7 +595,6 @@ export class MessagesService {
     messageContent: string,
   ): Promise<void> {
     const frontendUrl = 'http://89.167.20.163:8080';
-    const SUPERVISOR_EMAIL = 'lmartinez@energiapd.com';
 
     // Obtener todos los participantes actuales con sus datos de usuario
     const participantes = await this.prisma.participantesChat.findMany({
@@ -660,14 +659,13 @@ export class MessagesService {
       });
     }
 
-    // Obtener datos del emisor (nombre + email para determinar rol)
+    // Obtener datos del emisor (nombre + rol para determinar permisos)
     const emisor = await this.prisma.usuario.findUnique({
       where: { id: senderId },
-      select: { nombre: true, email: true },
+      select: { nombre: true, email: true, rol: { select: { nombre: true } } },
     });
 
     const senderName = emisor?.nombre || 'Un usuario';
-    const senderEmail = emisor?.email || '';
     const chatUrl = `${frontendUrl}/messages/${chatId}`;
     const preview =
       messageContent.length > 100
@@ -692,24 +690,27 @@ export class MessagesService {
     ];
 
     // Destinatario de EMAIL:
-    // - Si manda el supervisor (lmartinez) → email solo al solicitante
-    // - Si manda el solicitante u otro → email solo a lmartinez@energiapd.com
+    // - Si manda SUPERVISOR o JEFE_COMPRAS → email solo al solicitante
+    // - Si manda el solicitante u otro → email al primer JEFE_COMPRAS o SUPERVISOR activo
+    const senderRole = (emisor?.rol?.nombre || '').toUpperCase();
+    const esSupervisor = senderRole === 'SUPERVISOR' || senderRole === 'JEFE_COMPRAS';
     let emailDestinatario: UsuarioBasico | null = null;
 
-    if (senderEmail === SUPERVISOR_EMAIL) {
-      // El supervisor manda → notificar al solicitante
+    if (esSupervisor) {
+      // El jefe/supervisor manda → notificar al solicitante
       const solicitante = cotizacion?.solicitante as UsuarioBasico | undefined;
       if (solicitante?.activo && solicitante.email) {
         emailDestinatario = solicitante;
       }
     } else {
-      // El solicitante (u otro) manda → notificar a lmartinez
-      const supervisora = await this.prisma.usuario.findFirst({
-        where: { email: SUPERVISOR_EMAIL, activo: true },
+      // El solicitante u otro manda → notificar al jefe de compras
+      const jefeCompras = await this.prisma.usuario.findFirst({
+        where: { activo: true, rol: { nombre: { in: ['JEFE_COMPRAS', 'SUPERVISOR'] } } },
+        orderBy: { creado: 'asc' },
         select: { id: true, nombre: true, email: true, activo: true },
       });
-      if (supervisora) {
-        emailDestinatario = supervisora as UsuarioBasico;
+      if (jefeCompras) {
+        emailDestinatario = jefeCompras as UsuarioBasico;
       }
     }
 

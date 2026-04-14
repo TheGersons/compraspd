@@ -337,6 +337,6 @@ export class CompraService {
    */
   private isSupervisorOrAdmin(user: UserJwt): boolean {
     const role = (user.role || '').toUpperCase();
-    return role === 'SUPERVISOR' || role === 'ADMIN' || role === 'COMERCIAL';
+    return role === 'SUPERVISOR' || role === 'ADMIN' || role === 'COMERCIAL' || role === 'JEFE_COMPRAS';
   }
 }

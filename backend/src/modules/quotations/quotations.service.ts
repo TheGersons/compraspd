@@ -195,13 +195,12 @@ export class QuotationsService {
   ): Promise<void> {
     const frontendUrl = 'http://89.167.20.163:8080';
     const quotationUrl = `${frontendUrl}/quotes/${cotizacionId}`;
-    const SUPERVISOR_EMAIL = 'lmartinez@energiapd.com';
 
-    // Obtener todos los usuarios con rol SUPERVISOR activos
+    // Obtener todos los usuarios con rol SUPERVISOR o JEFE_COMPRAS activos
     const supervisores = await this.prisma.usuario.findMany({
       where: {
         activo: true,
-        rol: { nombre: 'SUPERVISOR' },
+        rol: { nombre: { in: ['SUPERVISOR', 'JEFE_COMPRAS'] } },
       },
       select: { id: true, nombre: true, email: true },
     });
@@ -212,7 +211,7 @@ export class QuotationsService {
       descripcion: `"${quotationName}" solicitada por ${requesterName}`,
     };
 
-    // Notificaciones BD + SSE para todos los supervisores (sin cambios)
+    // Notificaciones BD + SSE + email para todos los supervisores/jefe de compras
     await Promise.allSettled(
       supervisores.map(async (s) => {
         // 1. Crear notificación en BD
@@ -226,20 +225,17 @@ export class QuotationsService {
           ...notif,
           cotizacionId,
         });
+
+        // 3. Email
+        this.mailService.sendNewQuotationNotification(
+          s.email,
+          s.nombre,
+          quotationName,
+          requesterName,
+          quotationUrl,
+        ).catch(() => {});
       }),
     );
-
-    // 3. Email solo a lmartinez@energiapd.com
-    const supervisora = supervisores.find((s) => s.email === SUPERVISOR_EMAIL);
-    if (supervisora) {
-      this.mailService.sendNewQuotationNotification(
-        supervisora.email,
-        supervisora.nombre,
-        quotationName,
-        requesterName,
-        quotationUrl,
-      ).catch(() => {});
-    }
   }
 
   /**
@@ -628,7 +624,7 @@ export class QuotationsService {
    */
   private isSupervisorOrAdmin(user: UserJwt): boolean {
     const role = (user.role || '').toUpperCase();
-    return role === 'SUPERVISOR' || role === 'ADMIN';
+    return role === 'SUPERVISOR' || role === 'ADMIN' || role === 'JEFE_COMPRAS';
   }
 
   // ============================================================================

@@ -278,19 +278,10 @@ export class UsersService {
    * Listar supervisores activos
    */
   async supervisorsList() {
-    const supervisorRole = await this.prisma.rol.findFirst({
-      where: { nombre: 'SUPERVISOR' },
-      select: { id: true },
-    });
-
-    if (!supervisorRole) {
-      throw new NotFoundException('Rol de SUPERVISOR no encontrado en el sistema');
-    }
-
     const supervisores = await this.prisma.usuario.findMany({
-      where: { 
-        activo: true, 
-        rolId: supervisorRole.id 
+      where: {
+        activo: true,
+        rol: { nombre: { in: ['SUPERVISOR', 'JEFE_COMPRAS'] } },
       },
       select: { 
         id: true, 

@@ -623,7 +623,7 @@ export default function FollowUps() {
   const [notasAbiertas, setNotasAbiertas] = useState<string | null>(null);
   const { user, isLoading } = useAuth();
   const isComercial = user?.rol?.nombre?.toUpperCase() === 'COMERCIAL';
-  const canAsignarResponsable = user?.rol?.nombre?.toUpperCase() === 'SUPERVISOR' && (user as any)?.departamento?.nombre === 'Gerencia';
+  const canAsignarResponsable = ['SUPERVISOR', 'JEFE_COMPRAS', 'ADMIN'].includes(user?.rol?.nombre?.toUpperCase() || '');
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center">

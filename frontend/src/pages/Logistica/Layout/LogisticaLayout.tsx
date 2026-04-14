@@ -2,11 +2,11 @@ import { Outlet, NavLink } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
 
 const allTabs = [
-  { to: "/logistica/cotizaciones",  label: "Cotizaciones",  roles: ["ADMIN", "SUPERVISOR", "COMERCIAL"] },
+  { to: "/logistica/cotizaciones",  label: "Cotizaciones",  roles: ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS", "COMERCIAL"] },
   { to: "/logistica/historial",     label: "Historial" },
-  { to: "/logistica/rechazadas",    label: "Rechazadas",    roles: ["ADMIN", "SUPERVISOR"] },
-  { to: "/logistica/compras",       label: "Compras",       roles: ["ADMIN", "SUPERVISOR", "COMERCIAL"] },
-  { to: "/logistica/documentos",    label: "Documentos",    roles: ["ADMIN", "SUPERVISOR", "COMERCIAL"] },
+  { to: "/logistica/rechazadas",    label: "Rechazadas",    roles: ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS"] },
+  { to: "/logistica/compras",       label: "Compras",       roles: ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS", "COMERCIAL"] },
+  { to: "/logistica/documentos",    label: "Documentos",    roles: ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS", "COMERCIAL"] },
 ];
 
 export default function LogisticaLayout() {
