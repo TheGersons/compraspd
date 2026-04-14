@@ -126,6 +126,7 @@ export type EstadoProducto = {
     tipoCompra: 'NACIONAL' | 'INTERNACIONAL';
     chatId?: string | null;
     solicitante?: { id: string; nombre: string; email?: string } | null;
+    tipo?: { nombre: string; area: { nombreArea: string } } | null;
   };
   paisOrigen?: {
     id: string;
@@ -786,12 +787,13 @@ export default function ShoppingFollowUps() {
         tipoCompra: p.cotizacion?.tipoCompra || p.tipoCompra,
         chatId: p.cotizacion?.chatId || null,
         solicitante: p.cotizacion?.solicitante || null,
+        tipo: p.cotizacion?.tipo || null,
         productos: [],
       };
     }
     acc[key].productos.push(p);
     return acc;
-  }, {} as Record<string, { cotizacionId: string; nombre: string; tipoCompra: string; chatId: string | null; solicitante: { id: string; nombre: string } | null; productos: EstadoProducto[] }>);
+  }, {} as Record<string, { cotizacionId: string; nombre: string; tipoCompra: string; chatId: string | null; solicitante: { id: string; nombre: string } | null; tipo: { nombre: string; area: { nombreArea: string } } | null; productos: EstadoProducto[] }>);
 
   const gruposOrdenados = Object.values(productosAgrupados).sort((a, b) => a.nombre.localeCompare(b.nombre));
 
@@ -1129,13 +1131,18 @@ export default function ShoppingFollowUps() {
                               onBlur={() => setEditandoCotizacion(null)}
                               className="text-sm font-semibold border-b border-blue-500 bg-transparent text-gray-900 dark:text-white outline-none" />
                           ) : (
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               <p className="font-semibold text-gray-900 dark:text-white text-sm truncate">{grupo.nombre}</p>
                               {!isComercial && (
                                 <button onClick={(e) => { e.stopPropagation(); setEditandoCotizacion(grupo.cotizacionId); setNombreCotEditado(grupo.nombre); }}
                                   className="text-gray-400 hover:text-blue-500 transition-colors flex-shrink-0" title="Editar nombre">
                                   <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                                 </button>
+                              )}
+                              {grupo.tipo && (
+                                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                                  {grupo.tipo.area.nombreArea} - {grupo.tipo.nombre}
+                                </span>
                               )}
                             </div>
                           )}

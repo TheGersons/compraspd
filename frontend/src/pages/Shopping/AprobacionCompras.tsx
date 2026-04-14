@@ -61,6 +61,7 @@ type ProductoResumen = {
     precioTotal?: number;
     nombreCotizacion?: string;
     tipoCompra?: string;
+    tipo?: { nombre: string; area: { nombreArea: string } } | null;
     solicitante?: { id: string; nombre: string } | null;
     responsableSeguimiento?: { id: string; nombre: string } | null;
 };
@@ -182,6 +183,7 @@ export default function AprobacionCompras() {
                 precioTotal: p.precioTotal ? parseFloat(p.precioTotal) : undefined,
                 nombreCotizacion: p.cotizacion?.nombreCotizacion,
                 tipoCompra: p.cotizacion?.tipoCompra || p.tipoCompra,
+                tipo: p.cotizacion?.tipo || null,
                 solicitante: p.cotizacion?.solicitante || null,
                 responsableSeguimiento: p.responsableSeguimiento || null,
             }));
@@ -214,6 +216,7 @@ export default function AprobacionCompras() {
                 precioTotal: p.precioTotal ? parseFloat(p.precioTotal) : undefined,
                 nombreCotizacion: p.cotizacion?.nombreCotizacion,
                 tipoCompra: p.cotizacion?.tipoCompra || p.tipoCompra,
+                tipo: p.cotizacion?.tipo || null,
                 solicitante: p.cotizacion?.solicitante || null,
                 responsableSeguimiento: p.responsableSeguimiento || null,
             }));
@@ -444,6 +447,11 @@ export default function AprobacionCompras() {
                                                             : 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
                                                     }`}>
                                                         {prods[0].tipoCompra === 'NACIONAL' ? 'Nacional' : 'Internacional'}
+                                                    </span>
+                                                )}
+                                                {prods[0]?.tipo && (
+                                                    <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                                                        {prods[0].tipo.area.nombreArea} - {prods[0].tipo.nombre}
                                                     </span>
                                                 )}
                                             </div>

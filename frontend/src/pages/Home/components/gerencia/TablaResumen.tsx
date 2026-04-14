@@ -24,12 +24,18 @@ const ESTADOS_INTERNACIONAL: string[] = [
   'conBL', 'segundoSeguimiento', 'enCIF', 'recibido',
 ];
 
+const ESTADOS_NACIONAL: string[] = [
+  'cotizado', 'conDescuento', 'aprobacionCompra', 'comprado', 'pagado',
+  'aprobacionPlanos', 'primerSeguimiento', 'recibido',
+];
+
 interface TablaResumenProps {
   resumen: ResumenProcesos;
   titulo: string;
   subtitulo?: string;
   onVerDetalle: (etapa: string) => void;
-  productosDetallados: ProductoDetallado[]; // NUEVO: necesitamos los productos para calcular criticidad
+  productosDetallados: ProductoDetallado[];
+  tipoCompra?: 'NACIONAL' | 'INTERNACIONAL';
 }
 
 interface FilaProceso {
@@ -40,13 +46,15 @@ interface FilaProceso {
   etapaKey: string;
 }
 
-export default function TablaResumen({ 
-  resumen, 
-  titulo, 
-  subtitulo, 
+export default function TablaResumen({
+  resumen,
+  titulo,
+  subtitulo,
   onVerDetalle,
-  productosDetallados 
+  productosDetallados,
+  tipoCompra = 'INTERNACIONAL',
 }: TablaResumenProps) {
+  const estadosActivos = tipoCompra === 'NACIONAL' ? ESTADOS_NACIONAL : ESTADOS_INTERNACIONAL;
   const calcularPorcentaje = (valor: number, total: number): number => {
     if (total === 0) return 0;
     return Math.round((valor / total) * 100);
@@ -63,10 +71,10 @@ export default function TablaResumen({
   const getColorPorCriticidad = (etapaKey: string): string => {
     if (etapaKey === 'total') {
       const hayAtrasados = productosDetallados.some(p =>
-        ESTADOS_INTERNACIONAL.some(e => p.estados[e] === 'atrasado')
+        estadosActivos.some(e => p.estados[e] === 'atrasado')
       );
       const hayEnProceso = productosDetallados.some(p =>
-        ESTADOS_INTERNACIONAL.some(e => p.estados[e] === 'en_proceso')
+        estadosActivos.some(e => p.estados[e] === 'en_proceso')
       );
       if (hayAtrasados) return 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20';
       if (hayEnProceso) return 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20';
@@ -81,10 +89,10 @@ export default function TablaResumen({
     return 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20';
   };
 
-  // Construir filas dinámicamente usando todos los 13 estados
+  // Construir filas según tipo de compra
   const filas: FilaProceso[] = [
     { nombre: 'Total productos', valor: resumen.totalProductos, total: resumen.totalProductos, esTotal: true, etapaKey: 'total' },
-    ...ESTADOS_INTERNACIONAL.map(key => ({
+    ...estadosActivos.map(key => ({
       nombre: ESTADO_LABELS[key] || key,
       valor: (resumen as any)[key] || 0,
       total: resumen.totalProductos,
@@ -158,16 +166,25 @@ export default function TablaResumen({
                     </span>
                   </td>
                   <td className="px-6 py-3 text-center">
-                    <button
-                      onClick={() => onVerDetalle(fila.etapaKey)}
-                      className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 active:bg-blue-800"
-                    >
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
-                      Ver Detalle
-                    </button>
+                    {fila.esTotal ? (
+                      <button
+                        onClick={() => onVerDetalle(fila.etapaKey)}
+                        className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 active:bg-blue-800"
+                      >
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                        Ver Detalle
+                      </button>
+                    ) : fila.valor > 0 ? (
+                      <button
+                        onClick={() => onVerDetalle(fila.etapaKey)}
+                        className="text-xs text-gray-500 underline-offset-2 hover:text-blue-600 hover:underline dark:text-gray-400 dark:hover:text-blue-400 transition-colors"
+                      >
+                        Ver productos
+                      </button>
+                    ) : null}
                   </td>
                 </tr>
               );

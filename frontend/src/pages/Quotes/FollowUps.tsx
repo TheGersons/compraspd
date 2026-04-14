@@ -101,6 +101,10 @@ type Cotizacion = {
     id: string;
     nombre: string;
   };
+  tipo?: {
+    nombre: string;
+    area: { nombreArea: string };
+  } | null;
   chatId: string;
   fechaEntregaNacional?: string;
   totalProductos: number;
@@ -1856,7 +1860,14 @@ export default function FollowUps() {
                           </span>
                           <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{cot.porcentajeAprobado || 0}%</span>
                         </div>
-                        <h3 className="mb-0.5 font-semibold text-gray-900 dark:text-white truncate">{cot.nombreCotizacion}</h3>
+                        <div className="mb-0.5 flex items-center gap-1.5 flex-wrap">
+                          <h3 className="font-semibold text-gray-900 dark:text-white truncate">{cot.nombreCotizacion}</h3>
+                          {cot.tipo && (
+                            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 flex-shrink-0">
+                              {cot.tipo.area.nombreArea} - {cot.tipo.nombre}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-sm text-gray-600 dark:text-gray-400">
                           {cot.solicitante.nombre}
                           {cot.solicitante.departamento && <span className="text-gray-500"> • {cot.solicitante.departamento.nombre}</span>}

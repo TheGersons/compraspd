@@ -14,11 +14,25 @@ import Button from '../../components/ui/button/Button';
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 
+function defaultDesde() {
+  const d = new Date();
+  d.setMonth(d.getMonth() - 3);
+  return d.toISOString().slice(0, 10);
+}
+function defaultHasta() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export default function DashboardGerencia() {
   const [navegacion, setNavegacion] = useState<NavegacionContext>({
     nivel: 1
   });
   const [proyectoSeleccionado, setProyectoSeleccionado] = useState<Proyecto | null>(null);
+
+  // Filtros
+  const [filtroTipoCompra, setFiltroTipoCompra] = useState<'NACIONAL' | 'INTERNACIONAL'>('INTERNACIONAL');
+  const [desde, setDesde] = useState(defaultDesde());
+  const [hasta, setHasta] = useState(defaultHasta());
 
   // Estados para el modal
   const [modalAbierto, setModalAbierto] = useState(false);
@@ -35,7 +49,10 @@ export default function DashboardGerencia() {
     try {
       setLoading(true);
       const token = getToken();
-      const response = await fetch(`${API_BASE_URL}/api/v1/dashboard/gerencia`, {
+      const params = new URLSearchParams();
+      if (desde) params.set('desde', desde);
+      if (hasta) params.set('hasta', hasta);
+      const response = await fetch(`${API_BASE_URL}/api/v1/dashboard/gerencia?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) throw new Error('Error cargando dashboard');
@@ -49,7 +66,7 @@ export default function DashboardGerencia() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [desde, hasta]);
 
   useEffect(() => {
     cargarDatos();
@@ -67,10 +84,26 @@ export default function DashboardGerencia() {
     return productosDetallados.filter((p: any) => p.areaId === navegacion.area?.id);
   };
 
-  // Obtener productos detallados para el proyecto seleccionado
+  // Obtener productos detallados para el proyecto seleccionado (filtrados por tipoCompra)
   const getProductosDetalladosProyecto = (): ProductoDetallado[] => {
     if (!proyectoSeleccionado) return [];
-    return productosDetallados.filter((p: any) => p.proyectoId === proyectoSeleccionado.id);
+    return productosDetallados.filter(
+      (p: any) => p.proyectoId === proyectoSeleccionado.id && p.tipoCompra === filtroTipoCompra
+    );
+  };
+
+  // Calcular resumen desde los productos filtrados
+  const computeResumen = (prods: ProductoDetallado[]) => {
+    const keys = [
+      'cotizado','conDescuento','aprobacionCompra','comprado','pagado',
+      'aprobacionPlanos','primerSeguimiento','enFOB','cotizacionFleteInternacional',
+      'conBL','segundoSeguimiento','enCIF','recibido',
+    ];
+    const resumen: any = { totalProductos: prods.length };
+    for (const key of keys) {
+      resumen[key] = prods.filter(p => p.estados[key] && p.estados[key] !== 'pendiente').length;
+    }
+    return resumen;
   };
 
   // Obtener todos los proyectos para el carrusel
@@ -97,10 +130,6 @@ export default function DashboardGerencia() {
     setNavegacion((prev) => ({ ...prev, proyecto }));
   };
 
-  const handleVerDetalle = () => {
-    setNavegacion((prev) => ({ ...prev, nivel: 3 }));
-  };
-
   // Handler para abrir modal desde tabla
   const handleVerDetalleEtapa = (etapaKey: string) => {
     setEtapaModal(etapaKey as EtapaDetalle);
@@ -121,11 +150,9 @@ export default function DashboardGerencia() {
   };
 
   const handleVolver = () => {
-    if (navegacion.nivel === 2) {
+    if (navegacion.nivel >= 2) {
       setNavegacion({ nivel: 1 });
       setProyectoSeleccionado(null);
-    } else if (navegacion.nivel === 3) {
-      setNavegacion({ nivel: 2, area: navegacion.area, proyecto: proyectoSeleccionado || undefined });
     }
   };
 
@@ -139,6 +166,9 @@ export default function DashboardGerencia() {
       </div>
     );
   }
+
+  const productosProyectoFiltrados = getProductosDetalladosProyecto();
+  const resumenFiltrado = proyectoSeleccionado ? computeResumen(productosProyectoFiltrados) : null;
 
   return (
     <div className="space-y-6">
@@ -154,6 +184,57 @@ export default function DashboardGerencia() {
         </div>
       </div>
 
+      {/* Barra de Filtros */}
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        {/* Tipo de compra */}
+        <div className="flex items-center gap-1 rounded-lg border border-gray-200 bg-gray-50 p-0.5 dark:border-gray-600 dark:bg-gray-700/50">
+          {(['INTERNACIONAL', 'NACIONAL'] as const).map((opt) => (
+            <button
+              key={opt}
+              onClick={() => setFiltroTipoCompra(opt)}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                filtroTipoCompra === opt
+                  ? opt === 'NACIONAL'
+                    ? 'bg-emerald-500 text-white shadow-sm'
+                    : 'bg-blue-500 text-white shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+              }`}
+            >
+              {opt === 'NACIONAL' ? 'Nacional' : 'Internacional'}
+            </button>
+          ))}
+        </div>
+
+        {/* Separador */}
+        <div className="h-6 w-px bg-gray-200 dark:bg-gray-600" />
+
+        {/* Rango de fechas */}
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Desde</label>
+          <input
+            type="date"
+            value={desde}
+            onChange={(e) => setDesde(e.target.value)}
+            className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs outline-none focus:border-blue-400 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Hasta</label>
+          <input
+            type="date"
+            value={hasta}
+            onChange={(e) => setHasta(e.target.value)}
+            className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs outline-none focus:border-blue-400 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+          />
+        </div>
+        <button
+          onClick={() => { setDesde(defaultDesde()); setHasta(defaultHasta()); setFiltroTipoCompra('INTERNACIONAL'); }}
+          className="ml-auto rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
+        >
+          Resetear
+        </button>
+      </div>
+
       {/* Breadcrumbs y botón volver */}
       {navegacion.nivel > 1 && (
         <div className="flex items-center justify-between">
@@ -167,18 +248,15 @@ export default function DashboardGerencia() {
         </div>
       )}
 
-      {/* NIVEL 1: Vista General con Áreas - SIN TABLAS */}
+      {/* NIVEL 1: Vista General con Áreas */}
       {navegacion.nivel === 1 && (
         <div className="space-y-8">
-          {/* Áreas Principales - Grid 2x2 - SOLO CARDS */}
           <div className="grid gap-6 lg:grid-cols-2">
             {areas.map((area) => (
               <AreaCard key={area.id} area={area} onClick={() => handleSelectArea(area)} />
             ))}
           </div>
 
-
-          {/* Carrusel de Proyectos Activos */}
           <div className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
             <div className="mb-4">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">
@@ -191,8 +269,6 @@ export default function DashboardGerencia() {
             <ProyectoCarousel proyectos={getTodosProyectos()} />
           </div>
 
-
-          {/* Gráfico Comparativo */}
           <GraficoComparativo
             proyectosProyectos={getProyectosPorAreaTipo('proyectos')}
             proyectosComercial={getProyectosPorAreaTipo('comercial')}
@@ -202,10 +278,9 @@ export default function DashboardGerencia() {
         </div>
       )}
 
-      {/* NIVEL 2: Panel lateral + Tabla de resumen CON BOTÓN VER DETALLE */}
+      {/* NIVEL 2: Panel lateral + Tabla de resumen */}
       {navegacion.nivel === 2 && navegacion.area && (
         <div className="flex gap-6">
-          {/* Panel lateral de proyectos */}
           <PanelProyectos
             tipoArea={navegacion.area.tipo}
             proyectos={getProyectosPorArea()}
@@ -214,34 +289,23 @@ export default function DashboardGerencia() {
             productosDetallados={getProductosDetalladosArea()}
           />
 
-          {/* Contenido principal */}
           <div className="flex-1 space-y-6">
-            {proyectoSeleccionado ? (
+            {proyectoSeleccionado && resumenFiltrado ? (
               <>
                 {/* Info del proyecto */}
                 <div className="rounded-xl border-2 border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                        {proyectoSeleccionado.nombre}
-                      </h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Responsable: {proyectoSeleccionado.responsable}
-                      </p>
-                    </div>
-                    <Button onClick={handleVerDetalle} variant="primary" size="sm">
-                      Ver Detalle Completo
-                    </Button>
-                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    {proyectoSeleccionado.nombre}
+                  </h3>
                 </div>
 
-                {/* Tabla de resumen con botones Ver Detalle */}
                 <TablaResumen
-                  resumen={proyectoSeleccionado.resumen}
+                  resumen={resumenFiltrado}
                   titulo="Resumen de Procesos"
-                  subtitulo={`Distribución de ${proyectoSeleccionado.resumen.totalProductos} productos en las diferentes etapas`}
+                  subtitulo={`${resumenFiltrado.totalProductos} productos ${filtroTipoCompra === 'NACIONAL' ? 'nacionales' : 'internacionales'}`}
                   onVerDetalle={handleVerDetalleEtapa}
-                  productosDetallados={getProductosDetalladosProyecto()}
+                  productosDetallados={productosProyectoFiltrados}
+                  tipoCompra={filtroTipoCompra}
                 />
               </>
             ) : (
@@ -255,36 +319,12 @@ export default function DashboardGerencia() {
         </div>
       )}
 
-      {/* NIVEL 3: Detalle completo del proyecto - Tabla de resumen + productos */}
-      {navegacion.nivel === 3 && proyectoSeleccionado && (
-        <div className="space-y-6">
-          {/* Info del proyecto */}
-          <div className="rounded-xl border-2 border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {proyectoSeleccionado.nombre}
-            </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Detalle completo de productos • Responsable: {proyectoSeleccionado.responsable}
-            </p>
-          </div>
-
-          {/* Tabla de resumen con detalle */}
-          <TablaResumen
-            resumen={proyectoSeleccionado.resumen}
-            titulo="Resumen de Procesos"
-            subtitulo={`Distribución de ${proyectoSeleccionado.resumen.totalProductos} productos en las diferentes etapas`}
-            onVerDetalle={handleVerDetalleEtapa}
-            productosDetallados={getProductosDetalladosProyecto()}
-          />
-        </div>
-      )}
-
       {/* MODAL DE DETALLES */}
       <ModalDetalleProductos
         isOpen={modalAbierto}
         onClose={() => setModalAbierto(false)}
         etapa={etapaModal}
-        productos={getProductosDetalladosProyecto()}
+        productos={productosProyectoFiltrados}
         nombreProyecto={proyectoSeleccionado?.nombre || ''}
       />
     </div>
