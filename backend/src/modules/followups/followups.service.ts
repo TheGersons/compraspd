@@ -49,7 +49,8 @@ export class FollowUpsService {
     const esAutorizado =
       rolNombreList.includes('supervisor') ||
       rolNombreList.includes('admin') ||
-      rolNombreList.includes('comercial');
+      rolNombreList.includes('comercial') ||
+      rolNombreList.includes('jefe_compras');
     if (!esAutorizado) {
       throw new ForbiddenException(
         'Solo supervisores pueden acceder a esta función',
@@ -226,7 +227,8 @@ export class FollowUpsService {
     const esSupervisorOAdmin =
       rolNombre.includes('supervisor') ||
       rolNombre.includes('admin') ||
-      rolNombre.includes('comercial');
+      rolNombre.includes('comercial') ||
+      rolNombre.includes('jefe_compras');
 
     if (!esSupervisorOAdmin) {
       throw new ForbiddenException(
@@ -440,7 +442,8 @@ export class FollowUpsService {
     if (
       !rolNombreTimeline.includes('supervisor') &&
       !rolNombreTimeline.includes('admin') &&
-      !rolNombreTimeline.includes('comercial')
+      !rolNombreTimeline.includes('comercial') &&
+      !rolNombreTimeline.includes('jefe_compras')
     ) {
       throw new ForbiddenException(
         'Solo supervisores pueden configurar timelines',
@@ -866,7 +869,8 @@ export class FollowUpsService {
     if (
       !rolNombreAprobar.includes('supervisor') &&
       !rolNombreAprobar.includes('admin') &&
-      !rolNombreAprobar.includes('comercial')
+      !rolNombreAprobar.includes('comercial') &&
+      !rolNombreAprobar.includes('jefe_compras')
     ) {
       throw new ForbiddenException(
         'Solo supervisores pueden aprobar productos',
@@ -1282,7 +1286,8 @@ export class FollowUpsService {
     if (
       !rolNombreStats.includes('supervisor') &&
       !rolNombreStats.includes('admin') &&
-      !rolNombreStats.includes('comercial')
+      !rolNombreStats.includes('comercial') &&
+      !rolNombreStats.includes('jefe_compras')
     ) {
       throw new ForbiddenException(
         'Solo supervisores pueden acceder a estadísticas',
@@ -1346,7 +1351,8 @@ export class FollowUpsService {
     if (
       !rolNombreReasignar.includes('supervisor') &&
       !rolNombreReasignar.includes('admin') &&
-      !rolNombreReasignar.includes('comercial')
+      !rolNombreReasignar.includes('comercial') &&
+      !rolNombreReasignar.includes('jefe_compras')
     ) {
       throw new ForbiddenException('Solo supervisores pueden reasignar');
     }
@@ -1357,8 +1363,9 @@ export class FollowUpsService {
       include: { rol: true },
     });
 
-    if (!nuevoSupervisor?.rol.nombre.toLowerCase().includes('supervisor')) {
-      throw new BadRequestException('El usuario seleccionado no es supervisor');
+    const nuevoRol = nuevoSupervisor?.rol.nombre.toLowerCase() || '';
+    if (!nuevoRol.includes('supervisor') && !nuevoRol.includes('admin') && !nuevoRol.includes('jefe_compras')) {
+      throw new BadRequestException('El usuario seleccionado no tiene rol de supervisor o jefe de compras');
     }
 
     const cotizacion = await this.prisma.cotizacion.findUnique({
@@ -1461,7 +1468,8 @@ export class FollowUpsService {
     const esSupervisorOAdmin =
       rolNombre.includes('supervisor') ||
       rolNombre.includes('admin') ||
-      rolNombre.includes('comercial');
+      rolNombre.includes('comercial') ||
+      rolNombre.includes('jefe_compras');
 
     if (!esSupervisorOAdmin) {
       throw new ForbiddenException(
