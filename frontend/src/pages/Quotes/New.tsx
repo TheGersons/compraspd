@@ -254,11 +254,16 @@ async function parseRequisa(file: File): Promise<RequisaData> {
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
+  // Helper: small delay to avoid blocking the main thread on large PDFs
+  const delay = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+
   let fullText = '';
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const tc = await page.getTextContent();
     fullText += tc.items.map((it: any) => it.str).join(' ') + '\n';
+    // Yield to event loop every page to maintain data integrity on large requisas
+    await delay(20);
   }
 
   // Normalize whitespace
@@ -266,14 +271,15 @@ async function parseRequisa(file: File): Promise<RequisaData> {
 
   const extract = (re: RegExp) => re.exec(txt)?.[1]?.trim();
 
-  const requisaNo = extract(/REQUISA\s+No[:\s]+([A-Z0-9/]+)/i);
-  const proyecto   = extract(/PROYECTO[:\s]+([\w\s\-.,()]+?)(?=\s+ACUERDO|\s+FECHA|\s+PRESUPUESTO)/i);
-  const creador    = extract(/CREADOR[:\s]+([\wáéíóúñÁÉÍÓÚÑ\s]+?)(?=\s+ITEM|\s+RECIBIDO|\s*$)/i);
-  const acuerdoCompra = extract(/ACUERDO\s+DE\s+COMPRA[:\s]+([A-Z0-9]+)/i);
+  const requisaNo     = extract(/REQUISA\s+No[:\s]+([A-Z0-9/]+)/i);
+  const proyecto      = extract(/PROYECTO[:\s]+([\w\s\-.,()]+?)(?=\s+ACUERDO|\s+FECHA|\s+PRESUPUESTO)/i);
+  const creador       = extract(/CREADOR[:\s]+([\wáéíóúñÁÉÍÓÚÑ\s]+?)(?=\s+ITEM|\s+RECIBIDO|\s*$)/i);
+  const acuerdoCompra = extract(/ACUERDO\s+DE\s+COMPRA[:\s]+([A-Z0-9\-/]+)/i);
   const presupuesto   = extract(/PRESUPUESTO[:\s]+(\[[^\]]+\][\w\s]+?)(?=\s+DOCUMENTO|\s+CREADOR)/i);
   const docOrigen     = extract(/DOCUMENTO\s+ORIGEN[:\s]+([A-Z0-9]+)/i);
 
   // Parse items table: rows after "ITEM PRODUCTO DESCRIPCION UNIDAD DEMANDA HECHO"
+  // Process in chunks to avoid regex backtracking issues on texts with 50-100+ rows
   const items: RequisaData['items'] = [];
   const afterHeader = txt.split(/ITEM\s+PRODUCTO\s+DESCRIPCI[OÓ]N\s+UNIDAD\s+DEMANDA\s+HECHO/i)[1];
   if (afterHeader) {
@@ -281,6 +287,7 @@ async function parseRequisa(file: File): Promise<RequisaData> {
     // SKU codes look like: CAB-00411, ELE-123, TUB-0001, etc.
     const rowRe = /\b(\d+)\s+([A-Z]{2,}-\d+)\s+(.+?)\s+([A-Za-z]+)\s+([\d.]+)\s+[\d.]+/g;
     let m: RegExpExecArray | null;
+    let matchCount = 0;
     while ((m = rowRe.exec(afterHeader)) !== null) {
       items.push({
         sku: m[2].trim(),
@@ -288,6 +295,11 @@ async function parseRequisa(file: File): Promise<RequisaData> {
         unidad: m[4].trim(),
         cantidad: parseFloat(m[5]),
       });
+      matchCount++;
+      // Yield to event loop every 10 items to avoid UI freezing on large requisas
+      if (matchCount % 10 === 0) {
+        await delay(10);
+      }
     }
   }
 
@@ -593,8 +605,8 @@ export default function New() {
     try {
       const data = await parseRequisa(pendingRequisaFile);
 
-      // Nombre desde Requisa No
-      if (data.requisaNo) setNombreBase(data.requisaNo);
+      // Nombre desde Acuerdo de Compra (queda en blanco si no existe en la requisa)
+      if (data.acuerdoCompra) setNombreBase(data.acuerdoCompra);
 
       // Proyecto: buscar match → si no existe, crear automáticamente
       if (data.proyecto) {
