@@ -690,14 +690,14 @@ export class MessagesService {
     ];
 
     // Destinatario de EMAIL:
-    // - Si manda SUPERVISOR o JEFE_COMPRAS → email solo al solicitante
-    // - Si manda el solicitante u otro → email al primer JEFE_COMPRAS o SUPERVISOR activo
+    // - Si manda JEFE_COMPRAS → email solo al solicitante
+    // - Si manda el solicitante u otro → email al JEFE_COMPRAS activo
     const senderRole = (emisor?.rol?.nombre || '').toUpperCase();
-    const esSupervisor = senderRole === 'SUPERVISOR' || senderRole === 'JEFE_COMPRAS';
+    const esJefeCompras = senderRole === 'JEFE_COMPRAS';
     let emailDestinatario: UsuarioBasico | null = null;
 
-    if (esSupervisor) {
-      // El jefe/supervisor manda → notificar al solicitante
+    if (esJefeCompras) {
+      // El jefe de compras manda → notificar al solicitante
       const solicitante = cotizacion?.solicitante as UsuarioBasico | undefined;
       if (solicitante?.activo && solicitante.email) {
         emailDestinatario = solicitante;
@@ -705,7 +705,7 @@ export class MessagesService {
     } else {
       // El solicitante u otro manda → notificar al jefe de compras
       const jefeCompras = await this.prisma.usuario.findFirst({
-        where: { activo: true, rol: { nombre: { in: ['JEFE_COMPRAS', 'SUPERVISOR'] } } },
+        where: { activo: true, rol: { nombre: 'JEFE_COMPRAS' } },
         orderBy: { creado: 'asc' },
         select: { id: true, nombre: true, email: true, activo: true },
       });

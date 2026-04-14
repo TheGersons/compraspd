@@ -211,7 +211,8 @@ export class QuotationsService {
       descripcion: `"${quotationName}" solicitada por ${requesterName}`,
     };
 
-    // Notificaciones BD + SSE + email para todos los supervisores/jefe de compras
+    // Notificaciones BD + SSE para todos los supervisores/jefe de compras
+    // Email solo a usuarios con rol JEFE_COMPRAS
     await Promise.allSettled(
       supervisores.map(async (s) => {
         // 1. Crear notificación en BD
@@ -225,17 +226,23 @@ export class QuotationsService {
           ...notif,
           cotizacionId,
         });
-
-        // 3. Email
-        this.mailService.sendNewQuotationNotification(
-          s.email,
-          s.nombre,
-          quotationName,
-          requesterName,
-          quotationUrl,
-        ).catch(() => {});
       }),
     );
+
+    // 3. Email solo a JEFE_COMPRAS
+    const jefes = await this.prisma.usuario.findMany({
+      where: { activo: true, rol: { nombre: 'JEFE_COMPRAS' } },
+      select: { id: true, nombre: true, email: true },
+    });
+    for (const jefe of jefes) {
+      this.mailService.sendNewQuotationNotification(
+        jefe.email,
+        jefe.nombre,
+        quotationName,
+        requesterName,
+        quotationUrl,
+      ).catch(() => {});
+    }
   }
 
   /**
