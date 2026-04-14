@@ -604,6 +604,7 @@ export default function FollowUps() {
   const [fechaFiltro, setFechaFiltro] = useState<string>("TODOS");
   const [fechaDesde, setFechaDesde] = useState<Date | null>(null);
   const [fechaHasta, setFechaHasta] = useState<Date | null>(null);
+  const [incluirCompletadas, setIncluirCompletadas] = useState(false);
 
   // Paginación
   const [currentPage, setCurrentPage] = useState(1);
@@ -1228,7 +1229,10 @@ export default function FollowUps() {
         }
       })();
 
-      return matchesSearch && matchesResponsable && matchesSolicitante && matchesFecha;
+      const matchesEstado = incluirCompletadas ||
+        !['APROBADA_COMPLETA', 'COMPLETADA'].includes(cot.estado);
+
+      return matchesSearch && matchesResponsable && matchesSolicitante && matchesFecha && matchesEstado;
     });
     return filtered;
   })();
@@ -1801,6 +1805,19 @@ export default function FollowUps() {
                 <option value="PERSONALIZADO">Personalizado</option>
               </select>
             </div>
+          </div>
+          {/* Checkbox incluir completadas */}
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="incluirCompletadas"
+              checked={incluirCompletadas}
+              onChange={(e) => { setIncluirCompletadas(e.target.checked); setCurrentPage(1); }}
+              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <label htmlFor="incluirCompletadas" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer select-none">
+              Incluir cotizaciones completadas
+            </label>
           </div>
           {/* Selector de rango de fechas personalizado */}
           {fechaFiltro === "PERSONALIZADO" && (

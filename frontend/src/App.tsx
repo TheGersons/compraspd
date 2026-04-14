@@ -364,11 +364,11 @@ export default function App() {
                 }
               />
 
-              {/* Usuarios - Solo ADMIN */}
+              {/* Usuarios - ADMIN y SUPERVISOR */}
               <Route
                 path="/Profiles"
                 element={
-                  <ProtectedRoute roles={["ADMIN"]}>
+                  <ProtectedRoute roles={["ADMIN", "SUPERVISOR"]}>
                     <Profiles />
                   </ProtectedRoute>
                 }

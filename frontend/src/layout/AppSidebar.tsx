@@ -131,7 +131,7 @@ const othersItems: NavItem[] = [
   {
     icon: <User />,
     name: "Usuarios",
-    roles: ["ADMIN"],
+    roles: ["ADMIN", "SUPERVISOR"],
     subItems: [
       { name: "Gestión de Usuarios", path: "/profiles", pro: false },
       { name: "Configuración", path: "/settings", pro: false },
