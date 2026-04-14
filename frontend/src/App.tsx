@@ -64,6 +64,7 @@ import OfertasArchivadas from "./pages/Ofertas/OfertasArchivadas";
 import Ofertas from "./pages/Ofertas/Ofertas";
 import OdooOportunidades from "./pages/Odoo/OdooOportunidades";
 // Logistica module
+import LogisticaLayout from "./pages/Logistica/Layout/LogisticaLayout";
 import LogisticaQuotesFollowUps from "./pages/Quotes/Logistica/FollowUps";
 import LogisticaQuotesHistory from "./pages/Quotes/Logistica/History";
 import LogisticaQuotesRejected from "./pages/Quotes/Logistica/RejectedQuotes";
@@ -209,10 +210,6 @@ export default function App() {
                 />
                 {/* History - TODOS pueden acceder */}
                 <Route path="history" element={<QuotesHistory />} />
-                {/* LOGISTICA sub-module */}
-                <Route path="logistica/follow-ups" element={<ProtectedRoute roles={COMERCIAL_ROLES}><LogisticaQuotesFollowUps /></ProtectedRoute>} />
-                <Route path="logistica/history" element={<LogisticaQuotesHistory />} />
-                <Route path="logistica/rejected" element={<ProtectedRoute roles={STAFF_ROLES}><LogisticaQuotesRejected /></ProtectedRoute>} />
                 {/* Assignment - Solo SUPERVISOR/ADMIN */}
                 <Route
                   path="assignment"
@@ -254,9 +251,22 @@ export default function App() {
                     <AprobacionCompras />
                   </ProtectedRoute>
                 } />
-                {/* LOGISTICA sub-module */}
-                <Route path="logistica/follow-ups" element={<ProtectedRoute roles={COMERCIAL_ROLES}><LogisticaShoppingFollowUps /></ProtectedRoute>} />
-                <Route path="logistica/documents" element={<ProtectedRoute roles={COMERCIAL_ROLES}><LogisticaShoppingDocuments /></ProtectedRoute>} />
+              </Route>
+
+              {/* LOGÍSTICA */}
+              <Route
+                path="/logistica"
+                element={
+                  <ProtectedRoute roles={COMERCIAL_ROLES}>
+                    <LogisticaLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route path="cotizaciones" element={<ProtectedRoute roles={COMERCIAL_ROLES}><LogisticaQuotesFollowUps /></ProtectedRoute>} />
+                <Route path="historial" element={<LogisticaQuotesHistory />} />
+                <Route path="rechazadas" element={<ProtectedRoute roles={STAFF_ROLES}><LogisticaQuotesRejected /></ProtectedRoute>} />
+                <Route path="compras" element={<ProtectedRoute roles={COMERCIAL_ROLES}><LogisticaShoppingFollowUps /></ProtectedRoute>} />
+                <Route path="documentos" element={<ProtectedRoute roles={COMERCIAL_ROLES}><LogisticaShoppingDocuments /></ProtectedRoute>} />
               </Route>
 
               {/* LICITACIONES - STAFF + COMERCIAL */}

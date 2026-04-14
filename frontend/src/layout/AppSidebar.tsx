@@ -79,8 +79,11 @@ const navItems: NavItem[] = [
     name: "Logística",
     roles: ["ADMIN", "SUPERVISOR", "COMERCIAL"],
     subItems: [
-      { name: "Cotizaciones / Seguimiento", path: "/quotes/logistica/follow-ups", pro: false },
-      { name: "Compras / Documentos", path: "/shopping/logistica/documents", pro: false },
+      { name: "Cotizaciones", path: "/logistica/cotizaciones", pro: false, roles: ["ADMIN", "SUPERVISOR", "COMERCIAL"] },
+      { name: "Historial", path: "/logistica/historial", pro: false },
+      { name: "Rechazadas", path: "/logistica/rechazadas", pro: false, roles: ["ADMIN", "SUPERVISOR"] },
+      { name: "Compras", path: "/logistica/compras", pro: false, roles: ["ADMIN", "SUPERVISOR", "COMERCIAL"] },
+      { name: "Documentos", path: "/logistica/documentos", pro: false, roles: ["ADMIN", "SUPERVISOR", "COMERCIAL"] },
     ],
   },
   {
