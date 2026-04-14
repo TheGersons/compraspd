@@ -63,6 +63,12 @@ import Archivadas from "./pages/Licitaciones/Archivadas";
 import OfertasArchivadas from "./pages/Ofertas/OfertasArchivadas";
 import Ofertas from "./pages/Ofertas/Ofertas";
 import OdooOportunidades from "./pages/Odoo/OdooOportunidades";
+// Logistica module
+import LogisticaQuotesFollowUps from "./pages/Quotes/Logistica/FollowUps";
+import LogisticaQuotesHistory from "./pages/Quotes/Logistica/History";
+import LogisticaQuotesRejected from "./pages/Quotes/Logistica/RejectedQuotes";
+import LogisticaShoppingFollowUps from "./pages/Shopping/Logistica/FollowUps";
+import LogisticaShoppingDocuments from "./pages/Shopping/Logistica/Documents";
 
 const SHOPPING_MANAGER_ROLES = ["ADMIN", "SUPERVISOR"];
 const QUOTES_SUPERVISOR_ROLES = ["SUPERVISOR", "ADMIN"];
@@ -203,6 +209,10 @@ export default function App() {
                 />
                 {/* History - TODOS pueden acceder */}
                 <Route path="history" element={<QuotesHistory />} />
+                {/* LOGISTICA sub-module */}
+                <Route path="logistica/follow-ups" element={<ProtectedRoute roles={COMERCIAL_ROLES}><LogisticaQuotesFollowUps /></ProtectedRoute>} />
+                <Route path="logistica/history" element={<LogisticaQuotesHistory />} />
+                <Route path="logistica/rejected" element={<ProtectedRoute roles={STAFF_ROLES}><LogisticaQuotesRejected /></ProtectedRoute>} />
                 {/* Assignment - Solo SUPERVISOR/ADMIN */}
                 <Route
                   path="assignment"
@@ -244,6 +254,9 @@ export default function App() {
                     <AprobacionCompras />
                   </ProtectedRoute>
                 } />
+                {/* LOGISTICA sub-module */}
+                <Route path="logistica/follow-ups" element={<ProtectedRoute roles={COMERCIAL_ROLES}><LogisticaShoppingFollowUps /></ProtectedRoute>} />
+                <Route path="logistica/documents" element={<ProtectedRoute roles={COMERCIAL_ROLES}><LogisticaShoppingDocuments /></ProtectedRoute>} />
               </Route>
 
               {/* LICITACIONES - STAFF + COMERCIAL */}

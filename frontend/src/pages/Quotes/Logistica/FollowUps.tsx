@@ -1,17 +1,17 @@
 import { useState, useEffect, useRef } from "react";
-import PageMeta from "../../components/common/PageMeta";
-import { getToken } from "../../lib/api";
-import { useNotifications } from "../Notifications/context/NotificationContext";
-import Historial from "./components/Historial";
-import { useAuth } from "../../context/AuthContext";
+import PageMeta from "../../../components/common/PageMeta";
+import { getToken } from "../../../lib/api";
+import { useNotifications } from "../../Notifications/context/NotificationContext";
+import Historial from "../components/Historial";
+import { useAuth } from "../../../context/AuthContext";
 import toast from "react-hot-toast";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import DescuentoActions from "./components/DescuentoActions";
+import DescuentoActions from "../components/DescuentoActions";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Calendar as CalendarIcon } from "lucide-react";
-import { Calendar } from "../../components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/popover";
+import { Calendar } from "../../../components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "../../../components/ui/popover";
 
 // ============================================================================
 // TYPES
@@ -608,7 +608,7 @@ export default function FollowUps() {
   const [notasAbiertas, setNotasAbiertas] = useState<string | null>(null);
   const { user, isLoading } = useAuth();
   const isComercial = user?.rol?.nombre?.toUpperCase() === 'COMERCIAL';
-  const canAsignarResponsable = user?.rol?.nombre?.toUpperCase() === 'SUPERVISOR' && (user as any)?.departamento?.nombre === 'Gerencia';
+  const canAsignarResponsable = user?.email === 'lmartinez@energiapd.com';
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -675,7 +675,12 @@ export default function FollowUps() {
     cargarCotizaciones();
     cargarPaises();
     asignarUsuario();
-    api.getSupervisores().then(setSupervisores).catch(() => { });
+    api.getSupervisores().then(sups => {
+      setSupervisores(sups);
+      // Auto-assign auxiliaroperaciones to logistica products without responsable
+      const auxiliar = (sups as any[]).find((s: any) => s.email === 'auxiliaroperaciones@energiapd.com');
+      if (auxiliar) autoAsignarAuxiliarQuotes(auxiliar.id);
+    }).catch(() => { });
   }, []);
 
   // Cargar mensajes cuando cambia la cotización seleccionada
@@ -712,6 +717,23 @@ export default function FollowUps() {
   const asignarUsuario = async () => {
     setCurrentUserId(user.id);
   }
+
+  const autoAsignarAuxiliarQuotes = async (auxiliarId: string) => {
+    try {
+      const token = getToken();
+      const r = await fetch(`${API_BASE_URL}/api/v1/estado-productos?pageSize=200`, {
+        credentials: 'include', headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!r.ok) return;
+      const data = await r.json();
+      const sinResponsable = (data.items || []).filter(
+        (p: any) => p.cotizacion?.tipo?.nombre?.toLowerCase() === 'logistica' && !p.responsableSeguimiento
+      );
+      if (sinResponsable.length === 0) return;
+      await api.asignarResponsableMasivo(sinResponsable.map((p: any) => p.id), auxiliarId);
+    } catch { /* silent */ }
+  };
+
   const cargarCotizaciones = async () => {
     try {
       setLoading(true);
@@ -727,7 +749,7 @@ export default function FollowUps() {
         return;
       }
       const items = (data.items || []).filter(
-        (c: any) => c.tipo?.nombre?.toLowerCase() !== 'logistica'
+        (c: any) => c.tipo?.nombre?.toLowerCase() === 'logistica'
       );
       setCotizaciones(items);
 
@@ -1669,7 +1691,7 @@ export default function FollowUps() {
 
   return (
     <>
-      <PageMeta description="Seguimiento de cotizaciones" title="Seguimiento de Cotizaciones" />
+      <PageMeta description="Seguimiento de cotizaciones logística" title="Logística — Cotizaciones" />
 
       <div className="max-w-full space-y-4">
         {/* Filtros */}

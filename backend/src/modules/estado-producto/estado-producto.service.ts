@@ -555,8 +555,10 @@ export class EstadoProductoService {
     if (estado === 'aprobacionCompra') {
       const ep = await this.prisma.estadoProducto.findUnique({
         where: { id: estadoProductoId },
+        include: { cotizacion: { include: { tipo: true } } },
       });
-      if (ep && !(ep as any).aprobadoCompra) {
+      const esLogisticaEp = (ep?.cotizacion as any)?.tipo?.nombre?.toLowerCase() === 'logistica';
+      if (ep && !(ep as any).aprobadoCompra && !esLogisticaEp) {
         faltantes.push(
           'Aprobación de compra pendiente (debe aprobarse en la vista de Aprobación de Compras)',
         );
@@ -618,12 +620,13 @@ export class EstadoProductoService {
 
     const estado = await this.prisma.estadoProducto.findUnique({
       where: { id },
-      include: { cotizacion: true },
+      include: { cotizacion: { include: { tipo: true } } },
     });
 
     if (!estado) throw new NotFoundException();
 
     const tipoCompra = estado.cotizacion?.tipoCompra || 'INTERNACIONAL';
+    const esLogistica = (estado.cotizacion as any)?.tipo?.nombre?.toLowerCase() === 'logistica';
     const estadosAplicables = this.getEstadosAplicables(tipoCompra);
     const estadoActual = this.obtenerEstadoActual(estado);
     const indexActual = estadosAplicables.indexOf(
@@ -694,6 +697,12 @@ export class EstadoProductoService {
     updateData.criticidad = criticidad;
     updateData.nivelCriticidad = nivelCriticidad;
     updateData.diasRetrasoActual = diasRetraso;
+
+    // Auto-aprobación de compra para cotizaciones de tipo Logistica
+    if (siguienteEstado === 'aprobacionCompra' && esLogistica) {
+      updateData.aprobadoCompra = true;
+      updateData.fechaAprobadoCompra = ahora;
+    }
 
     // Guardar
     const updated = await this.prisma.estadoProducto.update({

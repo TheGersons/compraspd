@@ -261,7 +261,7 @@ export default function History() {
     try {
       setLoading(true);
       const data = await api.getEstadosProductos();
-      const productosData = data.items || [];
+      const productosData = (data.items || []).filter((p: any) => p.cotizacion?.tipo?.nombre?.toLowerCase() !== 'logistica');
       setProductos(productosData);
 
       const todosEventos: EventoTimeline[] = [];

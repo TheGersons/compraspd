@@ -44,6 +44,15 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   {
+    icon: <UtilityPole />,
+    name: "Logística",
+    roles: ["ADMIN", "SUPERVISOR", "COMERCIAL"],
+    subItems: [
+      { name: "Cotizaciones / Seguimiento", path: "/quotes/logistica/follow-ups", pro: false },
+      { name: "Compras / Documentos", path: "/shopping/logistica/documents", pro: false },
+    ],
+  },
+  {
     icon: <PieChartIcon />,
     name: "Inicio",
     path: "/dashboard",

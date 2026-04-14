@@ -168,7 +168,7 @@ export default function AprobacionCompras() {
         try {
             setLoading(true);
             const data = await api.getProductosAprobados();
-            const items = (data.items || []).map((p: any) => ({
+            const items = (data.items || []).filter((p: any) => p.cotizacion?.tipo?.nombre?.toLowerCase() !== 'logistica').map((p: any) => ({
                 id: p.id,
                 sku: p.sku,
                 descripcion: p.descripcion,
@@ -201,7 +201,7 @@ export default function AprobacionCompras() {
         try {
             setLoading(true);
             const data = await api.getProductosRechazados();
-            const items = (data.items || []).map((p: any) => ({
+            const items = (data.items || []).filter((p: any) => p.cotizacion?.tipo?.nombre?.toLowerCase() !== 'logistica').map((p: any) => ({
                 id: p.id,
                 sku: p.sku,
                 descripcion: p.descripcion,

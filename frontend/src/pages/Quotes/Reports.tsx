@@ -336,6 +336,7 @@ export default function Reports() {
   const [desde, setDesde] = useState(defaultDesde());
   const [hasta, setHasta] = useState(defaultHasta());
   const [filtroTipoCompra, setFiltroTipoCompra] = useState<"TODAS" | "NACIONAL" | "INTERNACIONAL">("TODAS");
+  const [incluirLogistica, setIncluirLogistica] = useState(false);
   const [page, setPage] = useState(1);
 
   const fetchData = useCallback(async () => {
@@ -382,6 +383,7 @@ export default function Reports() {
   const filtered = reportes
     .map(withCalc)
     .filter((r) => {
+      if (!incluirLogistica && r.tipo?.toLowerCase() === 'logistica') return false;
       if (filtroTipoCompra !== "TODAS" && r.tipoCompra !== filtroTipoCompra) return false;
       if (!search) return true;
       const q = search.toLowerCase();
@@ -556,8 +558,17 @@ export default function Reports() {
             className="w-56 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs outline-none focus:border-blue-400 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-500"
           />
         </div>
+        <label className="flex cursor-pointer items-center gap-1.5 select-none">
+          <input
+            type="checkbox"
+            checked={incluirLogistica}
+            onChange={(e) => { setIncluirLogistica(e.target.checked); setPage(1); }}
+            className="h-3.5 w-3.5 rounded border-gray-300 accent-blue-500"
+          />
+          <span className="text-xs text-gray-500 dark:text-gray-400">Incluir Logística</span>
+        </label>
         <button
-          onClick={() => { setDesde(defaultDesde()); setHasta(defaultHasta()); setSearch(""); setFiltroTipoCompra("TODAS"); setPage(1); }}
+          onClick={() => { setDesde(defaultDesde()); setHasta(defaultHasta()); setSearch(""); setFiltroTipoCompra("TODAS"); setIncluirLogistica(false); setPage(1); }}
           className="ml-auto rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
         >
           Resetear

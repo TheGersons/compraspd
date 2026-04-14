@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
-import PageMeta from "../../components/common/PageMeta";
-import { getToken } from "../../lib/api";
-import { useNotifications } from "../Notifications/context/NotificationContext";
-import { useAuth } from "../../context/AuthContext";
+import PageMeta from "../../../components/common/PageMeta";
+import { getToken } from "../../../lib/api";
+import { useNotifications } from "../../Notifications/context/NotificationContext";
+import { useAuth } from "../../../context/AuthContext";
 import toast from "react-hot-toast";
 import {
     FileText, Upload, Trash2, Eye, Download, ChevronDown, ChevronRight,
@@ -236,7 +236,7 @@ export default function Documents() {
     }, [searchParams, productos]);
 
     const cargarProductos = async () => {
-        try { setLoading(true); const filters: any = { pageSize: 50 }; if (filtroTipoCompra) filters.tipoCompra = filtroTipoCompra; const data = await api.getProductos(filters); setProductos((data.items || []).filter((p: any) => p.cotizacion?.tipo?.nombre?.toLowerCase() !== 'logistica')); }
+        try { setLoading(true); const filters: any = { pageSize: 50 }; if (filtroTipoCompra) filters.tipoCompra = filtroTipoCompra; const data = await api.getProductos(filters); setProductos((data.items || []).filter((p: any) => p.cotizacion?.tipo?.nombre?.toLowerCase() === 'logistica')); }
         catch (error) { addNotification("danger", "Error", "Error al cargar productos"); }
         finally { setLoading(false); }
     };
@@ -376,15 +376,15 @@ export default function Documents() {
     // ============================================================================
     return (
         <>
-            <PageMeta title="Documentos de Compra" description="Gestión de documentos por estado" />
+            <PageMeta title="Logística — Documentos" description="Gestión de documentos logística" />
             <input ref={fileInputRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp" onChange={handleFileUpload} className="hidden" />
 
             <div className="space-y-6">
                 {/* Header */}
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">📄 Documentos de Compra</h1>
-                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Gestión de documentos requeridos por estado de compra</p>
+                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">📄 Documentos — Logística</h1>
+                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Gestión de documentos logística requeridos por estado de compra</p>
                     </div>
                     {esSupervisorOAdmin && (
                         <button onClick={abrirConfig} className="inline-flex items-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 transition-colors">

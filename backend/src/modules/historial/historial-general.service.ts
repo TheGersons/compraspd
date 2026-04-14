@@ -27,12 +27,20 @@ export class HistorialGeneralService {
   /**
    * Obtiene el resumen de todas las cotizaciones a las que el usuario tiene acceso
    */
-  async obtenerResumenGeneral(user: UserJwt) {
+  async obtenerResumenGeneral(user: UserJwt, tipoNombre?: string) {
     // Obtener cotizaciones según permisos
     const whereClause = this.construirFiltroPermisos(user);
 
+    const tipoFilter: any = tipoNombre
+      ? { tipo: { nombre: { equals: tipoNombre, mode: 'insensitive' } } }
+      : { NOT: { tipo: { nombre: { equals: 'logistica', mode: 'insensitive' } } } };
+
+    const combinedWhere = Object.keys(whereClause).length
+      ? { AND: [whereClause, tipoFilter] }
+      : tipoFilter;
+
     const cotizaciones = await this.prisma.cotizacion.findMany({
-      where: whereClause,
+      where: combinedWhere,
       include: {
         solicitante: {
           select: {

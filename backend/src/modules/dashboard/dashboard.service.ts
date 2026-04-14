@@ -63,11 +63,14 @@ export class DashboardService {
       orderBy: { criticidad: 'desc' },
     });
 
-    // 3. Cargar TODOS los EstadoProducto aprobados con relaciones necesarias
+    // 3. Cargar TODOS los EstadoProducto aprobados con relaciones necesarias (excluir logistica)
     const productos = await this.prisma.estadoProducto.findMany({
       where: {
         aprobadoPorSupervisor: true,
         rechazado: false,
+        cotizacion: {
+          NOT: { tipo: { nombre: { equals: 'logistica', mode: 'insensitive' } } },
+        },
       },
       include: {
         proyecto: { select: { id: true, nombre: true, areaId: true } },
@@ -192,11 +195,14 @@ export class DashboardService {
         },
       }),
 
-      // Todos los EstadoProducto aprobados
+      // Todos los EstadoProducto aprobados (excluir logistica)
       this.prisma.estadoProducto.findMany({
         where: {
           aprobadoPorSupervisor: true,
           rechazado: false,
+          cotizacion: {
+            NOT: { tipo: { nombre: { equals: 'logistica', mode: 'insensitive' } } },
+          },
         },
         include: {
           cotizacion: {
@@ -215,12 +221,15 @@ export class DashboardService {
         },
       }),
 
-      // Productos con retraso
+      // Productos con retraso (excluir logistica)
       this.prisma.estadoProducto.count({
         where: {
           aprobadoPorSupervisor: true,
           rechazado: false,
           diasRetrasoActual: { gt: 0 },
+          cotizacion: {
+            NOT: { tipo: { nombre: { equals: 'logistica', mode: 'insensitive' } } },
+          },
         },
       }),
 
@@ -249,6 +258,7 @@ export class DashboardService {
       where: {
         fechaLimite: { lt: now },
         estado: { notIn: ['COMPLETADA', 'CANCELADA'] },
+        NOT: { tipo: { nombre: { equals: 'logistica', mode: 'insensitive' } } },
       },
       include: {
         solicitante: {
@@ -266,6 +276,9 @@ export class DashboardService {
       where: {
         rechazado: true,
         fechaRechazo: { gte: hace30Dias },
+        cotizacion: {
+          NOT: { tipo: { nombre: { equals: 'logistica', mode: 'insensitive' } } },
+        },
       },
       include: {
         cotizacion: { select: { nombreCotizacion: true } },

@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
-import PageMeta from "../../components/common/PageMeta";
-import { getToken } from "../../lib/api";
-import { useNotifications } from "../Notifications/context/NotificationContext";
+import { useAuth } from "../../../context/AuthContext";
+import PageMeta from "../../../components/common/PageMeta";
+import { getToken } from "../../../lib/api";
+import { useNotifications } from "../../Notifications/context/NotificationContext";
 import toast from "react-hot-toast";
 import { Download, Eye, X, FileText, MoreVertical, UserCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import TimelineItem from "./components/TimeLineItem";
+import TimelineItem from "../components/TimeLineItem";
 
 // ============================================================================
 // TYPES
@@ -502,7 +502,7 @@ export default function ShoppingFollowUps() {
   const { addNotification } = useNotifications();
   const { user } = useAuth();
   const isComercial = user?.rol?.nombre?.toUpperCase() === 'COMERCIAL';
-  const canAsignarResponsable = user?.rol?.nombre?.toUpperCase() === 'SUPERVISOR' && (user as any)?.departamento?.nombre === 'Gerencia';
+  const canAsignarResponsable = user?.email === 'lmartinez@energiapd.com';
   const [searchParams] = useSearchParams();
 
   // Estados principales
@@ -586,7 +586,12 @@ export default function ShoppingFollowUps() {
   // Efectos
   useEffect(() => {
     cargarProductos();
-    api.getSupervisores().then(setSupervisores).catch(() => { });
+    api.getSupervisores().then(sups => {
+      setSupervisores(sups);
+      // Auto-assign default responsable after load
+      const auxiliar = (sups as any[]).find((s: any) => s.email === 'auxiliaroperaciones@energiapd.com');
+      if (auxiliar) autoAsignarAuxiliar(auxiliar.id);
+    }).catch(() => { });
   }, [filtroNivel, filtroTipoCompra]);
 
   useEffect(() => {
@@ -600,6 +605,18 @@ export default function ShoppingFollowUps() {
   // HANDLERS
   // ============================================================================
 
+  const autoAsignarAuxiliar = async (auxiliarId: string) => {
+    // Assign auxiliaroperaciones as responsable to all logistica products that have none
+    try {
+      const data = await api.getEstadosProductos({ pageSize: 200 });
+      const sinResponsable = (data.items || [])
+        .filter((p: any) => p.cotizacion?.tipo?.nombre?.toLowerCase() === 'logistica' && !p.responsableSeguimiento);
+      if (sinResponsable.length === 0) return;
+      await api.asignarResponsableMasivo(sinResponsable.map((p: any) => p.id), auxiliarId);
+      await cargarProductos();
+    } catch { /* silent */ }
+  };
+
   const cargarProductos = async () => {
     try {
       setLoading(true);
@@ -610,7 +627,7 @@ export default function ShoppingFollowUps() {
       const data = await api.getEstadosProductos(filters);
       // Enriquecer con siguienteEstado calculado si no viene del backend
       const items = (data.items || [])
-        .filter((p: any) => p.cotizacion?.tipo?.nombre?.toLowerCase() !== 'logistica')
+        .filter((p: any) => p.cotizacion?.tipo?.nombre?.toLowerCase() === 'logistica')
         .map((p: EstadoProducto) => {
           if (!p.siguienteEstado && p.estadoActual && p.estadosAplicables) {
             const idx = p.estadosAplicables.indexOf(p.estadoActual);
@@ -988,14 +1005,14 @@ export default function ShoppingFollowUps() {
 
   return (
     <>
-      <PageMeta title="Seguimiento de Compras" description="Tracking de productos en proceso" />
+      <PageMeta title="Logística — Seguimiento" description="Tracking de productos logística en proceso" />
 
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Seguimiento de Compras
+              Seguimiento — Logística
             </h1>
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
               Tracking detallado de productos aprobados

@@ -1,5 +1,5 @@
 // src/historial-general/historial-general.controller.ts
-import { Controller, Get, Param, UseGuards, ParseUUIDPipe } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards, ParseUUIDPipe } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { HistorialGeneralService } from './historial-general.service';
@@ -28,8 +28,11 @@ export class HistorialGeneralController {
    * - Productos atrasados
    */
   @Get()
-  async obtenerResumen(@CurrentUser() user: UserJwt) {
-    return this.service.obtenerResumenGeneral(user);
+  async obtenerResumen(
+    @CurrentUser() user: UserJwt,
+    @Query('tipoNombre') tipoNombre?: string,
+  ) {
+    return this.service.obtenerResumenGeneral(user, tipoNombre);
   }
 
   /**
