@@ -1363,7 +1363,10 @@ export class FollowUpsService {
       include: { rol: true },
     });
 
-    const nuevoRol = nuevoSupervisor?.rol.nombre.toLowerCase() || '';
+    if (!nuevoSupervisor) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+    const nuevoRol = nuevoSupervisor.rol.nombre.toLowerCase();
     if (!nuevoRol.includes('supervisor') && !nuevoRol.includes('admin') && !nuevoRol.includes('jefe_compras')) {
       throw new BadRequestException('El usuario seleccionado no tiene rol de supervisor o jefe de compras');
     }
