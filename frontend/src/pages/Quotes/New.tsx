@@ -285,12 +285,21 @@ async function parseRequisa(file: File): Promise<RequisaData> {
   if (afterHeader) {
     // Pattern: row_num  SKU_CODE  description_text  unit  demand  done
     // SKU codes look like: CAB-00411, ELE-123, TUB-0001, etc.
-    const rowRe = /\b(\d+)\s+([A-Z]{2,}-\d+)\s+(.+?)\s+([A-Za-z]+)\s+([\d.]+)\s+[\d.]+/g;
+    // Also captures SKUs with parenthesized cost variants: COP-00071-(COSTO), HRM-00238-(COSTO P)
+    const rowRe = /\b(\d+)\s+([A-Z]{2,4}-\d+(?:[-\s]*\([^)]*\))?)\s+(.+?)\s+([A-Za-z]+)\s+([\d.]+)\s+[\d.]+/g;
+
+    // Strips parenthesized suffix and the preceding char if it's a dash or space.
+    // e.g. "COP-00071-(COSTO)" → "COP-00071"
+    //      "HRM-00238-(COSTO P)" → "HRM-00238"
+    //      "ACC-00143" → "ACC-00143" (unchanged)
+    const cleanSku = (raw: string): string =>
+      raw.replace(/[-\s]*\([^)]*\)/g, '').trimEnd();
+
     let m: RegExpExecArray | null;
     let matchCount = 0;
     while ((m = rowRe.exec(afterHeader)) !== null) {
       items.push({
-        sku: m[2].trim(),
+        sku: cleanSku(m[2].trim()),
         descripcion: m[3].trim(),
         unidad: m[4].trim(),
         cantidad: parseFloat(m[5]),
