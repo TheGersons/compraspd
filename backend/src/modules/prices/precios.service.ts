@@ -328,34 +328,21 @@ export class PreciosService {
       throw new NotFoundException('Oferta no encontrada');
     }
 
-    // Solo permitir selección en estado EN_CONFIGURACION o EN_REVISION
-    if (
-      precio.cotizacionDetalle.cotizacion.estado !== 'EN_REVISION' &&
-      precio.cotizacionDetalle.cotizacion.estado !== 'EN_CONFIGURACION' &&
-      precio.cotizacionDetalle.cotizacion.estado !== 'APROBADA_PARCIAL'
-    ) {
+    const estadosPermitidos = [
+      'ENVIADA', 'PENDIENTE', 'EN_REVISION', 'EN_CONFIGURACION', 'APROBADA_PARCIAL',
+    ];
+    if (!estadosPermitidos.includes(precio.cotizacionDetalle.cotizacion.estado)) {
       throw new BadRequestException(
-        `Solo se pueden seleccionar ofertas cuando la cotización está EN_REVISION` +
-          ` o EN_CONFIGURACION. Estado actual: ${precio.cotizacionDetalle.cotizacion.estado}`,
+        `Solo se pueden seleccionar ofertas cuando la cotización está en proceso. ` +
+          `Estado actual: ${precio.cotizacionDetalle.cotizacion.estado}`,
       );
     }
 
     // Actualizar detalle para marcar esta oferta como seleccionada
     await this.prisma.cotizacionDetalle.update({
       where: { id: precio.cotizacionDetalleId },
-      data: {
-        preciosId: id,
-      },
+      data: { preciosId: id },
     });
-
-    // Auto-aplicar "no aplica descuento" si aún no se ha seleccionado opción de descuento.
-    // Esto evita que el item quede en limbo cuando no se elige ninguna opción.
-    if (!precio.ComprobanteDescuento) {
-      await this.prisma.precios.update({
-        where: { id },
-        data: { ComprobanteDescuento: 'NO_APLICA' },
-      });
-    }
 
     return {
       ok: true,

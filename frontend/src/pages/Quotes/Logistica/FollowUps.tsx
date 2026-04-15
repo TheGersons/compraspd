@@ -1263,7 +1263,8 @@ export default function FollowUps() {
       }));
       const primer = precios[0];
       if (primer?.ComprobanteDescuento) {
-        const status = primer.ComprobanteDescuento === 'no_aplica' ? 'no_aplica' : 'aplica';
+        const val = primer.ComprobanteDescuento.toLowerCase();
+        const status = val === 'no_aplica' ? 'no_aplica' : 'aplica';
         setComprobanteStatus(prev => ({ ...prev, [detalleId]: status }));
       }
       if (primer?.precioDescuento != null) {
@@ -1566,6 +1567,10 @@ export default function FollowUps() {
       for (const oldId of oldIds) {
         try { await api.deletePrecio(oldId); } catch { /* ignorar si ya no existe */ }
       }
+
+      // Limpiar estado del comprobante para que el usuario elija de nuevo
+      setComprobanteStatus(prev => { const n = { ...prev }; delete n[detalle.id]; return n; });
+      setPrecioDescuentoEditando(prev => { const n = { ...prev }; delete n[detalle.id]; return n; });
 
       await cargarPreciosProducto(detalle.id);
       setPrecioEditando(prev => { const n = { ...prev }; delete n[detalle.id]; return n; });
