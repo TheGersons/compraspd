@@ -751,7 +751,9 @@ export default function FollowUps() {
         return;
       }
       const items = (data.items || []).filter(
-        (c: any) => c.tipo?.nombre?.toLowerCase() === 'logistica'
+        (c: any) =>
+          c.tipo?.nombre?.toLowerCase() === 'logistica' &&
+          c.estado !== 'APROBADA_COMPLETA'
       );
       setCotizaciones(items);
 
@@ -808,6 +810,15 @@ export default function FollowUps() {
     try {
       const detalle = await api.getCotizacionDetalle(cotizacionId);
       setCotizacionSeleccionada(detalle);
+
+      // Si todos los productos fueron aprobados, la cotización pasa a Compras
+      if (detalle.estado === 'APROBADA_COMPLETA') {
+        setCotizaciones(prev => prev.filter(c => c.id !== cotizacionId));
+        setCotizacionSeleccionada(null);
+        toast.success("Cotización aprobada completa — pasó a Compras", { duration: 4000 });
+        return;
+      }
+
       setCotizaciones(prev =>
         prev.map(c =>
           c.id === cotizacionId
@@ -1065,6 +1076,12 @@ export default function FollowUps() {
             if (precioActual && !precioActual.seleccionado && precioActual.precio > 0) {
               await api.selectPrecio(precioActual.id);
               await cargarPreciosProducto(pending.detalle.id);
+            }
+            // Auto-default a 'no_aplica' si no se seleccionó
+            if (pending.confirmar && !comprobanteStatus[pending.detalle.id]) {
+              const precio = preciosPorProducto[pending.detalle.id]?.[0];
+              if (precio) await api.updatePrecio(precio.id, { comprobanteDescuento: 'no_aplica' });
+              setComprobanteStatus(prev => ({ ...prev, [pending.detalle.id]: 'no_aplica' }));
             }
             await api.aprobarProductos(cotizacionSeleccionada.id, [{
               estadoProductoId: pending.estadoProductoId,
@@ -1598,6 +1615,15 @@ export default function FollowUps() {
           await api.selectPrecio(precioActual.id);
           await cargarPreciosProducto(detalle.id);
         }
+      }
+
+      // Si no se seleccionó aplica/no aplica descuento, default a 'no_aplica'
+      if (confirmar && !comprobanteStatus[detalle.id]) {
+        const precioActual = preciosPorProducto[detalle.id]?.[0];
+        if (precioActual) {
+          await api.updatePrecio(precioActual.id, { comprobanteDescuento: 'no_aplica' });
+        }
+        setComprobanteStatus(prev => ({ ...prev, [detalle.id]: 'no_aplica' }));
       }
 
       await api.aprobarProductos(cotizacionSeleccionada.id, [{ estadoProductoId, aprobado: confirmar }]);
