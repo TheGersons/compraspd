@@ -101,7 +101,7 @@ export default function DashboardGerencia() {
     ];
     const resumen: any = { totalProductos: prods.length };
     for (const key of keys) {
-      resumen[key] = prods.filter(p => p.estados[key] && p.estados[key] !== 'pendiente').length;
+      resumen[key] = prods.filter(p => p.estados[key] === 'completado').length;
     }
     return resumen;
   };
