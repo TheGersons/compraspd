@@ -207,6 +207,7 @@ export class EstadoProductoService {
               nombreCotizacion: true,
               tipoCompra: true,
               chatId: true,
+              tipo: { select: { nombre: true } },
               solicitante: {
                 select: {
                   id: true,
