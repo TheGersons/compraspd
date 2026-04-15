@@ -1161,7 +1161,7 @@ export default function ShoppingFollowUps() {
                               )}
                               {grupo.tipo && (
                                 <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
-                                  {grupo.tipo.area.nombreArea} - {grupo.tipo.nombre}
+                                  {grupo.tipo.area?.nombreArea ? `${grupo.tipo.area.nombreArea} - ` : ''}{grupo.tipo.nombre}
                                 </span>
                               )}
                             </div>
