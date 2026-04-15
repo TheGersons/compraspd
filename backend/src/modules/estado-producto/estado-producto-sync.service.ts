@@ -207,7 +207,7 @@ export class EstadoProductoSyncService {
       const actualizado = await this.prisma.estadoProducto.update({
         where: { id: estadoExistente.id },
         data: {
-          proveedor: precio.proveedor.nombre,
+          proveedor: precio.proveedor?.nombre ?? '',
           precioUnitario,
           precioTotal,
           // NO tocar: estados booleanos, fechas, criticidad, etc.
@@ -233,7 +233,7 @@ export class EstadoProductoSyncService {
         conDescuento: tieneDescuento,
         fechaCotizado: new Date(),
         fechaConDescuento: tieneDescuento ? new Date() : estadoExistente.fechaConDescuento,
-        proveedor: precio.proveedor.nombre,
+        proveedor: precio.proveedor?.nombre ?? '',
         precioUnitario,
         precioTotal,
       },
