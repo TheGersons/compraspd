@@ -25,8 +25,7 @@ const ESTADOS_INTERNACIONAL: string[] = [
 ];
 
 const ESTADOS_NACIONAL: string[] = [
-  'cotizado', 'conDescuento', 'aprobacionCompra', 'comprado', 'pagado',
-  'aprobacionPlanos', 'primerSeguimiento', 'recibido',
+  'cotizado', 'conDescuento', 'aprobacionCompra', 'comprado', 'pagado', 'recibido',
 ];
 
 interface TablaResumenProps {
