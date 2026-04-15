@@ -502,7 +502,8 @@ export default function ShoppingFollowUps() {
   const { addNotification } = useNotifications();
   const { user } = useAuth();
   const isComercial = user?.rol?.nombre?.toUpperCase() === 'COMERCIAL';
-  const canAsignarResponsable = ['SUPERVISOR', 'JEFE_COMPRAS', 'ADMIN'].includes(user?.rol?.nombre?.toUpperCase() || '');
+  const canAsignarResponsable = ['JEFE_COMPRAS', 'ADMIN'].includes(user?.rol?.nombre?.toUpperCase() || '');
+  const canEditNombre = ['JEFE_COMPRAS', 'ADMIN'].includes(user?.rol?.nombre?.toUpperCase() || '');
   const [searchParams] = useSearchParams();
 
   // Estados principales
@@ -1152,7 +1153,7 @@ export default function ShoppingFollowUps() {
                           ) : (
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <p className="font-semibold text-gray-900 dark:text-white text-sm truncate">{grupo.nombre}</p>
-                              {!isComercial && (
+                              {canEditNombre && (
                                 <button onClick={(e) => { e.stopPropagation(); setEditandoCotizacion(grupo.cotizacionId); setNombreCotEditado(grupo.nombre); }}
                                   className="text-gray-400 hover:text-blue-500 transition-colors flex-shrink-0" title="Editar nombre">
                                   <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>

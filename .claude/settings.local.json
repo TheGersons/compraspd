@@ -36,7 +36,9 @@
       "Bash(echo \"EXIT:$?\")",
       "Bash(cd C:\\\\\\\\Repo\\\\\\\\admin-dashboard-main\\\\\\\\frontend)",
       "Bash(node_modules\\\\\\\\.bin\\\\\\\\tsc --noEmit --skipLibCheck)",
-      "Bash(node_modules/.bin/tsc --noEmit --skipLibCheck)"
+      "Bash(node_modules/.bin/tsc --noEmit --skipLibCheck)",
+      "Bash(git add:*)",
+      "Bash(find C:\\\\Repo\\\\admin-dashboard-main:*)"
     ]
   }
 }

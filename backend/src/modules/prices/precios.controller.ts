@@ -113,11 +113,15 @@ export class PreciosController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: UserJwt
   ) {
-    const resultado = this.preciosService.selectOffer(id, user);
+    const resultado = await this.preciosService.selectOffer(id, user);
 
+    // Crear/actualizar EstadoProducto para que el item aparezca en el módulo de compras
+    await this.estadoProductoSyncService.sincronizarPrecioSeleccionado(
+      id,
+      resultado.cotizacionDetalleId,
+    );
 
     return resultado;
-
   }
 
   /**

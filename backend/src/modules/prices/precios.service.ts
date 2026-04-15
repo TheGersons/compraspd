@@ -348,10 +348,20 @@ export class PreciosService {
       },
     });
 
+    // Auto-aplicar "no aplica descuento" si aún no se ha seleccionado opción de descuento.
+    // Esto evita que el item quede en limbo cuando no se elige ninguna opción.
+    if (!precio.ComprobanteDescuento) {
+      await this.prisma.precios.update({
+        where: { id },
+        data: { ComprobanteDescuento: 'NO_APLICA' },
+      });
+    }
+
     return {
       ok: true,
       message: 'Oferta seleccionada exitosamente',
       precioId: id,
+      cotizacionDetalleId: precio.cotizacionDetalleId,
     };
   }
 

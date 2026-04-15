@@ -609,7 +609,8 @@ export default function FollowUps() {
   const [notasAbiertas, setNotasAbiertas] = useState<string | null>(null);
   const { user, isLoading } = useAuth();
   const isComercial = user?.rol?.nombre?.toUpperCase() === 'COMERCIAL';
-  const canAsignarResponsable = ['SUPERVISOR', 'JEFE_COMPRAS', 'ADMIN'].includes(user?.rol?.nombre?.toUpperCase() || '');
+  const canAsignarResponsable = ['JEFE_COMPRAS', 'ADMIN'].includes(user?.rol?.nombre?.toUpperCase() || '');
+  const canEditNombre = ['JEFE_COMPRAS', 'ADMIN'].includes(user?.rol?.nombre?.toUpperCase() || '');
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -1952,12 +1953,12 @@ export default function FollowUps() {
                                   </div>
                                 ) : (
                                   <h2
-                                    className={`text-xl font-bold text-gray-900 dark:text-white ${!isComercial ? 'cursor-pointer hover:text-blue-600 dark:hover:text-blue-400' : ''}`}
-                                    onClick={!isComercial ? () => { setNombreEditado(cotizacionSeleccionada.nombreCotizacion); setEditandoNombre(true); } : undefined}
-                                    title={!isComercial ? "Click para editar nombre" : undefined}
+                                    className={`text-xl font-bold text-gray-900 dark:text-white ${canEditNombre ? 'cursor-pointer hover:text-blue-600 dark:hover:text-blue-400' : ''}`}
+                                    onClick={canEditNombre ? () => { setNombreEditado(cotizacionSeleccionada.nombreCotizacion); setEditandoNombre(true); } : undefined}
+                                    title={canEditNombre ? "Click para editar nombre" : undefined}
                                   >
                                     {cotizacionSeleccionada.nombreCotizacion}
-                                    {!isComercial && <span className="ml-2 text-xs text-gray-400">✏️</span>}
+                                    {canEditNombre && <span className="ml-2 text-xs text-gray-400">✏️</span>}
                                   </h2>
                                 )}
                                 <div className="mt-1.5 flex flex-wrap items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
