@@ -330,6 +330,7 @@ export default function DashboardGerencia() {
         etapa={etapaModal}
         productos={productosProyectoFiltrados}
         nombreProyecto={proyectoSeleccionado?.nombre || ''}
+        tipoCompra={filtroTipoCompra}
       />
     </div>
   );

@@ -457,6 +457,14 @@ export class DashboardService {
     const estados: Record<string, string> = {};
     const diasAtraso: Record<string, number | undefined> = {};
 
+    // Si el producto ya fue recibido, todos sus estados son completados
+    if (producto.recibido) {
+      for (const estadoKey of estadosAplicables) {
+        estados[estadoKey] = 'completado';
+      }
+      return { estados, diasAtraso };
+    }
+
     for (const estadoKey of estadosAplicables) {
       const completado = producto[estadoKey];
       const fechaLimiteKey = ESTADO_A_FECHA_LIMITE[estadoKey];

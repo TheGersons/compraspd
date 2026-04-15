@@ -24,12 +24,17 @@ const ESTADOS_INTERNACIONAL: string[] = [
   'conBL', 'segundoSeguimiento', 'enCIF', 'recibido',
 ];
 
+const ESTADOS_NACIONAL: string[] = [
+  'cotizado', 'conDescuento', 'aprobacionCompra', 'comprado', 'pagado', 'recibido',
+];
+
 interface ModalDetalleProductosProps {
   isOpen: boolean;
   onClose: () => void;
   etapa: EtapaDetalle;
   productos: ProductoDetallado[];
   nombreProyecto: string;
+  tipoCompra?: 'NACIONAL' | 'INTERNACIONAL';
 }
 
 type EstadoProducto = 'completado' | 'en_proceso' | 'atrasado' | 'pendiente';
@@ -41,7 +46,8 @@ export default function ModalDetalleProductos({
   onClose,
   etapa,
   productos,
-  nombreProyecto
+  nombreProyecto,
+  tipoCompra = 'INTERNACIONAL',
 }: ModalDetalleProductosProps) {
   const [ordenColumna, setOrdenColumna] = useState<OrdenColumna>('default');
   const [direccionOrden, setDireccionOrden] = useState<DireccionOrden>('asc');
@@ -169,7 +175,7 @@ export default function ModalDetalleProductos({
     );
   };
 
-  const todasLasEtapas = ESTADOS_INTERNACIONAL.map(key => ({
+  const todasLasEtapas = (tipoCompra === 'NACIONAL' ? ESTADOS_NACIONAL : ESTADOS_INTERNACIONAL).map(key => ({
     key,
     label: ESTADO_LABELS[key] || key,
   }));
