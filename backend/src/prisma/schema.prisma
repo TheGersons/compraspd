@@ -1097,25 +1097,27 @@ model SeguimientoInternacional {
   cotizacionId String @unique @map("cotizacion_id") @db.Uuid
 
   // Campos de texto
-  proveedor       String? @db.Text
-  marcaModelo     String? @map("marca_modelo") @db.Text
-  nombreMaterial  String? @map("nombre_material") @db.Text
-  numeroOC        String? @map("numero_oc") @db.VarChar(100)
-  tipoImportacion String? @map("tipo_importacion") @db.VarChar(100)
-  destino         String? @db.Text
-  estado          String? @db.VarChar(100)
-  incoterms       String? @db.VarChar(50)
-  terminosPago    String? @map("terminos_pago") @db.Text
-  formaPago       String? @map("forma_pago") @db.VarChar(100)
-  tipoTransporte  String? @map("tipo_transporte") @db.VarChar(50)
-  bookingBl       String? @map("booking_bl") @db.VarChar(150)
-  tracking        String? @db.Text
-  puertoSalida    String? @map("puerto_salida") @db.VarChar(150)
-  puertoLlegada   String? @map("puerto_llegada") @db.VarChar(150)
-  agenteAduanal   String? @map("agente_aduanal") @db.Text
-  naviera         String? @db.Text
-  contenedor      String? @db.VarChar(150)
-  observaciones   String? @db.Text
+  proveedor           String? @db.Text
+  marcaModelo         String? @map("marca_modelo") @db.Text
+  nombreMaterial      String? @map("nombre_material") @db.Text
+  numeroOC            String? @map("numero_oc") @db.VarChar(100)
+  tipoImportacion     String? @map("tipo_importacion") @db.VarChar(100)
+  paisOrigenEdit      String? @map("pais_origen_edit") @db.VarChar(150)
+  destino             String? @db.Text
+  estado              String? @db.VarChar(100)
+  seguimiento         String? @db.Text
+  incoterms           String? @db.VarChar(50)
+  terminosPago        String? @map("terminos_pago") @db.Text
+  formaPago           String? @map("forma_pago") @db.VarChar(100)
+  tipoTransporte      String? @map("tipo_transporte") @db.VarChar(50)
+  bookingBl           String? @map("booking_bl") @db.VarChar(150)
+  tracking            String? @db.Text
+  puertoSalida        String? @map("puerto_salida") @db.VarChar(150)
+  puertoLlegada       String? @map("puerto_llegada") @db.VarChar(150)
+  agenteAduanal       String? @map("agente_aduanal") @db.Text
+  naviera             String? @db.Text
+  contenedor          String? @db.VarChar(150)
+  observaciones       String? @db.Text
 
   // Fechas (dd/mm/yyyy en UI)
   fechaOc                     DateTime? @map("fecha_oc")
