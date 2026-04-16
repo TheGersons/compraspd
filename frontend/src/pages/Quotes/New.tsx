@@ -396,20 +396,8 @@ export default function New() {
   const [loading, setLoading] = useState(false);
   const [loadingCatalogos, setLoadingCatalogos] = useState(true);
 
-
-  // 1. LOADING
-  if (isLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
-      </div>
-    );
-  }
-  if (!user) {
-    return null;
-  }
-
   // Cargar catálogos al montar
+  // NOTE: estos useEffect deben estar ANTES de cualquier return condicional (reglas de hooks)
   useEffect(() => {
     cargarCatalogos();
   }, []);
@@ -484,7 +472,6 @@ export default function New() {
 
   useEffect(() => {
     if (!proyectoId && lugarEntrega === "PROYECTO") {
-
       setLugarEntrega("ALMACEN");
       addNotification(
         "info",
@@ -492,10 +479,20 @@ export default function New() {
         "Se cambió a Almacén porque no hay proyecto seleccionado.",
         { priority: "low" }
       );
-
-
     }
   }, [proyectoId]);
+
+  // ── Early returns (después de todos los hooks para no violar las reglas de React) ──
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+      </div>
+    );
+  }
+  if (!user) {
+    return null;
+  }
 
   // ─── Helpers para items ────────────────────────────────────────────────────
   const emptyItem = (): ItemCotizacion => ({
@@ -531,43 +528,68 @@ export default function New() {
   const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    e.target.value = ""; // Reset input de inmediato para permitir re-selección
+
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      try {
-        const data = new Uint8Array(ev.target!.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: "array" });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
 
-        // Saltar encabezado (primera fila)
-        const dataRows = rows.slice(1).filter((r) =>
-          r.some((cell) => String(cell).trim() !== "")
-        );
-
-        if (dataRows.length === 0) {
-          addNotification("warn", "Archivo vacío", "El archivo no contiene datos.");
-          return;
-        }
-
-        const resolveUnidad = (raw: string): TipoUnidad => normalizarUnidad(raw);
-
-        const parsed: ItemCotizacion[] = dataRows.map((row) => ({
-          numeroParte: String(row[0] ?? "").trim(),
-          descripcionProducto: String(row[1] ?? "").trim(),
-          cantidad: Math.max(1, parseInt(String(row[2])) || 1),
-          tipoUnidad: resolveUnidad(String(row[3] ?? "")),
-          notas: String(row[4] ?? "").trim(),
-        }));
-
-        // Agregar fila extra vacía al final
-        setItems([...parsed, emptyItem()]);
-        addNotification("success", "Items importados", `${parsed.length} items cargados desde Excel.`);
-      } catch {
-        addNotification("danger", "Error al importar", "No se pudo leer el archivo Excel.");
-      }
+    reader.onerror = () => {
+      addNotification("danger", "Error al leer archivo", "No se pudo leer el archivo. Verifica que no esté dañado.");
     };
+
+    reader.onload = (ev) => {
+      // Usar setTimeout(0) para no bloquear el hilo principal durante el parsing (XLSX es síncrono)
+      setTimeout(() => {
+        try {
+          const result = ev.target?.result;
+          if (!result) {
+            addNotification("danger", "Error al importar", "El archivo está vacío o no se pudo leer.");
+            return;
+          }
+
+          const data = new Uint8Array(result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: "array" });
+
+          if (!workbook.SheetNames.length) {
+            addNotification("warn", "Archivo sin hojas", "El archivo no contiene ninguna hoja.");
+            return;
+          }
+
+          const sheet = workbook.Sheets[workbook.SheetNames[0]];
+          if (!sheet) {
+            addNotification("warn", "Hoja no encontrada", "No se encontró la hoja de datos en el archivo.");
+            return;
+          }
+
+          const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+
+          // Saltar encabezado (primera fila) y filtrar filas vacías
+          const dataRows = rows.slice(1).filter((r) =>
+            Array.isArray(r) && r.some((cell) => String(cell ?? "").trim() !== "")
+          );
+
+          if (dataRows.length === 0) {
+            addNotification("warn", "Archivo sin datos", "El archivo no contiene filas con datos. Asegúrate de llenar la hoja 'Items'.");
+            return;
+          }
+
+          const parsed: ItemCotizacion[] = dataRows.map((row) => ({
+            numeroParte: String(row[0] ?? "").trim(),
+            descripcionProducto: String(row[1] ?? "").trim(),
+            cantidad: Math.max(1, Number(String(row[2] ?? "1").replace(",", ".")) || 1),
+            tipoUnidad: normalizarUnidad(String(row[3] ?? "")),
+            notas: String(row[4] ?? "").trim(),
+          }));
+
+          setItems([...parsed, emptyItem()]);
+          addNotification("success", "Items importados", `${parsed.length} item${parsed.length !== 1 ? "s" : ""} cargado${parsed.length !== 1 ? "s" : ""} desde Excel.`);
+        } catch (err) {
+          console.error("[ImportExcel] Error al procesar archivo:", err);
+          addNotification("danger", "Error al importar", "No se pudo procesar el archivo. Verifica que sea un Excel válido y no tenga formato especial.");
+        }
+      }, 0);
+    };
+
     reader.readAsArrayBuffer(file);
-    e.target.value = ""; // Reset input
   };
 
   // ─── Excel: Descargar plantilla ────────────────────────────────────────────
