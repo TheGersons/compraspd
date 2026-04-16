@@ -12,7 +12,7 @@ import {
   UploadedFile,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiBearerAuth, ApiTags, ApiConsumes } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags, ApiConsumes, ApiOperation } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { MessagesService } from './messages.service';
 import { CreateChatDto, AddParticipantsDto } from './dto/create-chat.dto';
