@@ -360,10 +360,12 @@ export class StorageService {
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
     const timestamp = Date.now();
-    const safeOriginal = originalName
-      .replace(/[^a-zA-Z0-9._-]/g, '_')
-      .substring(0, 50);
-    const fileName = `${timestamp}_${safeOriginal}`;
+    // Separar extensión del nombre base para no truncarla
+    const dotIndex = originalName.lastIndexOf('.');
+    const rawBase = dotIndex > 0 ? originalName.slice(0, dotIndex) : originalName;
+    const fileExt = dotIndex > 0 ? originalName.slice(dotIndex) : ''; // ej: ".xlsx"
+    const safeBase = rawBase.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 50);
+    const fileName = `${timestamp}_${safeBase}${fileExt}`;
     const folderPath = `${this.basePath}/chats/${year}/${month}/CHAT-${chatId.substring(0, 8)}`;
     const fullPath = `${folderPath}/${fileName}`;
 
