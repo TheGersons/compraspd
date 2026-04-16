@@ -5,6 +5,7 @@ import { useNotifications } from "../../Notifications/context/NotificationContex
 import Historial from "../components/Historial";
 import { useAuth } from "../../../context/AuthContext";
 import toast from "react-hot-toast";
+import ChatPanel from "../../../components/chat/ChatPanel";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import DescuentoActions from "../components/DescuentoActions";
 import { format } from "date-fns";
@@ -596,16 +597,7 @@ export default function FollowUps() {
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
 
-  // Estados del chat
-  const [mensajes, setMensajes] = useState<ChatMessage[]>([]);
-  const [nuevoMensaje, setNuevoMensaje] = useState("");
-  const [loadingChat, setLoadingChat] = useState(false);
-  const [sendingMessage, setSendingMessage] = useState(false);
-  const chatFileRef = useRef<HTMLInputElement>(null);
-  const [sendingFile, setSendingFile] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const [imagenModal, setImagenModal] = useState<{ src: string; nombre: string; downloadUrl: string } | null>(null);
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  // (chat state moved to ChatPanel component)
   const [notasAbiertas, setNotasAbiertas] = useState<string | null>(null);
   const { user, isLoading } = useAuth();
   const isComercial = user?.rol?.nombre?.toUpperCase() === 'COMERCIAL';
@@ -685,12 +677,6 @@ export default function FollowUps() {
     }).catch(() => { });
   }, []);
 
-  // Cargar mensajes cuando cambia la cotización seleccionada
-  useEffect(() => {
-    if (cotizacionSeleccionada?.chatId) {
-      cargarMensajes(cotizacionSeleccionada.chatId);
-    }
-  }, [cotizacionSeleccionada]);
 
   // Scroll al acordeón expandido
   useEffect(() => {
@@ -701,12 +687,6 @@ export default function FollowUps() {
     }
   }, [cotizacionSeleccionada?.id]);
 
-  // Auto-scroll en chat solo cuando llegan mensajes nuevos (no al cambiar de tab)
-  useEffect(() => {
-    if (vistaActiva === "chat" && mensajes.length > 0) {
-      scrollToBottom();
-    }
-  }, [mensajes]);
   useEffect(() => {
     cargarProveedores();
   }, []);
@@ -923,70 +903,6 @@ export default function FollowUps() {
     }
   };
 
-  const cargarMensajes = async (chatId: string) => {
-    if (!chatId) return;
-
-    try {
-      setLoadingChat(true);
-      const data = await api.getChatMessages(chatId);
-
-      // CORRECCIÓN: Ordenar por fecha ascendente (más antiguos primero)
-      const mensajesOrdenados = (data.items || data || []).sort((a: any, b: any) => {
-        return new Date(a.creado).getTime() - new Date(b.creado).getTime();
-      });
-
-      setMensajes(mensajesOrdenados);
-    } catch (error) {
-      console.error("Error al cargar mensajes:", error);
-    } finally {
-      setLoadingChat(false);
-    }
-  };
-
-  const enviarMensaje = async () => {
-    if (!nuevoMensaje.trim() || !cotizacionSeleccionada?.chatId) return;
-
-    try {
-      setSendingMessage(true);
-      await api.sendMessage(cotizacionSeleccionada.chatId, nuevoMensaje);
-      setNuevoMensaje("");
-      await cargarMensajes(cotizacionSeleccionada.chatId);
-      addNotification("success", "Mensaje enviado", "Mensaje enviado exitosamente");
-    } catch (error) {
-      console.error("Error al enviar mensaje:", error);
-      addNotification("danger", "Error al enviar mensaje", "Error");
-    } finally {
-      setSendingMessage(false);
-    }
-  };
-
-  const MAX_FILE_SIZE = 30 * 1024 * 1024; // 30MB
-
-  const enviarArchivos = async (files: File[]) => {
-    if (!files.length || !cotizacionSeleccionada?.chatId) return;
-    const tooLarge = files.filter(f => f.size > MAX_FILE_SIZE);
-    if (tooLarge.length > 0) {
-      toast.error(`Archivo(s) superan 30MB: ${tooLarge.map(f => f.name).join(', ')}`);
-      return;
-    }
-    try {
-      setSendingFile(true);
-      for (const file of files) {
-        await api.sendMessageWithFile(cotizacionSeleccionada.chatId, file);
-      }
-      await cargarMensajes(cotizacionSeleccionada.chatId);
-      addNotification("success", files.length === 1 ? "Archivo enviado" : `${files.length} archivos enviados`, files.map(f => f.name).join(', '));
-    } catch (error: any) {
-      console.error("Error al enviar archivo:", error);
-      addNotification("danger", "Error", error.message || "Error al enviar archivo");
-    } finally {
-      setSendingFile(false);
-      if (chatFileRef.current) chatFileRef.current.value = "";
-    }
-  };
-
-  const enviarArchivo = async (file: File) => enviarArchivos([file]);
-
   const handleAsignarResponsableCotizacion = async (responsableId: string | null) => {
     if (!cotizacionSeleccionada?.estadosProductos) return;
     const ids = cotizacionSeleccionada.estadosProductos.map((ep: any) => ep.id);
@@ -1143,10 +1059,6 @@ export default function FollowUps() {
       console.error("Error al cargar historial:", error);
       addNotification("danger", "Error al cargar historial", "Error al cargar historial");
     }
-  };
-
-  const scrollToBottom = () => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   const formatFecha = (fecha: string) => {
@@ -2388,119 +2300,11 @@ export default function FollowUps() {
 
                               {/* TAB 2: CHAT */}
                               {vistaActiva === "chat" && (
-                                <div
-                                  className={`relative flex h-[400px] flex-col transition-colors ${isDragging ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}
-                                  onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                                  onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragging(false); }}
-                                  onDrop={(e) => {
-                                    e.preventDefault();
-                                    setIsDragging(false);
-                                    const files = Array.from(e.dataTransfer.files);
-                                    if (files.length) enviarArchivos(files);
-                                  }}
-                                >
-                                  {isDragging && (
-                                    <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-blue-400 bg-blue-50/80 dark:bg-blue-900/50">
-                                      <svg className="mb-2 h-10 w-10 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                      </svg>
-                                      <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">Suelta los archivos aquí</span>
-                                      <span className="mt-1 text-xs text-blue-500 dark:text-blue-500">Máx. 30MB por archivo</span>
-                                    </div>
-                                  )}
-                                  <div className="flex-1 overflow-y-auto space-y-4 mb-4">
-                                    {loadingChat ? (
-                                      <div className="flex h-full items-center justify-center">
-                                        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
-                                      </div>
-                                    ) : mensajes.length === 0 ? (
-                                      <div className="flex h-full flex-col items-center justify-center text-center">
-                                        <svg className="mb-4 h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                                        </svg>
-                                        <p className="text-gray-600 dark:text-gray-400">No hay mensajes. ¡Sé el primero en escribir!</p>
-                                      </div>
-                                    ) : (
-                                      <>
-                                        {mensajes.map((mensaje) => {
-                                          const esPropio = mensaje.emisor.id === currentUserId;
-                                          return (
-                                            <div key={mensaje.id} className={`flex ${esPropio ? "justify-end" : "justify-start"}`}>
-                                              <div className={`max-w-[70%] ${esPropio ? "items-end" : "items-start"} flex flex-col`}>
-                                                {!esPropio && (
-                                                  <span className="mb-1 text-xs font-medium text-gray-600 dark:text-gray-400">{mensaje.emisor.nombre}</span>
-                                                )}
-                                                <div className={`rounded-2xl px-4 py-2 ${esPropio ? "bg-blue-600 text-white dark:bg-blue-500" : "bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white"}`}>
-                                                  {mensaje.adjuntos && mensaje.adjuntos.length > 0 && (
-                                                    <div className="mb-2">
-                                                      {mensaje.adjuntos.map((adj: any) => {
-                                                        const esImagen = adj.tipoArchivo?.startsWith('image/');
-                                                        const nombre = adj.nombreArchivo || adj.direccionArchivo?.split('/').pop() || 'Archivo';
-                                                        return (
-                                                          <div key={adj.id}>
-                                                            {esImagen && adj.previewUrl ? (
-                                                              <div className="cursor-pointer" onClick={() => setImagenModal({ src: adj.direccionArchivo + '/download', nombre, downloadUrl: adj.direccionArchivo })}>
-                                                                <img src={adj.previewUrl} alt={nombre} className="max-w-[280px] max-h-[200px] rounded-lg hover:opacity-90 transition-opacity" loading="lazy"
-                                                                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }} />
-                                                                <div className="hidden mt-1">
-                                                                  <span className={`inline-flex items-center gap-1 text-xs underline ${esPropio ? 'text-blue-100' : 'text-blue-600 dark:text-blue-400'}`}>📎 {nombre}</span>
-                                                                </div>
-                                                              </div>
-                                                            ) : (
-                                                              <a href={adj.direccionArchivo} target="_blank" rel="noopener noreferrer"
-                                                                className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors ${esPropio ? 'border-blue-400 text-blue-100 hover:bg-blue-500' : 'border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-600'}`}>
-                                                                <span className="text-base">
-                                                                  {adj.tipoArchivo?.includes('pdf') ? '📄' : adj.tipoArchivo?.includes('sheet') || adj.tipoArchivo?.includes('excel') ? '📊' : adj.tipoArchivo?.includes('word') || adj.tipoArchivo?.includes('document') ? '📝' : '📎'}
-                                                                </span>
-                                                                <span className="max-w-[180px] truncate">{nombre}</span>
-                                                                <span className="text-[10px] opacity-70">{adj.tamanio ? `${(Number(adj.tamanio) / 1024).toFixed(0)}KB` : ''}</span>
-                                                              </a>
-                                                            )}
-                                                          </div>
-                                                        );
-                                                      })}
-                                                    </div>
-                                                  )}
-                                                  {mensaje.contenido && !(mensaje.tipoMensaje === 'ARCHIVO' && mensaje.adjuntos?.length > 0 && mensaje.contenido.startsWith('📎')) && (
-                                                    <p className="text-sm whitespace-pre-wrap break-words max-w-[500px]">{mensaje.contenido}</p>
-                                                  )}
-                                                </div>
-                                                <span className="mt-1 text-xs text-gray-500 dark:text-gray-500">{formatFecha(mensaje.creado)}</span>
-                                              </div>
-                                            </div>
-                                          );
-                                        })}
-                                        <div ref={chatEndRef} />
-                                      </>
-                                    )}
-                                  </div>
-                                  <div className="flex gap-2 border-t border-gray-200 pt-4 dark:border-gray-700">
-                                    <input ref={chatFileRef} type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,.rar"
-                                      onChange={(e) => { const files = Array.from(e.target.files || []); if (files.length) enviarArchivos(files); }} className="hidden" />
-                                    <button onClick={() => chatFileRef.current?.click()} disabled={sendingFile || sendingMessage}
-                                      className="rounded-lg border-2 border-gray-300 px-3 py-2 text-gray-500 transition-colors hover:border-blue-400 hover:text-blue-500 disabled:opacity-50 dark:border-gray-600 dark:text-gray-400 dark:hover:border-blue-500 dark:hover:text-blue-400" title="Adjuntar archivos (máx. 30MB c/u)">
-                                      {sendingFile ? (
-                                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
-                                      ) : (
-                                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                                        </svg>
-                                      )}
-                                    </button>
-                                    <input type="text" value={nuevoMensaje} onChange={(e) => setNuevoMensaje(e.target.value)}
-                                      onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && enviarMensaje()}
-                                      placeholder="Escribe un mensaje o arrastra archivos aquí..." disabled={sendingMessage || sendingFile}
-                                      className="flex-1 rounded-lg border-2 border-gray-300 bg-white px-4 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400" />
-                                    <button onClick={enviarMensaje} disabled={!nuevoMensaje.trim() || sendingMessage}
-                                      className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600">
-                                      {sendingMessage ? (
-                                        <><div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>Enviando...</>
-                                      ) : (
-                                        <><svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>Enviar</>
-                                      )}
-                                    </button>
-                                  </div>
-                                </div>
+                                <ChatPanel
+                                  chatId={cotizacionSeleccionada?.chatId}
+                                  currentUserId={user.id}
+                                  userRole={user?.rol?.nombre?.toUpperCase() || ''}
+                                />
                               )}
 
                               {/* TAB 3: HISTORIAL */}
@@ -2606,25 +2410,6 @@ export default function FollowUps() {
         )}
       </div>
 
-      {/* Modal de imagen ampliada */}
-      {imagenModal && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-4" onClick={() => setImagenModal(null)}>
-          <div className="relative max-h-[90vh] max-w-[90vw] flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
-            <div className="absolute -top-10 right-0 flex items-center gap-2">
-              <a href={imagenModal.downloadUrl} target="_blank" rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors">
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                Descargar
-              </a>
-              <button onClick={() => setImagenModal(null)} className="rounded-lg bg-gray-700 px-3 py-1.5 text-sm text-white hover:bg-gray-600 transition-colors">✕ Cerrar</button>
-            </div>
-            <img src={imagenModal.src} alt={imagenModal.nombre} className="max-h-[85vh] w-auto h-auto min-w-[50vw] rounded-lg object-contain shadow-2xl" />
-            <p className="mt-2 text-sm text-gray-300">{imagenModal.nombre}</p>
-          </div>
-        </div>
-      )}
     </>
   );
 }

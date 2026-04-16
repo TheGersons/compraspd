@@ -346,7 +346,26 @@ export class MessagesService {
     }).then((result) => {
       // Enviar notificaciones por correo (fire-and-forget)
       this.notifyOtherParticipants(dto.chatId, user.sub, dto.contenido).catch(() => {});
+      // Enviar correos de mención si aplica (fire-and-forget)
+      if (dto.menciones && dto.menciones.length > 0) {
+        this.notifyMentionedUsers(dto.chatId, user.sub, dto.contenido, dto.menciones).catch(() => {});
+      }
       return result;
+    });
+  }
+
+  /**
+   * Retorna los usuarios que pueden ser mencionados en un chat:
+   * SUPERVISOR y JEFE_COMPRAS activos
+   */
+  async getMentionableUsers() {
+    return this.prisma.usuario.findMany({
+      where: {
+        activo: true,
+        rol: { nombre: { in: ['SUPERVISOR', 'JEFE_COMPRAS'] } },
+      },
+      select: { id: true, nombre: true, email: true, rol: { select: { nombre: true } } },
+      orderBy: { nombre: 'asc' },
     });
   }
 
@@ -749,5 +768,53 @@ export class MessagesService {
         cotizacion?.id ?? undefined,
       ).catch(() => {});
     }
+  }
+
+  /**
+   * Envía correos a los usuarios mencionados con @
+   */
+  private async notifyMentionedUsers(
+    chatId: string,
+    senderId: string,
+    messageContent: string,
+    mencionIds: string[],
+  ): Promise<void> {
+    const frontendUrl = 'http://89.167.20.163:8080';
+
+    const emisor = await this.prisma.usuario.findUnique({
+      where: { id: senderId },
+      select: { nombre: true },
+    });
+    const senderName = emisor?.nombre || 'Un usuario';
+
+    const cotizacion = await this.prisma.cotizacion.findFirst({
+      where: { chatId },
+      select: { id: true, nombreCotizacion: true },
+    });
+
+    const chatUrl = `${frontendUrl}/messages/${chatId}`;
+
+    const mencionados = await this.prisma.usuario.findMany({
+      where: {
+        id: { in: mencionIds },
+        activo: true,
+        rol: { nombre: { in: ['SUPERVISOR', 'JEFE_COMPRAS'] } },
+      },
+      select: { id: true, nombre: true, email: true },
+    });
+
+    await Promise.allSettled(
+      mencionados.map((usuario) =>
+        this.mailService.sendMentionNotification(
+          usuario.email,
+          usuario.nombre,
+          senderName,
+          messageContent,
+          chatUrl,
+          cotizacion?.nombreCotizacion ?? undefined,
+          cotizacion?.id ?? undefined,
+        ).catch(() => {}),
+      ),
+    );
   }
 }

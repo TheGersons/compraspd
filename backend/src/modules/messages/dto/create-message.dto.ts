@@ -1,7 +1,7 @@
-import { 
-  IsString, 
-  IsNotEmpty, 
-  IsOptional, 
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
   IsUUID,
   IsArray,
   IsIn
@@ -27,4 +27,9 @@ export class CreateMessageDto {
   @IsArray()
   @IsUUID('4', { each: true })
   adjuntosIds?: string[]; // IDs de adjuntos previamente subidos
+
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  menciones?: string[]; // IDs de usuarios mencionados con @
 }

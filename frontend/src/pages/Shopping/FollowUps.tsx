@@ -5,6 +5,7 @@ import PageMeta from "../../components/common/PageMeta";
 import { getToken } from "../../lib/api";
 import { useNotifications } from "../Notifications/context/NotificationContext";
 import toast from "react-hot-toast";
+import ChatPanel from "../../components/chat/ChatPanel";
 import { Download, Eye, X, FileText, MoreVertical, UserCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -574,16 +575,7 @@ export default function ShoppingFollowUps() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Chat
-  const [mensajes, setMensajes] = useState<any[]>([]);
-  const [nuevoMensaje, setNuevoMensaje] = useState("");
-  const [loadingChat, setLoadingChat] = useState(false);
-  const [sendingMessage, setSendingMessage] = useState(false);
-  const [sendingFile, setSendingFile] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
   const [chatIdActivo, setChatIdActivo] = useState<string | null>(null);
-  const chatEndRef = useRef<HTMLDivElement>(null);
-  const chatFileRef = useRef<HTMLInputElement>(null);
-  const chatMessagesContainerRef = useRef<HTMLDivElement>(null);
   const currentUserId = user?.id || '';
   // Promise que resuelve cuando el usuario queda registrado como participante del chat activo
   const participanteListoRef = useRef<Promise<void> | null>(null);
@@ -956,7 +948,6 @@ export default function ShoppingFollowUps() {
     if (grupoExpandido === cotizacionId) {
       setGrupoExpandido(null);
       setChatIdActivo(null);
-      setMensajes([]);
       setProductoSeleccionado(null);
       setTimeline(null);
       participanteListoRef.current = null;
@@ -969,63 +960,15 @@ export default function ShoppingFollowUps() {
     setProductoSeleccionado(null);
     setTimeline(null);
     setChatIdActivo(chatIdDelGrupo);
-    setMensajes([]);
-    // Registrar participante en background; guardamos la Promise para poder awaiterarla en handleActivarChat
+    // Registrar participante en background
     participanteListoRef.current = chatIdDelGrupo
       ? api.getCotizacionDetalle(cotizacionId).then(() => {}).catch(() => {})
       : Promise.resolve();
   };
 
-  // Chat handlers
-  const cargarChat = async (chatId: string) => {
-    try {
-      setLoadingChat(true);
-      const data = await api.getChatMessages(chatId);
-      // Igual que Quotes: data.items o array directo, ordenado por creado asc
-      const lista = (data.items || data || []).sort((a: any, b: any) =>
-        new Date(a.creado).getTime() - new Date(b.creado).getTime()
-      );
-      setMensajes(lista);
-      // Scroll dentro del contenedor, sin mover la página
-      setTimeout(() => {
-        if (chatMessagesContainerRef.current) {
-          chatMessagesContainerRef.current.scrollTop = chatMessagesContainerRef.current.scrollHeight;
-        }
-      }, 50);
-    } catch (err) {
-      console.error('Error al cargar chat:', err);
-    }
-    finally { setLoadingChat(false); }
-  };
-
-  const enviarMensaje = async () => {
-    if (!nuevoMensaje.trim() || !chatIdActivo) return;
-    try {
-      setSendingMessage(true);
-      await api.sendMessage(chatIdActivo, nuevoMensaje.trim());
-      setNuevoMensaje("");
-      await cargarChat(chatIdActivo);
-    } catch (e: any) { toast.error(e.message || "Error al enviar"); }
-    finally { setSendingMessage(false); }
-  };
-
-  const enviarArchivoChat = async (files: File[]) => {
-    if (!chatIdActivo || !files.length) return;
-    try {
-      setSendingFile(true);
-      for (const f of files) await api.sendMessageWithFile(chatIdActivo, f);
-      await cargarChat(chatIdActivo);
-    } catch (e: any) { toast.error(e.message || "Error al enviar archivo"); }
-    finally { setSendingFile(false); if (chatFileRef.current) chatFileRef.current.value = ""; }
-  };
-
-  // Cuando se activa la vista de chat, esperar al registro de participante y luego cargar mensajes
+  // Cuando se activa la vista de chat
   const handleActivarChat = async () => {
     setVistaActivaGrupo('chat');
-    if (!chatIdActivo) return;
-    // Esperar a que el usuario quede registrado como participante (generalmente < 300ms)
-    if (participanteListoRef.current) await participanteListoRef.current;
-    cargarChat(chatIdActivo);
   };
 
   // ============================================================================
@@ -1290,11 +1233,6 @@ export default function ShoppingFollowUps() {
                             }`}
                           >
                             Chat
-                            {mensajes.length > 0 && (
-                              <span className="ml-1.5 inline-flex items-center rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                                {mensajes.length}
-                              </span>
-                            )}
                           </button>
                         </div>
 
@@ -1535,138 +1473,11 @@ export default function ShoppingFollowUps() {
 
                         {/* Tab: Chat */}
                         {vistaActivaGrupo === 'chat' && (
-                          <div
-                            className={`flex flex-col h-[500px] ${isDragging ? 'ring-2 ring-blue-400' : ''}`}
-                            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                            onDragLeave={() => setIsDragging(false)}
-                            onDrop={(e) => {
-                              e.preventDefault();
-                              setIsDragging(false);
-                              const files = Array.from(e.dataTransfer.files);
-                              if (files.length) enviarArchivoChat(files);
-                            }}
-                          >
-                            <div ref={chatMessagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3">
-                              {loadingChat ? (
-                                <div className="flex h-full items-center justify-center">
-                                  <div className="h-6 w-6 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
-                                </div>
-                              ) : mensajes.length === 0 ? (
-                                <div className="flex h-full flex-col items-center justify-center text-center text-gray-500 dark:text-gray-400">
-                                  <svg className="mb-3 h-10 w-10 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                                  </svg>
-                                  <p className="text-sm">No hay mensajes aún</p>
-                                  {!chatIdActivo && <p className="text-xs mt-1 text-gray-400">Chat no disponible para esta compra</p>}
-                                </div>
-                              ) : (
-                                mensajes.map((msg: any) => {
-                                  const esPropio = msg.emisor?.id === currentUserId;
-                                  return (
-                                    <div key={msg.id} className={`flex ${esPropio ? 'justify-end' : 'justify-start'}`}>
-                                      <div className={`max-w-[70%] ${esPropio ? 'items-end' : 'items-start'} flex flex-col`}>
-                                        {!esPropio && (
-                                          <span className="mb-1 text-xs font-medium text-gray-600 dark:text-gray-400">
-                                            {msg.emisor?.nombre || 'Usuario'}
-                                          </span>
-                                        )}
-                                        <div className={`rounded-2xl px-4 py-2 ${esPropio ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white'}`}>
-                                          {msg.adjuntos && msg.adjuntos.length > 0 && (
-                                            <div className="mb-2">
-                                              {msg.adjuntos.map((adj: any) => {
-                                                const esImagen = adj.tipoArchivo?.startsWith('image/');
-                                                const nombre = adj.nombreArchivo || adj.direccionArchivo?.split('/').pop() || 'Archivo';
-                                                return (
-                                                  <div key={adj.id}>
-                                                    {esImagen ? (
-                                                      <a href={adj.direccionArchivo} target="_blank" rel="noopener noreferrer">
-                                                        <img src={adj.previewUrl || adj.direccionArchivo} alt={nombre}
-                                                          className="max-w-[240px] max-h-[180px] rounded-lg hover:opacity-90 transition-opacity" loading="lazy" />
-                                                      </a>
-                                                    ) : (
-                                                      <a href={adj.direccionArchivo} target="_blank" rel="noopener noreferrer"
-                                                        className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors ${esPropio ? 'border-blue-400 text-blue-100 hover:bg-blue-500' : 'border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-600'}`}>
-                                                        <FileText size={12} />
-                                                        <span className="max-w-[180px] truncate">{nombre}</span>
-                                                        {adj.tamanio ? <span className="text-[10px] opacity-70">{(Number(adj.tamanio) / 1024).toFixed(0)}KB</span> : null}
-                                                      </a>
-                                                    )}
-                                                  </div>
-                                                );
-                                              })}
-                                            </div>
-                                          )}
-                                          {msg.contenido && !(msg.tipoMensaje === 'ARCHIVO' && msg.adjuntos?.length > 0 && msg.contenido.startsWith('📎')) && (
-                                            <p className="text-sm whitespace-pre-wrap break-words">{msg.contenido}</p>
-                                          )}
-                                        </div>
-                                        <span className="mt-1 text-xs text-gray-500 dark:text-gray-500">
-                                          {msg.creado ? new Date(msg.creado).toLocaleTimeString('es-HN', { hour: '2-digit', minute: '2-digit' }) : ''}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  );
-                                })
-                              )}
-                              <div ref={chatEndRef} />
-                            </div>
-                            {chatIdActivo && (
-                              <div className="border-t border-gray-200 dark:border-gray-700 p-3">
-                                <div className="flex items-end gap-2">
-                                  <input
-                                    ref={chatFileRef}
-                                    type="file"
-                                    className="hidden"
-                                    multiple
-                                    onChange={(e) => {
-                                      const files = Array.from(e.target.files || []);
-                                      if (files.length) enviarArchivoChat(files);
-                                    }}
-                                  />
-                                  <button
-                                    onClick={() => chatFileRef.current?.click()}
-                                    disabled={sendingFile}
-                                    className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors"
-                                    title="Adjuntar archivo"
-                                  >
-                                    {sendingFile ? (
-                                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-transparent" />
-                                    ) : (
-                                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                                      </svg>
-                                    )}
-                                  </button>
-                                  <textarea
-                                    value={nuevoMensaje}
-                                    onChange={(e) => setNuevoMensaje(e.target.value)}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarMensaje(); }
-                                    }}
-                                    placeholder="Escribe un mensaje... (Enter para enviar)"
-                                    rows={1}
-                                    className="flex-1 resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-                                  />
-                                  <button
-                                    onClick={enviarMensaje}
-                                    disabled={sendingMessage || !nuevoMensaje.trim()}
-                                    className="rounded-lg bg-blue-600 p-2 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                                  >
-                                    {sendingMessage ? (
-                                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                                    ) : (
-                                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                                      </svg>
-                                    )}
-                                  </button>
-                                </div>
-                                {isDragging && (
-                                  <p className="mt-2 text-center text-xs text-blue-500">Suelta los archivos aquí para adjuntarlos</p>
-                                )}
-                              </div>
-                            )}
-                          </div>
+                          <ChatPanel
+                            chatId={chatIdActivo}
+                            currentUserId={currentUserId}
+                            userRole={user?.rol?.nombre?.toUpperCase() || ''}
+                          />
                         )}
                       </div>
                     )}

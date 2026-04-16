@@ -264,6 +264,103 @@ export class MailService {
   }
 
   /**
+   * Notificación de mención en chat (@usuario)
+   */
+  async sendMentionNotification(
+    to: string,
+    recipientName: string,
+    senderName: string,
+    messagePreview: string,
+    chatUrl: string,
+    cotizacionNombre?: string,
+    cotizacionId?: string,
+  ): Promise<boolean> {
+    const preview =
+      messagePreview.length > 120
+        ? messagePreview.substring(0, 120) + '...'
+        : messagePreview;
+
+    const subjectCotizacion = cotizacionNombre
+      ? ` en cotización "${cotizacionNombre}"`
+      : '';
+    const subject = `${senderName} te mencionó${subjectCotizacion} - Energía PD`;
+
+    const cotizacionBlock = cotizacionNombre
+      ? `
+        <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 12px; padding: 20px 24px; margin-bottom: 24px;">
+          <p style="margin: 0 0 6px; color: #0369a1; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Cotización relacionada</p>
+          <p style="margin: 0; color: #0c4a6e; font-size: 16px; font-weight: 600;">${cotizacionNombre}</p>
+          ${cotizacionId ? `<p style="margin: 4px 0 0; color: #64748b; font-size: 12px;">ID: ${cotizacionId}</p>` : ''}
+        </div>`
+      : '';
+
+    const mailOptions = {
+      from: `"Energía PD" <${process.env.MAIL_USER || 'noreply@energiapd.com'}>`,
+      to,
+      subject,
+      html: `
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Te mencionaron en un chat</title>
+        </head>
+        <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f0f4f8;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f0f4f8; padding: 48px 16px;">
+            <tr>
+              <td align="center">
+                <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 520px; background: #ffffff; border-radius: 24px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.1);">
+                  <tr>
+                    <td style="background: linear-gradient(145deg, #7c3aed 0%, #5b21b6 50%, #4c1d95 100%); padding: 48px 40px; text-align: center;">
+                      <div style="margin-bottom: 16px;">${this.getLogoSvg()}</div>
+                      <p style="margin: 0; color: white; font-size: 13px; letter-spacing: 0.5px; text-transform: uppercase;">COMPRAS EPD</p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 48px 40px 32px;">
+                      <h1 style="margin: 0 0 8px; color: #1a202c; font-size: 24px; font-weight: 700; text-align: center;">Te mencionaron</h1>
+                      <p style="margin: 0 0 32px; color: #64748b; font-size: 15px; text-align: center; line-height: 1.6;">
+                        Hola <strong style="color: #334155;">${recipientName}</strong>, <strong style="color: #7c3aed;">${senderName}</strong> te mencionó en un mensaje y necesita que revises el chat.
+                      </p>
+                      ${cotizacionBlock}
+                      <div style="background: #faf5ff; border: 1px solid #e9d5ff; border-left: 4px solid #7c3aed; border-radius: 8px; padding: 20px 24px; margin-bottom: 32px;">
+                        <p style="margin: 0 0 6px; color: #94a3b8; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Mensaje</p>
+                        <p style="margin: 0; color: #334155; font-size: 15px; line-height: 1.6; font-style: italic;">"${preview}"</p>
+                      </div>
+                      <div style="text-align: center; margin-bottom: 32px;">
+                        <a href="${chatUrl}" style="display: inline-block; background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%); color: #ffffff; text-decoration: none; padding: 16px 48px; border-radius: 12px; font-weight: 600; font-size: 15px; box-shadow: 0 4px 14px rgba(124,58,237,0.4);">
+                          Ver Conversación
+                        </a>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="background: #f8fafc; padding: 32px 40px; border-top: 1px solid #e2e8f0; text-align: center;">
+                      <p style="margin: 0 0 8px; color: #64748b; font-size: 13px;">Este es un correo automático, por favor no respondas.</p>
+                      <p style="margin: 0; color: #94a3b8; font-size: 12px;">© ${new Date().getFullYear()} Energía PD · Todos los derechos reservados</p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+      `,
+    };
+
+    try {
+      const info = await this.transporter.sendMail(mailOptions);
+      this.logger.log(`Notificación de mención enviada a ${to}: ${info.messageId}`);
+      return true;
+    } catch (error) {
+      this.logger.error(`Error enviando notificación de mención a ${to}:`, error);
+      return false;
+    }
+  }
+
+  /**
    * Notificación de nueva cotización para supervisores
    */
   async sendNewQuotationNotification(

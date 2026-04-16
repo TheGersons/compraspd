@@ -69,6 +69,16 @@ export class MessagesController {
   }
 
   /**
+   * GET /api/v1/messages/mentionable-users
+   * Retorna usuarios que pueden ser mencionados (SUPERVISOR + JEFE_COMPRAS)
+   */
+  @Get('mentionable-users')
+  @ApiOperation({ summary: 'Usuarios mencionables en chat' })
+  getMentionableUsers() {
+    return this.service.getMentionableUsers();
+  }
+
+  /**
    * GET /api/v1/messages/unread/count
    * Obtiene el total de mensajes no leídos del usuario
    */
