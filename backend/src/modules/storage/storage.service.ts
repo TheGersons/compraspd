@@ -326,20 +326,20 @@ export class StorageService {
     tipoArchivo: string;
   }> {
     const allowedExtensions = [
-      'pdf',
-      'png',
-      'jpg',
-      'jpeg',
-      'gif',
-      'webp',
-      'doc',
-      'docx',
-      'xls',
-      'xlsx',
-      'csv',
-      'txt',
-      'zip',
-      'rar',
+      // Imágenes
+      'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'tiff', 'tif', 'svg', 'heic', 'heif',
+      // Videos
+      'mp4', 'mov', 'avi', 'mkv', 'wmv', 'flv', 'webm', 'm4v', '3gp',
+      // Documentos Office
+      'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp',
+      // Texto y datos
+      'csv', 'txt', 'json', 'xml',
+      // Comprimidos
+      'zip', 'rar', '7z', 'tar', 'gz',
+      // AutoCAD / Ingeniería
+      'dwg', 'dxf', 'dwf', 'rvt', 'ifc', 'step', 'stp', 'iges', 'igs', 'stl',
+      // Otros técnicos
+      'mpp', 'vsd', 'vsdx',
     ];
     const ext = originalName.split('.').pop()?.toLowerCase() || '';
 
@@ -349,10 +349,10 @@ export class StorageService {
       );
     }
 
-    const maxSize = 15 * 1024 * 1024; // 15MB para chat
+    const maxSize = 200 * 1024 * 1024; // 200MB (videos y archivos de ingeniería pueden ser grandes)
     if (file.length > maxSize) {
       throw new BadRequestException(
-        'El archivo excede el tamaño máximo de 15MB',
+        'El archivo excede el tamaño máximo de 200MB',
       );
     }
 
@@ -392,7 +392,7 @@ export class StorageService {
     const publicUrl = await this.getShareLink(fullPath);
 
     // Si es imagen, generar preview URL
-    const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
+    const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'tiff', 'tif', 'heic', 'heif'];
     let previewUrl: string | null = null;
 
     if (imageExtensions.includes(ext)) {
@@ -401,20 +401,65 @@ export class StorageService {
 
     // Determinar tipo MIME
     const mimeTypes: Record<string, string> = {
-      pdf: 'application/pdf',
+      // Imágenes
       png: 'image/png',
       jpg: 'image/jpeg',
       jpeg: 'image/jpeg',
       gif: 'image/gif',
       webp: 'image/webp',
+      bmp: 'image/bmp',
+      tiff: 'image/tiff',
+      tif: 'image/tiff',
+      svg: 'image/svg+xml',
+      heic: 'image/heic',
+      heif: 'image/heif',
+      // Videos
+      mp4: 'video/mp4',
+      mov: 'video/quicktime',
+      avi: 'video/x-msvideo',
+      mkv: 'video/x-matroska',
+      wmv: 'video/x-ms-wmv',
+      flv: 'video/x-flv',
+      webm: 'video/webm',
+      m4v: 'video/x-m4v',
+      '3gp': 'video/3gpp',
+      // Documentos
+      pdf: 'application/pdf',
       doc: 'application/msword',
       docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       xls: 'application/vnd.ms-excel',
       xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      ppt: 'application/vnd.ms-powerpoint',
+      pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      odt: 'application/vnd.oasis.opendocument.text',
+      ods: 'application/vnd.oasis.opendocument.spreadsheet',
+      odp: 'application/vnd.oasis.opendocument.presentation',
+      // Texto y datos
       csv: 'text/csv',
       txt: 'text/plain',
+      json: 'application/json',
+      xml: 'application/xml',
+      // Comprimidos
       zip: 'application/zip',
       rar: 'application/vnd.rar',
+      '7z': 'application/x-7z-compressed',
+      tar: 'application/x-tar',
+      gz: 'application/gzip',
+      // AutoCAD / Ingeniería
+      dwg: 'application/acad',
+      dxf: 'application/dxf',
+      dwf: 'model/vnd.dwf',
+      rvt: 'application/octet-stream',
+      ifc: 'application/x-step',
+      step: 'application/step',
+      stp: 'application/step',
+      iges: 'model/iges',
+      igs: 'model/iges',
+      stl: 'model/stl',
+      // Otros técnicos
+      mpp: 'application/vnd.ms-project',
+      vsd: 'application/vnd.visio',
+      vsdx: 'application/vnd.ms-visio.drawing',
     };
 
     return {

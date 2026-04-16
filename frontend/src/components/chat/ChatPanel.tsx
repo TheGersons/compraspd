@@ -114,7 +114,7 @@ interface ChatPanelProps {
   userRole: string;
 }
 
-const MAX_FILE_SIZE = 30 * 1024 * 1024; // 30 MB
+const MAX_FILE_SIZE = 200 * 1024 * 1024; // 200 MB
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -302,7 +302,7 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
     if (!files.length || !chatId) return;
     const tooLarge = files.filter((f) => f.size > MAX_FILE_SIZE);
     if (tooLarge.length > 0) {
-      toast.error(`Archivo(s) superan 30MB: ${tooLarge.map((f) => f.name).join(', ')}`);
+      toast.error(`Archivo(s) superan 200MB: ${tooLarge.map((f) => f.name).join(', ')}`);
       return;
     }
     try {
@@ -384,7 +384,7 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
             <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">Suelta los archivos aquí</span>
-            <span className="mt-1 text-xs text-blue-500">Máx. 30MB por archivo</span>
+            <span className="mt-1 text-xs text-blue-500">Máx. 200MB por archivo</span>
           </div>
         )}
 
@@ -527,7 +527,7 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
               ref={fileRef}
               type="file"
               multiple
-              accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,.rar"
+              accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.bmp,.tiff,.tif,.svg,.heic,.heif,.mp4,.mov,.avi,.mkv,.wmv,.flv,.webm,.m4v,.3gp,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp,.csv,.txt,.json,.xml,.zip,.rar,.7z,.tar,.gz,.dwg,.dxf,.dwf,.rvt,.ifc,.step,.stp,.iges,.igs,.stl,.mpp,.vsd,.vsdx"
               className="hidden"
               onChange={(e) => {
                 const files = Array.from(e.target.files || []);
@@ -540,7 +540,7 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
               type="button"
               onClick={() => fileRef.current?.click()}
               disabled={sendingFile || sendingMessage}
-              title="Adjuntar archivos (máx. 30MB c/u)"
+              title="Adjuntar archivos (máx. 200MB c/u)"
               className="rounded-lg border-2 border-gray-300 px-3 py-2 text-gray-500 transition-colors hover:border-blue-400 hover:text-blue-500 disabled:opacity-50 dark:border-gray-600 dark:text-gray-400 dark:hover:border-blue-500 dark:hover:text-blue-400"
             >
               {sendingFile ? (
