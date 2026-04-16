@@ -230,3 +230,38 @@ export async function apiNoRefresh<T>(
 
   return response.json() as Promise<T>;
 }
+
+// ============================================================================
+// FETCH AUTENTICADO (sin inyectar Content-Type, con auto-refresh)
+// ============================================================================
+
+/**
+ * Fetch autenticado con retry de token. No inyecta Content-Type,
+ * por lo que es apto para FormData/multipart además de JSON.
+ * Devuelve el Response crudo para que el caller lo procese.
+ */
+export async function apiFetch(
+  url: string,
+  init: RequestInit = {}
+): Promise<Response> {
+  const makeRequest = (token: string | null) =>
+    fetch(url, {
+      ...init,
+      headers: {
+        ...(init.headers || {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+
+  let token = getToken();
+  let response = await makeRequest(token);
+
+  if (response.status === 401 && getRefreshToken()) {
+    const newToken = await refreshAccessToken();
+    if (newToken) {
+      response = await makeRequest(newToken);
+    }
+  }
+
+  return response;
+}

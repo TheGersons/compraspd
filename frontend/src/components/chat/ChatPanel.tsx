@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { getToken } from '../../lib/api';
+import { apiFetch } from '../../lib/api';
 import toast from 'react-hot-toast';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
@@ -34,11 +34,7 @@ interface MentionableUser {
 
 const chatApi = {
   async getMessages(chatId: string): Promise<ChatMessage[]> {
-    const token = getToken();
-    const res = await fetch(`${API_BASE_URL}/api/v1/messages/${chatId}/messages`, {
-      credentials: 'include',
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await apiFetch(`${API_BASE_URL}/api/v1/messages/${chatId}/messages`);
     if (!res.ok) throw new Error('Error al cargar mensajes');
     const data = await res.json();
     const items: ChatMessage[] = data.items || data || [];
@@ -46,11 +42,9 @@ const chatApi = {
   },
 
   async sendMessage(chatId: string, contenido: string, menciones: string[]): Promise<ChatMessage> {
-    const token = getToken();
-    const res = await fetch(`${API_BASE_URL}/api/v1/messages/${chatId}/messages`, {
+    const res = await apiFetch(`${API_BASE_URL}/api/v1/messages/${chatId}/messages`, {
       method: 'POST',
-      credentials: 'include',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chatId, contenido, menciones }),
     });
     if (!res.ok) throw new Error('Error al enviar mensaje');
@@ -58,13 +52,10 @@ const chatApi = {
   },
 
   async sendFile(chatId: string, file: File): Promise<void> {
-    const token = getToken();
     const form = new FormData();
     form.append('file', file);
-    const res = await fetch(`${API_BASE_URL}/api/v1/messages/${chatId}/upload`, {
+    const res = await apiFetch(`${API_BASE_URL}/api/v1/messages/${chatId}/upload`, {
       method: 'POST',
-      credentials: 'include',
-      headers: { Authorization: `Bearer ${token}` },
       body: form,
     });
     if (!res.ok) {
@@ -74,11 +65,7 @@ const chatApi = {
   },
 
   async getMentionableUsers(): Promise<MentionableUser[]> {
-    const token = getToken();
-    const res = await fetch(`${API_BASE_URL}/api/v1/messages/mentionable-users`, {
-      credentials: 'include',
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await apiFetch(`${API_BASE_URL}/api/v1/messages/mentionable-users`);
     if (!res.ok) return [];
     return res.json();
   },
