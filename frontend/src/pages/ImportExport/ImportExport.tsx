@@ -88,6 +88,45 @@ const ESTADO_STYLES: Record<string, { bg: string; text: string }> = {
   "CANCELADO":       { bg: "bg-red-100 dark:bg-red-900/20",         text: "text-red-800 dark:text-red-300" },
 };
 
+// ─── Campo labels for log drawer filter ─────────────────────────────────────
+
+const CAMPO_LABELS_DISPLAY: Record<string, string> = {
+  proveedor: "Proveedor",
+  marcaModelo: "Marca / Modelo",
+  nombreMaterial: "Nombre Material",
+  numeroOC: "# OC",
+  tipoImportacion: "Tipo Importación",
+  paisOrigenEdit: "País Origen",
+  destino: "Destino",
+  estado: "Estado",
+  seguimiento: "Seguimiento",
+  incoterms: "Incoterms",
+  terminosPago: "Términos Pago",
+  formaPago: "Forma Pago",
+  tipoTransporte: "Tipo Transporte",
+  bookingBl: "Booking / BL",
+  tracking: "Tracking",
+  puertoSalida: "Pto. Salida",
+  puertoLlegada: "Pto. Llegada",
+  agenteAduanal: "Agente Aduanal",
+  naviera: "Naviera",
+  contenedor: "Contenedor",
+  observaciones: "Observaciones",
+  fechaOc: "Fecha OC",
+  fechaFabricacion: "Fecha Fabricación",
+  fechaListoEmbarque: "Fecha Listo Embarque",
+  fechaEmbarque: "Fecha Embarque",
+  fechaLlegadaPuerto: "Fecha Llegada Puerto",
+  fechaRetiroPuerto: "Fecha Retiro Puerto",
+  fechaLiberacionAduana: "Fecha Lib. Aduana",
+  fechaEntregaFinal: "Fecha Entrega Final",
+  fechaPagoProveedor: "Fecha Pago Proveedor",
+  fechaDocumentosCompletos: "Fecha Docs. Completos",
+  remesaNotificado: "Remesa Notificado",
+  blTelexReleased: "BL Telex Released",
+  polizaSeguroRecibida: "Póliza Seguro Recibida",
+};
+
 // ─── Search column options ───────────────────────────────────────────────────
 
 const SEARCH_COLUMNS = [
@@ -339,6 +378,7 @@ function ActualizacionCell({
 function LogDrawer({ seguimientoId, onClose }: { seguimientoId: string; onClose: () => void }) {
   const [logs, setLogs] = useState<Log[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filtroCol, setFiltroCol] = useState<string>("seguimiento");
 
   useEffect(() => {
     apiFetch<Log[]>(`/api/v1/import-export/${seguimientoId}/logs`)
@@ -346,6 +386,19 @@ function LogDrawer({ seguimientoId, onClose }: { seguimientoId: string; onClose:
       .catch(() => setLogs([]))
       .finally(() => setLoading(false));
   }, [seguimientoId]);
+
+  // Columnas únicas presentes en los logs + opciones fijas
+  const colsEnLogs = Array.from(new Set(logs.map((l) => l.campoKey)));
+  const opcionesCol = [
+    { key: "seguimiento", label: "Seguimiento" },
+    ...colsEnLogs
+      .filter((k) => k !== "seguimiento")
+      .map((k) => ({ key: k, label: CAMPO_LABELS_DISPLAY[k] ?? k })),
+  ];
+
+  const logsVisibles = filtroCol === "__all__"
+    ? logs
+    : logs.filter((l) => l.campoKey === filtroCol);
 
   return (
     <div className="fixed inset-0 z-[9999] flex justify-end bg-black/40" onClick={onClose}>
@@ -357,18 +410,34 @@ function LogDrawer({ seguimientoId, onClose }: { seguimientoId: string; onClose:
           <h3 className="text-sm font-semibold text-gray-800 dark:text-white">Historial de cambios</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">✕</button>
         </div>
+
+        {/* Filtro por columna */}
+        {!loading && logs.length > 0 && (
+          <div className="border-b border-gray-100 px-5 py-3 dark:border-gray-800">
+            <select
+              value={filtroCol}
+              onChange={(e) => setFiltroCol(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+            >
+              {opcionesCol.map((o) => (
+                <option key={o.key} value={o.key}>{o.label}</option>
+              ))}
+              <option value="__all__">Todas las columnas</option>
+            </select>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
           </div>
-        ) : logs.length === 0 ? (
+        ) : logsVisibles.length === 0 ? (
           <div className="flex flex-col items-center py-16 text-center text-sm text-gray-400">
-            <span className="mb-2 text-3xl">📋</span>
-            Sin cambios registrados
+            Sin cambios registrados{filtroCol !== "__all__" ? " para esta columna" : ""}.
           </div>
         ) : (
           <ul className="divide-y divide-gray-100 dark:divide-gray-800">
-            {logs.map((l) => (
+            {logsVisibles.map((l) => (
               <li key={l.id} className="px-5 py-3.5">
                 <div className="flex items-center justify-between gap-2">
                   <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
@@ -478,7 +547,7 @@ export default function ImportExport() {
         <div className="mb-4">
           <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Import-Export</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Seguimiento de cotizaciones internacionales — FR-CO-16
+            Seguimiento de cotizaciones internacionales
           </p>
         </div>
 
