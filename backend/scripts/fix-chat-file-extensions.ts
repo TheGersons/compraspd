@@ -34,7 +34,8 @@
  */
 
 import { PrismaClient } from '@prisma/client';
-import * as dotenv from 'dotenv';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const dotenv = require('dotenv');
 import * as path from 'path';
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
@@ -265,19 +266,22 @@ async function main() {
       }
     }
 
+    // A este punto cloudFilename siempre tiene valor (los casos null hacen continue arriba)
+    const resolvedFilename: string = cloudFilename!;
+
     // Verificar que el safeOriginal del cloud filename tiene 50 chars (confirmar que es el archivo buggy)
-    const soLen = safeOriginalLength(cloudFilename);
+    const soLen = safeOriginalLength(resolvedFilename);
     if (soLen !== 50) {
-      console.log(`    ✓  El archivo ya tiene nombre correcto (${cloudFilename}), omitiendo.`);
+      console.log(`    ✓  El archivo ya tiene nombre correcto (${resolvedFilename}), omitiendo.`);
       yaCorrectos++;
       console.log('');
       continue;
     }
 
     // Construir el nuevo nombre correcto
-    const timestampMatch = cloudFilename.match(/^(\d{13})_/);
+    const timestampMatch = resolvedFilename.match(/^(\d{13})_/);
     if (!timestampMatch) {
-      console.log(`    ✗  No se pudo extraer timestamp del nombre "${cloudFilename}".`);
+      console.log(`    ✗  No se pudo extraer timestamp del nombre "${resolvedFilename}".`);
       fallidos++;
       console.log('');
       continue;
@@ -285,10 +289,10 @@ async function main() {
 
     const timestamp   = timestampMatch[1];
     const newFilename = `${timestamp}_${safeOriginalFixed}`;
-    const oldFullPath = `${folderPath}/${cloudFilename}`;
+    const oldFullPath = `${folderPath}/${resolvedFilename}`;
     const newFullPath = `${folderPath}/${newFilename}`;
 
-    console.log(`    Renombrar: ${cloudFilename}`);
+    console.log(`    Renombrar: ${resolvedFilename}`);
     console.log(`          → : ${newFilename}`);
 
     if (IS_DRY_RUN) {
@@ -310,7 +314,7 @@ async function main() {
 
         // Si la direccionArchivo era URL WebDAV directa, actualizar en DB también
         if (adj.direccionArchivo.includes(WEBDAV_URL)) {
-          const newUrl = adj.direccionArchivo.replace(cloudFilename, newFilename);
+          const newUrl = adj.direccionArchivo.replace(resolvedFilename, newFilename);
           await prisma.adjuntos.update({
             where: { id: adj.id },
             data: { direccionArchivo: newUrl },
