@@ -63,6 +63,7 @@ import Archivadas from "./pages/Licitaciones/Archivadas";
 import OfertasArchivadas from "./pages/Ofertas/OfertasArchivadas";
 import Ofertas from "./pages/Ofertas/Ofertas";
 import OdooOportunidades from "./pages/Odoo/OdooOportunidades";
+import ImportExport from "./pages/ImportExport/ImportExport";
 // Logistica module
 import LogisticaLayout from "./pages/Logistica/Layout/LogisticaLayout";
 import LogisticaQuotesFollowUps from "./pages/Quotes/Logistica/FollowUps";
@@ -252,6 +253,16 @@ export default function App() {
                   </ProtectedRoute>
                 } />
               </Route>
+
+              {/* IMPORT-EXPORT - SHOPPING_MANAGER_ROLES */}
+              <Route
+                path="/import-export"
+                element={
+                  <ProtectedRoute roles={SHOPPING_MANAGER_ROLES}>
+                    <ImportExport />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* LOGÍSTICA */}
               <Route

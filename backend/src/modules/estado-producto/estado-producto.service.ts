@@ -207,6 +207,7 @@ export class EstadoProductoService {
               nombreCotizacion: true,
               tipoCompra: true,
               chatId: true,
+              ordenCompra: true,
               tipo: { select: { nombre: true, area: { select: { nombreArea: true } } } },
               solicitante: {
                 select: {
@@ -639,6 +640,18 @@ export class EstadoProductoService {
     }
 
     const siguienteEstado = estadosAplicables[indexActual + 1];
+
+    // Para cotizaciones INTERNACIONAL: bloquear avance desde "comprado"
+    // si la cotización aún no tiene # de Orden de Compra asignado.
+    if (
+      estadoActual === 'comprado' &&
+      tipoCompra === 'INTERNACIONAL' &&
+      !(estado.cotizacion as any)?.ordenCompra
+    ) {
+      throw new BadRequestException(
+        'Debes asignar el # de Orden de Compra a la cotización antes de avanzar del estado "Comprado".',
+      );
+    }
     const verificacion = await this.verificarDocumentosParaAvanzar(
       id,
       siguienteEstado,

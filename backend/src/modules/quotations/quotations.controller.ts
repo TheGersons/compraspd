@@ -162,4 +162,18 @@ export class QuotationsController {
     return this.service.delete(id, user);
   }
 
+  /**
+   * PATCH /api/v1/quotations/:id/orden-compra
+   * Setea el # de Orden de Compra para toda la cotización.
+   * Obligatorio antes de avanzar del estado "comprado" en INTERNACIONAL.
+   */
+  @Patch(':id/orden-compra')
+  setOrdenCompra(
+    @CurrentUser() user: UserJwt,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: { ordenCompra: string },
+  ) {
+    return this.service.setOrdenCompra(id, dto.ordenCompra, user);
+  }
+
 }

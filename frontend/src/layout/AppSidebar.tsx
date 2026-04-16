@@ -9,6 +9,7 @@ import {
   BadgeDollarSign,
   ShoppingBag,
   Link2,
+  Ship,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
@@ -73,6 +74,12 @@ const navItems: NavItem[] = [
       { name: "Historial", path: "/shopping/history", pro: false },
       { name: "Asignación", path: "/shopping/assignment", pro: false, roles: ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS"] },
     ],
+  },
+  {
+    icon: <Ship />,
+    name: "Import-Export",
+    roles: ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS"],
+    path: "/import-export",
   },
   {
     icon: <UtilityPole />,

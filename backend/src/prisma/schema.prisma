@@ -190,6 +190,7 @@ model Usuario {
   ofertasArchivadas        Oferta[]                @relation("OfertaArchivadaPor")
   ofertaProductos          OfertaProducto[]        @relation("ResponsableOferta")
   reporteCompraLogs        ReporteCompraLog[]      @relation("ReporteCompraLogUsuario")
+  seguimientoIntLogs       SeguimientoInternacionalLog[] @relation("SeguimientoIntLogUsuario")
 
   @@index([email])
   @@index([rolId])
@@ -294,6 +295,7 @@ model Cotizacion {
   todosProductosAprobados  Boolean   @default(false) @map("todos_productos_aprobados")
   fechaAprobacion          DateTime? @map("fecha_aprobacion")
   fechaEntregaNacional     DateTime? @map("fecha_entrega_nacional")
+  ordenCompra              String?   @map("orden_compra")
 
   // Relaciones existentes
   tipo        Tipo      @relation(fields: [tipoId], references: [id], onDelete: Restrict)
@@ -308,12 +310,13 @@ model Cotizacion {
   historial             HistorialCotizacion[]
 
   // Relaciones existentes
-  detalles         CotizacionDetalle[]
-  compras          Compra[]
-  estadosProductos EstadoProducto[]
-  licitacion       Licitacion?
-  oferta           Oferta?
-  reporte          ReporteCompra?
+  detalles                CotizacionDetalle[]
+  compras                 Compra[]
+  estadosProductos        EstadoProducto[]
+  licitacion              Licitacion?
+  oferta                  Oferta?
+  reporte                 ReporteCompra?
+  seguimientoInternacional SeguimientoInternacional?
 
   @@index([solicitanteId])
   @@index([estado])
@@ -1083,4 +1086,76 @@ model ReporteCompraLog {
   @@index([reporteId])
   @@index([usuarioId])
   @@map("reporte_compra_log")
+}
+
+// ============================================
+// IMPORT-EXPORT (FR-CO-16)
+// ============================================
+
+model SeguimientoInternacional {
+  id           String @id @default(uuid()) @db.Uuid
+  cotizacionId String @unique @map("cotizacion_id") @db.Uuid
+
+  // Campos de texto
+  proveedor       String? @db.Text
+  marcaModelo     String? @map("marca_modelo") @db.Text
+  nombreMaterial  String? @map("nombre_material") @db.Text
+  numeroOC        String? @map("numero_oc") @db.VarChar(100)
+  tipoImportacion String? @map("tipo_importacion") @db.VarChar(100)
+  destino         String? @db.Text
+  estado          String? @db.VarChar(100)
+  incoterms       String? @db.VarChar(50)
+  terminosPago    String? @map("terminos_pago") @db.Text
+  formaPago       String? @map("forma_pago") @db.VarChar(100)
+  tipoTransporte  String? @map("tipo_transporte") @db.VarChar(50)
+  bookingBl       String? @map("booking_bl") @db.VarChar(150)
+  tracking        String? @db.Text
+  puertoSalida    String? @map("puerto_salida") @db.VarChar(150)
+  puertoLlegada   String? @map("puerto_llegada") @db.VarChar(150)
+  agenteAduanal   String? @map("agente_aduanal") @db.Text
+  naviera         String? @db.Text
+  contenedor      String? @db.VarChar(150)
+  observaciones   String? @db.Text
+
+  // Fechas (dd/mm/yyyy en UI)
+  fechaOc                     DateTime? @map("fecha_oc")
+  fechaFabricacion            DateTime? @map("fecha_fabricacion")
+  fechaListoEmbarque          DateTime? @map("fecha_listo_embarque")
+  fechaEmbarque               DateTime? @map("fecha_embarque")
+  fechaLlegadaPuerto          DateTime? @map("fecha_llegada_puerto")
+  fechaRetiroPuerto           DateTime? @map("fecha_retiro_puerto")
+  fechaLiberacionAduana       DateTime? @map("fecha_liberacion_aduana")
+  fechaEntregaFinal           DateTime? @map("fecha_entrega_final")
+  fechaPagoProveedor          DateTime? @map("fecha_pago_proveedor")
+  fechaDocumentosCompletos    DateTime? @map("fecha_documentos_completos")
+
+  // ACTUALIZACION: 3 indicadores
+  remesaNotificado       Boolean @default(false) @map("remesa_notificado")
+  blTelexReleased        Boolean @default(false) @map("bl_telex_released")
+  polizaSeguroRecibida   Boolean @default(false) @map("poliza_seguro_recibida")
+
+  creado      DateTime @default(now())
+  actualizado DateTime @default(now()) @updatedAt
+
+  cotizacion Cotizacion                    @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  logs       SeguimientoInternacionalLog[]
+
+  @@map("seguimiento_internacional")
+}
+
+model SeguimientoInternacionalLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  seguimientoId String   @map("seguimiento_id") @db.Uuid
+  campo         String   @db.VarChar(100)
+  valorAnterior String?  @map("valor_anterior") @db.Text
+  valorNuevo    String?  @map("valor_nuevo") @db.Text
+  usuarioId     String   @map("usuario_id") @db.Uuid
+  creado        DateTime @default(now())
+
+  seguimiento SeguimientoInternacional @relation(fields: [seguimientoId], references: [id], onDelete: Cascade)
+  usuario     Usuario                  @relation("SeguimientoIntLogUsuario", fields: [usuarioId], references: [id], onDelete: Restrict)
+
+  @@index([seguimientoId])
+  @@index([usuarioId])
+  @@map("seguimiento_internacional_log")
 }

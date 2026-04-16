@@ -882,4 +882,45 @@ export class QuotationsService {
       return { message: 'Cotización eliminada correctamente' };
     });
   }
+
+  /**
+   * Setea el # de Orden de Compra para una cotización.
+   * Aplica a todos los productos y es obligatorio antes de avanzar
+   * del estado "comprado" en cotizaciones INTERNACIONAL.
+   */
+  async setOrdenCompra(id: string, ordenCompra: string, user: UserJwt) {
+    const oc = (ordenCompra ?? '').trim();
+    if (!oc) {
+      throw new BadRequestException('El # de Orden de Compra es obligatorio');
+    }
+
+    const cotizacion = await this.prisma.cotizacion.findUnique({
+      where: { id },
+      select: { id: true, ordenCompra: true },
+    });
+    if (!cotizacion) throw new NotFoundException('Cotización no encontrada');
+
+    // Permitir a supervisor/admin/jefe de compras
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id: user.sub },
+      include: { rol: true },
+    });
+    const rol = usuario?.rol?.nombre?.toLowerCase() ?? '';
+    if (
+      !rol.includes('supervisor') &&
+      !rol.includes('admin') &&
+      !rol.includes('jefe') &&
+      !rol.includes('compras')
+    ) {
+      throw new ForbiddenException(
+        'No tienes permisos para asignar la Orden de Compra',
+      );
+    }
+
+    return this.prisma.cotizacion.update({
+      where: { id },
+      data: { ordenCompra: oc },
+      select: { id: true, ordenCompra: true },
+    });
+  }
 }

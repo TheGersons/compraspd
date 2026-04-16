@@ -35,6 +35,7 @@ import { LocationsModule } from './modules/Locations/locations.module';
 import { LicitacionesModule } from './modules/licitaciones/licitaciones.module';
 import { OfertasModule } from './modules/ofertas/ofertas.module';
 import { ReportesModule } from './modules/reportes/reportes.module';
+import { ImportExportModule } from './modules/import-export/import-export.module';
 import { CronServicesModule } from './modules/cron-services/cron.service.module';
 import { OdooModule } from './modules/odoo/odoo.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
@@ -75,6 +76,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     LicitacionesModule,
     OfertasModule,
     ReportesModule,
+    ImportExportModule,
     DashboardModule,
     OdooModule,
   ],

@@ -126,6 +126,7 @@ export type EstadoProducto = {
     nombreCotizacion: string;
     tipoCompra: 'NACIONAL' | 'INTERNACIONAL';
     chatId?: string | null;
+    ordenCompra?: string | null;
     solicitante?: { id: string; nombre: string; email?: string } | null;
     tipo?: { nombre: string; area: { nombreArea: string } } | null;
   };
@@ -393,6 +394,17 @@ const api = {
     return response.json();
   },
 
+  async setOrdenCompra(cotizacionId: string, ordenCompra: string) {
+    const token = getToken();
+    const response = await fetch(`${API_BASE_URL}/api/v1/quotations/${cotizacionId}/orden-compra`, {
+      method: "PATCH", credentials: "include",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ ordenCompra }),
+    });
+    if (!response.ok) { const e = await response.json(); throw new Error(e.message || "Error al asignar OC"); }
+    return response.json();
+  },
+
   async asignarResponsableMasivo(ids: string[], responsableId: string | null) {
     const token = getToken();
     const response = await fetch(`${API_BASE_URL}/api/v1/estado-productos/asignar-responsable-masivo`, {
@@ -571,6 +583,12 @@ export default function ShoppingFollowUps() {
   const [editandoCotizacion, setEditandoCotizacion] = useState<string | null>(null);
   const [nombreCotEditado, setNombreCotEditado] = useState("");
   const [menuGrupoAbierto, setMenuGrupoAbierto] = useState<string | null>(null);
+
+  // Modal para asignar # Orden de Compra a una cotización INTERNACIONAL
+  const [ocCotizacionId, setOcCotizacionId] = useState<string | null>(null);
+  const [ocValue, setOcValue] = useState("");
+  const [ocSaving, setOcSaving] = useState(false);
+  const [ocError, setOcError] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -796,6 +814,7 @@ export default function ShoppingFollowUps() {
         nombre: p.cotizacion?.nombreCotizacion || 'Sin cotización',
         tipoCompra: p.cotizacion?.tipoCompra || p.tipoCompra,
         chatId: p.cotizacion?.chatId || null,
+        ordenCompra: p.cotizacion?.ordenCompra || null,
         solicitante: p.cotizacion?.solicitante || null,
         tipo: p.cotizacion?.tipo || null,
         productos: [],
@@ -803,7 +822,7 @@ export default function ShoppingFollowUps() {
     }
     acc[key].productos.push(p);
     return acc;
-  }, {} as Record<string, { cotizacionId: string; nombre: string; tipoCompra: string; chatId: string | null; solicitante: { id: string; nombre: string } | null; tipo: { nombre: string; area: { nombreArea: string } } | null; productos: EstadoProducto[] }>);
+  }, {} as Record<string, { cotizacionId: string; nombre: string; tipoCompra: string; chatId: string | null; ordenCompra: string | null; solicitante: { id: string; nombre: string } | null; tipo: { nombre: string; area: { nombreArea: string } } | null; productos: EstadoProducto[] }>);
 
   const gruposOrdenados = Object.values(productosAgrupados).sort((a, b) => a.nombre.localeCompare(b.nombre));
 
@@ -897,6 +916,40 @@ export default function ShoppingFollowUps() {
       setEditandoCotizacion(null);
       await cargarProductos();
     } catch (e: any) { toast.error(e.message); }
+  };
+
+  // Abrir modal para asignar # Orden de Compra a una cotización INTERNACIONAL
+  const abrirModalOC = (cotizacionId: string, ocActual: string | null) => {
+    setOcCotizacionId(cotizacionId);
+    setOcValue(ocActual || "");
+    setOcError(null);
+  };
+
+  const cerrarModalOC = () => {
+    setOcCotizacionId(null);
+    setOcValue("");
+    setOcError(null);
+  };
+
+  const handleGuardarOC = async () => {
+    if (!ocCotizacionId) return;
+    const oc = ocValue.trim();
+    if (!oc) {
+      setOcError("El # de Orden de Compra es obligatorio");
+      return;
+    }
+    try {
+      setOcSaving(true);
+      setOcError(null);
+      await api.setOrdenCompra(ocCotizacionId, oc);
+      toast.success("# Orden de Compra asignada");
+      cerrarModalOC();
+      await cargarProductos();
+    } catch (e: any) {
+      setOcError(e.message || "Error al asignar OC");
+    } finally {
+      setOcSaving(false);
+    }
   };
 
   const abrirEditarPrecios = (cotizacionId: string) => {
@@ -1351,41 +1404,64 @@ export default function ShoppingFollowUps() {
                                             </Button>
                                           </div>
 
-                                          {productoSeleccionado.siguienteEstado && productoSeleccionado.progreso !== 100 && (
-                                            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-900/20">
-                                              <div className="flex items-center justify-between gap-3">
-                                                <div>
-                                                  <p className="text-xs text-blue-600 dark:text-blue-400">Siguiente estado</p>
-                                                  <p className="mt-0.5 text-sm font-semibold text-blue-900 dark:text-blue-100">
-                                                    {ESTADOS_ICONOS[productoSeleccionado.siguienteEstado]} {ESTADOS_LABELS[productoSeleccionado.siguienteEstado]}
-                                                  </p>
-                                                </div>
-                                                <div className="flex items-center gap-2 shrink-0">
-                                                  <button
-                                                    onClick={abrirModalAvanzar}
-                                                    disabled={loadingAccion}
-                                                    className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap"
-                                                  >
-                                                    Avanzar Estado
-                                                  </button>
-                                                  {productoSeleccionado.cotizacionId && (() => {
-                                                    const grupoProductos = productos.filter(p => p.cotizacionId === productoSeleccionado.cotizacionId);
-                                                    const eligiblesAvance = grupoProductos.filter(p => p.progreso < 100 && p.siguienteEstado && !p.rechazado);
-                                                    return eligiblesAvance.length > 1 ? (
+                                          {productoSeleccionado.siguienteEstado && productoSeleccionado.progreso !== 100 && (() => {
+                                            const esInternacional = (productoSeleccionado.cotizacion?.tipoCompra || productoSeleccionado.tipoCompra) === 'INTERNACIONAL';
+                                            const estadoActualEsComprado = productoSeleccionado.estadoActual === 'comprado';
+                                            const ocActual = productoSeleccionado.cotizacion?.ordenCompra || null;
+                                            const requiereOC = esInternacional && estadoActualEsComprado;
+                                            const ocFaltante = requiereOC && !ocActual;
+                                            return (
+                                              <div className={`rounded-lg border p-3 ${ocFaltante ? 'border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20' : 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20'}`}>
+                                                <div className="flex items-center justify-between gap-3 flex-wrap">
+                                                  <div>
+                                                    <p className="text-xs text-blue-600 dark:text-blue-400">Siguiente estado</p>
+                                                    <p className="mt-0.5 text-sm font-semibold text-blue-900 dark:text-blue-100">
+                                                      {ESTADOS_ICONOS[productoSeleccionado.siguienteEstado]} {ESTADOS_LABELS[productoSeleccionado.siguienteEstado]}
+                                                    </p>
+                                                    {requiereOC && (
+                                                      <p className={`mt-1 text-xs ${ocFaltante ? 'text-amber-700 dark:text-amber-300' : 'text-green-700 dark:text-green-300'}`}>
+                                                        {ocActual ? `# OC: ${ocActual}` : 'Orden de Compra pendiente (obligatoria para avanzar)'}
+                                                      </p>
+                                                    )}
+                                                  </div>
+                                                  <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                                                    {requiereOC && productoSeleccionado.cotizacionId && (
                                                       <button
-                                                        onClick={() => abrirAvanceMasivo(productoSeleccionado.cotizacionId!, grupoProductos)}
+                                                        onClick={() => abrirModalOC(productoSeleccionado.cotizacionId!, ocActual)}
                                                         disabled={loadingAccion}
-                                                        className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50 whitespace-nowrap"
-                                                        title="Avanzar todos los productos de esta compra al siguiente estado"
+                                                        className={`rounded-lg px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50 whitespace-nowrap ${ocFaltante ? 'bg-amber-600 hover:bg-amber-700' : 'bg-gray-600 hover:bg-gray-700'}`}
+                                                        title={ocActual ? 'Editar # Orden de Compra' : 'Agregar # Orden de Compra (obligatorio)'}
                                                       >
-                                                        Avanzar todos ({eligiblesAvance.length})
+                                                        {ocActual ? `Editar # OC` : 'Agregar # Orden de Compra'}
                                                       </button>
-                                                    ) : null;
-                                                  })()}
+                                                    )}
+                                                    <button
+                                                      onClick={abrirModalAvanzar}
+                                                      disabled={loadingAccion || ocFaltante}
+                                                      className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap"
+                                                      title={ocFaltante ? 'Debes asignar el # de Orden de Compra primero' : 'Avanzar al siguiente estado'}
+                                                    >
+                                                      Avanzar Estado
+                                                    </button>
+                                                    {productoSeleccionado.cotizacionId && (() => {
+                                                      const grupoProductos = productos.filter(p => p.cotizacionId === productoSeleccionado.cotizacionId);
+                                                      const eligiblesAvance = grupoProductos.filter(p => p.progreso < 100 && p.siguienteEstado && !p.rechazado);
+                                                      return eligiblesAvance.length > 1 ? (
+                                                        <button
+                                                          onClick={() => abrirAvanceMasivo(productoSeleccionado.cotizacionId!, grupoProductos)}
+                                                          disabled={loadingAccion || ocFaltante}
+                                                          className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50 whitespace-nowrap"
+                                                          title={ocFaltante ? 'Debes asignar el # de Orden de Compra primero' : 'Avanzar todos los productos de esta compra al siguiente estado'}
+                                                        >
+                                                          Avanzar todos ({eligiblesAvance.length})
+                                                        </button>
+                                                      ) : null;
+                                                    })()}
+                                                  </div>
                                                 </div>
                                               </div>
-                                            </div>
-                                          )}
+                                            );
+                                          })()}
 
                                           {timeline && (
                                             <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
@@ -1841,6 +1917,48 @@ export default function ShoppingFollowUps() {
                 disabled={loadingAvanceMasivo || productosParaAvance.length === 0 || loadingVerificacionMasiva}
                 className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
                 {loadingAvanceMasivo ? "Avanzando..." : `Avanzar ${productosParaAvance.length} producto(s)`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Asignar # Orden de Compra */}
+      {ocCotizacionId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-gray-900">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              # Orden de Compra
+            </h3>
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+              Esta OC aplica a todos los productos de la cotización y es obligatoria
+              antes de avanzar del estado "Comprado" en compras internacionales.
+            </p>
+            <input
+              type="text"
+              value={ocValue}
+              onChange={(e) => setOcValue(e.target.value)}
+              placeholder="Ej: OC-2026-00123"
+              autoFocus
+              className="mt-4 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+            />
+            {ocError && (
+              <p className="mt-2 text-xs text-red-600 dark:text-red-400">{ocError}</p>
+            )}
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                onClick={cerrarModalOC}
+                disabled={ocSaving}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 dark:border-gray-600 dark:text-gray-300"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleGuardarOC}
+                disabled={ocSaving || !ocValue.trim()}
+                className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+              >
+                {ocSaving ? "Guardando..." : "Guardar"}
               </button>
             </div>
           </div>
