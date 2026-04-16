@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { apiFetch } from '../../lib/api';
+import { apiFetch, uploadWithProgress } from '../../lib/api';
 import toast from 'react-hot-toast';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
@@ -51,17 +51,18 @@ const chatApi = {
     return res.json();
   },
 
-  async sendFile(chatId: string, file: File): Promise<void> {
+  async sendFile(
+    chatId: string,
+    file: File,
+    onProgress: (pct: number) => void,
+  ): Promise<void> {
     const form = new FormData();
     form.append('file', file);
-    const res = await apiFetch(`${API_BASE_URL}/api/v1/messages/${chatId}/upload`, {
-      method: 'POST',
-      body: form,
-    });
-    if (!res.ok) {
-      const e = await res.json().catch(() => ({}));
-      throw new Error((e as any).message || 'Error al enviar archivo');
-    }
+    await uploadWithProgress(
+      `${API_BASE_URL}/api/v1/messages/${chatId}/upload`,
+      form,
+      onProgress,
+    );
   },
 
   async getMentionableUsers(): Promise<MentionableUser[]> {
@@ -127,6 +128,10 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
 
   // ── Input state ───────────────────────────────────────────────────────────
   const [texto, setTexto] = useState('');
+
+  // ── Upload progress ───────────────────────────────────────────────────────
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [uploadFileName, setUploadFileName] = useState<string>('');
 
   // ── Drag-and-drop ─────────────────────────────────────────────────────────
   const [isDragging, setIsDragging] = useState(false);
@@ -305,20 +310,29 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
       toast.error(`Archivo(s) superan 200MB: ${tooLarge.map((f) => f.name).join(', ')}`);
       return;
     }
-    try {
-      setSendingFile(true);
-      for (const file of files) {
-        await chatApi.sendFile(chatId, file);
+    setSendingFile(true);
+    let errorCount = 0;
+    for (const file of files) {
+      setUploadFileName(file.name);
+      setUploadProgress(0);
+      try {
+        await chatApi.sendFile(chatId, file, (pct) => setUploadProgress(pct));
+      } catch (e: any) {
+        errorCount++;
+        toast.error(e.message || `Error al enviar ${file.name}`);
       }
+    }
+    setUploadProgress(null);
+    setUploadFileName('');
+    setSendingFile(false);
+    if (fileRef.current) fileRef.current.value = '';
+    if (errorCount < files.length) {
       await cargarMensajes();
-      toast.success(
-        files.length === 1 ? 'Archivo enviado' : `${files.length} archivos enviados`,
-      );
-    } catch (e: any) {
-      toast.error(e.message || 'Error al enviar archivo');
-    } finally {
-      setSendingFile(false);
-      if (fileRef.current) fileRef.current.value = '';
+      if (files.length - errorCount > 0) {
+        toast.success(
+          files.length === 1 ? 'Archivo enviado' : `${files.length - errorCount} archivo(s) enviados`,
+        );
+      }
     }
   };
 
@@ -518,6 +532,26 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
                   </div>
                 </button>
               ))}
+            </div>
+          )}
+
+          {/* Upload progress bar */}
+          {uploadProgress !== null && (
+            <div className="mb-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 dark:border-blue-800 dark:bg-blue-900/20">
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <span className="max-w-[220px] truncate text-xs font-medium text-blue-700 dark:text-blue-300">
+                  {uploadFileName}
+                </span>
+                <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">
+                  {uploadProgress}%
+                </span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-blue-100 dark:bg-blue-900/50">
+                <div
+                  className="h-full rounded-full bg-blue-500 transition-all duration-150"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
             </div>
           )}
 

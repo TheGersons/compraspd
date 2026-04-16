@@ -4,7 +4,7 @@ import * as XLSX from "xlsx";
 import PageMeta from "../../components/common/PageMeta";
 import Button from "../../components/ui/button/Button";
 import { useNotifications } from "../Notifications/context/NotificationContext";
-import { getToken } from "../../lib/api";
+import { getToken, uploadWithProgress } from "../../lib/api";
 import { LoadingScreen } from "../../components/common/LoadingScreen";
 import { useAuth } from "../../context/AuthContext";
 import "../../components/common/datepick.css";
@@ -23,6 +23,7 @@ interface ArchivoAdjunto {
   file: File;
   id: string; // local key para el preview
   estado: "pendiente" | "subiendo" | "ok" | "error";
+  progreso: number; // 0-100
   error?: string;
 }
 
@@ -670,7 +671,7 @@ export default function New() {
       // Auto-adjuntar el PDF
       setArchivos(prev => {
         const sinAnterior = prev.filter(a => a.file.name !== pendingRequisaFile.name);
-        return [...sinAnterior, { file: pendingRequisaFile, id: `requisa-${Date.now()}`, estado: 'pendiente' as const }];
+        return [...sinAnterior, { file: pendingRequisaFile, id: `requisa-${Date.now()}`, estado: 'pendiente' as const, progreso: 0 }];
       });
       setCreacionViaRequisa(true);
 
@@ -690,6 +691,7 @@ export default function New() {
       file: f,
       id: `adicional-${f.name}-${Date.now()}-${Math.random()}`,
       estado: 'pendiente' as const,
+      progreso: 0,
     }));
     setArchivosAdicionales(prev => [...prev, ...nuevos]);
   };
@@ -708,18 +710,36 @@ export default function New() {
 
       // Subir archivos si hay
       if (adjuntarChatId && archivosAdicionales.length > 0) {
-        setArchivosAdicionales(prev => prev.map(a => ({ ...a, estado: 'subiendo' as const })));
-        const { ok, error: errs } = await api.subirArchivosChat(
-          adjuntarChatId,
-          archivosAdicionales.map(a => a.file)
-        );
-        setArchivosAdicionales(prev =>
-          prev.map(a => ({ ...a, estado: errs.includes(a.file) ? 'error' as const : 'ok' as const }))
-        );
-        if (errs.length > 0) {
-          addNotification("warn", "Algunos archivos fallaron", `${ok.length} subidos, ${errs.length} fallaron.`);
-        } else if (ok.length > 0) {
-          addNotification("success", "Archivos adjuntados", `${ok.length} archivo(s) adjuntados al chat.`);
+        let errorCount = 0;
+        for (const adjunto of archivosAdicionales) {
+          setArchivosAdicionales((prev) =>
+            prev.map((a) => a.id === adjunto.id ? { ...a, estado: 'subiendo' as const, progreso: 0 } : a)
+          );
+          try {
+            const form = new FormData();
+            form.append("file", adjunto.file);
+            await uploadWithProgress(
+              `${API_BASE_URL}/api/v1/messages/${adjuntarChatId}/upload`,
+              form,
+              (pct) => setArchivosAdicionales((prev) =>
+                prev.map((a) => a.id === adjunto.id ? { ...a, progreso: pct } : a)
+              ),
+            );
+            setArchivosAdicionales((prev) =>
+              prev.map((a) => a.id === adjunto.id ? { ...a, estado: 'ok' as const, progreso: 100 } : a)
+            );
+          } catch {
+            errorCount++;
+            setArchivosAdicionales((prev) =>
+              prev.map((a) => a.id === adjunto.id ? { ...a, estado: 'error' as const } : a)
+            );
+          }
+        }
+        const okCount = archivosAdicionales.length - errorCount;
+        if (errorCount > 0) {
+          addNotification("warn", "Algunos archivos fallaron", `${okCount} subidos, ${errorCount} fallaron.`);
+        } else if (okCount > 0) {
+          addNotification("success", "Archivos adjuntados", `${okCount} archivo(s) adjuntados al chat.`);
         }
       }
 
@@ -735,6 +755,7 @@ export default function New() {
       file,
       id: `${file.name}-${Date.now()}-${Math.random()}`,
       estado: "pendiente" as const,
+      progreso: 0,
     }));
     setArchivos((prev) => [...prev, ...nuevos]);
   };
@@ -836,26 +857,36 @@ export default function New() {
 
       // Subir archivos adjuntos al chat (si hay)
       if (archivos.length > 0 && resultado.chatId) {
-        // Marcar todos como "subiendo"
-        setArchivos((prev) => prev.map((a) => ({ ...a, estado: "subiendo" as const })));
-
-        const { ok, error: errores } = await api.subirArchivosChat(
-          resultado.chatId,
-          archivos.map((a) => a.file)
-        );
-
-        // Actualizar estados individuales
-        setArchivos((prev) =>
-          prev.map((a) => ({
-            ...a,
-            estado: errores.includes(a.file) ? ("error" as const) : ("ok" as const),
-          }))
-        );
-
-        if (errores.length > 0 && ok.length === 0) {
-          addNotification("warn", "Archivos no subidos", `La cotización se creó pero no se pudieron subir ${errores.length} archivo(s). Puedes adjuntarlos desde el chat en Mis Cotizaciones.`);
-        } else if (errores.length > 0) {
-          addNotification("warn", "Algunos archivos fallaron", `${ok.length} archivo(s) subidos, ${errores.length} fallaron. Puedes adjuntar los faltantes desde el chat.`);
+        let errorCount = 0;
+        for (const adjunto of archivos) {
+          setArchivos((prev) =>
+            prev.map((a) => a.id === adjunto.id ? { ...a, estado: "subiendo" as const, progreso: 0 } : a)
+          );
+          try {
+            const form = new FormData();
+            form.append("file", adjunto.file);
+            await uploadWithProgress(
+              `${API_BASE_URL}/api/v1/messages/${resultado.chatId}/upload`,
+              form,
+              (pct) => setArchivos((prev) =>
+                prev.map((a) => a.id === adjunto.id ? { ...a, progreso: pct } : a)
+              ),
+            );
+            setArchivos((prev) =>
+              prev.map((a) => a.id === adjunto.id ? { ...a, estado: "ok" as const, progreso: 100 } : a)
+            );
+          } catch {
+            errorCount++;
+            setArchivos((prev) =>
+              prev.map((a) => a.id === adjunto.id ? { ...a, estado: "error" as const } : a)
+            );
+          }
+        }
+        const okCount = archivos.length - errorCount;
+        if (errorCount > 0 && okCount === 0) {
+          addNotification("warn", "Archivos no subidos", `La cotización se creó pero no se pudieron subir ${errorCount} archivo(s). Puedes adjuntarlos desde el chat en Mis Cotizaciones.`);
+        } else if (errorCount > 0) {
+          addNotification("warn", "Algunos archivos fallaron", `${okCount} archivo(s) subidos, ${errorCount} fallaron. Puedes adjuntar los faltantes desde el chat.`);
         }
       }
 
@@ -1462,7 +1493,15 @@ export default function New() {
                   </div>
                   {/* Estado */}
                   {adjunto.estado === "subiendo" && (
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+                    <div className="flex min-w-[80px] flex-col items-end gap-1">
+                      <span className="text-xs font-medium text-blue-600 dark:text-blue-400">{adjunto.progreso}%</span>
+                      <div className="h-1.5 w-20 overflow-hidden rounded-full bg-blue-100 dark:bg-blue-900/40">
+                        <div
+                          className="h-full rounded-full bg-blue-500 transition-all duration-200"
+                          style={{ width: `${adjunto.progreso}%` }}
+                        />
+                      </div>
+                    </div>
                   )}
                   {adjunto.estado === "ok" && (
                     <svg className="h-5 w-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1702,7 +1741,17 @@ export default function New() {
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-xs font-medium text-gray-800 dark:text-gray-200">{adj.file.name}</p>
                       </div>
-                      {adj.estado === "subiendo" && <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />}
+                      {adj.estado === "subiendo" && (
+                        <div className="flex min-w-[64px] flex-col items-end gap-1">
+                          <span className="text-[10px] font-medium text-blue-600 dark:text-blue-400">{adj.progreso}%</span>
+                          <div className="h-1 w-16 overflow-hidden rounded-full bg-blue-100 dark:bg-blue-900/40">
+                            <div
+                              className="h-full rounded-full bg-blue-500 transition-all duration-200"
+                              style={{ width: `${adj.progreso}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
                       {adj.estado === "ok" && <svg className="h-4 w-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>}
                       {adj.estado === "error" && <span className="text-xs font-medium text-red-600">Error</span>}
                       {adj.estado === "pendiente" && (

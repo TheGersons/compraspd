@@ -232,6 +232,54 @@ export async function apiNoRefresh<T>(
 }
 
 // ============================================================================
+// UPLOAD CON PROGRESO (XHR — fetch no soporta upload progress)
+// ============================================================================
+
+/**
+ * Sube un FormData con reporte de progreso (0-100).
+ * Intenta refresh de token si recibe 401.
+ */
+export function uploadWithProgress(
+  url: string,
+  formData: FormData,
+  onProgress: (percent: number) => void,
+): Promise<void> {
+  const doUpload = (token: string | null) =>
+    new Promise<{ status: number; body: string }>((resolve) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url);
+      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+      };
+      xhr.onload = () => resolve({ status: xhr.status, body: xhr.responseText });
+      xhr.onerror = () => resolve({ status: 0, body: '' });
+      xhr.send(formData);
+    });
+
+  return (async () => {
+    let token = getToken();
+    let { status, body } = await doUpload(token);
+
+    if (status === 401 && getRefreshToken()) {
+      const newToken = await refreshAccessToken();
+      if (newToken) ({ status, body } = await doUpload(newToken));
+    }
+
+    if (status >= 200 && status < 300) {
+      onProgress(100);
+      return;
+    }
+    try {
+      const err = JSON.parse(body);
+      throw new Error(err.message || `Error ${status}`);
+    } catch {
+      throw new Error(`Error ${status}`);
+    }
+  })();
+}
+
+// ============================================================================
 // FETCH AUTENTICADO (sin inyectar Content-Type, con auto-refresh)
 // ============================================================================
 
