@@ -4,6 +4,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { MailService } from '../Mail/mail.service';
+import { NotificacionService } from '../notifications/notificacion.service';
 
 type UserJwt = { sub: string; role?: string };
 
@@ -83,9 +85,16 @@ const CAMPOS_BOOLEAN = new Set<string>([
 
 const CAMPOS_EDITABLES = Object.keys(CAMPO_LABELS);
 
+const IMPORT_EXPORT_NOTIFICATION_EMAIL = 'importexport@energiapd.com';
+const ROLES_NOTIFICAR = ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'];
+
 @Injectable()
 export class ImportExportService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mailService: MailService,
+    private readonly notificacionService: NotificacionService,
+  ) {}
 
   private async verificarAcceso(user: UserJwt) {
     const usuario = await this.prisma.usuario.findUnique({
@@ -152,6 +161,54 @@ export class ImportExportService {
         data: faltantes.map((c) => ({ cotizacionId: c.id })),
         skipDuplicates: true,
       });
+
+      // Notificar por cada nuevo seguimiento creado
+      const frontendUrl =
+        process.env.FRONTEND_URL_SANDBOX ||
+        process.env.FRONTEND_URL ||
+        'http://localhost:5173';
+      const url = `${frontendUrl}/import-export`;
+
+      const usuariosNotificar = await this.prisma.usuario.findMany({
+        where: { rol: { nombre: { in: ROLES_NOTIFICAR } } },
+        select: { id: true },
+      });
+      const userIds = usuariosNotificar.map((u) => u.id);
+
+      for (const c of faltantes) {
+        const nombre = (c as any).nombreCotizacion ?? c.id;
+        const solicitante = (c as any).solicitante?.nombre ?? '—';
+
+        // Email
+        this.mailService
+          .sendNuevoSeguimientoNotification(
+            IMPORT_EXPORT_NOTIFICATION_EMAIL,
+            nombre,
+            solicitante,
+            url,
+          )
+          .catch(() => {});
+
+        // In-app notifications
+        if (userIds.length > 0) {
+          const titulo = 'Nuevo seguimiento Import/Export';
+          const descripcion = `Cotización "${nombre}" (solicitante: ${solicitante}) ingresó al módulo.`;
+          await this.notificacionService.createBulk(
+            userIds,
+            'IMPORT_EXPORT',
+            titulo,
+            descripcion,
+          );
+          for (const uid of userIds) {
+            this.notificacionService.emitToUser(uid, {
+              tipo: 'IMPORT_EXPORT',
+              titulo,
+              descripcion,
+            });
+          }
+        }
+      }
+
       return this.listar(user);
     }
 
