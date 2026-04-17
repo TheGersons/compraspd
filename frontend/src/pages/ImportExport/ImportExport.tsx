@@ -815,7 +815,7 @@ export default function ImportExport() {
                     <Th>TIPO IMP/EXP</Th><Th>PAIS ORIGEN</Th><Th>DESTINO</Th>
                     <Th>INCOTERMS</Th><Th>TERMINOS PAGO</Th><Th>FORMA PAGO</Th>
                     <Th>TIPO TRANSP.</Th><Th>TIPO EMBARQUE</Th>
-                    <Th>BL / TRACKING</Th>
+                    <Th>BL / TRACKING</Th><Th>ACTUALIZACION</Th>
                     <Th>PUERTO ORIGEN</Th><Th>PUERTO DESTINO</Th>
                     <Th>AGENTE ADUANAL</Th><Th>NAVIERA / FORWARDER</Th><Th>CONTENEDOR</Th>
                     <Th>F. OC</Th><Th>F. LISTO EMB.</Th><Th>F. ETD</Th><Th>F. ETA</Th>
@@ -824,7 +824,6 @@ export default function ImportExport() {
                     <Th>F. REVISION</Th><Th>F. LEVANTE</Th>
                     <Th>F. GATE PASS</Th><Th>F. ENTREGA FINAL</Th>
                     <Th>T. ENTREGA (GATE-MANIF.)</Th>
-                    <Th>ACTUALIZACION</Th>
                     <Th>OBSERVACIONES</Th>
                   </tr>
                 </thead>
@@ -865,11 +864,10 @@ export default function ImportExport() {
                         <Td><TextCell value={r.formaPago} onSave={(v) => actualizarCampo(r.id, "formaPago", v)} /></Td>
                         <Td><TextCell value={r.tipoTransporte || r.medioTransporte} onSave={(v) => actualizarCampo(r.id, "tipoTransporte", v)} /></Td>
                         <Td><SelectCell value={r.tipoEmbarque} options={TIPO_EMBARQUE_OPTIONS} onSave={(v) => actualizarCampo(r.id, "tipoEmbarque", v)} /></Td>
+                        <Td><TextCell value={r.bookingBl} onSave={(v) => actualizarCampo(r.id, "bookingBl", v)} minWidth="120px" /></Td>
                         <Td>
-                          <BLTrackingCell
-                            bookingBl={r.bookingBl} tracking={r.tracking}
-                            onSavebl={(v) => actualizarCampo(r.id, "bookingBl", v)}
-                            onSaveTracking={(v) => actualizarCampo(r.id, "tracking", v)} />
+                          <ActualizacionCell remesa={r.remesaNotificado} bl={r.blTelexReleased} poliza={r.polizaSeguroRecibida} factura={r.factura}
+                            onToggle={(k, v) => actualizarCampo(r.id, k, v)} />
                         </Td>
                         <Td><TextCell value={r.puertoSalida} onSave={(v) => actualizarCampo(r.id, "puertoSalida", v)} /></Td>
                         <Td><TextCell value={r.puertoLlegada} onSave={(v) => actualizarCampo(r.id, "puertoLlegada", v)} /></Td>
@@ -889,10 +887,6 @@ export default function ImportExport() {
                         <Td><DateCell value={r.fechaGatePass} onSave={(v) => actualizarCampo(r.id, "fechaGatePass", v)} /></Td>
                         <Td><DateCell value={r.fechaEntregaFinal} onSave={(v) => actualizarCampo(r.id, "fechaEntregaFinal", v)} /></Td>
                         <Td><span className="block whitespace-nowrap px-1 py-0.5 text-xs font-medium text-gray-600 dark:text-gray-300">{calcDiasEntrega(r)}</span></Td>
-                        <Td>
-                          <ActualizacionCell remesa={r.remesaNotificado} bl={r.blTelexReleased} poliza={r.polizaSeguroRecibida} factura={r.factura}
-                            onToggle={(k, v) => actualizarCampo(r.id, k, v)} />
-                        </Td>
                         <Td><TextCell value={r.observaciones} onSave={(v) => actualizarCampo(r.id, "observaciones", v)} minWidth="160px" /></Td>
                       </tr>
                     );
