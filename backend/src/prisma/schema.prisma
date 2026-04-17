@@ -1097,6 +1097,8 @@ model SeguimientoInternacional {
   cotizacionId String @unique @map("cotizacion_id") @db.Uuid
 
   // Campos de texto
+  tipoOperacion       String? @map("tipo_operacion") @db.VarChar(20)
+  prioridad           String? @db.VarChar(20)
   proveedor           String? @db.Text
   marcaModelo         String? @map("marca_modelo") @db.Text
   nombreMaterial      String? @map("nombre_material") @db.Text
@@ -1106,10 +1108,12 @@ model SeguimientoInternacional {
   destino             String? @db.Text
   estado              String? @db.VarChar(100)
   seguimiento         String? @db.Text
+  detalles            String? @db.Text
   incoterms           String? @db.VarChar(50)
   terminosPago        String? @map("terminos_pago") @db.Text
   formaPago           String? @map("forma_pago") @db.VarChar(100)
   tipoTransporte      String? @map("tipo_transporte") @db.VarChar(50)
+  tipoEmbarque        String? @map("tipo_embarque") @db.VarChar(50)
   bookingBl           String? @map("booking_bl") @db.VarChar(150)
   tracking            String? @db.Text
   puertoSalida        String? @map("puerto_salida") @db.VarChar(150)

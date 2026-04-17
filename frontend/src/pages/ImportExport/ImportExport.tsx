@@ -24,6 +24,8 @@ type Seguimiento = {
   medioTransporte: string | null;
   tipoEntrega: string | null;
   fechaComprado: string | null;
+  tipoOperacion: string | null;
+  prioridad: string | null;
   proveedor: string | null;
   marcaModelo: string | null;
   nombreMaterial: string | null;
@@ -33,10 +35,12 @@ type Seguimiento = {
   destino: string | null;
   estado: string | null;
   seguimiento: string | null;
+  detalles: string | null;
   incoterms: string | null;
   terminosPago: string | null;
   formaPago: string | null;
   tipoTransporte: string | null;
+  tipoEmbarque: string | null;
   bookingBl: string | null;
   tracking: string | null;
   puertoSalida: string | null;
@@ -77,68 +81,95 @@ type Log = {
   fecha: string;
 };
 
-// ─── Estado config ────────────────────────────────────────────────────────────
+// ─── Estado config ─────────────────────────────────────────────────────────
 
 const ESTADO_OPTIONS = ["EN PROCESO", "EN COORDINACION", "EN TRANSITO", "EN ADUANA", "RECIBIDO", "CANCELADO"] as const;
 
-// Clases Tailwind para UI
 const ESTADO_STYLES: Record<string, { bg: string; text: string }> = {
-  "EN PROCESO": { bg: "bg-orange-100 dark:bg-orange-900/30", text: "text-orange-800 dark:text-orange-300" },
-  "EN COORDINACION": { bg: "bg-pink-100 dark:bg-pink-900/20", text: "text-pink-700 dark:text-pink-300" },
-  "EN TRANSITO": { bg: "bg-yellow-100 dark:bg-yellow-900/20", text: "text-yellow-800 dark:text-yellow-400" },
-  "EN ADUANA": { bg: "bg-blue-100 dark:bg-blue-900/20", text: "text-blue-800 dark:text-blue-300" },
-  "RECIBIDO": { bg: "bg-emerald-100 dark:bg-emerald-900/20", text: "text-emerald-800 dark:text-emerald-300" },
-  "CANCELADO": { bg: "bg-red-100 dark:bg-red-900/20", text: "text-red-800 dark:text-red-300" },
+  "EN PROCESO":      { bg: "bg-orange-100 dark:bg-orange-900/30",  text: "text-orange-800 dark:text-orange-300" },
+  "EN COORDINACION": { bg: "bg-pink-100 dark:bg-pink-900/20",      text: "text-pink-700 dark:text-pink-300" },
+  "EN TRANSITO":     { bg: "bg-yellow-100 dark:bg-yellow-900/20",  text: "text-yellow-800 dark:text-yellow-400" },
+  "EN ADUANA":       { bg: "bg-blue-100 dark:bg-blue-900/20",      text: "text-blue-800 dark:text-blue-300" },
+  "RECIBIDO":        { bg: "bg-emerald-100 dark:bg-emerald-900/20",text: "text-emerald-800 dark:text-emerald-300" },
+  "CANCELADO":       { bg: "bg-red-100 dark:bg-red-900/20",        text: "text-red-800 dark:text-red-300" },
 };
 
-// RGB para Excel/PDF export
 const ESTADO_RGB: Record<string, [number, number, number]> = {
-  "EN PROCESO": [254, 215, 170], // orange-200
-  "EN COORDINACION": [251, 207, 232], // pink-200
-  "EN TRANSITO": [254, 240, 138], // yellow-200
-  "EN ADUANA": [191, 219, 254], // blue-200
-  "RECIBIDO": [167, 243, 208], // emerald-200
-  "CANCELADO": [254, 202, 202], // red-200
+  "EN PROCESO":      [254, 215, 170],
+  "EN COORDINACION": [251, 207, 232],
+  "EN TRANSITO":     [254, 240, 138],
+  "EN ADUANA":       [191, 219, 254],
+  "RECIBIDO":        [167, 243, 208],
+  "CANCELADO":       [254, 202, 202],
 };
 
-// ─── Campo labels ─────────────────────────────────────────────────────────────
+// ─── Prioridad config ───────────────────────────────────────────────────────
+
+const PRIORIDAD_OPTIONS = ["NORMAL", "URGENTE", "CRITICO"] as const;
+
+const PRIORIDAD_STYLES: Record<string, { bg: string; text: string }> = {
+  "NORMAL":  { bg: "bg-blue-100 dark:bg-blue-900/30",   text: "text-blue-800 dark:text-blue-300" },
+  "URGENTE": { bg: "bg-orange-100 dark:bg-orange-900/30", text: "text-orange-800 dark:text-orange-300" },
+  "CRITICO": { bg: "bg-red-100 dark:bg-red-900/20",     text: "text-red-800 dark:text-red-300" },
+};
+
+const PRIORIDAD_RGB: Record<string, [number, number, number]> = {
+  "NORMAL":  [191, 219, 254],
+  "URGENTE": [254, 215, 170],
+  "CRITICO": [254, 202, 202],
+};
+
+// ─── Campo labels ───────────────────────────────────────────────────────────
 
 const CAMPO_LABELS_DISPLAY: Record<string, string> = {
+  tipoOperacion: "Tipo Operación", prioridad: "Prioridad",
   proveedor: "Proveedor", marcaModelo: "Marca / Modelo", nombreMaterial: "Nombre Material",
-  numeroOC: "# OC", tipoImportacion: "Tipo Importación", paisOrigenEdit: "País Origen",
-  destino: "Destino", estado: "Estado", seguimiento: "Seguimiento", incoterms: "Incoterms",
-  terminosPago: "Términos Pago", formaPago: "Forma Pago", tipoTransporte: "Tipo Transporte",
-  bookingBl: "Booking / BL", tracking: "Tracking", puertoSalida: "Pto. Salida",
-  puertoLlegada: "Pto. Llegada", agenteAduanal: "Agente Aduanal", naviera: "Naviera",
-  contenedor: "Contenedor", observaciones: "Observaciones", fechaOc: "Fecha OC",
-  fechaFabricacion: "Fecha Fabricación", fechaListoEmbarque: "Fecha Listo Embarque",
-  fechaEmbarque: "Fecha Embarque", fechaLlegadaPuerto: "Fecha Llegada Puerto",
-  fechaRetiroPuerto: "Fecha Retiro Puerto", fechaLiberacionAduana: "Fecha Lib. Aduana",
-  fechaEntregaFinal: "Fecha Entrega Final", fechaPagoProveedor: "Fecha Pago Proveedor",
-  fechaDocumentosCompletos: "Fecha Docs. Completos", remesaNotificado: "Remesa Notificado",
-  blTelexReleased: "BL Telex Released", polizaSeguroRecibida: "Póliza Seguro Recibida",
+  numeroOC: "# OC", tipoImportacion: "Tipo Import/Export", paisOrigenEdit: "País Origen",
+  destino: "Destino", estado: "Estado", seguimiento: "Seguimiento", detalles: "Detalles",
+  incoterms: "Incoterms", terminosPago: "Términos Pago", formaPago: "Forma Pago",
+  tipoTransporte: "Tipo Transporte", tipoEmbarque: "Tipo Embarque",
+  bookingBl: "BL / Tracking", tracking: "Tracking",
+  puertoSalida: "Puerto Origen", puertoLlegada: "Puerto Destino",
+  agenteAduanal: "Agente Aduanal", naviera: "Naviera / Forwarder",
+  contenedor: "Contenedor", observaciones: "Observaciones",
+  fechaOc: "Fecha OC", fechaFabricacion: "Fecha Fabricación",
+  fechaListoEmbarque: "Fecha Listo Embarque", fechaEmbarque: "Fecha ETD",
+  fechaLlegadaPuerto: "Fecha ETA", fechaRetiroPuerto: "Fecha Manifiesto",
+  fechaEmisionBoletinImpuesto: "Fecha Emis. Boletín",
+  fechaPagoBoletin: "Fecha Pago Boletín", fechaSelectivo: "Fecha Selectivo",
+  fechaRevision: "Fecha Revisión", fechaLevante: "Fecha Levante",
+  fechaLiberacionAduana: "Fecha Lib. Aduana",
+  fechaGatePass: "Fecha Gate Pass", fechaEntregaFinal: "Fecha Entrega Final",
+  fechaPagoProveedor: "Fecha Pago Proveedor", fechaDocumentosCompletos: "Fecha Docs. Compl.",
+  remesaNotificado: "Remesa Notificado", blTelexReleased: "BL Telex Released",
+  polizaSeguroRecibida: "Póliza Seguro Recibida",
 };
 
-// ─── Search columns ───────────────────────────────────────────────────────────
+// ─── Options ────────────────────────────────────────────────────────────────
+
+const TIPO_IMPORTACION_OPTIONS = ["Temporal", "Definitiva"];
+const TIPO_EMBARQUE_OPTIONS = ["LCL", "FCL", "FTL", "FLT", "RORO/BREAKBULK", "AEREO"];
+
+// ─── Search columns ─────────────────────────────────────────────────────────
 
 const SEARCH_COLUMNS = [
   { key: "nombreCotizacion", label: "Cotización" },
   { key: "proveedor", label: "Proveedor" },
   { key: "numeroOC", label: "# OC" },
-  { key: "bookingBl", label: "Booking / BL" },
+  { key: "bookingBl", label: "BL / Tracking" },
   { key: "contenedor", label: "Contenedor" },
   { key: "descripcionProducto", label: "Descripción" },
   { key: "paisOrigen", label: "País Origen" },
   { key: "solicitante", label: "Solicitante" },
   { key: "proyecto", label: "Proyecto" },
   { key: "naviera", label: "Naviera" },
-  { key: "tracking", label: "Tracking" },
   { key: "estado", label: "Estado" },
+  { key: "prioridad", label: "Prioridad" },
 ];
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> {
   const token = getToken();
@@ -170,6 +201,14 @@ function toDateInput(d: string | null | undefined) {
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 
+function calcDiasEntrega(r: Seguimiento): string {
+  if (!r.fechaGatePass || !r.fechaRetiroPuerto) return "—";
+  const gate = new Date(r.fechaGatePass).getTime();
+  const manifiesto = new Date(r.fechaRetiroPuerto).getTime();
+  const dias = Math.round((gate - manifiesto) / (1000 * 60 * 60 * 24));
+  return `${dias} días`;
+}
+
 // ─── Inline editors ───────────────────────────────────────────────────────────
 
 function TextCell({ value, onSave, minWidth = "80px" }: { value: string | null; onSave: (v: string | null) => void; minWidth?: string }) {
@@ -180,14 +219,20 @@ function TextCell({ value, onSave, minWidth = "80px" }: { value: string | null; 
 
   if (!editing)
     return (
-      <span style={{ minWidth }} className="block cursor-pointer rounded px-1 py-0.5 text-xs hover:bg-blue-50 dark:hover:bg-blue-900/20"
-        onClick={() => { setDraft(value ?? ""); setEditing(true); }} title="Clic para editar">
+      <span
+        tabIndex={0}
+        style={{ minWidth }}
+        className="block cursor-pointer rounded px-1 py-0.5 text-xs hover:bg-blue-50 dark:hover:bg-blue-900/20 focus:outline-none focus:ring-1 focus:ring-blue-400 focus:ring-offset-0"
+        onClick={() => { setDraft(value ?? ""); setEditing(true); }}
+        onFocus={() => { setDraft(value ?? ""); setEditing(true); }}
+        title="Clic para editar">
         {value || <span className="text-gray-300 dark:text-gray-600">—</span>}
       </span>
     );
 
   return (
-    <input ref={ref} className="w-full min-w-[100px] rounded border border-blue-400 px-1.5 py-0.5 text-xs outline-none dark:bg-gray-700 dark:text-white"
+    <input ref={ref}
+      className="w-full min-w-[100px] rounded border border-blue-400 px-1.5 py-0.5 text-xs outline-none dark:bg-gray-700 dark:text-white"
       value={draft} onChange={(e) => setDraft(e.target.value)}
       onBlur={() => { setEditing(false); onSave(draft.trim() || null); }}
       onKeyDown={(e) => {
@@ -202,8 +247,12 @@ function LongTextCell({ value, onSave, label }: { value: string | null; onSave: 
   const [draft, setDraft] = useState(value ?? "");
   return (
     <>
-      <span className="block max-w-[200px] cursor-pointer truncate rounded px-1 py-0.5 text-xs hover:bg-blue-50 dark:hover:bg-blue-900/20"
-        onClick={() => { setDraft(value ?? ""); setOpen(true); }} title={value ?? "Clic para editar"}>
+      <span
+        tabIndex={0}
+        className="block max-w-[200px] cursor-pointer truncate rounded px-1 py-0.5 text-xs hover:bg-blue-50 dark:hover:bg-blue-900/20 focus:outline-none focus:ring-1 focus:ring-blue-400"
+        onClick={() => { setDraft(value ?? ""); setOpen(true); }}
+        onFocus={() => { setDraft(value ?? ""); setOpen(true); }}
+        title={value ?? "Clic para editar"}>
         {value || <span className="text-gray-300 dark:text-gray-600">—</span>}
       </span>
       {open && (
@@ -230,8 +279,12 @@ function DateCell({ value, onSave }: { value: string | null; onSave: (v: string 
 
   if (!editing)
     return (
-      <span className="block cursor-pointer rounded px-1 py-0.5 text-xs hover:bg-blue-50 dark:hover:bg-blue-900/20"
-        onClick={() => setEditing(true)} title="Clic para editar fecha">
+      <span
+        tabIndex={0}
+        className="block cursor-pointer rounded px-1 py-0.5 text-xs hover:bg-blue-50 dark:hover:bg-blue-900/20 focus:outline-none focus:ring-1 focus:ring-blue-400"
+        onClick={() => setEditing(true)}
+        onFocus={() => setEditing(true)}
+        title="Clic para editar fecha">
         {value ? fmtDateDMY(value) : <span className="text-gray-300 dark:text-gray-600">—</span>}
       </span>
     );
@@ -242,6 +295,16 @@ function DateCell({ value, onSave }: { value: string | null; onSave: (v: string 
       defaultValue={toDateInput(value)}
       onBlur={(e) => { setEditing(false); onSave(e.target.value ? new Date(e.target.value).toISOString() : null); }}
       onKeyDown={(e) => { if (e.key === "Escape") setEditing(false); }} />
+  );
+}
+
+function SelectCell({ value, options, onSave }: { value: string | null; options: string[]; onSave: (v: string | null) => void }) {
+  return (
+    <select value={value ?? ""} onChange={(e) => onSave(e.target.value || null)}
+      className="cursor-pointer rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-xs outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+      <option value="">—</option>
+      {options.map((o) => <option key={o} value={o}>{o}</option>)}
+    </select>
   );
 }
 
@@ -256,21 +319,99 @@ function EstadoCell({ value, onSave }: { value: string | null; onSave: (v: strin
   );
 }
 
+function PrioridadCell({ value, onSave }: { value: string | null; onSave: (v: string | null) => void }) {
+  const style = value ? PRIORIDAD_STYLES[value] : null;
+  return (
+    <select value={value ?? ""} onChange={(e) => onSave(e.target.value || null)}
+      className={`cursor-pointer rounded px-1.5 py-0.5 text-xs font-medium outline-none border-0 ${style ? `${style.bg} ${style.text}` : "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400"}`}>
+      <option value="">— Sin prioridad</option>
+      {PRIORIDAD_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+    </select>
+  );
+}
+
+function TipoOperacionCell({ value, onSave }: { value: string | null; onSave: (v: string | null) => void }) {
+  return (
+    <select value={value ?? ""} onChange={(e) => onSave(e.target.value || null)}
+      className={`cursor-pointer rounded px-1.5 py-0.5 text-xs font-medium outline-none border-0 ${
+        value === "IMPORTACION" ? "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300" :
+        value === "EXPORTACION" ? "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300" :
+        "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400"
+      }`}>
+      <option value="">— Tipo</option>
+      <option value="IMPORTACION">Importación</option>
+      <option value="EXPORTACION">Exportación</option>
+    </select>
+  );
+}
+
+function BLTrackingCell({ bookingBl, tracking, onSavebl, onSaveTracking }: {
+  bookingBl: string | null;
+  tracking: string | null;
+  onSavebl: (v: string | null) => void;
+  onSaveTracking: (v: string | null) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draftBl, setDraftBl] = useState(bookingBl ?? "");
+  const [draftTrack, setDraftTrack] = useState(tracking ?? "");
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const blRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { if (editing) blRef.current?.focus(); }, [editing]);
+
+  const save = () => {
+    setEditing(false);
+    onSavebl(draftBl.trim() || null);
+    onSaveTracking(draftTrack.trim() || null);
+  };
+
+  if (!editing) {
+    const display = [bookingBl, tracking].filter(Boolean).join(" / ") || null;
+    return (
+      <span
+        tabIndex={0}
+        className="block max-w-[180px] cursor-pointer truncate rounded px-1 py-0.5 text-xs hover:bg-blue-50 dark:hover:bg-blue-900/20 focus:outline-none focus:ring-1 focus:ring-blue-400"
+        onClick={() => { setDraftBl(bookingBl ?? ""); setDraftTrack(tracking ?? ""); setEditing(true); }}
+        onFocus={() => { setDraftBl(bookingBl ?? ""); setDraftTrack(tracking ?? ""); setEditing(true); }}
+        title="Clic para editar">
+        {display || <span className="text-gray-300 dark:text-gray-600">—</span>}
+      </span>
+    );
+  }
+
+  return (
+    <div ref={wrapRef} className="flex flex-col gap-0.5 min-w-[150px]"
+      onBlur={(e) => { if (!wrapRef.current?.contains(e.relatedTarget as Node)) save(); }}>
+      <input ref={blRef}
+        className="rounded border border-blue-400 px-1.5 py-0.5 text-xs outline-none dark:bg-gray-700 dark:text-white"
+        placeholder="Booking / BL"
+        value={draftBl} onChange={(e) => setDraftBl(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }} />
+      <input
+        className="rounded border border-blue-400 px-1.5 py-0.5 text-xs outline-none dark:bg-gray-700 dark:text-white"
+        placeholder="Tracking"
+        value={draftTrack} onChange={(e) => setDraftTrack(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }} />
+    </div>
+  );
+}
+
 function ActualizacionCell({ remesa, bl, poliza, onToggle }: {
   remesa: boolean; bl: boolean; poliza: boolean;
   onToggle: (k: "remesaNotificado" | "blTelexReleased" | "polizaSeguroRecibida", v: boolean) => void;
 }) {
   const items: { key: "remesaNotificado" | "blTelexReleased" | "polizaSeguroRecibida"; label: string; value: boolean }[] = [
-    { key: "remesaNotificado", label: "Remesa Notificado", value: remesa },
-    { key: "blTelexReleased", label: "BL Telex Released", value: bl },
-    { key: "polizaSeguroRecibida", label: "Póliza Seguro Recibida", value: poliza },
+    { key: "remesaNotificado", label: "Remesa", value: remesa },
+    { key: "blTelexReleased", label: "BL Telex", value: bl },
+    { key: "polizaSeguroRecibida", label: "Póliza", value: poliza },
   ];
   return (
     <div className="flex flex-col gap-1">
       {items.map((it) => (
         <button key={it.key} onClick={() => onToggle(it.key, !it.value)}
-          className={`flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors ${it.value ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300"
-              : "bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-300"}`}>
+          className={`flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors ${it.value
+            ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300"
+            : "bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-300"}`}>
           <span>{it.value ? "✓" : "✗"}</span>
           <span className="whitespace-nowrap">{it.label}</span>
         </button>
@@ -347,65 +488,57 @@ function LogDrawer({ seguimientoId, onClose }: { seguimientoId: string; onClose:
 
 // ─── Export helpers ───────────────────────────────────────────────────────────
 
-function calcDiasEntrega(r: Seguimiento): string {
-  if (!r.fechaGatePass || !r.fechaRetiroPuerto) return "—";
-  const gate = new Date(r.fechaGatePass).getTime();
-  const manifiesto = new Date(r.fechaRetiroPuerto).getTime();
-  const dias = Math.round((gate - manifiesto) / (1000 * 60 * 60 * 24));
-  return `${dias} días`;
-}
-
 type ExportCol = { label: string; get: (r: Seguimiento) => string };
 
 const EXPORT_COLS: ExportCol[] = [
-  { label: "Seguimiento", get: (r) => r.seguimiento ?? "" },
-  { label: "Estado", get: (r) => r.estado ?? "" },
-  { label: "Cotización", get: (r) => r.nombreCotizacion },
-  { label: "Solicitante", get: (r) => r.solicitante ?? "" },
-  { label: "Proyecto", get: (r) => r.proyecto ?? "" },
-  { label: "Descripción", get: (r) => r.descripcionProducto },
-  { label: "Proveedor", get: (r) => r.proveedor ?? "" },
-  { label: "Marca / Modelo", get: (r) => r.marcaModelo ?? "" },
-  { label: "Nombre Material", get: (r) => r.nombreMaterial ?? "" },
-  { label: "# OC", get: (r) => r.numeroOC ?? r.ordenCompraCotizacion ?? "" },
-  { label: "Tipo Importación", get: (r) => r.tipoImportacion ?? "" },
-  { label: "País Origen", get: (r) => r.paisOrigenEdit ?? r.paisOrigen ?? "" },
-  { label: "Destino", get: (r) => r.destino ?? "" },
-  { label: "Incoterms", get: (r) => r.incoterms ?? r.tipoEntrega ?? "" },
-  { label: "Términos Pago", get: (r) => r.terminosPago ?? "" },
-  { label: "Forma Pago", get: (r) => r.formaPago ?? "" },
-  { label: "Tipo Transporte", get: (r) => r.tipoTransporte ?? r.medioTransporte ?? "" },
-  { label: "Booking / BL", get: (r) => r.bookingBl ?? "" },
-  { label: "Tracking", get: (r) => r.tracking ?? "" },
-  { label: "Pto. Salida", get: (r) => r.puertoSalida ?? "" },
-  { label: "Pto. Llegada", get: (r) => r.puertoLlegada ?? "" },
-  { label: "Agente Aduanal", get: (r) => r.agenteAduanal ?? "" },
-  { label: "Naviera", get: (r) => r.naviera ?? "" },
-  { label: "Contenedor", get: (r) => r.contenedor ?? "" },
-  { label: "F. OC", get: (r) => fmtDateDMY(r.fechaOc) },
-  { label: "F. Fabricación", get: (r) => fmtDateDMY(r.fechaFabricacion) },
-  { label: "F. Listo Emb.", get: (r) => fmtDateDMY(r.fechaListoEmbarque) },
-  { label: "F. ETD", get: (r) => fmtDateDMY(r.fechaEmbarque) },
-  { label: "F. ETA", get: (r) => fmtDateDMY(r.fechaLlegadaPuerto) },
-  { label: "F. de Manifiesto", get: (r) => fmtDateDMY(r.fechaRetiroPuerto) },
-  { label: "F. emision boletin Impuesto", get: (r) => fmtDateDMY(r.fechaEmisionBoletinImpuesto) },
-  { label: "F. pago de boletin", get: (r) => fmtDateDMY(r.fechaPagoBoletin) },
-  { label: "F. Selectivo", get: (r) => fmtDateDMY(r.fechaSelectivo) },
-  { label: "F. Revision (Si aplica)", get: (r) => fmtDateDMY(r.fechaRevision) },
-  { label: "F. Levante", get: (r) => fmtDateDMY(r.fechaLevante) },
-  { label: "F. Lib. Aduana", get: (r) => fmtDateDMY(r.fechaLiberacionAduana) },
-  { label: "F. GATE PASS", get: (r) => fmtDateDMY(r.fechaGatePass) },
-  { label: "F. Entrega Final", get: (r) => fmtDateDMY(r.fechaEntregaFinal) },
-  { label: "Tiempo de Entrega (gatepass - manifiesto)", get: (r) => calcDiasEntrega(r) },
-  { label: "F. Docs. Compl.", get: (r) => fmtDateDMY(r.fechaDocumentosCompletos) },
-  { label: "Remesa Notificado", get: (r) => r.remesaNotificado ? "Sí" : "No" },
-  { label: "BL Telex Released", get: (r) => r.blTelexReleased ? "Sí" : "No" },
-  { label: "Póliza Seguro", get: (r) => r.polizaSeguroRecibida ? "Sí" : "No" },
-  { label: "Observaciones", get: (r) => r.observaciones ?? "" },
+  { label: "Tipo Operación",        get: (r) => r.tipoOperacion ?? "" },
+  { label: "Estado",                get: (r) => r.estado ?? "" },
+  { label: "# OC",                  get: (r) => r.numeroOC ?? r.ordenCompraCotizacion ?? "" },
+  { label: "Prioridad",             get: (r) => r.prioridad ?? "" },
+  { label: "Seguimiento",           get: (r) => r.seguimiento ?? "" },
+  { label: "Detalles",              get: (r) => r.detalles ?? "" },
+  { label: "Cotización",            get: (r) => r.nombreCotizacion },
+  { label: "Solicitante",           get: (r) => r.solicitante ?? "" },
+  { label: "Proyecto",              get: (r) => r.proyecto ?? "" },
+  { label: "Descripción",           get: (r) => r.descripcionProducto },
+  { label: "Proveedor",             get: (r) => r.proveedor ?? "" },
+  { label: "Marca / Modelo",        get: (r) => r.marcaModelo ?? "" },
+  { label: "Nombre Material",       get: (r) => r.nombreMaterial ?? "" },
+  { label: "Tipo Import/Export",    get: (r) => r.tipoImportacion ?? "" },
+  { label: "País Origen",           get: (r) => r.paisOrigenEdit ?? r.paisOrigen ?? "" },
+  { label: "Destino",               get: (r) => r.destino ?? "" },
+  { label: "Incoterms",             get: (r) => r.incoterms ?? r.tipoEntrega ?? "" },
+  { label: "Términos Pago",         get: (r) => r.terminosPago ?? "" },
+  { label: "Forma Pago",            get: (r) => r.formaPago ?? "" },
+  { label: "Tipo Transporte",       get: (r) => r.tipoTransporte ?? r.medioTransporte ?? "" },
+  { label: "Tipo Embarque",         get: (r) => r.tipoEmbarque ?? "" },
+  { label: "BL / Tracking",         get: (r) => [r.bookingBl, r.tracking].filter(Boolean).join(" / ") },
+  { label: "Puerto Origen",         get: (r) => r.puertoSalida ?? "" },
+  { label: "Puerto Destino",        get: (r) => r.puertoLlegada ?? "" },
+  { label: "Agente Aduanal",        get: (r) => r.agenteAduanal ?? "" },
+  { label: "Naviera / Forwarder",   get: (r) => r.naviera ?? "" },
+  { label: "Contenedor",            get: (r) => r.contenedor ?? "" },
+  { label: "F. OC",                 get: (r) => fmtDateDMY(r.fechaOc) },
+  { label: "F. Listo Emb.",         get: (r) => fmtDateDMY(r.fechaListoEmbarque) },
+  { label: "F. ETD",                get: (r) => fmtDateDMY(r.fechaEmbarque) },
+  { label: "F. ETA",                get: (r) => fmtDateDMY(r.fechaLlegadaPuerto) },
+  { label: "F. de Manifiesto",      get: (r) => fmtDateDMY(r.fechaRetiroPuerto) },
+  { label: "F. Emis. Boletín Imp.", get: (r) => fmtDateDMY(r.fechaEmisionBoletinImpuesto) },
+  { label: "F. Pago Boletín",       get: (r) => fmtDateDMY(r.fechaPagoBoletin) },
+  { label: "F. Selectivo",          get: (r) => fmtDateDMY(r.fechaSelectivo) },
+  { label: "F. Revisión",           get: (r) => fmtDateDMY(r.fechaRevision) },
+  { label: "F. Levante",            get: (r) => fmtDateDMY(r.fechaLevante) },
+  { label: "F. Gate Pass",          get: (r) => fmtDateDMY(r.fechaGatePass) },
+  { label: "F. Entrega Final",      get: (r) => fmtDateDMY(r.fechaEntregaFinal) },
+  { label: "T. Entrega (Gate-Manif.)", get: (r) => calcDiasEntrega(r) },
+  { label: "Remesa Notificado",     get: (r) => r.remesaNotificado ? "Sí" : "No" },
+  { label: "BL Telex Released",     get: (r) => r.blTelexReleased ? "Sí" : "No" },
+  { label: "Póliza Seguro",         get: (r) => r.polizaSeguroRecibida ? "Sí" : "No" },
+  { label: "Observaciones",         get: (r) => r.observaciones ?? "" },
 ];
 
-// Índice de la columna Estado en EXPORT_COLS (para colorear en Excel)
-const ESTADO_COL_IDX = EXPORT_COLS.findIndex((c) => c.label === "Estado");
+const ESTADO_COL_IDX    = EXPORT_COLS.findIndex((c) => c.label === "Estado");
+const PRIORIDAD_COL_IDX = EXPORT_COLS.findIndex((c) => c.label === "Prioridad");
 
 function exportExcel(rows: Seguimiento[]) {
   const wb = XLSX.utils.book_new();
@@ -414,25 +547,31 @@ function exportExcel(rows: Seguimiento[]) {
     ...rows.map((r) => EXPORT_COLS.map((c) => c.get(r))),
   ]);
 
-  // Ancho de columnas
   ws["!cols"] = EXPORT_COLS.map(() => ({ wch: 18 }));
 
-  // Colorear celda ESTADO por fila
   rows.forEach((r, rowIdx) => {
+    // Estado color
     const estado = r.estado;
-    if (!estado || !ESTADO_RGB[estado]) return;
-    const [red, green, blue] = ESTADO_RGB[estado];
-    const hexFill = ((red << 16) | (green << 8) | blue).toString(16).padStart(6, "0");
-    const cellAddr = XLSX.utils.encode_cell({ r: rowIdx + 1, c: ESTADO_COL_IDX });
-    if (!ws[cellAddr]) ws[cellAddr] = { t: "s", v: estado };
-    ws[cellAddr].s = {
-      fill: { patternType: "solid", fgColor: { rgb: hexFill } },
-      font: { bold: true },
-    };
-    // Indicadores ACTUALIZACION — últimas 3 columnas antes de Observaciones
+    if (estado && ESTADO_RGB[estado]) {
+      const [red, green, blue] = ESTADO_RGB[estado];
+      const hex = ((red << 16) | (green << 8) | blue).toString(16).padStart(6, "0");
+      const addr = XLSX.utils.encode_cell({ r: rowIdx + 1, c: ESTADO_COL_IDX });
+      if (!ws[addr]) ws[addr] = { t: "s", v: estado };
+      ws[addr].s = { fill: { patternType: "solid", fgColor: { rgb: hex } }, font: { bold: true } };
+    }
+    // Prioridad color
+    const prioridad = r.prioridad;
+    if (prioridad && PRIORIDAD_RGB[prioridad]) {
+      const [red, green, blue] = PRIORIDAD_RGB[prioridad];
+      const hex = ((red << 16) | (green << 8) | blue).toString(16).padStart(6, "0");
+      const addr = XLSX.utils.encode_cell({ r: rowIdx + 1, c: PRIORIDAD_COL_IDX });
+      if (!ws[addr]) ws[addr] = { t: "s", v: prioridad };
+      ws[addr].s = { fill: { patternType: "solid", fgColor: { rgb: hex } }, font: { bold: true } };
+    }
+    // Actualizacion indicators
     const actCols = [
-      { key: "remesaNotificado", idx: EXPORT_COLS.findIndex((c) => c.label === "Remesa Notificado") },
-      { key: "blTelexReleased", idx: EXPORT_COLS.findIndex((c) => c.label === "BL Telex Released") },
+      { key: "remesaNotificado",     idx: EXPORT_COLS.findIndex((c) => c.label === "Remesa Notificado") },
+      { key: "blTelexReleased",      idx: EXPORT_COLS.findIndex((c) => c.label === "BL Telex Released") },
       { key: "polizaSeguroRecibida", idx: EXPORT_COLS.findIndex((c) => c.label === "Póliza Seguro") },
     ];
     actCols.forEach(({ key, idx }) => {
@@ -465,21 +604,21 @@ function exportPDF(rows: Seguimiento[]) {
     headStyles: { fillColor: [37, 99, 235], textColor: 255, fontStyle: "bold" },
     alternateRowStyles: { fillColor: [248, 250, 252] },
     didParseCell(data) {
-      if (data.section === "body" && data.column.index === ESTADO_COL_IDX) {
-        const estado = data.cell.raw as string;
-        const rgb = ESTADO_RGB[estado];
-        if (rgb) {
-          data.cell.styles.fillColor = rgb;
-          data.cell.styles.fontStyle = "bold";
-        }
+      if (data.section !== "body") return;
+      if (data.column.index === ESTADO_COL_IDX) {
+        const rgb = ESTADO_RGB[data.cell.raw as string];
+        if (rgb) { data.cell.styles.fillColor = rgb; data.cell.styles.fontStyle = "bold"; }
       }
-      // Colorear indicadores ACTUALIZACION
+      if (data.column.index === PRIORIDAD_COL_IDX) {
+        const rgb = PRIORIDAD_RGB[data.cell.raw as string];
+        if (rgb) { data.cell.styles.fillColor = rgb; data.cell.styles.fontStyle = "bold"; }
+      }
       const actIdxs = [
         EXPORT_COLS.findIndex((c) => c.label === "Remesa Notificado"),
         EXPORT_COLS.findIndex((c) => c.label === "BL Telex Released"),
         EXPORT_COLS.findIndex((c) => c.label === "Póliza Seguro"),
       ];
-      if (data.section === "body" && actIdxs.includes(data.column.index)) {
+      if (actIdxs.includes(data.column.index)) {
         const val = data.cell.raw as string;
         data.cell.styles.fillColor = val === "Sí" ? [167, 243, 208] : [254, 202, 202];
         data.cell.styles.textColor = val === "Sí" ? [6, 95, 70] : [153, 27, 27];
@@ -499,13 +638,11 @@ export default function ImportExport() {
   const [saving, setSaving] = useState<string | null>(null);
   const [logId, setLogId] = useState<string | null>(null);
 
-  // Filtros
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
   const [searchCol, setSearchCol] = useState("nombreCotizacion");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Paginación
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 
@@ -536,7 +673,6 @@ export default function ImportExport() {
     }
   };
 
-  // Filtrado
   const filtered = rows.filter((r) => {
     if (desde) { const d = new Date(r.fechaSolicitud); if (d < new Date(desde)) return false; }
     if (hasta) { const d = new Date(r.fechaSolicitud); const h = new Date(hasta); h.setHours(23, 59, 59); if (d > h) return false; }
@@ -548,11 +684,9 @@ export default function ImportExport() {
     return true;
   });
 
-  // Paginación
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const paginated = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
-
   const colLabel = SEARCH_COLUMNS.find((c) => c.key === searchCol)?.label ?? "columna";
 
   return (
@@ -566,7 +700,6 @@ export default function ImportExport() {
             <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Import-Export</h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">Seguimiento de cotizaciones internacionales</p>
           </div>
-          {/* Botones export */}
           <div className="flex items-center gap-2">
             <button onClick={() => exportExcel(filtered)} disabled={filtered.length === 0}
               className="flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-40 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400">
@@ -618,7 +751,6 @@ export default function ImportExport() {
               Limpiar
             </button>
           )}
-          {/* Filas por página */}
           <div className="ml-auto flex items-center gap-2 self-end">
             <label className="text-xs text-gray-500 dark:text-gray-400">Filas por página</label>
             <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
@@ -672,37 +804,48 @@ export default function ImportExport() {
               <table className="min-w-full text-xs">
                 <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-800">
                   <tr className="text-left">
-                    <Th>SEGUIMIENTO</Th><Th>ACTUALIZACION</Th><Th>ESTADO</Th>
+                    <Th>TIPO OPER.</Th><Th>ESTADO</Th><Th># OC</Th><Th>PRIORIDAD</Th>
+                    <Th>SEGUIMIENTO</Th><Th>DETALLES</Th>
                     <Th>COTIZACION</Th><Th>SOLICITANTE</Th><Th>PROYECTO</Th><Th>DESCRIPCION</Th>
-                    <Th>PROVEEDOR</Th><Th>MARCA / MODELO</Th><Th>NOMBRE MATERIAL</Th><Th># OC</Th>
-                    <Th>TIPO IMPORT.</Th><Th>PAIS ORIGEN</Th><Th>DESTINO</Th>
-                    <Th>INCOTERMS</Th><Th>TERMINOS PAGO</Th><Th>FORMA PAGO</Th><Th>TIPO TRANSP.</Th>
-                    <Th>BOOKING / BL</Th><Th>TRACKING</Th><Th>PTO. SALIDA</Th><Th>PTO. LLEGADA</Th>
-                    <Th>AGENTE ADUANAL</Th><Th>NAVIERA</Th><Th>CONTENEDOR</Th>
-                    <Th>F. OC</Th><Th>F. FABRICACION</Th><Th>F. LISTO EMB.</Th>
-                    <Th>F. ETD</Th><Th>F. ETA</Th><Th>F. MANIFIESTO</Th>
-                    <Th>F. EMIS. BOLETIN IMP.</Th><Th>F. PAGO BOLETIN</Th><Th>F. SELECTIVO</Th>
-                    <Th>F. REVISION</Th><Th>F. LEVANTE</Th><Th>F. LIB. ADUANA</Th>
+                    <Th>PROVEEDOR</Th><Th>MARCA / MODELO</Th><Th>NOMBRE MATERIAL</Th>
+                    <Th>TIPO IMP/EXP</Th><Th>PAIS ORIGEN</Th><Th>DESTINO</Th>
+                    <Th>INCOTERMS</Th><Th>TERMINOS PAGO</Th><Th>FORMA PAGO</Th>
+                    <Th>TIPO TRANSP.</Th><Th>TIPO EMBARQUE</Th>
+                    <Th>BL / TRACKING</Th>
+                    <Th>PUERTO ORIGEN</Th><Th>PUERTO DESTINO</Th>
+                    <Th>AGENTE ADUANAL</Th><Th>NAVIERA / FORWARDER</Th><Th>CONTENEDOR</Th>
+                    <Th>F. OC</Th><Th>F. LISTO EMB.</Th><Th>F. ETD</Th><Th>F. ETA</Th>
+                    <Th>F. MANIFIESTO</Th><Th>F. EMIS. BOLETIN IMP.</Th>
+                    <Th>F. PAGO BOLETIN</Th><Th>F. SELECTIVO</Th>
+                    <Th>F. REVISION</Th><Th>F. LEVANTE</Th>
                     <Th>F. GATE PASS</Th><Th>F. ENTREGA FINAL</Th>
-                    <Th>T. ENTREGA (GATE-MANIF.)</Th><Th>F. DOCS COMPL.</Th>
+                    <Th>T. ENTREGA (GATE-MANIF.)</Th>
+                    <Th>ACTUALIZACION</Th>
                     <Th>OBSERVACIONES</Th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                   {paginated.map((r) => {
-                    const estadoStyle = r.estado ? ESTADO_STYLES[r.estado] : null;
+                    const estadoStyle    = r.estado    ? ESTADO_STYLES[r.estado]       : null;
+                    const prioridadStyle = r.prioridad ? PRIORIDAD_STYLES[r.prioridad] : null;
+                    const tipoOpBg =
+                      r.tipoOperacion === "IMPORTACION" ? "bg-indigo-50 dark:bg-indigo-900/10" :
+                      r.tipoOperacion === "EXPORTACION" ? "bg-teal-50 dark:bg-teal-900/10" : "";
                     return (
                       <tr key={r.id} style={{ height: "48px" }}
                         className={`${saving === r.id ? "bg-blue-50/50 dark:bg-blue-900/10" : ""} hover:bg-gray-50 dark:hover:bg-gray-800/50`}>
-                        <Td><LongTextCell value={r.seguimiento} onSave={(v) => actualizarCampo(r.id, "seguimiento", v)} label="Seguimiento" /></Td>
-                        <Td>
-                          <ActualizacionCell remesa={r.remesaNotificado} bl={r.blTelexReleased} poliza={r.polizaSeguroRecibida}
-                            onToggle={(k, v) => actualizarCampo(r.id, k, v)} />
-                        </Td>
-                        {/* ESTADO — celda completa coloreada */}
+                        <td className={`whitespace-nowrap px-2 py-1.5 align-middle text-xs ${tipoOpBg}`}>
+                          <TipoOperacionCell value={r.tipoOperacion} onSave={(v) => actualizarCampo(r.id, "tipoOperacion", v)} />
+                        </td>
                         <td className={`whitespace-nowrap px-2 py-1.5 align-middle text-xs ${estadoStyle ? `${estadoStyle.bg} ${estadoStyle.text}` : ""}`}>
                           <EstadoCell value={r.estado} onSave={(v) => actualizarCampo(r.id, "estado", v)} />
                         </td>
+                        <Td><TextCell value={r.numeroOC || r.ordenCompraCotizacion} onSave={(v) => actualizarCampo(r.id, "numeroOC", v)} /></Td>
+                        <td className={`whitespace-nowrap px-2 py-1.5 align-middle text-xs ${prioridadStyle ? `${prioridadStyle.bg} ${prioridadStyle.text}` : ""}`}>
+                          <PrioridadCell value={r.prioridad} onSave={(v) => actualizarCampo(r.id, "prioridad", v)} />
+                        </td>
+                        <Td><LongTextCell value={r.seguimiento} onSave={(v) => actualizarCampo(r.id, "seguimiento", v)} label="Seguimiento" /></Td>
+                        <Td><LongTextCell value={r.detalles} onSave={(v) => actualizarCampo(r.id, "detalles", v)} label="Detalles" /></Td>
                         <Td><span className="block max-w-[140px] truncate" title={r.nombreCotizacion}>{r.nombreCotizacion}</span></Td>
                         <Td>{r.solicitante || "—"}</Td>
                         <Td>{r.proyecto || "—"}</Td>
@@ -710,23 +853,26 @@ export default function ImportExport() {
                         <Td><TextCell value={r.proveedor} onSave={(v) => actualizarCampo(r.id, "proveedor", v)} /></Td>
                         <Td><TextCell value={r.marcaModelo} onSave={(v) => actualizarCampo(r.id, "marcaModelo", v)} /></Td>
                         <Td><TextCell value={r.nombreMaterial} onSave={(v) => actualizarCampo(r.id, "nombreMaterial", v)} /></Td>
-                        <Td><TextCell value={r.numeroOC || r.ordenCompraCotizacion} onSave={(v) => actualizarCampo(r.id, "numeroOC", v)} /></Td>
-                        <Td><TextCell value={r.tipoImportacion} onSave={(v) => actualizarCampo(r.id, "tipoImportacion", v)} /></Td>
+                        <Td><SelectCell value={r.tipoImportacion} options={TIPO_IMPORTACION_OPTIONS} onSave={(v) => actualizarCampo(r.id, "tipoImportacion", v)} /></Td>
                         <Td><TextCell value={r.paisOrigenEdit ?? r.paisOrigen} onSave={(v) => actualizarCampo(r.id, "paisOrigenEdit", v)} /></Td>
                         <Td><TextCell value={r.destino} onSave={(v) => actualizarCampo(r.id, "destino", v)} /></Td>
                         <Td><TextCell value={r.incoterms || r.tipoEntrega} onSave={(v) => actualizarCampo(r.id, "incoterms", v)} /></Td>
                         <Td><TextCell value={r.terminosPago} onSave={(v) => actualizarCampo(r.id, "terminosPago", v)} /></Td>
                         <Td><TextCell value={r.formaPago} onSave={(v) => actualizarCampo(r.id, "formaPago", v)} /></Td>
                         <Td><TextCell value={r.tipoTransporte || r.medioTransporte} onSave={(v) => actualizarCampo(r.id, "tipoTransporte", v)} /></Td>
-                        <Td><TextCell value={r.bookingBl} onSave={(v) => actualizarCampo(r.id, "bookingBl", v)} /></Td>
-                        <Td><TextCell value={r.tracking} onSave={(v) => actualizarCampo(r.id, "tracking", v)} /></Td>
+                        <Td><SelectCell value={r.tipoEmbarque} options={TIPO_EMBARQUE_OPTIONS} onSave={(v) => actualizarCampo(r.id, "tipoEmbarque", v)} /></Td>
+                        <Td>
+                          <BLTrackingCell
+                            bookingBl={r.bookingBl} tracking={r.tracking}
+                            onSavebl={(v) => actualizarCampo(r.id, "bookingBl", v)}
+                            onSaveTracking={(v) => actualizarCampo(r.id, "tracking", v)} />
+                        </Td>
                         <Td><TextCell value={r.puertoSalida} onSave={(v) => actualizarCampo(r.id, "puertoSalida", v)} /></Td>
                         <Td><TextCell value={r.puertoLlegada} onSave={(v) => actualizarCampo(r.id, "puertoLlegada", v)} /></Td>
                         <Td><TextCell value={r.agenteAduanal} onSave={(v) => actualizarCampo(r.id, "agenteAduanal", v)} /></Td>
                         <Td><TextCell value={r.naviera} onSave={(v) => actualizarCampo(r.id, "naviera", v)} /></Td>
                         <Td><TextCell value={r.contenedor} onSave={(v) => actualizarCampo(r.id, "contenedor", v)} /></Td>
                         <Td><DateCell value={r.fechaOc} onSave={(v) => actualizarCampo(r.id, "fechaOc", v)} /></Td>
-                        <Td><DateCell value={r.fechaFabricacion} onSave={(v) => actualizarCampo(r.id, "fechaFabricacion", v)} /></Td>
                         <Td><DateCell value={r.fechaListoEmbarque} onSave={(v) => actualizarCampo(r.id, "fechaListoEmbarque", v)} /></Td>
                         <Td><DateCell value={r.fechaEmbarque} onSave={(v) => actualizarCampo(r.id, "fechaEmbarque", v)} /></Td>
                         <Td><DateCell value={r.fechaLlegadaPuerto} onSave={(v) => actualizarCampo(r.id, "fechaLlegadaPuerto", v)} /></Td>
@@ -736,11 +882,13 @@ export default function ImportExport() {
                         <Td><DateCell value={r.fechaSelectivo} onSave={(v) => actualizarCampo(r.id, "fechaSelectivo", v)} /></Td>
                         <Td><DateCell value={r.fechaRevision} onSave={(v) => actualizarCampo(r.id, "fechaRevision", v)} /></Td>
                         <Td><DateCell value={r.fechaLevante} onSave={(v) => actualizarCampo(r.id, "fechaLevante", v)} /></Td>
-                        <Td><DateCell value={r.fechaLiberacionAduana} onSave={(v) => actualizarCampo(r.id, "fechaLiberacionAduana", v)} /></Td>
                         <Td><DateCell value={r.fechaGatePass} onSave={(v) => actualizarCampo(r.id, "fechaGatePass", v)} /></Td>
                         <Td><DateCell value={r.fechaEntregaFinal} onSave={(v) => actualizarCampo(r.id, "fechaEntregaFinal", v)} /></Td>
                         <Td><span className="block whitespace-nowrap px-1 py-0.5 text-xs font-medium text-gray-600 dark:text-gray-300">{calcDiasEntrega(r)}</span></Td>
-                        <Td><DateCell value={r.fechaDocumentosCompletos} onSave={(v) => actualizarCampo(r.id, "fechaDocumentosCompletos", v)} /></Td>
+                        <Td>
+                          <ActualizacionCell remesa={r.remesaNotificado} bl={r.blTelexReleased} poliza={r.polizaSeguroRecibida}
+                            onToggle={(k, v) => actualizarCampo(r.id, k, v)} />
+                        </Td>
                         <Td><TextCell value={r.observaciones} onSave={(v) => actualizarCampo(r.id, "observaciones", v)} minWidth="160px" /></Td>
                       </tr>
                     );
