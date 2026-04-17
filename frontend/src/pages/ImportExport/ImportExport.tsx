@@ -772,31 +772,10 @@ export default function ImportExport() {
         )}
 
         {/* Tabla */}
-        <div className="flex gap-0 overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
+        <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
 
-          {/* Columna fija historial */}
-          <div className="flex-shrink-0 border-r border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
-            <div className="flex h-[37px] items-center justify-center border-b border-gray-200 px-2 dark:border-gray-700">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Log</span>
-            </div>
-            {loading ? (
-              <div className="flex items-center justify-center py-20 px-3">
-                <div className="h-6 w-6 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
-              </div>
-            ) : (
-              paginated.map((r) => (
-                <div key={r.id} className={`flex items-center justify-center border-b border-gray-100 px-2 py-1.5 dark:border-gray-800 ${saving === r.id ? "bg-blue-50/50 dark:bg-blue-900/10" : ""}`} style={{ height: "48px" }}>
-                  <button onClick={() => setLogId(r.id)} title="Ver historial de cambios"
-                    className="flex items-center justify-center rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-white hover:text-blue-600 dark:hover:bg-gray-700 dark:hover:text-blue-400">
-                    <History className="h-4 w-4" />
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-
-          {/* Tabla scrolleable */}
-          <div className="flex-1 overflow-x-auto bg-white dark:bg-gray-900">
+          {/* Tabla con columna Log sticky */}
+          <div className="bg-white dark:bg-gray-900">
             {loading ? (
               <div className="flex items-center justify-center py-20">
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
@@ -807,6 +786,7 @@ export default function ImportExport() {
               <table className="min-w-full text-xs">
                 <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-800">
                   <tr className="text-left">
+                    <th className="sticky left-0 z-20 whitespace-nowrap border-b border-r border-gray-200 bg-gray-50 px-2 py-2 text-[10px] font-semibold uppercase tracking-wider text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">LOG</th>
                     <Th>TIPO OPER.</Th><Th>TIPO IMP/EXP</Th><Th>ESTADO</Th><Th># OC</Th><Th>PRIORIDAD</Th>
                     <Th>SEGUIMIENTO</Th><Th>DETALLES</Th>
                     <Th>SOLICITANTE</Th><Th>PROYECTO</Th><Th>DESCRIPCION</Th>
@@ -834,8 +814,14 @@ export default function ImportExport() {
                       r.tipoOperacion === "IMPORTACION" ? "bg-indigo-50 dark:bg-indigo-900/10" :
                         r.tipoOperacion === "EXPORTACION" ? "bg-teal-50 dark:bg-teal-900/10" : "";
                     return (
-                      <tr key={r.id} style={{ height: "48px" }}
+                      <tr key={r.id}
                         className={`${saving === r.id ? "bg-blue-50/50 dark:bg-blue-900/10" : ""} hover:bg-gray-50 dark:hover:bg-gray-800/50`}>
+                        <td className="sticky left-0 z-[5] whitespace-nowrap border-r border-gray-100 bg-white px-2 py-1.5 align-middle dark:border-gray-800 dark:bg-gray-900">
+                          <button onClick={() => setLogId(r.id)} title="Ver historial de cambios"
+                            className="flex items-center justify-center rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-gray-700 dark:hover:text-blue-400">
+                            <History className="h-4 w-4" />
+                          </button>
+                        </td>
                         <td className={`whitespace-nowrap px-2 py-1.5 align-middle text-xs ${tipoOpBg}`}>
                           <TipoOperacionCell value={r.tipoOperacion} onSave={(v) => actualizarCampo(r.id, "tipoOperacion", v)} />
                         </td>
@@ -894,6 +880,7 @@ export default function ImportExport() {
             )}
           </div>
         </div>
+
 
         {/* Paginación */}
         {!loading && totalPages > 1 && (
