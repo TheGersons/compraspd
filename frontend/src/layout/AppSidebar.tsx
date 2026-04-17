@@ -10,6 +10,7 @@ import {
   ShoppingBag,
   Link2,
   Ship,
+  Forklift,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
@@ -82,7 +83,7 @@ const navItems: NavItem[] = [
     path: "/import-export",
   },
   {
-    icon: <UtilityPole />,
+    icon: <Forklift />,
     name: "Logística",
     roles: ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS", "COMERCIAL"],
     subItems: [
