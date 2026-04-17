@@ -493,19 +493,18 @@ type ExportCol = { label: string; get: (r: Seguimiento) => string };
 
 const EXPORT_COLS: ExportCol[] = [
   { label: "Tipo Operación", get: (r) => r.tipoOperacion ?? "" },
+  { label: "Tipo Import/Export", get: (r) => r.tipoImportacion ?? "" },
   { label: "Estado", get: (r) => r.estado ?? "" },
   { label: "# OC", get: (r) => r.numeroOC ?? r.ordenCompraCotizacion ?? "" },
   { label: "Prioridad", get: (r) => r.prioridad ?? "" },
   { label: "Seguimiento", get: (r) => r.seguimiento ?? "" },
   { label: "Detalles", get: (r) => r.detalles ?? "" },
-  { label: "Cotización", get: (r) => r.nombreCotizacion },
   { label: "Solicitante", get: (r) => r.solicitante ?? "" },
   { label: "Proyecto", get: (r) => r.proyecto ?? "" },
   { label: "Descripción", get: (r) => r.descripcionProducto },
   { label: "Proveedor", get: (r) => r.proveedor ?? "" },
   { label: "Marca / Modelo", get: (r) => r.marcaModelo ?? "" },
   { label: "Nombre Material", get: (r) => r.nombreMaterial ?? "" },
-  { label: "Tipo Import/Export", get: (r) => r.tipoImportacion ?? "" },
   { label: "País Origen", get: (r) => r.paisOrigenEdit ?? r.paisOrigen ?? "" },
   { label: "Destino", get: (r) => r.destino ?? "" },
   { label: "Incoterms", get: (r) => r.incoterms ?? r.tipoEntrega ?? "" },
@@ -572,10 +571,10 @@ function exportExcel(rows: Seguimiento[]) {
     }
     // Actualizacion indicators
     const actCols = [
-      { key: "remesaNotificado",     idx: EXPORT_COLS.findIndex((c) => c.label === "Packing List") },
-      { key: "blTelexReleased",      idx: EXPORT_COLS.findIndex((c) => c.label === "BL Telex Released") },
+      { key: "remesaNotificado", idx: EXPORT_COLS.findIndex((c) => c.label === "Packing List") },
+      { key: "blTelexReleased", idx: EXPORT_COLS.findIndex((c) => c.label === "BL Telex Released") },
       { key: "polizaSeguroRecibida", idx: EXPORT_COLS.findIndex((c) => c.label === "Póliza Seguro") },
-      { key: "factura",              idx: EXPORT_COLS.findIndex((c) => c.label === "Factura") },
+      { key: "factura", idx: EXPORT_COLS.findIndex((c) => c.label === "Factura") },
     ];
     actCols.forEach(({ key, idx }) => {
       const addr = XLSX.utils.encode_cell({ r: rowIdx + 1, c: idx });
@@ -808,11 +807,11 @@ export default function ImportExport() {
               <table className="min-w-full text-xs">
                 <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-800">
                   <tr className="text-left">
-                    <Th>TIPO OPER.</Th><Th>ESTADO</Th><Th># OC</Th><Th>PRIORIDAD</Th>
+                    <Th>TIPO OPER.</Th><Th>TIPO IMP/EXP</Th><Th>ESTADO</Th><Th># OC</Th><Th>PRIORIDAD</Th>
                     <Th>SEGUIMIENTO</Th><Th>DETALLES</Th>
-                    <Th>COTIZACION</Th><Th>SOLICITANTE</Th><Th>PROYECTO</Th><Th>DESCRIPCION</Th>
+                    <Th>SOLICITANTE</Th><Th>PROYECTO</Th><Th>DESCRIPCION</Th>
                     <Th>PROVEEDOR</Th><Th>MARCA / MODELO</Th><Th>NOMBRE MATERIAL</Th>
-                    <Th>TIPO IMP/EXP</Th><Th>PAIS ORIGEN</Th><Th>DESTINO</Th>
+                    <Th>PAIS ORIGEN</Th><Th>DESTINO</Th>
                     <Th>INCOTERMS</Th><Th>TERMINOS PAGO</Th><Th>FORMA PAGO</Th>
                     <Th>TIPO TRANSP.</Th><Th>TIPO EMBARQUE</Th>
                     <Th>BL / TRACKING</Th><Th>ACTUALIZACION</Th>
@@ -840,6 +839,7 @@ export default function ImportExport() {
                         <td className={`whitespace-nowrap px-2 py-1.5 align-middle text-xs ${tipoOpBg}`}>
                           <TipoOperacionCell value={r.tipoOperacion} onSave={(v) => actualizarCampo(r.id, "tipoOperacion", v)} />
                         </td>
+                        <Td><SelectCell value={r.tipoImportacion} options={TIPO_IMPORTACION_OPTIONS} onSave={(v) => actualizarCampo(r.id, "tipoImportacion", v)} /></Td>
                         <td className={`whitespace-nowrap px-2 py-1.5 align-middle text-xs ${estadoStyle ? `${estadoStyle.bg} ${estadoStyle.text}` : ""}`}>
                           <EstadoCell value={r.estado} onSave={(v) => actualizarCampo(r.id, "estado", v)} />
                         </td>
@@ -849,14 +849,12 @@ export default function ImportExport() {
                         </td>
                         <Td><LongTextCell value={r.seguimiento} onSave={(v) => actualizarCampo(r.id, "seguimiento", v)} label="Seguimiento" /></Td>
                         <Td><LongTextCell value={r.detalles} onSave={(v) => actualizarCampo(r.id, "detalles", v)} label="Detalles" /></Td>
-                        <Td><span className="block max-w-[140px] truncate" title={r.nombreCotizacion}>{r.nombreCotizacion}</span></Td>
                         <Td>{r.solicitante || "—"}</Td>
                         <Td>{r.proyecto || "—"}</Td>
                         <Td><span className="block max-w-[200px] truncate" title={r.descripcionProducto}>{r.descripcionProducto}</span></Td>
                         <Td><TextCell value={r.proveedor} onSave={(v) => actualizarCampo(r.id, "proveedor", v)} /></Td>
                         <Td><TextCell value={r.marcaModelo} onSave={(v) => actualizarCampo(r.id, "marcaModelo", v)} /></Td>
                         <Td><TextCell value={r.nombreMaterial} onSave={(v) => actualizarCampo(r.id, "nombreMaterial", v)} /></Td>
-                        <Td><SelectCell value={r.tipoImportacion} options={TIPO_IMPORTACION_OPTIONS} onSave={(v) => actualizarCampo(r.id, "tipoImportacion", v)} /></Td>
                         <Td><TextCell value={r.paisOrigenEdit ?? r.paisOrigen} onSave={(v) => actualizarCampo(r.id, "paisOrigenEdit", v)} /></Td>
                         <Td><TextCell value={r.destino} onSave={(v) => actualizarCampo(r.id, "destino", v)} /></Td>
                         <Td><TextCell value={r.incoterms || r.tipoEntrega} onSave={(v) => actualizarCampo(r.id, "incoterms", v)} /></Td>
