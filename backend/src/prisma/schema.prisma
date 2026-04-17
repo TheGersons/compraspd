@@ -1141,10 +1141,11 @@ model SeguimientoInternacional {
   fechaPagoProveedor               DateTime? @map("fecha_pago_proveedor")
   fechaDocumentosCompletos         DateTime? @map("fecha_documentos_completos")
 
-  // ACTUALIZACION: 3 indicadores
+  // ACTUALIZACION: 4 indicadores
   remesaNotificado       Boolean @default(false) @map("remesa_notificado")
   blTelexReleased        Boolean @default(false) @map("bl_telex_released")
   polizaSeguroRecibida   Boolean @default(false) @map("poliza_seguro_recibida")
+  factura                Boolean @default(false)
 
   creado      DateTime @default(now())
   actualizado DateTime @default(now()) @updatedAt

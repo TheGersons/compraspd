@@ -49,9 +49,10 @@ const CAMPO_LABELS: Record<string, string> = {
   fechaEntregaFinal: 'Fecha Entrega Final',
   fechaPagoProveedor: 'Fecha Pago Proveedor',
   fechaDocumentosCompletos: 'Fecha Documentos Completos',
-  remesaNotificado: 'Remesa Notificado',
+  remesaNotificado: 'Packing List',
   blTelexReleased: 'BL Telex Released',
   polizaSeguroRecibida: 'Póliza de Seguro Recibida',
+  factura: 'Factura',
 };
 
 const CAMPOS_FECHA = new Set<string>([
@@ -77,6 +78,7 @@ const CAMPOS_BOOLEAN = new Set<string>([
   'remesaNotificado',
   'blTelexReleased',
   'polizaSeguroRecibida',
+  'factura',
 ]);
 
 const CAMPOS_EDITABLES = Object.keys(CAMPO_LABELS);
@@ -323,6 +325,7 @@ export class ImportExportService {
       remesaNotificado: s.remesaNotificado,
       blTelexReleased: s.blTelexReleased,
       polizaSeguroRecibida: s.polizaSeguroRecibida,
+      factura: s.factura,
       actualizado: s.actualizado,
     };
   }

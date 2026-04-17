@@ -68,6 +68,7 @@ type Seguimiento = {
   remesaNotificado: boolean;
   blTelexReleased: boolean;
   polizaSeguroRecibida: boolean;
+  factura: boolean;
   actualizado: string;
 };
 
@@ -86,21 +87,21 @@ type Log = {
 const ESTADO_OPTIONS = ["EN PROCESO", "EN COORDINACION", "EN TRANSITO", "EN ADUANA", "RECIBIDO", "CANCELADO"] as const;
 
 const ESTADO_STYLES: Record<string, { bg: string; text: string }> = {
-  "EN PROCESO":      { bg: "bg-orange-100 dark:bg-orange-900/30",  text: "text-orange-800 dark:text-orange-300" },
-  "EN COORDINACION": { bg: "bg-pink-100 dark:bg-pink-900/20",      text: "text-pink-700 dark:text-pink-300" },
-  "EN TRANSITO":     { bg: "bg-yellow-100 dark:bg-yellow-900/20",  text: "text-yellow-800 dark:text-yellow-400" },
-  "EN ADUANA":       { bg: "bg-blue-100 dark:bg-blue-900/20",      text: "text-blue-800 dark:text-blue-300" },
-  "RECIBIDO":        { bg: "bg-emerald-100 dark:bg-emerald-900/20",text: "text-emerald-800 dark:text-emerald-300" },
-  "CANCELADO":       { bg: "bg-red-100 dark:bg-red-900/20",        text: "text-red-800 dark:text-red-300" },
+  "EN PROCESO": { bg: "bg-orange-100 dark:bg-orange-900/30", text: "text-orange-800 dark:text-orange-300" },
+  "EN COORDINACION": { bg: "bg-pink-100 dark:bg-pink-900/20", text: "text-pink-700 dark:text-pink-300" },
+  "EN TRANSITO": { bg: "bg-yellow-100 dark:bg-yellow-900/20", text: "text-yellow-800 dark:text-yellow-400" },
+  "EN ADUANA": { bg: "bg-blue-100 dark:bg-blue-900/20", text: "text-blue-800 dark:text-blue-300" },
+  "RECIBIDO": { bg: "bg-emerald-100 dark:bg-emerald-900/20", text: "text-emerald-800 dark:text-emerald-300" },
+  "CANCELADO": { bg: "bg-red-100 dark:bg-red-900/20", text: "text-red-800 dark:text-red-300" },
 };
 
 const ESTADO_RGB: Record<string, [number, number, number]> = {
-  "EN PROCESO":      [254, 215, 170],
+  "EN PROCESO": [254, 215, 170],
   "EN COORDINACION": [251, 207, 232],
-  "EN TRANSITO":     [254, 240, 138],
-  "EN ADUANA":       [191, 219, 254],
-  "RECIBIDO":        [167, 243, 208],
-  "CANCELADO":       [254, 202, 202],
+  "EN TRANSITO": [254, 240, 138],
+  "EN ADUANA": [191, 219, 254],
+  "RECIBIDO": [167, 243, 208],
+  "CANCELADO": [254, 202, 202],
 };
 
 // ─── Prioridad config ───────────────────────────────────────────────────────
@@ -108,13 +109,13 @@ const ESTADO_RGB: Record<string, [number, number, number]> = {
 const PRIORIDAD_OPTIONS = ["NORMAL", "URGENTE", "CRITICO"] as const;
 
 const PRIORIDAD_STYLES: Record<string, { bg: string; text: string }> = {
-  "NORMAL":  { bg: "bg-blue-100 dark:bg-blue-900/30",   text: "text-blue-800 dark:text-blue-300" },
+  "NORMAL": { bg: "bg-blue-100 dark:bg-blue-900/30", text: "text-blue-800 dark:text-blue-300" },
   "URGENTE": { bg: "bg-orange-100 dark:bg-orange-900/30", text: "text-orange-800 dark:text-orange-300" },
-  "CRITICO": { bg: "bg-red-100 dark:bg-red-900/20",     text: "text-red-800 dark:text-red-300" },
+  "CRITICO": { bg: "bg-red-100 dark:bg-red-900/20", text: "text-red-800 dark:text-red-300" },
 };
 
 const PRIORIDAD_RGB: Record<string, [number, number, number]> = {
-  "NORMAL":  [191, 219, 254],
+  "NORMAL": [191, 219, 254],
   "URGENTE": [254, 215, 170],
   "CRITICO": [254, 202, 202],
 };
@@ -141,8 +142,8 @@ const CAMPO_LABELS_DISPLAY: Record<string, string> = {
   fechaLiberacionAduana: "Fecha Lib. Aduana",
   fechaGatePass: "Fecha Gate Pass", fechaEntregaFinal: "Fecha Entrega Final",
   fechaPagoProveedor: "Fecha Pago Proveedor", fechaDocumentosCompletos: "Fecha Docs. Compl.",
-  remesaNotificado: "Remesa Notificado", blTelexReleased: "BL Telex Released",
-  polizaSeguroRecibida: "Póliza Seguro Recibida",
+  remesaNotificado: "Packing List", blTelexReleased: "BL Telex Released",
+  polizaSeguroRecibida: "Póliza Seguro Recibida", factura: "Factura",
 };
 
 // ─── Options ────────────────────────────────────────────────────────────────
@@ -333,11 +334,10 @@ function PrioridadCell({ value, onSave }: { value: string | null; onSave: (v: st
 function TipoOperacionCell({ value, onSave }: { value: string | null; onSave: (v: string | null) => void }) {
   return (
     <select value={value ?? ""} onChange={(e) => onSave(e.target.value || null)}
-      className={`cursor-pointer rounded px-1.5 py-0.5 text-xs font-medium outline-none border-0 ${
-        value === "IMPORTACION" ? "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300" :
+      className={`cursor-pointer rounded px-1.5 py-0.5 text-xs font-medium outline-none border-0 ${value === "IMPORTACION" ? "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300" :
         value === "EXPORTACION" ? "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300" :
-        "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400"
-      }`}>
+          "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400"
+        }`}>
       <option value="">— Tipo</option>
       <option value="IMPORTACION">Importación</option>
       <option value="EXPORTACION">Exportación</option>
@@ -396,14 +396,15 @@ function BLTrackingCell({ bookingBl, tracking, onSavebl, onSaveTracking }: {
   );
 }
 
-function ActualizacionCell({ remesa, bl, poliza, onToggle }: {
-  remesa: boolean; bl: boolean; poliza: boolean;
-  onToggle: (k: "remesaNotificado" | "blTelexReleased" | "polizaSeguroRecibida", v: boolean) => void;
+function ActualizacionCell({ remesa, bl, poliza, factura, onToggle }: {
+  remesa: boolean; bl: boolean; poliza: boolean; factura: boolean;
+  onToggle: (k: "remesaNotificado" | "blTelexReleased" | "polizaSeguroRecibida" | "factura", v: boolean) => void;
 }) {
-  const items: { key: "remesaNotificado" | "blTelexReleased" | "polizaSeguroRecibida"; label: string; value: boolean }[] = [
-    { key: "remesaNotificado", label: "Remesa", value: remesa },
+  const items: { key: "remesaNotificado" | "blTelexReleased" | "polizaSeguroRecibida" | "factura"; label: string; value: boolean }[] = [
+    { key: "remesaNotificado", label: "Packing List", value: remesa },
     { key: "blTelexReleased", label: "BL Telex", value: bl },
     { key: "polizaSeguroRecibida", label: "Póliza", value: poliza },
+    { key: "factura", label: "Factura", value: factura },
   ];
   return (
     <div className="flex flex-col gap-1">
@@ -491,53 +492,54 @@ function LogDrawer({ seguimientoId, onClose }: { seguimientoId: string; onClose:
 type ExportCol = { label: string; get: (r: Seguimiento) => string };
 
 const EXPORT_COLS: ExportCol[] = [
-  { label: "Tipo Operación",        get: (r) => r.tipoOperacion ?? "" },
-  { label: "Estado",                get: (r) => r.estado ?? "" },
-  { label: "# OC",                  get: (r) => r.numeroOC ?? r.ordenCompraCotizacion ?? "" },
-  { label: "Prioridad",             get: (r) => r.prioridad ?? "" },
-  { label: "Seguimiento",           get: (r) => r.seguimiento ?? "" },
-  { label: "Detalles",              get: (r) => r.detalles ?? "" },
-  { label: "Cotización",            get: (r) => r.nombreCotizacion },
-  { label: "Solicitante",           get: (r) => r.solicitante ?? "" },
-  { label: "Proyecto",              get: (r) => r.proyecto ?? "" },
-  { label: "Descripción",           get: (r) => r.descripcionProducto },
-  { label: "Proveedor",             get: (r) => r.proveedor ?? "" },
-  { label: "Marca / Modelo",        get: (r) => r.marcaModelo ?? "" },
-  { label: "Nombre Material",       get: (r) => r.nombreMaterial ?? "" },
-  { label: "Tipo Import/Export",    get: (r) => r.tipoImportacion ?? "" },
-  { label: "País Origen",           get: (r) => r.paisOrigenEdit ?? r.paisOrigen ?? "" },
-  { label: "Destino",               get: (r) => r.destino ?? "" },
-  { label: "Incoterms",             get: (r) => r.incoterms ?? r.tipoEntrega ?? "" },
-  { label: "Términos Pago",         get: (r) => r.terminosPago ?? "" },
-  { label: "Forma Pago",            get: (r) => r.formaPago ?? "" },
-  { label: "Tipo Transporte",       get: (r) => r.tipoTransporte ?? r.medioTransporte ?? "" },
-  { label: "Tipo Embarque",         get: (r) => r.tipoEmbarque ?? "" },
-  { label: "BL / Tracking",         get: (r) => [r.bookingBl, r.tracking].filter(Boolean).join(" / ") },
-  { label: "Puerto Origen",         get: (r) => r.puertoSalida ?? "" },
-  { label: "Puerto Destino",        get: (r) => r.puertoLlegada ?? "" },
-  { label: "Agente Aduanal",        get: (r) => r.agenteAduanal ?? "" },
-  { label: "Naviera / Forwarder",   get: (r) => r.naviera ?? "" },
-  { label: "Contenedor",            get: (r) => r.contenedor ?? "" },
-  { label: "F. OC",                 get: (r) => fmtDateDMY(r.fechaOc) },
-  { label: "F. Listo Emb.",         get: (r) => fmtDateDMY(r.fechaListoEmbarque) },
-  { label: "F. ETD",                get: (r) => fmtDateDMY(r.fechaEmbarque) },
-  { label: "F. ETA",                get: (r) => fmtDateDMY(r.fechaLlegadaPuerto) },
-  { label: "F. de Manifiesto",      get: (r) => fmtDateDMY(r.fechaRetiroPuerto) },
+  { label: "Tipo Operación", get: (r) => r.tipoOperacion ?? "" },
+  { label: "Estado", get: (r) => r.estado ?? "" },
+  { label: "# OC", get: (r) => r.numeroOC ?? r.ordenCompraCotizacion ?? "" },
+  { label: "Prioridad", get: (r) => r.prioridad ?? "" },
+  { label: "Seguimiento", get: (r) => r.seguimiento ?? "" },
+  { label: "Detalles", get: (r) => r.detalles ?? "" },
+  { label: "Cotización", get: (r) => r.nombreCotizacion },
+  { label: "Solicitante", get: (r) => r.solicitante ?? "" },
+  { label: "Proyecto", get: (r) => r.proyecto ?? "" },
+  { label: "Descripción", get: (r) => r.descripcionProducto },
+  { label: "Proveedor", get: (r) => r.proveedor ?? "" },
+  { label: "Marca / Modelo", get: (r) => r.marcaModelo ?? "" },
+  { label: "Nombre Material", get: (r) => r.nombreMaterial ?? "" },
+  { label: "Tipo Import/Export", get: (r) => r.tipoImportacion ?? "" },
+  { label: "País Origen", get: (r) => r.paisOrigenEdit ?? r.paisOrigen ?? "" },
+  { label: "Destino", get: (r) => r.destino ?? "" },
+  { label: "Incoterms", get: (r) => r.incoterms ?? r.tipoEntrega ?? "" },
+  { label: "Términos Pago", get: (r) => r.terminosPago ?? "" },
+  { label: "Forma Pago", get: (r) => r.formaPago ?? "" },
+  { label: "Tipo Transporte", get: (r) => r.tipoTransporte ?? r.medioTransporte ?? "" },
+  { label: "Tipo Embarque", get: (r) => r.tipoEmbarque ?? "" },
+  { label: "BL / Tracking", get: (r) => [r.bookingBl, r.tracking].filter(Boolean).join(" / ") },
+  { label: "Packing List", get: (r) => r.remesaNotificado ? "Sí" : "No" },
+  { label: "BL Telex Released", get: (r) => r.blTelexReleased ? "Sí" : "No" },
+  { label: "Póliza Seguro", get: (r) => r.polizaSeguroRecibida ? "Sí" : "No" },
+  { label: "Factura", get: (r) => r.factura ? "Sí" : "No" },
+  { label: "Puerto Origen", get: (r) => r.puertoSalida ?? "" },
+  { label: "Puerto Destino", get: (r) => r.puertoLlegada ?? "" },
+  { label: "Agente Aduanal", get: (r) => r.agenteAduanal ?? "" },
+  { label: "Naviera / Forwarder", get: (r) => r.naviera ?? "" },
+  { label: "Contenedor", get: (r) => r.contenedor ?? "" },
+  { label: "F. OC", get: (r) => fmtDateDMY(r.fechaOc) },
+  { label: "F. Listo Emb.", get: (r) => fmtDateDMY(r.fechaListoEmbarque) },
+  { label: "F. ETD", get: (r) => fmtDateDMY(r.fechaEmbarque) },
+  { label: "F. ETA", get: (r) => fmtDateDMY(r.fechaLlegadaPuerto) },
+  { label: "F. de Manifiesto", get: (r) => fmtDateDMY(r.fechaRetiroPuerto) },
   { label: "F. Emis. Boletín Imp.", get: (r) => fmtDateDMY(r.fechaEmisionBoletinImpuesto) },
-  { label: "F. Pago Boletín",       get: (r) => fmtDateDMY(r.fechaPagoBoletin) },
-  { label: "F. Selectivo",          get: (r) => fmtDateDMY(r.fechaSelectivo) },
-  { label: "F. Revisión",           get: (r) => fmtDateDMY(r.fechaRevision) },
-  { label: "F. Levante",            get: (r) => fmtDateDMY(r.fechaLevante) },
-  { label: "F. Gate Pass",          get: (r) => fmtDateDMY(r.fechaGatePass) },
-  { label: "F. Entrega Final",      get: (r) => fmtDateDMY(r.fechaEntregaFinal) },
+  { label: "F. Pago Boletín", get: (r) => fmtDateDMY(r.fechaPagoBoletin) },
+  { label: "F. Selectivo", get: (r) => fmtDateDMY(r.fechaSelectivo) },
+  { label: "F. Revisión", get: (r) => fmtDateDMY(r.fechaRevision) },
+  { label: "F. Levante", get: (r) => fmtDateDMY(r.fechaLevante) },
+  { label: "F. Gate Pass", get: (r) => fmtDateDMY(r.fechaGatePass) },
+  { label: "F. Entrega Final", get: (r) => fmtDateDMY(r.fechaEntregaFinal) },
   { label: "T. Entrega (Gate-Manif.)", get: (r) => calcDiasEntrega(r) },
-  { label: "Remesa Notificado",     get: (r) => r.remesaNotificado ? "Sí" : "No" },
-  { label: "BL Telex Released",     get: (r) => r.blTelexReleased ? "Sí" : "No" },
-  { label: "Póliza Seguro",         get: (r) => r.polizaSeguroRecibida ? "Sí" : "No" },
-  { label: "Observaciones",         get: (r) => r.observaciones ?? "" },
+  { label: "Observaciones", get: (r) => r.observaciones ?? "" },
 ];
 
-const ESTADO_COL_IDX    = EXPORT_COLS.findIndex((c) => c.label === "Estado");
+const ESTADO_COL_IDX = EXPORT_COLS.findIndex((c) => c.label === "Estado");
 const PRIORIDAD_COL_IDX = EXPORT_COLS.findIndex((c) => c.label === "Prioridad");
 
 function exportExcel(rows: Seguimiento[]) {
@@ -570,9 +572,10 @@ function exportExcel(rows: Seguimiento[]) {
     }
     // Actualizacion indicators
     const actCols = [
-      { key: "remesaNotificado",     idx: EXPORT_COLS.findIndex((c) => c.label === "Remesa Notificado") },
+      { key: "remesaNotificado",     idx: EXPORT_COLS.findIndex((c) => c.label === "Packing List") },
       { key: "blTelexReleased",      idx: EXPORT_COLS.findIndex((c) => c.label === "BL Telex Released") },
       { key: "polizaSeguroRecibida", idx: EXPORT_COLS.findIndex((c) => c.label === "Póliza Seguro") },
+      { key: "factura",              idx: EXPORT_COLS.findIndex((c) => c.label === "Factura") },
     ];
     actCols.forEach(({ key, idx }) => {
       const addr = XLSX.utils.encode_cell({ r: rowIdx + 1, c: idx });
@@ -614,9 +617,10 @@ function exportPDF(rows: Seguimiento[]) {
         if (rgb) { data.cell.styles.fillColor = rgb; data.cell.styles.fontStyle = "bold"; }
       }
       const actIdxs = [
-        EXPORT_COLS.findIndex((c) => c.label === "Remesa Notificado"),
+        EXPORT_COLS.findIndex((c) => c.label === "Packing List"),
         EXPORT_COLS.findIndex((c) => c.label === "BL Telex Released"),
         EXPORT_COLS.findIndex((c) => c.label === "Póliza Seguro"),
+        EXPORT_COLS.findIndex((c) => c.label === "Factura"),
       ];
       if (actIdxs.includes(data.column.index)) {
         const val = data.cell.raw as string;
@@ -826,11 +830,11 @@ export default function ImportExport() {
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                   {paginated.map((r) => {
-                    const estadoStyle    = r.estado    ? ESTADO_STYLES[r.estado]       : null;
+                    const estadoStyle = r.estado ? ESTADO_STYLES[r.estado] : null;
                     const prioridadStyle = r.prioridad ? PRIORIDAD_STYLES[r.prioridad] : null;
                     const tipoOpBg =
                       r.tipoOperacion === "IMPORTACION" ? "bg-indigo-50 dark:bg-indigo-900/10" :
-                      r.tipoOperacion === "EXPORTACION" ? "bg-teal-50 dark:bg-teal-900/10" : "";
+                        r.tipoOperacion === "EXPORTACION" ? "bg-teal-50 dark:bg-teal-900/10" : "";
                     return (
                       <tr key={r.id} style={{ height: "48px" }}
                         className={`${saving === r.id ? "bg-blue-50/50 dark:bg-blue-900/10" : ""} hover:bg-gray-50 dark:hover:bg-gray-800/50`}>
@@ -886,7 +890,7 @@ export default function ImportExport() {
                         <Td><DateCell value={r.fechaEntregaFinal} onSave={(v) => actualizarCampo(r.id, "fechaEntregaFinal", v)} /></Td>
                         <Td><span className="block whitespace-nowrap px-1 py-0.5 text-xs font-medium text-gray-600 dark:text-gray-300">{calcDiasEntrega(r)}</span></Td>
                         <Td>
-                          <ActualizacionCell remesa={r.remesaNotificado} bl={r.blTelexReleased} poliza={r.polizaSeguroRecibida}
+                          <ActualizacionCell remesa={r.remesaNotificado} bl={r.blTelexReleased} poliza={r.polizaSeguroRecibida} factura={r.factura}
                             onToggle={(k, v) => actualizarCampo(r.id, k, v)} />
                         </Td>
                         <Td><TextCell value={r.observaciones} onSave={(v) => actualizarCampo(r.id, "observaciones", v)} minWidth="160px" /></Td>
