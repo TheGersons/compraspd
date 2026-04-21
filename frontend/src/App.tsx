@@ -31,19 +31,6 @@ import ShoppingHistory from "./pages/Shopping/History";
 import ShoppingNew from "./pages/Shopping/New";
 import Profiles from "./pages/users/Profiles";
 import GestionarResponsables from "./pages/users/GestionarResponsables";
-import UserProfiles from "./pages/UserProfiles";
-import Calendar from "./pages/Calendar";
-import BasicTables from "./pages/Tables/BasicTables";
-import FormElements from "./pages/Forms/FormElements";
-import Blank from "./pages/Blank";
-import Alerts from "./pages/UiElements/Alerts";
-import Avatars from "./pages/UiElements/Avatars";
-import Badges from "./pages/UiElements/Badges";
-import Buttons from "./pages/UiElements/Buttons";
-import Images from "./pages/UiElements/Images";
-import Videos from "./pages/UiElements/Videos";
-import LineChart from "./pages/Charts/LineChart";
-import BarChart from "./pages/Charts/BarChart";
 import Dashboard from "./pages/Home/Dashboard";
 import { NotificationProvider } from "./pages/Notifications/context/NotificationContext";
 import NotificationContainer from "./pages/Notifications/components/notifications/NotificationContainer";
@@ -394,38 +381,11 @@ export default function App() {
                 }
               />
               <Route
-                path="/settings"
-                element={
-                  <ProtectedRoute roles={STAFF_ROLES}>
-                    <UserProfiles />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
                 path="/profile"
                 element={
                   <Profile />
                 }
               />
-              <Route
-                path="/roles"
-                element={
-                  <ProtectedRoute roles={["ADMIN"]}>
-                    <UserProfiles />
-                  </ProtectedRoute>
-                }
-              />
-
-              {/* Resto - Solo STAFF */}
-              <Route
-                path="/calendar"
-                element={
-                  <ProtectedRoute roles={STAFF_ROLES}>
-                    <Calendar />
-                  </ProtectedRoute>
-                }
-              />
-              {/* ... resto de rutas genéricas igual con STAFF_ROLES */}
             </Route>
           </Route>
 

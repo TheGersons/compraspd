@@ -38,7 +38,25 @@
       "Bash(node_modules\\\\\\\\.bin\\\\\\\\tsc --noEmit --skipLibCheck)",
       "Bash(node_modules/.bin/tsc --noEmit --skipLibCheck)",
       "Bash(git add:*)",
-      "Bash(find C:\\\\Repo\\\\admin-dashboard-main:*)"
+      "Bash(find C:\\\\Repo\\\\admin-dashboard-main:*)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:postgres@89.167.20.163:5455/compras?schema=public\" npx prisma db execute --url \"postgresql://postgres:postgres@89.167.20.163:5455/compras\" --stdin)",
+      "Bash(PGPASSWORD=postgres psql *)",
+      "Bash(where psql *)",
+      "Read(//c/Program Files/PostgreSQL/**)",
+      "Bash(C:/Program Files/PostgreSQL/17/bin/psql.exe *)",
+      "Bash(PGPASSWORD=postgres C:/Program Files/PostgreSQL/17/bin/psql.exe *)",
+      "Bash(PGPASSWORD=postgres \"C:/Program Files/PostgreSQL/17/bin/psql.exe\" -h 89.167.20.163 -p 5455 -U postgres -d compras -c \"\\\\dt\")",
+      "Bash(PGPASSWORD=postgres \"C:/Program Files/PostgreSQL/17/bin/psql.exe\" -h 89.167.20.163 -p 5455 -U postgres -d compras -c \"\\\\d cotizacion\")",
+      "Bash(PGPASSWORD=postgres \"C:/Program Files/PostgreSQL/17/bin/psql.exe\" -h 89.167.20.163 -p 5455 -U postgres -d compras -c \"\\\\d estado_producto\")",
+      "Bash(PGPASSWORD=postgres \"C:/Program Files/PostgreSQL/17/bin/psql.exe\" -h 89.167.20.163 -p 5455 -U postgres -d compras -c \"\\\\d cotizacion_detalle\")",
+      "Bash(ssh -o StrictHostKeyChecking=no root@89.167.20.163 \"pm2 logs --lines 50 --nostream 2>/dev/null || journalctl -u compras-backend -n 50 --no-pager 2>/dev/null || cd /var/www/compras/backend && tail -50 logs/error.log 2>/dev/null || echo 'no logs found'\")",
+      "Bash(cat)",
+      "Bash(bash /tmp/analyze_unused.sh)",
+      "Bash(bash /tmp/compare.sh)",
+      "Bash(xargs -I {} basename {})",
+      "Bash(bash /tmp/final_analysis.sh)",
+      "Bash(bash /tmp/comprehensive_report.sh)",
+      "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")"
     ]
   }
 }
