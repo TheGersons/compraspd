@@ -154,39 +154,42 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
   } | null>(null);
 
   const abrirArchivoModal = useCallback(async (tipo: ArchivoModalTipo, nombre: string, downloadUrl: string) => {
-    if (tipo === 'pdf') {
-      // PDF: iframe directo al share link — sin fetch, sin CORS
-      const pdfSrc = downloadUrl.endsWith('/download') ? downloadUrl : `${downloadUrl}/download`;
-      setArchivoModal({ tipo, nombre, downloadUrl, blobUrl: pdfSrc, loading: false });
-      return;
-    }
-
-    // Excel: proxy a través del backend para evitar CORS
     setArchivoModal({ tipo, nombre, downloadUrl, loading: true });
     try {
       const token = getToken();
-      const proxyUrl = `${API_BASE_URL}/api/v1/storage/proxy-file?url=${encodeURIComponent(downloadUrl)}`;
+      const disposition = tipo === 'pdf' ? 'inline' : 'attachment';
+      const proxyUrl = `${API_BASE_URL}/api/v1/storage/proxy-file?url=${encodeURIComponent(downloadUrl)}&disposition=${disposition}`;
       const res = await fetch(proxyUrl, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!res.ok) throw new Error('No se pudo cargar el archivo');
-      const arrayBuffer = await res.arrayBuffer();
-      const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-      const sheets: { headers: string[]; rows: string[][] }[] = workbook.SheetNames.map((sheetName) => {
-        const ws = workbook.Sheets[sheetName];
-        const data: string[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }) as string[][];
-        const headers = (data[0] ?? []).map(String);
-        const rows = data.slice(1).map((r) => r.map(String));
-        return { headers, rows };
-      });
-      setArchivoModal((prev) => prev ? { ...prev, excelData: sheets, loading: false } : null);
+
+      if (tipo === 'pdf') {
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+        setArchivoModal((prev) => prev ? { ...prev, blobUrl, loading: false } : null);
+      } else {
+        const arrayBuffer = await res.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        const sheets: { headers: string[]; rows: string[][] }[] = workbook.SheetNames.map((sheetName) => {
+          const ws = workbook.Sheets[sheetName];
+          const data: string[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }) as string[][];
+          const headers = (data[0] ?? []).map(String);
+          const rows = data.slice(1).map((r) => r.map(String));
+          return { headers, rows };
+        });
+        setArchivoModal((prev) => prev ? { ...prev, excelData: sheets, loading: false } : null);
+      }
     } catch {
       setArchivoModal((prev) => prev ? { ...prev, loading: false, error: 'No se pudo cargar el archivo' } : null);
     }
   }, []);
 
   const cerrarArchivoModal = useCallback(() => {
-    setArchivoModal(null);
+    setArchivoModal((prev) => {
+      if (prev?.blobUrl) URL.revokeObjectURL(prev.blobUrl);
+      return null;
+    });
   }, []);
 
   const [excelSheetIdx, setExcelSheetIdx] = useState(0);

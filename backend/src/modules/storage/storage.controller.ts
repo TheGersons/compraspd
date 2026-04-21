@@ -135,13 +135,15 @@ export class StorageController {
 
     /**
      * GET /api/v1/storage/proxy-file
-     * Proxy para descargar archivos de Nextcloud evitando CORS en el frontend.
+     * Proxy para archivos de Nextcloud evitando CORS.
+     * ?url=<share_url>&disposition=inline|attachment
      * Solo acepta URLs del dominio Nextcloud configurado.
      */
     @Get('proxy-file')
-    @ApiOperation({ summary: 'Proxy de descarga de archivo desde Nextcloud' })
+    @ApiOperation({ summary: 'Proxy de archivo desde Nextcloud' })
     async proxyFile(
         @Query('url') url: string,
+        @Query('disposition') disposition: string = 'attachment',
         @Res() res: Response,
     ) {
         if (!url) throw new BadRequestException('Falta el parámetro url');
@@ -168,9 +170,11 @@ export class StorageController {
 
         const contentType = upstream.headers.get('content-type') || 'application/octet-stream';
         const buffer = Buffer.from(await upstream.arrayBuffer());
+        const safeDisposition = disposition === 'inline' ? 'inline' : 'attachment';
 
         (res as any).set({
             'Content-Type': contentType,
+            'Content-Disposition': safeDisposition,
             'Content-Length': buffer.length,
             'Cache-Control': 'private, max-age=300',
         });
