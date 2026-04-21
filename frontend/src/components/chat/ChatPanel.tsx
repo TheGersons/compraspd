@@ -148,7 +148,7 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
     nombre: string;
     downloadUrl: string;
     blobUrl?: string;
-    excelData?: { headers: string[]; rows: string[][] }[];
+    excelData?: { name: string; headers: string[]; rows: string[][] }[];
     loading: boolean;
     error?: string;
   } | null>(null);
@@ -171,12 +171,12 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
       } else {
         const arrayBuffer = await res.arrayBuffer();
         const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-        const sheets: { headers: string[]; rows: string[][] }[] = workbook.SheetNames.map((sheetName) => {
+        const sheets: { name: string; headers: string[]; rows: string[][] }[] = workbook.SheetNames.map((sheetName) => {
           const ws = workbook.Sheets[sheetName];
           const data: string[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }) as string[][];
           const headers = (data[0] ?? []).map(String);
           const rows = data.slice(1).map((r) => r.map(String));
-          return { headers, rows };
+          return { name: sheetName, headers, rows };
         });
         setArchivoModal((prev) => prev ? { ...prev, excelData: sheets, loading: false } : null);
       }
@@ -490,25 +490,30 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
 
               {/* Excel */}
               {!archivoModal.loading && !archivoModal.error && archivoModal.tipo === 'excel' && archivoModal.excelData && (
-                <div className="flex flex-1 flex-col overflow-hidden">
-                  {/* Sheet tabs */}
+                <div className="flex min-h-0 flex-1 overflow-hidden">
+                  {/* Sidebar de hojas — siempre visible */}
                   {archivoModal.excelData.length > 1 && (
-                    <div className="flex gap-1 overflow-x-auto border-b border-gray-200 px-4 pt-2 dark:border-gray-700">
-                      {archivoModal.excelData.map((_, idx) => (
+                    <div className="flex w-44 shrink-0 flex-col gap-1 overflow-y-auto border-r border-gray-200 p-2 dark:border-gray-700">
+                      <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                        Hojas
+                      </p>
+                      {archivoModal.excelData.map((sheet, idx) => (
                         <button
                           key={idx}
                           onClick={() => setExcelSheetIdx(idx)}
-                          className={`shrink-0 rounded-t-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                          className={`flex items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-medium transition-colors ${
                             idx === excelSheetIdx
-                              ? 'bg-blue-600 text-white'
-                              : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
+                              ? 'bg-blue-600 text-white shadow-sm'
+                              : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
                           }`}
                         >
-                          Hoja {idx + 1}
+                          <span className="text-sm">📋</span>
+                          <span className="truncate">{sheet.name}</span>
                         </button>
                       ))}
                     </div>
                   )}
+                  {/* Tabla */}
                   <div className="flex-1 overflow-auto p-4">
                     {(() => {
                       const sheet = archivoModal.excelData[excelSheetIdx];
@@ -516,7 +521,7 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
                       return (
                         <table className="w-full border-collapse text-xs">
                           {sheet.headers.length > 0 && (
-                            <thead>
+                            <thead className="sticky top-0 z-10">
                               <tr className="bg-gray-100 dark:bg-gray-800">
                                 {sheet.headers.map((h, i) => (
                                   <th
