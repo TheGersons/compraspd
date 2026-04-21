@@ -388,7 +388,7 @@ export default function App() {
               <Route
                 path="/users/gestionar-responsables"
                 element={
-                  <ProtectedRoute roles={["ADMIN"]}>
+                  <ProtectedRoute roles={["ADMIN", "JEFE_COMPRAS"]}>
                     <GestionarResponsables />
                   </ProtectedRoute>
                 }

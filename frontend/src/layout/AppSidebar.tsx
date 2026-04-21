@@ -142,7 +142,7 @@ const othersItems: NavItem[] = [
     roles: ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS"],
     subItems: [
       { name: "Gestión de Usuarios", path: "/profiles", pro: false },
-      { name: "Gestionar Responsables", path: "/users/gestionar-responsables", pro: false, roles: ["ADMIN"] },
+      { name: "Gestionar Responsables", path: "/users/gestionar-responsables", pro: false, roles: ["ADMIN", "JEFE_COMPRAS"] },
       { name: "Configuración", path: "/settings", pro: false },
       { name: "Roles", path: "/roles", pro: false },
     ],
