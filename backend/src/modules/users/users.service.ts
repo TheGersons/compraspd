@@ -281,13 +281,10 @@ export class UsersService {
     const supervisores = await this.prisma.usuario.findMany({
       where: {
         activo: true,
+        puedeSerAsignado: true,
         rol: { nombre: { in: ['SUPERVISOR', 'JEFE_COMPRAS'] } },
       },
-      select: { 
-        id: true, 
-        nombre: true, 
-        email: true 
-      },
+      select: { id: true, nombre: true, email: true },
       orderBy: { nombre: 'asc' },
     });
 
@@ -296,6 +293,34 @@ export class UsersService {
     }
 
     return supervisores;
+  }
+
+  async listAsignables() {
+    return this.prisma.usuario.findMany({
+      where: {
+        activo: true,
+        rol: { nombre: { in: ['SUPERVISOR', 'JEFE_COMPRAS', 'ADMIN'] } },
+      },
+      select: {
+        id: true,
+        nombre: true,
+        email: true,
+        puedeSerAsignado: true,
+        rol: { select: { nombre: true } },
+        _count: { select: { seguimientosAsignados: true, cotizacionesSupervisadas: true } },
+      },
+      orderBy: [{ puedeSerAsignado: 'desc' }, { nombre: 'asc' }],
+    });
+  }
+
+  async toggleAsignable(id: string, puedeSerAsignado: boolean) {
+    const usuario = await this.prisma.usuario.findUnique({ where: { id } });
+    if (!usuario) throw new NotFoundException('Usuario no encontrado');
+    return this.prisma.usuario.update({
+      where: { id },
+      data: { puedeSerAsignado },
+      select: { id: true, nombre: true, puedeSerAsignado: true },
+    });
   }
 
   /**

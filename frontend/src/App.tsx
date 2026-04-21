@@ -30,6 +30,7 @@ import ShoppingFollowUps from "./pages/Shopping/FollowUps";
 import ShoppingHistory from "./pages/Shopping/History";
 import ShoppingNew from "./pages/Shopping/New";
 import Profiles from "./pages/users/Profiles";
+import GestionarResponsables from "./pages/users/GestionarResponsables";
 import UserProfiles from "./pages/UserProfiles";
 import Calendar from "./pages/Calendar";
 import BasicTables from "./pages/Tables/BasicTables";
@@ -381,6 +382,14 @@ export default function App() {
                 element={
                   <ProtectedRoute roles={["ADMIN", "SUPERVISOR", "JEFE_COMPRAS"]}>
                     <Profiles />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/users/gestionar-responsables"
+                element={
+                  <ProtectedRoute roles={["ADMIN"]}>
+                    <GestionarResponsables />
                   </ProtectedRoute>
                 }
               />

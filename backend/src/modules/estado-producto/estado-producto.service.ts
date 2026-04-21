@@ -1059,6 +1059,7 @@ export class EstadoProductoService {
     return this.prisma.usuario.findMany({
       where: {
         activo: true,
+        puedeSerAsignado: true,
         rol: {
           nombre: { in: ['SUPERVISOR', 'ADMIN', 'JEFE_COMPRAS'] },
         },
@@ -1068,11 +1069,7 @@ export class EstadoProductoService {
         nombre: true,
         email: true,
         rol: { select: { nombre: true } },
-        _count: {
-          select: {
-            seguimientosAsignados: true,
-          },
-        },
+        _count: { select: { seguimientosAsignados: true } },
       },
       orderBy: { nombre: 'asc' },
     });

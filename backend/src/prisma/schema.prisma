@@ -165,6 +165,7 @@ model Usuario {
   rolId                  String    @map("rol_id") @db.Uuid
   departamentoId         String    @map("departamento_id") @db.Uuid
   activo                 Boolean   @default(true)
+  puedeSerAsignado       Boolean   @default(true) @map("puede_ser_asignado")
   creado                 DateTime  @default(now())
   actualizado            DateTime? @default(now())
   requierecambiopassword Boolean   @default(false) @map("requierecambiopassword")

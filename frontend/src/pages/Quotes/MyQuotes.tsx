@@ -500,10 +500,8 @@ export default function MyQuotes() {
             setCotizacionSeleccionada(detalle);
             setShowProductos(false);
             setProductoExpandido(null);
-            // Detectar responsable del primer estadoProducto (igual que FollowUps)
-            const primerEstado = detalle.estadosProductos?.[0];
-            if (primerEstado?.responsableSeguimiento) {
-                setResponsableSeguimiento({ id: primerEstado.responsableSeguimiento.id, nombre: primerEstado.responsableSeguimiento.nombre });
+            if (detalle.supervisorResponsable) {
+                setResponsableSeguimiento({ id: detalle.supervisorResponsable.id, nombre: detalle.supervisorResponsable.nombre });
             } else {
                 setResponsableSeguimiento(null);
             }

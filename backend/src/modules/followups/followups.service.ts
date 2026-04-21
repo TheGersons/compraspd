@@ -1417,6 +1417,7 @@ export class FollowUpsService {
     const supervisores = await this.prisma.usuario.findMany({
       where: {
         activo: true,
+        puedeSerAsignado: true,
         rol: {
           nombre: {
             contains: 'supervisor',

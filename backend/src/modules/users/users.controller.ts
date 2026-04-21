@@ -1,15 +1,16 @@
-import { 
-  Body, 
-  Controller, 
-  Get, 
-  Param, 
-  Patch, 
-  Post, 
-  Query, 
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
   UseGuards,
   ParseUUIDPipe,
   HttpCode,
-  HttpStatus
+  HttpStatus,
+  ParseBoolPipe,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { UsersService } from './users.service';
@@ -49,14 +50,33 @@ export class UsersController {
   }
 
   /**
-   * Listar supervisores activos
+   * Listar supervisores asignables activos
    */
   @Get('supervisors')
-  @ApiOperation({ summary: 'Listar supervisores activos' })
-  @ApiResponse({ status: 200, description: 'Lista de supervisores obtenida' })
-  @ApiResponse({ status: 404, description: 'No se encontraron supervisores' })
+  @ApiOperation({ summary: 'Listar supervisores asignables activos' })
   listSupervisors() {
     return this.usersService.supervisorsList();
+  }
+
+  /**
+   * Listar todos los supervisores/jefes con su estado de asignabilidad
+   */
+  @Get('asignables')
+  @ApiOperation({ summary: 'Listar supervisores con estado puedeSerAsignado' })
+  listAsignables() {
+    return this.usersService.listAsignables();
+  }
+
+  /**
+   * Cambiar si un usuario puede ser asignado como responsable
+   */
+  @Patch(':id/asignable')
+  @ApiOperation({ summary: 'Activar o desactivar asignabilidad de un usuario' })
+  toggleAsignable(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body('puedeSerAsignado', ParseBoolPipe) puedeSerAsignado: boolean,
+  ) {
+    return this.usersService.toggleAsignable(id, puedeSerAsignado);
   }
 
   /**
