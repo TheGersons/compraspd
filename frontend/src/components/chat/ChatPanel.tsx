@@ -90,11 +90,10 @@ function MensajeContenido({ contenido, esPropio }: { contenido: string; esPropio
         part.startsWith('@') ? (
           <span
             key={i}
-            className={`font-semibold rounded px-0.5 ${
-              esPropio
-                ? 'text-blue-100 bg-blue-500/40'
-                : 'text-purple-700 bg-purple-100 dark:text-purple-300 dark:bg-purple-900/40'
-            }`}
+            className={`font-semibold rounded px-0.5 ${esPropio
+              ? 'text-blue-100 bg-blue-500/40'
+              : 'text-purple-700 bg-purple-100 dark:text-purple-300 dark:bg-purple-900/40'
+              }`}
           >
             {part}
           </span>
@@ -181,7 +180,7 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
   // Load mentionable users once (only if user can mention)
   useEffect(() => {
     if (canMention) {
-      chatApi.getMentionableUsers().then(setMentionableUsers).catch(() => {});
+      chatApi.getMentionableUsers().then(setMentionableUsers).catch(() => { });
     }
   }, [canMention]);
 
@@ -189,8 +188,8 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
   const mentionSuggestions =
     mentionQuery !== null
       ? mentionableUsers.filter((u) =>
-          u.nombre.toLowerCase().includes(mentionQuery.toLowerCase()),
-        )
+        u.nombre.toLowerCase().includes(mentionQuery.toLowerCase()),
+      )
       : [];
 
   // ── Input change handler ──────────────────────────────────────────────────
@@ -342,7 +341,7 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
       {/* Image modal */}
       {imagenModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          className="fixed inset-0 z-2000 flex items-center justify-center bg-black/80 p-4"
           onClick={() => setImagenModal(null)}
         >
           <div className="relative max-h-[90vh] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
@@ -377,9 +376,8 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
 
       {/* Chat container */}
       <div
-        className={`relative flex h-[400px] flex-col transition-colors ${
-          isDragging ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''
-        }`}
+        className={`relative flex h-[400px] flex-col transition-colors ${isDragging ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''
+          }`}
         onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
         onDragLeave={(e) => {
           if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragging(false);
@@ -517,11 +515,10 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
                     e.preventDefault();
                     selectMention(user);
                   }}
-                  className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
-                    idx === mentionIndex
-                      ? 'bg-purple-50 dark:bg-purple-900/30'
-                      : 'hover:bg-gray-50 dark:hover:bg-gray-700'
-                  }`}
+                  className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${idx === mentionIndex
+                    ? 'bg-purple-50 dark:bg-purple-900/30'
+                    : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
                 >
                   <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-purple-100 text-xs font-bold text-purple-700 dark:bg-purple-900 dark:text-purple-300">
                     {user.nombre.charAt(0).toUpperCase()}
