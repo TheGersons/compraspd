@@ -708,30 +708,35 @@ export class MessagesService {
       ...responsablesExternos.filter((r) => r.activo),
     ];
 
-    // Destinatario de EMAIL:
-    // - Si manda JEFE_COMPRAS → email solo al solicitante
-    // - Si manda el solicitante u otro → email al JEFE_COMPRAS activo
+    // Destinatarios de EMAIL
+    const emailDestinatarios: UsuarioBasico[] = [];
+    const emailVistos = new Set<string>();
+
+    const agregarEmailDest = (u: UsuarioBasico | null | undefined) => {
+      if (u && u.activo && u.email && u.id !== senderId && !emailVistos.has(u.id)) {
+        emailVistos.add(u.id);
+        emailDestinatarios.push(u);
+      }
+    };
+
     const senderRole = (emisor?.rol?.nombre || '').toUpperCase();
     const esJefeCompras = senderRole === 'JEFE_COMPRAS';
-    let emailDestinatario: UsuarioBasico | null = null;
 
     if (esJefeCompras) {
-      // El jefe de compras manda → notificar al solicitante
-      const solicitante = cotizacion?.solicitante as UsuarioBasico | undefined;
-      if (solicitante?.activo && solicitante.email) {
-        emailDestinatario = solicitante;
-      }
+      // Jefe manda → notificar al solicitante
+      agregarEmailDest(cotizacion?.solicitante as UsuarioBasico | undefined);
     } else {
-      // El solicitante u otro manda → notificar al jefe de compras
+      // Otros mandan → notificar al jefe de compras
       const jefeCompras = await this.prisma.usuario.findFirst({
         where: { activo: true, rol: { nombre: 'JEFE_COMPRAS' } },
         orderBy: { creado: 'asc' },
         select: { id: true, nombre: true, email: true, activo: true },
       });
-      if (jefeCompras) {
-        emailDestinatario = jefeCompras as UsuarioBasico;
-      }
+      agregarEmailDest(jefeCompras as UsuarioBasico | null);
     }
+
+    // Siempre también al supervisorResponsable (si no es el emisor y no ya incluido)
+    agregarEmailDest(cotizacion?.supervisorResponsable as UsuarioBasico | undefined);
 
     await Promise.allSettled(
       destinatariosNotif.map(async (usuario) => {
@@ -756,11 +761,11 @@ export class MessagesService {
       }),
     );
 
-    // 3. Email — solo al destinatario determinado arriba
-    if (emailDestinatario) {
+    // 3. Email — a todos los destinatarios determinados arriba
+    for (const dest of emailDestinatarios) {
       this.mailService.sendNewMessageNotification(
-        emailDestinatario.email,
-        emailDestinatario.nombre,
+        dest.email,
+        dest.nombre,
         senderName,
         messageContent,
         chatUrl,

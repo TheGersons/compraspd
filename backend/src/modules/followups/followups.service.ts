@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { AprobarProductosDto } from './dto/aprobar-productos.dto';
 import { ConfigurarCotizacionDto } from './dto/configurar-cotizacion.dto';
+import { MailService } from '../Mail/mail.service';
 
 type UserJwt = { sub: string; role?: string };
 
@@ -23,7 +24,10 @@ type UserJwt = { sub: string; role?: string };
  */
 @Injectable()
 export class FollowUpsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mailService: MailService,
+  ) {}
 
   /**
    * Lista cotizaciones pendientes de configuración/aprobación
@@ -1380,6 +1384,12 @@ export class FollowUpsService {
       throw new NotFoundException('Cotización no encontrada');
     }
 
+    // Obtener nombre de cotización para el email
+    const cotizacionConNombre = await this.prisma.cotizacion.findUnique({
+      where: { id: cotizacionId },
+      select: { nombreCotizacion: true, supervisorResponsableId: true },
+    });
+
     // Actualizar y registrar
     await this.prisma.$transaction([
       this.prisma.cotizacion.update({
@@ -1399,6 +1409,23 @@ export class FollowUpsService {
         },
       }),
     ]);
+
+    // Email al nuevo responsable
+    if (nuevoSupervisor.id !== user.sub && nuevoSupervisor.email) {
+      const asignadoPor = await this.prisma.usuario.findUnique({
+        where: { id: user.sub },
+        select: { nombre: true },
+      });
+      const frontendUrl = process.env.FRONTEND_URL || 'http://89.167.20.163:8080';
+      this.mailService.sendAsignacionResponsableNotification(
+        nuevoSupervisor.email,
+        nuevoSupervisor.nombre,
+        asignadoPor?.nombre || 'Un usuario',
+        'cotización',
+        cotizacionConNombre?.nombreCotizacion || cotizacionId,
+        `${frontendUrl}/quotes/follow-ups`,
+      ).catch(() => {});
+    }
 
     return {
       message: 'Supervisor reasignado exitosamente',

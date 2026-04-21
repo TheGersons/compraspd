@@ -4,6 +4,7 @@ import { EstadoProductoService } from './estado-producto.service';
 import { SyncEstadoProductoController } from './sync-estado-producto.controller';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { EstadoProductoSyncService } from './estado-producto-sync.service';
+import { MailService } from '../Mail/mail.service';
 
 @Module({
   imports: [PrismaModule],
@@ -14,6 +15,7 @@ import { EstadoProductoSyncService } from './estado-producto-sync.service';
   providers: [
     EstadoProductoService,
     EstadoProductoSyncService, // ← NUEVO
+    MailService,
   ],
   exports: [EstadoProductoService, EstadoProductoSyncService], // Exportar para usar en quotations
 })

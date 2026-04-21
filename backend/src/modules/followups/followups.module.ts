@@ -4,6 +4,7 @@ import { TimelineController } from './timeline.controller';
 import { FollowUpsService } from './followups.service';
 import { TimelineService } from './timeline.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { MailService } from '../Mail/mail.service';
 
 @Module({
   controllers: [
@@ -13,7 +14,8 @@ import { PrismaService } from '../../prisma/prisma.service';
   providers: [
     FollowUpsService,
     TimelineService,
-    PrismaService
+    PrismaService,
+    MailService,
   ],
   exports: [
     FollowUpsService,

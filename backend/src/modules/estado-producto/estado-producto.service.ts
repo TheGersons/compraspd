@@ -20,6 +20,7 @@ import {
   RegistrarEvidenciaDto,
 } from './dto/estado-producto.dto';
 import console from 'console';
+import { MailService } from '../Mail/mail.service';
 
 type UserJwt = { sub: string; role?: string };
 
@@ -70,7 +71,10 @@ const ESTADO_A_CAMPO_FECHA: Record<EstadoProceso, string> = {
  */
 @Injectable()
 export class EstadoProductoService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mailService: MailService,
+  ) {}
 
   /**
    * Crear EstadoProducto al aprobar cotización
@@ -1018,8 +1022,32 @@ export class EstadoProductoService {
         responsableSeguimiento: {
           select: { id: true, nombre: true, email: true },
         },
+        cotizacion: {
+          select: { nombreCotizacion: true },
+        },
       },
     });
+
+    // Email al nuevo responsable (solo cuando se asigna, no cuando se remueve)
+    if (responsableId && responsableId !== user.sub) {
+      const resp = (updated as any).responsableSeguimiento as { id: string; nombre: string; email: string } | null;
+      if (resp?.email) {
+        const asignadoPor = await this.prisma.usuario.findUnique({
+          where: { id: user.sub },
+          select: { nombre: true },
+        });
+        const frontendUrl = process.env.FRONTEND_URL || 'http://89.167.20.163:8080';
+        const cotNombre = (updated as any).cotizacion?.nombreCotizacion || id;
+        this.mailService.sendAsignacionResponsableNotification(
+          resp.email,
+          resp.nombre,
+          asignadoPor?.nombre || 'Un usuario',
+          'compra',
+          cotNombre,
+          `${frontendUrl}/shopping/follow-ups`,
+        ).catch(() => {});
+      }
+    }
 
     return {
       message: responsableId ? 'Responsable asignado' : 'Responsable removido',
@@ -1046,6 +1074,29 @@ export class EstadoProductoService {
       where: { id: { in: ids } },
       data: { responsableSeguimientoId: responsableId } as any,
     });
+
+    // Email al nuevo responsable (solo cuando se asigna, no cuando se remueve)
+    if (responsableId && responsableId !== user.sub) {
+      const resp = await this.prisma.usuario.findUnique({
+        where: { id: responsableId },
+        select: { nombre: true, email: true },
+      });
+      if (resp?.email) {
+        const asignadoPor = await this.prisma.usuario.findUnique({
+          where: { id: user.sub },
+          select: { nombre: true },
+        });
+        const frontendUrl = process.env.FRONTEND_URL || 'http://89.167.20.163:8080';
+        this.mailService.sendAsignacionResponsableNotification(
+          resp.email,
+          resp.nombre,
+          asignadoPor?.nombre || 'Un usuario',
+          'compra',
+          `${ids.length} productos asignados`,
+          `${frontendUrl}/shopping/follow-ups`,
+        ).catch(() => {});
+      }
+    }
 
     return {
       message: `Responsable ${responsableId ? 'asignado' : 'removido'} de ${ids.length} productos`,

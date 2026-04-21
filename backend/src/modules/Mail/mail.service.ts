@@ -628,6 +628,84 @@ export class MailService {
   }
 
   /**
+   * Notificación de asignación como responsable de cotización/compra
+   */
+  async sendAsignacionResponsableNotification(
+    to: string,
+    recipientName: string,
+    asignadoPorNombre: string,
+    entidadTipo: 'cotización' | 'compra',
+    entidadNombre: string,
+    entidadUrl: string,
+  ): Promise<boolean> {
+    const subject = `Se te asignó una ${entidadTipo}: ${entidadNombre} - Energía PD`;
+
+    const mailOptions = {
+      from: `"Energía PD" <${process.env.MAIL_USER || 'noreply@energiapd.com'}>`,
+      to,
+      subject,
+      html: `
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Nueva Asignación</title>
+        </head>
+        <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f0f4f8; -webkit-font-smoothing: antialiased;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f0f4f8; padding: 48px 16px;">
+            <tr>
+              <td align="center">
+                <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 520px; background: #ffffff; border-radius: 24px; overflow: hidden; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);">
+                  <tr>
+                    <td style="background: linear-gradient(145deg, #059669 0%, #047857 50%, #065f46 100%); padding: 48px 40px; text-align: center;">
+                      <div style="margin-bottom: 16px;">${this.getLogoSvg()}</div>
+                      <p style="margin: 0; color: white; font-size: 13px; letter-spacing: 0.5px; text-transform: uppercase;">COMPRAS EPD</p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 48px 40px 32px;">
+                      <h1 style="margin: 0 0 8px; color: #1a202c; font-size: 24px; font-weight: 700; text-align: center;">Nueva Asignación</h1>
+                      <p style="margin: 0 0 32px; color: #64748b; font-size: 15px; text-align: center; line-height: 1.6;">
+                        Hola <strong style="color: #334155;">${recipientName}</strong>, <strong style="color: #334155;">${asignadoPorNombre}</strong> te asignó como responsable de una ${entidadTipo}.
+                      </p>
+                      <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 20px 24px; margin-bottom: 32px;">
+                        <p style="margin: 0 0 6px; color: #166534; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">${entidadTipo === 'cotización' ? 'Cotización asignada' : 'Compra asignada'}</p>
+                        <p style="margin: 0; color: #14532d; font-size: 16px; font-weight: 600;">${entidadNombre}</p>
+                      </div>
+                      <div style="text-align: center; margin-bottom: 32px;">
+                        <a href="${entidadUrl}" style="display: inline-block; background: linear-gradient(135deg, #059669 0%, #047857 100%); color: #ffffff; text-decoration: none; padding: 16px 48px; border-radius: 12px; font-weight: 600; font-size: 15px; box-shadow: 0 4px 14px rgba(5, 150, 105, 0.4);">
+                          Ver ${entidadTipo === 'cotización' ? 'Cotización' : 'Compra'}
+                        </a>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="background: #f8fafc; padding: 32px 40px; border-top: 1px solid #e2e8f0; text-align: center;">
+                      <p style="margin: 0 0 8px; color: #64748b; font-size: 13px;">Este es un correo automático, por favor no respondas.</p>
+                      <p style="margin: 0; color: #94a3b8; font-size: 12px;">© ${new Date().getFullYear()} Energía PD · Todos los derechos reservados</p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+      `,
+    };
+
+    try {
+      const info = await this.transporter.sendMail(mailOptions);
+      this.logger.log(`Notificación asignación enviada a ${to}: ${info.messageId}`);
+      return true;
+    } catch (error) {
+      this.logger.error(`Error enviando notificación asignación a ${to}:`, error);
+      return false;
+    }
+  }
+
+  /**
    * Notificación de nuevo seguimiento internacional creado automáticamente
    */
   async sendNuevoSeguimientoNotification(
