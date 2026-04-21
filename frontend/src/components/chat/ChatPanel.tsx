@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { apiFetch, uploadWithProgress } from '../../lib/api';
+import { apiFetch, uploadWithProgress, getToken } from '../../lib/api';
+import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
@@ -139,6 +140,58 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
   const [imagenModal, setImagenModal] = useState<{
     src: string; nombre: string; downloadUrl: string;
   } | null>(null);
+
+  // ── PDF / Excel modal ─────────────────────────────────────────────────────
+  type ArchivoModalTipo = 'pdf' | 'excel';
+  const [archivoModal, setArchivoModal] = useState<{
+    tipo: ArchivoModalTipo;
+    nombre: string;
+    downloadUrl: string;
+    blobUrl?: string;
+    excelData?: { headers: string[]; rows: string[][] }[];
+    loading: boolean;
+    error?: string;
+  } | null>(null);
+
+  const abrirArchivoModal = useCallback(async (tipo: ArchivoModalTipo, nombre: string, downloadUrl: string) => {
+    setArchivoModal({ tipo, nombre, downloadUrl, loading: true });
+    try {
+      const token = getToken();
+      const res = await fetch(`${downloadUrl}/download`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error('No se pudo cargar el archivo');
+      const blob = await res.blob();
+
+      if (tipo === 'pdf') {
+        const blobUrl = URL.createObjectURL(blob);
+        setArchivoModal((prev) => prev ? { ...prev, blobUrl, loading: false } : null);
+      } else {
+        const arrayBuffer = await blob.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        const sheets: { headers: string[]; rows: string[][] }[] = workbook.SheetNames.map((sheetName) => {
+          const ws = workbook.Sheets[sheetName];
+          const data: string[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }) as string[][];
+          const headers = (data[0] ?? []).map(String);
+          const rows = data.slice(1).map((r) => r.map(String));
+          return { headers, rows };
+        });
+        setArchivoModal((prev) => prev ? { ...prev, excelData: sheets, loading: false } : null);
+      }
+    } catch (e) {
+      setArchivoModal((prev) => prev ? { ...prev, loading: false, error: 'No se pudo cargar el archivo' } : null);
+    }
+  }, []);
+
+  const cerrarArchivoModal = useCallback(() => {
+    setArchivoModal((prev) => {
+      if (prev?.blobUrl) URL.revokeObjectURL(prev.blobUrl);
+      return null;
+    });
+  }, []);
+
+  const [excelSheetIdx, setExcelSheetIdx] = useState(0);
+  useEffect(() => { if (!archivoModal) setExcelSheetIdx(0); }, [archivoModal]);
 
   // ── Mention state ─────────────────────────────────────────────────────────
   const canMention = userRole !== 'USUARIO';
@@ -374,6 +427,131 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
         </div>
       )}
 
+      {/* PDF / Excel modal */}
+      {archivoModal && (
+        <div
+          className="fixed inset-0 z-20000 flex items-center justify-center bg-black/80 p-4"
+          onClick={cerrarArchivoModal}
+        >
+          <div
+            className="relative flex max-h-[92vh] w-full max-w-5xl flex-col rounded-2xl bg-white shadow-2xl dark:bg-gray-900"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between gap-3 border-b border-gray-200 px-5 py-3 dark:border-gray-700">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="text-xl">{archivoModal.tipo === 'pdf' ? '📄' : '📊'}</span>
+                <span className="truncate text-sm font-semibold text-gray-800 dark:text-white">{archivoModal.nombre}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={archivoModal.downloadUrl}
+                  download
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
+                >
+                  Descargar
+                </a>
+                <button
+                  onClick={cerrarArchivoModal}
+                  className="rounded-full p-1.5 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              {archivoModal.loading && (
+                <div className="flex flex-1 items-center justify-center py-20">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
+                </div>
+              )}
+              {archivoModal.error && (
+                <div className="flex flex-1 items-center justify-center py-20 text-sm text-red-500">
+                  {archivoModal.error}
+                </div>
+              )}
+
+              {/* PDF */}
+              {!archivoModal.loading && !archivoModal.error && archivoModal.tipo === 'pdf' && archivoModal.blobUrl && (
+                <iframe
+                  src={archivoModal.blobUrl}
+                  className="h-[75vh] w-full rounded-b-2xl border-0"
+                  title={archivoModal.nombre}
+                />
+              )}
+
+              {/* Excel */}
+              {!archivoModal.loading && !archivoModal.error && archivoModal.tipo === 'excel' && archivoModal.excelData && (
+                <div className="flex flex-1 flex-col overflow-hidden">
+                  {/* Sheet tabs */}
+                  {archivoModal.excelData.length > 1 && (
+                    <div className="flex gap-1 overflow-x-auto border-b border-gray-200 px-4 pt-2 dark:border-gray-700">
+                      {archivoModal.excelData.map((_, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setExcelSheetIdx(idx)}
+                          className={`shrink-0 rounded-t-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                            idx === excelSheetIdx
+                              ? 'bg-blue-600 text-white'
+                              : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
+                          }`}
+                        >
+                          Hoja {idx + 1}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex-1 overflow-auto p-4">
+                    {(() => {
+                      const sheet = archivoModal.excelData[excelSheetIdx];
+                      if (!sheet) return null;
+                      return (
+                        <table className="w-full border-collapse text-xs">
+                          {sheet.headers.length > 0 && (
+                            <thead>
+                              <tr className="bg-gray-100 dark:bg-gray-800">
+                                {sheet.headers.map((h, i) => (
+                                  <th
+                                    key={i}
+                                    className="border border-gray-300 px-3 py-2 text-left font-semibold text-gray-700 dark:border-gray-600 dark:text-gray-300"
+                                  >
+                                    {h || ' '}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                          )}
+                          <tbody>
+                            {sheet.rows.map((row, ri) => (
+                              <tr key={ri} className="even:bg-gray-50 dark:even:bg-gray-800/40">
+                                {row.map((cell, ci) => (
+                                  <td
+                                    key={ci}
+                                    className="border border-gray-200 px-3 py-1.5 text-gray-800 dark:border-gray-700 dark:text-gray-200"
+                                  >
+                                    {cell}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Chat container */}
       <div
         className={`relative flex h-[400px] flex-col transition-colors ${isDragging ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''
@@ -432,6 +610,8 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
                             {mensaje.adjuntos.map((adj) => {
                               const esImagen = adj.tipoArchivo?.startsWith('image/');
                               const nombre = adj.nombreArchivo || adj.direccionArchivo?.split('/').pop() || 'Archivo';
+                              const esPdf = adj.tipoArchivo?.includes('pdf') || nombre.toLowerCase().endsWith('.pdf');
+                              const esExcel = adj.tipoArchivo?.includes('sheet') || adj.tipoArchivo?.includes('excel') || /\.(xlsx?|ods|csv)$/i.test(nombre);
                               return (
                                 <div key={adj.id}>
                                   {esImagen && adj.previewUrl ? (
@@ -455,6 +635,19 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
                                         </span>
                                       </div>
                                     </div>
+                                  ) : (esPdf || esExcel) ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => abrirArchivoModal(esPdf ? 'pdf' : 'excel', nombre, adj.direccionArchivo)}
+                                      className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors ${esPropio ? 'border-blue-400 text-blue-100 hover:bg-blue-500' : 'border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-600'}`}
+                                    >
+                                      <span className="text-base">{esPdf ? '📄' : '📊'}</span>
+                                      <span className="max-w-[180px] truncate">{nombre}</span>
+                                      <span className="text-[10px] opacity-70">
+                                        {adj.tamanio ? `${(Number(adj.tamanio) / 1024).toFixed(0)}KB` : ''}
+                                      </span>
+                                      <span className={`text-[10px] ${esPropio ? 'text-blue-200' : 'text-blue-500 dark:text-blue-400'}`}>Vista previa</span>
+                                    </button>
                                   ) : (
                                     <a
                                       href={adj.direccionArchivo}
@@ -463,7 +656,7 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
                                       className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors ${esPropio ? 'border-blue-400 text-blue-100 hover:bg-blue-500' : 'border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-600'}`}
                                     >
                                       <span className="text-base">
-                                        {adj.tipoArchivo?.includes('pdf') ? '📄' : adj.tipoArchivo?.includes('sheet') || adj.tipoArchivo?.includes('excel') ? '📊' : adj.tipoArchivo?.includes('word') || adj.tipoArchivo?.includes('document') ? '📝' : '📎'}
+                                        {adj.tipoArchivo?.includes('word') || adj.tipoArchivo?.includes('document') ? '📝' : '📎'}
                                       </span>
                                       <span className="max-w-[180px] truncate">{nombre}</span>
                                       <span className="text-[10px] opacity-70">
