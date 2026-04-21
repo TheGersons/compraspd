@@ -9,6 +9,7 @@ import {
     Get,
     Query,
     Res,
+    InternalServerErrorException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -130,5 +131,49 @@ export class StorageController {
         });
 
         res.send(fileData.buffer);
+    }
+
+    /**
+     * GET /api/v1/storage/proxy-file
+     * Proxy para descargar archivos de Nextcloud evitando CORS en el frontend.
+     * Solo acepta URLs del dominio Nextcloud configurado.
+     */
+    @Get('proxy-file')
+    @ApiOperation({ summary: 'Proxy de descarga de archivo desde Nextcloud' })
+    async proxyFile(
+        @Query('url') url: string,
+        @Res() res: Response,
+    ) {
+        if (!url) throw new BadRequestException('Falta el parámetro url');
+
+        const NEXTCLOUD_HOST = process.env.NEXTCLOUD_HOST || 'your-storageshare.de';
+        let parsed: URL;
+        try {
+            parsed = new URL(url);
+        } catch {
+            throw new BadRequestException('URL inválida');
+        }
+        if (!parsed.hostname.endsWith(NEXTCLOUD_HOST)) {
+            throw new BadRequestException('Dominio no permitido');
+        }
+
+        const downloadUrl = url.endsWith('/download') ? url : `${url}/download`;
+        let upstream: globalThis.Response;
+        try {
+            upstream = await fetch(downloadUrl);
+        } catch {
+            throw new InternalServerErrorException('No se pudo conectar a Nextcloud');
+        }
+        if (!upstream.ok) throw new InternalServerErrorException(`Nextcloud respondió ${upstream.status}`);
+
+        const contentType = upstream.headers.get('content-type') || 'application/octet-stream';
+        const buffer = Buffer.from(await upstream.arrayBuffer());
+
+        (res as any).set({
+            'Content-Type': contentType,
+            'Content-Length': buffer.length,
+            'Cache-Control': 'private, max-age=300',
+        });
+        (res as any).send(buffer);
     }
 }
