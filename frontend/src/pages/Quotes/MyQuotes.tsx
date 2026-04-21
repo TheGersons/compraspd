@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect } from "react";
 import PageMeta from "../../components/common/PageMeta";
 import { getToken } from "../../lib/api";
-import * as XLSX from 'xlsx';
 import { useNotifications } from "../Notifications/context/NotificationContext";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
+import ChatPanel from "../../components/chat/ChatPanel";
 
 // ============================================================================
 // TYPES
@@ -145,26 +145,6 @@ type Cotizacion = {
     productosEnCompra?: number;
     productosRecibidos?: number;
     progresoCompraTotal?: number;
-};
-
-type ChatMessage = {
-    id: string;
-    contenido: string;
-    tipoMensaje?: string;
-    creado: string;
-    emisor: {
-        id: string;
-        nombre: string;
-        email: string;
-    };
-    adjuntos?: {
-        id: string;
-        direccionArchivo: string;
-        tipoArchivo: string;
-        tamanio: number;
-        nombreArchivo?: string;
-        previewUrl?: string;
-    }[];
 };
 
 // ============================================================================
@@ -332,50 +312,6 @@ const api = {
         return data.items || data || [];
     },
 
-    // Chat - Obtener mensajes
-    async getChatMessages(chatId: string) {
-        const token = this.getToken();
-        const response = await fetch(`${API_BASE_URL}/api/v1/messages/${chatId}/messages`, {
-            credentials: "include",
-            headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!response.ok) throw new Error("Error al cargar mensajes");
-        return response.json();
-    },
-
-    // Chat - Enviar mensaje
-    async sendMessage(chatId: string, contenido: string) {
-        const token = this.getToken();
-        const response = await fetch(`${API_BASE_URL}/api/v1/messages/${chatId}/messages`, {
-            method: "POST",
-            credentials: "include",
-            headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ chatId, contenido }),
-        });
-        if (!response.ok) throw new Error("Error al enviar mensaje");
-        return response.json();
-    },
-
-    async sendMessageWithFile(chatId: string, file: File, contenido?: string) {
-        const token = this.getToken();
-        const formData = new FormData();
-        formData.append("file", file);
-        if (contenido?.trim()) formData.append("contenido", contenido);
-        const response = await fetch(`${API_BASE_URL}/api/v1/messages/${chatId}/upload`, {
-            method: "POST",
-            credentials: "include",
-            headers: { Authorization: `Bearer ${token}` },
-            body: formData,
-        });
-        if (!response.ok) {
-            const e = await response.json().catch(() => ({}));
-            throw new Error(e.message || "Error al enviar archivo");
-        }
-        return response.json();
-    },
 };
 
 // ============================================================================
@@ -487,7 +423,6 @@ const getEstadoActualProducto = (producto: any, tipoCompra: string): string => {
 
 export default function MyQuotes() {
     const { addNotification } = useNotifications();
-    const chatEndRef = useRef<HTMLDivElement>(null);
 
     // Estados principales
     const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>([]);
@@ -499,63 +434,6 @@ export default function MyQuotes() {
     // Estados de búsqueda y filtros
     const [searchQuery, setSearchQuery] = useState("");
     const [vistaActual, setVistaActual] = useState<'cotizaciones' | 'enCompras' | 'completadas'>('cotizaciones');
-
-    // Estados del chat
-    const [mensajes, setMensajes] = useState<ChatMessage[]>([]);
-    const [nuevoMensaje, setNuevoMensaje] = useState("");
-    const [loadingChat, setLoadingChat] = useState(false);
-    const [sendingMessage, setSendingMessage] = useState(false);
-    const chatFileRef = useRef<HTMLInputElement>(null);
-    const [sendingFile, setSendingFile] = useState(false);
-    const [imagenModal, setImagenModal] = useState<{ src: string; nombre: string; downloadUrl: string } | null>(null);
-
-    type ArchivoModalTipo = 'pdf' | 'excel';
-    const [archivoModal, setArchivoModal] = useState<{
-        tipo: ArchivoModalTipo; nombre: string; downloadUrl: string;
-        blobUrl?: string; excelData?: { name: string; headers: string[]; rows: string[][] }[];
-        loading: boolean; error?: string;
-    } | null>(null);
-    const [excelSheetIdx, setExcelSheetIdx] = useState(0);
-    useEffect(() => { if (!archivoModal) setExcelSheetIdx(0); }, [archivoModal]);
-
-    const abrirArchivoModal = useCallback(async (tipo: ArchivoModalTipo, nombre: string, downloadUrl: string) => {
-        setArchivoModal({ tipo, nombre, downloadUrl, loading: true });
-        try {
-            const token = getToken();
-            const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-            const disposition = tipo === 'pdf' ? 'inline' : 'attachment';
-            const proxyUrl = `${API_BASE_URL}/api/v1/storage/proxy-file?url=${encodeURIComponent(downloadUrl)}&disposition=${disposition}`;
-            const res = await fetch(proxyUrl, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
-            if (!res.ok) throw new Error();
-            if (tipo === 'pdf') {
-                const blob = await res.blob();
-                const blobUrl = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
-                setArchivoModal((prev) => prev ? { ...prev, blobUrl, loading: false } : null);
-            } else {
-                const arrayBuffer = await res.arrayBuffer();
-                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-                const sheets = workbook.SheetNames.map((sheetName) => {
-                    const ws = workbook.Sheets[sheetName];
-                    const data: string[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }) as string[][];
-                    return { name: sheetName, headers: (data[0] ?? []).map(String), rows: data.slice(1).map((r) => r.map(String)) };
-                });
-                setArchivoModal((prev) => prev ? { ...prev, excelData: sheets, loading: false } : null);
-            }
-        } catch {
-            setArchivoModal((prev) => prev ? { ...prev, loading: false, error: 'No se pudo cargar el archivo' } : null);
-        }
-    }, []);
-
-    const cerrarArchivoModal = useCallback(() => {
-        setArchivoModal((prev) => { if (prev?.blobUrl) URL.revokeObjectURL(prev.blobUrl); return null; });
-    }, []);
-
-    // Bloquear scroll del body cuando cualquier modal está abierto
-    useEffect(() => {
-        const anyOpen = !!(imagenModal || archivoModal);
-        document.body.style.overflow = anyOpen ? 'hidden' : '';
-        return () => { document.body.style.overflow = ''; };
-    }, [imagenModal, archivoModal]);
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
 
@@ -573,8 +451,6 @@ export default function MyQuotes() {
         );
     }
 
-    const [currentUserId, setCurrentUserId] = useState<string>("");
-
     if (!user) {
         return null;
     }
@@ -585,26 +461,11 @@ export default function MyQuotes() {
 
     useEffect(() => {
         cargarMisCotizaciones();
-        obtenerUsuarioActual();
     }, []);
-
-    useEffect(() => {
-        if (cotizacionSeleccionada?.chatId) {
-            cargarMensajes(cotizacionSeleccionada.chatId);
-        }
-    }, [cotizacionSeleccionada]);
-
-    useEffect(() => {
-        scrollToBottom();
-    }, [mensajes]);
 
     // ============================================================================
     // FUNCTIONS
     // ============================================================================
-
-    const obtenerUsuarioActual = async () => {
-        setCurrentUserId(user.id);
-    };
 
     const cargarMisCotizaciones = async () => {
         try {
@@ -652,61 +513,6 @@ export default function MyQuotes() {
         } finally {
             setLoadingDetalle(false);
         }
-    };
-
-    const cargarMensajes = async (chatId: string) => {
-        try {
-            setLoadingChat(true);
-            const data = await api.getChatMessages(chatId);
-            const mensajesOrdenados = (data.items || data || []).sort((a: ChatMessage, b: ChatMessage) => {
-                return new Date(a.creado).getTime() - new Date(b.creado).getTime();
-            });
-            setMensajes(mensajesOrdenados);
-        } catch (error) {
-            console.error("Error al cargar mensajes:", error);
-        } finally {
-            setLoadingChat(false);
-        }
-    };
-
-    const enviarMensaje = async () => {
-        if (!nuevoMensaje.trim() || !cotizacionSeleccionada?.chatId) {
-            addNotification("warn", "Advertencia", "Escribe un mensaje");
-            return;
-        }
-
-        try {
-            setSendingMessage(true);
-            await api.sendMessage(cotizacionSeleccionada.chatId, nuevoMensaje.trim());
-            setNuevoMensaje("");
-            await cargarMensajes(cotizacionSeleccionada.chatId);
-            addNotification("success", "Éxito", "Mensaje enviado");
-        } catch (error) {
-            console.error("Error al enviar mensaje:", error);
-            addNotification("danger", "Error", "Error al enviar mensaje");
-        } finally {
-            setSendingMessage(false);
-        }
-    };
-
-    const enviarArchivo = async (file: File) => {
-        if (!file || !cotizacionSeleccionada?.chatId) return;
-        try {
-            setSendingFile(true);
-            await api.sendMessageWithFile(cotizacionSeleccionada.chatId, file);
-            await cargarMensajes(cotizacionSeleccionada.chatId);
-            addNotification("success", "Archivo enviado", file.name);
-        } catch (error: any) {
-            console.error("Error al enviar archivo:", error);
-            addNotification("danger", "Error", error.message || "Error al enviar archivo");
-        } finally {
-            setSendingFile(false);
-            if (chatFileRef.current) chatFileRef.current.value = "";
-        }
-    };
-
-    const scrollToBottom = () => {
-        chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
 
     // Filtrar cotizaciones según la vista
@@ -1412,244 +1218,17 @@ export default function MyQuotes() {
                                 <h3 className="mb-3 font-semibold text-gray-800 dark:text-white/90">
                                     💬 Chat con {cotizacionSeleccionada.supervisorResponsable?.nombre || "el equipo"}
                                 </h3>
-
-                                {!cotizacionSeleccionada.chatId ? (
-                                    <div className="rounded-lg bg-yellow-50 p-4 dark:bg-yellow-900/20">
-                                        <p className="text-sm text-yellow-700 dark:text-yellow-400">
-                                            ⚠️ El chat aún no está disponible para esta cotización.
-                                        </p>
-                                    </div>
-                                ) : (
-                                    <div className="flex h-[350px] flex-col">
-                                        {/* Mensajes */}
-                                        <div className="flex-1 space-y-3 overflow-auto rounded-lg bg-gray-50 p-3 dark:bg-gray-900">
-                                            {loadingChat ? (
-                                                <div className="flex h-full items-center justify-center">
-                                                    <div className="h-6 w-6 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
-                                                </div>
-                                            ) : mensajes.length === 0 ? (
-                                                <p className="text-center text-sm text-gray-500 dark:text-gray-400">
-                                                    No hay mensajes aún. Inicia la conversación.
-                                                </p>
-                                            ) : (
-                                                <>
-                                                    {mensajes.map((mensaje) => {
-                                                        const esPropio = mensaje.emisor.id === currentUserId;
-                                                        return (
-                                                            <div
-                                                                key={mensaje.id}
-                                                                className={`flex ${esPropio ? "justify-end" : "justify-start"}`}
-                                                            >
-                                                                <div className={`max-w-[70%] ${esPropio ? "items-end" : "items-start"} flex flex-col`}>
-                                                                    {!esPropio && (
-                                                                        <span className="mb-1 text-xs font-medium text-gray-600 dark:text-gray-400">
-                                                                            {mensaje.emisor.nombre}
-                                                                        </span>
-                                                                    )}
-                                                                    <div
-                                                                        className={`rounded-2xl px-4 py-2 ${esPropio
-                                                                            ? "bg-blue-600 text-white"
-                                                                            : "bg-white text-gray-900 dark:bg-gray-800 dark:text-white"
-                                                                            }`}
-                                                                    >
-                                                                        {/* Adjuntos */}
-                                                                        {mensaje.adjuntos && mensaje.adjuntos.length > 0 && (
-                                                                            <div className="mb-2">
-                                                                                {mensaje.adjuntos.map((adj) => {
-                                                                                    const esImagen = adj.tipoArchivo?.startsWith('image/');
-                                                                                    const nombre = adj.nombreArchivo || adj.direccionArchivo?.split('/').pop() || 'Archivo';
-                                                                                    const esPdf = adj.tipoArchivo?.includes('pdf') || nombre.toLowerCase().endsWith('.pdf');
-                                                                                    const esExcel = adj.tipoArchivo?.includes('sheet') || adj.tipoArchivo?.includes('excel') || /\.(xlsx?|ods|csv)$/i.test(nombre);
-                                                                                    return (
-                                                                                        <div key={adj.id}>
-                                                                                            {esImagen && adj.previewUrl ? (
-                                                                                                <div className="cursor-pointer" onClick={() => setImagenModal({ src: adj.direccionArchivo + '/download', nombre, downloadUrl: adj.direccionArchivo })}>
-                                                                                                    <img src={adj.previewUrl} alt={nombre} className="max-w-[250px] max-h-[180px] rounded-lg hover:opacity-90 transition-opacity" loading="lazy" />
-                                                                                                </div>
-                                                                                            ) : (esPdf || esExcel) ? (
-                                                                                                <button type="button" onClick={() => abrirArchivoModal(esPdf ? 'pdf' : 'excel', nombre, adj.direccionArchivo)}
-                                                                                                    className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors ${esPropio ? 'border-blue-400 text-blue-100 hover:bg-blue-500' : 'border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-600'}`}>
-                                                                                                    <span className="text-base">{esPdf ? '📄' : '📊'}</span>
-                                                                                                    <span className="max-w-[150px] truncate">{nombre}</span>
-                                                                                                    <span className="text-[10px] opacity-70">{adj.tamanio ? `${(Number(adj.tamanio) / 1024).toFixed(0)}KB` : ''}</span>
-                                                                                                    <span className={`text-[10px] ${esPropio ? 'text-blue-200' : 'text-blue-500 dark:text-blue-400'}`}>Vista previa</span>
-                                                                                                </button>
-                                                                                            ) : (
-                                                                                                <a href={adj.direccionArchivo} target="_blank" rel="noopener noreferrer"
-                                                                                                    className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors ${esPropio ? 'border-blue-400 text-blue-100 hover:bg-blue-500' : 'border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-600'}`}>
-                                                                                                    <span className="text-base">{adj.tipoArchivo?.includes('word') ? '📝' : '📎'}</span>
-                                                                                                    <span className="max-w-[150px] truncate">{nombre}</span>
-                                                                                                    <span className="text-[10px] opacity-70">{adj.tamanio ? `${(Number(adj.tamanio) / 1024).toFixed(0)}KB` : ''}</span>
-                                                                                                </a>
-                                                                                            )}
-                                                                                        </div>
-                                                                                    );
-                                                                                })}
-                                                                            </div>
-                                                                        )}
-                                                                        {/* Texto (ocultar el automático "📎 filename" si hay adjuntos) */}
-                                                                        {mensaje.contenido && !(mensaje.tipoMensaje === 'ARCHIVO' && mensaje.adjuntos?.length && mensaje.contenido.startsWith('📎')) && (
-                                                                            <p className="whitespace-pre-wrap break-words text-sm">
-                                                                                {mensaje.contenido}
-                                                                            </p>
-                                                                        )}
-                                                                    </div>
-                                                                    <span className="mt-1 text-xs text-gray-500">
-                                                                        {formatDate(mensaje.creado)}
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                    <div ref={chatEndRef} />
-                                                </>
-                                            )}
-                                        </div>
-
-                                        {/* Input */}
-                                        <div className="mt-2 flex items-end gap-2">
-                                            {/* Botón adjuntar */}
-                                            <input ref={chatFileRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,.rar"
-                                                onChange={(e) => { const file = e.target.files?.[0]; if (file) enviarArchivo(file); }} className="hidden" />
-                                            <button onClick={() => chatFileRef.current?.click()} disabled={sendingFile || sendingMessage}
-                                                className="rounded-lg border border-gray-300 p-2.5 text-gray-500 hover:border-blue-400 hover:text-blue-500 disabled:opacity-50 dark:border-gray-600 dark:text-gray-400 dark:hover:border-blue-500 dark:hover:text-blue-400 transition-colors"
-                                                title="Adjuntar archivo">
-                                                {sendingFile ? (
-                                                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
-                                                ) : (
-                                                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                                                    </svg>
-                                                )}
-                                            </button>
-                                            <textarea
-                                                value={nuevoMensaje}
-                                                onChange={(e) => setNuevoMensaje(e.target.value)}
-                                                onKeyDown={(e) => {
-                                                    if (e.key === "Enter" && !e.shiftKey) {
-                                                        e.preventDefault();
-                                                        enviarMensaje();
-                                                    }
-                                                }}
-                                                disabled={sendingMessage}
-                                                className="max-h-24 min-h-[44px] flex-1 resize-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none disabled:opacity-50 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                                                placeholder="Escribe un mensaje..."
-                                            />
-                                            <button
-                                                onClick={enviarMensaje}
-                                                disabled={!nuevoMensaje.trim() || sendingMessage}
-                                                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-                                            >
-                                                {sendingMessage ? "..." : "Enviar"}
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
+                                <ChatPanel
+                                    chatId={cotizacionSeleccionada.chatId}
+                                    currentUserId={user.id}
+                                    userRole={user.rol?.nombre || 'USUARIO'}
+                                />
                             </div>
                         )}
                     </div>
                 </div>
             </div>
 
-            {/* Modal PDF / Excel */}
-            {archivoModal && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-4" onClick={cerrarArchivoModal}>
-                    <div className="relative flex max-h-[92vh] w-full max-w-5xl flex-col rounded-2xl bg-white shadow-2xl dark:bg-gray-900" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-between gap-3 border-b border-gray-200 px-5 py-3 dark:border-gray-700">
-                            <div className="flex min-w-0 items-center gap-2">
-                                <span className="text-xl">{archivoModal.tipo === 'pdf' ? '📄' : '📊'}</span>
-                                <span className="truncate text-sm font-semibold text-gray-800 dark:text-white">{archivoModal.nombre}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                {archivoModal.tipo !== 'pdf' && (
-                                    <a href={archivoModal.downloadUrl} download target="_blank" rel="noopener noreferrer"
-                                        className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700">
-                                        Descargar
-                                    </a>
-                                )}
-                                <button onClick={cerrarArchivoModal} className="rounded-full p-1.5 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800">
-                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                            {archivoModal.loading && <div className="flex flex-1 items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" /></div>}
-                            {archivoModal.error && <div className="flex flex-1 items-center justify-center py-20 text-sm text-red-500">{archivoModal.error}</div>}
-                            {!archivoModal.loading && !archivoModal.error && archivoModal.tipo === 'pdf' && archivoModal.blobUrl && (
-                                <iframe src={archivoModal.blobUrl} className="h-[75vh] w-full rounded-b-2xl border-0" title={archivoModal.nombre} />
-                            )}
-                            {!archivoModal.loading && !archivoModal.error && archivoModal.tipo === 'excel' && archivoModal.excelData && (
-                                <div className="flex min-h-0 flex-1 overflow-hidden">
-                                    {archivoModal.excelData.length > 1 && (
-                                        <div className="flex w-44 shrink-0 flex-col gap-1 overflow-y-auto border-r border-gray-200 p-2 dark:border-gray-700">
-                                            <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">Hojas</p>
-                                            {archivoModal.excelData.map((sheet, idx) => (
-                                                <button key={idx} onClick={() => setExcelSheetIdx(idx)}
-                                                    className={`flex items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-medium transition-colors ${idx === excelSheetIdx ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'}`}>
-                                                    <span className="text-sm">📋</span>
-                                                    <span className="truncate">{sheet.name}</span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                    <div className="flex-1 overflow-auto p-4">
-                                        {(() => {
-                                            const sheet = archivoModal.excelData[excelSheetIdx];
-                                            if (!sheet) return null;
-                                            return (
-                                                <table className="w-full border-collapse text-xs">
-                                                    {sheet.headers.length > 0 && (
-                                                        <thead className="sticky top-0 z-10">
-                                                            <tr className="bg-gray-100 dark:bg-gray-800">
-                                                                {sheet.headers.map((h, i) => <th key={i} className="border border-gray-300 px-3 py-2 text-left font-semibold text-gray-700 dark:border-gray-600 dark:text-gray-300">{h || ' '}</th>)}
-                                                            </tr>
-                                                        </thead>
-                                                    )}
-                                                    <tbody>
-                                                        {sheet.rows.map((row, ri) => (
-                                                            <tr key={ri} className="even:bg-gray-50 dark:even:bg-gray-800/40">
-                                                                {row.map((cell, ci) => <td key={ci} className="border border-gray-200 px-3 py-1.5 text-gray-800 dark:border-gray-700 dark:text-gray-200">{cell}</td>)}
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            );
-                                        })()}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Modal de imagen ampliada */}
-            {imagenModal && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-4"
-                    onClick={() => setImagenModal(null)}>
-                    <div className="relative max-h-[90vh] max-w-[90vw] flex flex-col items-center"
-                        onClick={(e) => e.stopPropagation()}>
-                        <div className="absolute -top-10 right-0 flex items-center gap-2">
-                            <a href={imagenModal.downloadUrl} target="_blank" rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors">
-                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                </svg>
-                                Descargar
-                            </a>
-                            <button onClick={() => setImagenModal(null)}
-                                className="rounded-lg bg-gray-700 px-3 py-1.5 text-sm text-white hover:bg-gray-600 transition-colors">
-                                ✕ Cerrar
-                            </button>
-                        </div>
-                        <img src={imagenModal.src} alt={imagenModal.nombre}
-                            className="max-h-[85vh] w-auto h-auto min-w-[50vw] rounded-lg object-contain shadow-2xl" />
-                        <p className="mt-2 text-sm text-gray-300">{imagenModal.nombre}</p>
-                    </div>
-                </div>
-            )}
         </>
     );
 }
