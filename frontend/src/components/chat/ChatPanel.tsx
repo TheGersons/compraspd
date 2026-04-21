@@ -195,6 +195,13 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
   const [excelSheetIdx, setExcelSheetIdx] = useState(0);
   useEffect(() => { if (!archivoModal) setExcelSheetIdx(0); }, [archivoModal]);
 
+  // Bloquear scroll del body cuando cualquier modal está abierto
+  useEffect(() => {
+    const anyOpen = !!(imagenModal || archivoModal);
+    document.body.style.overflow = anyOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [imagenModal, archivoModal]);
+
   // ── Mention state ─────────────────────────────────────────────────────────
   const canMention = userRole !== 'USUARIO';
   const [mentionableUsers, setMentionableUsers] = useState<MentionableUser[]>([]);
@@ -446,18 +453,20 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
                 <span className="truncate text-sm font-semibold text-gray-800 dark:text-white">{archivoModal.nombre}</span>
               </div>
               <div className="flex items-center gap-2">
-                <a
-                  href={archivoModal.downloadUrl}
-                  download
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
-                >
-                  Descargar
-                </a>
+                {archivoModal.tipo !== 'pdf' && (
+                  <a
+                    href={archivoModal.downloadUrl}
+                    download
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
+                  >
+                    Descargar
+                  </a>
+                )}
                 <button
                   onClick={cerrarArchivoModal}
-                  className="rounded-full p-1.5 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+                  className="rounded-full p-1.5 text-gray-500 hover:bg-black/10 dark:text-gray-400 dark:hover:bg-white/10"
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
