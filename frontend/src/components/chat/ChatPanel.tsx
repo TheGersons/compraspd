@@ -341,7 +341,7 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
       {/* Image modal */}
       {imagenModal && (
         <div
-          className="fixed inset-0 z-2000 flex items-center justify-center bg-black/80 p-4"
+          className="fixed inset-0 z-20000 flex items-center justify-center bg-black/80 p-4"
           onClick={() => setImagenModal(null)}
         >
           <div className="relative max-h-[90vh] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
