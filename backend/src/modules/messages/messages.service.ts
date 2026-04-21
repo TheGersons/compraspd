@@ -735,8 +735,13 @@ export class MessagesService {
       agregarEmailDest(jefeCompras as UsuarioBasico | null);
     }
 
-    // Siempre también al supervisorResponsable (si no es el emisor y no ya incluido)
+    // También al supervisorResponsable de la cotización (si tiene)
     agregarEmailDest(cotizacion?.supervisorResponsable as UsuarioBasico | undefined);
+
+    // También a los responsableSeguimiento de cada producto (asignación por compras)
+    for (const ep of cotizacion?.estadosProductos ?? []) {
+      agregarEmailDest(ep.responsableSeguimiento as UsuarioBasico | undefined);
+    }
 
     await Promise.allSettled(
       destinatariosNotif.map(async (usuario) => {
