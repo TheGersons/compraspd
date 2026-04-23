@@ -11,6 +11,7 @@ import { Download, Eye, X, FileText, MoreVertical, UserCheck } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import TimelineItem from "./components/TimeLineItem";
 import { matchesSearch } from "../../utils/utils";
+import { SearchableSelect } from "../../components/ui/searchable-select";
 
 // ============================================================================
 // TYPES
@@ -1090,30 +1091,24 @@ export default function ShoppingFollowUps() {
             {/* Solicitante */}
             <div className="flex items-center gap-2 flex-1 min-w-[180px]">
               <label className="shrink-0 text-sm font-medium text-gray-700 dark:text-gray-300">Solicitante:</label>
-              <select
+              <SearchableSelect
                 value={filtroSolicitante}
-                onChange={(e) => setFiltroSolicitante(e.target.value)}
-                className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
-              >
-                <option value="">Todos los solicitantes</option>
-                {solicitantesUnicos.map(s => (
-                  <option key={s.id} value={s.id}>{s.nombre}</option>
-                ))}
-              </select>
+                onChange={setFiltroSolicitante}
+                options={solicitantesUnicos}
+                allLabel="Todos los solicitantes"
+                allValue=""
+              />
             </div>
             {/* Responsable */}
             <div className="flex items-center gap-2 flex-1 min-w-[180px]">
               <label className="shrink-0 text-sm font-medium text-gray-700 dark:text-gray-300">Responsable:</label>
-              <select
+              <SearchableSelect
                 value={filtroResponsable}
-                onChange={(e) => setFiltroResponsable(e.target.value)}
-                className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
-              >
-                <option value="">Todos los responsables</option>
-                {supervisores.map(s => (
-                  <option key={s.id} value={s.id}>{s.nombre}</option>
-                ))}
-              </select>
+                onChange={setFiltroResponsable}
+                options={supervisores}
+                allLabel="Todos los responsables"
+                allValue=""
+              />
             </div>
             {/* Tipo de compra */}
             <div className="flex items-center gap-2 flex-1 min-w-[180px]">

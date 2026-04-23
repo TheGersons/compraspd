@@ -13,6 +13,8 @@ import { es } from "date-fns/locale";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { Calendar } from "../../../components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../../../components/ui/popover";
+import { matchesSearch } from "../../../utils/utils";
+import { SearchableSelect } from "../../../components/ui/searchable-select";
 
 // ============================================================================
 // TYPES
@@ -1093,9 +1095,11 @@ export default function FollowUps() {
 
   const filteredCotizaciones = (() => {
     const filtered = cotizaciones.filter((cot) => {
-      const matchesSearch =
-        cot.nombreCotizacion.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        cot.solicitante.nombre.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearchTerm = matchesSearch(
+        searchTerm,
+        cot.nombreCotizacion,
+        cot.solicitante.nombre,
+      );
 
       const matchesResponsable =
         responsableFiltro === "TODOS" ||
@@ -1138,7 +1142,7 @@ export default function FollowUps() {
         }
       })();
 
-      return matchesSearch && matchesResponsable && matchesSolicitante && matchesFecha;
+      return matchesSearchTerm && matchesResponsable && matchesSolicitante && matchesFecha;
     });
     return filtered;
   })();
@@ -1662,43 +1666,37 @@ export default function FollowUps() {
               <label className="shrink-0 text-sm font-medium text-gray-700 dark:text-gray-300">
                 Solicitante:
               </label>
-              <select
+              <SearchableSelect
                 value={solicitanteFiltro}
-                onChange={(e) => { setSolicitanteFiltro(e.target.value); setCurrentPage(1); }}
-                className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
-              >
-                <option value="TODOS">Todos los solicitantes</option>
-                {Array.from(
+                onChange={(v) => { setSolicitanteFiltro(v); setCurrentPage(1); }}
+                options={Array.from(
                   new Map(
                     cotizaciones.map((c) => [c.solicitante.id, c.solicitante])
                   ).values()
-                ).map((s) => (
-                  <option key={s.id} value={s.id}>{s.nombre}</option>
-                ))}
-              </select>
+                )}
+                allLabel="Todos los solicitantes"
+                allValue="TODOS"
+              />
             </div>
             {/* Filtro por responsable asignado */}
             <div className="flex items-center gap-2 flex-1 min-w-[200px]">
               <label className="shrink-0 text-sm font-medium text-gray-700 dark:text-gray-300">
                 Responsable:
               </label>
-              <select
+              <SearchableSelect
                 value={responsableFiltro}
-                onChange={(e) => { setResponsableFiltro(e.target.value); setCurrentPage(1); }}
-                className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
-              >
-                <option value="TODOS">Todos los responsables</option>
-                <option value="SIN_ASIGNAR">Sin asignar</option>
-                {Array.from(
+                onChange={(v) => { setResponsableFiltro(v); setCurrentPage(1); }}
+                options={Array.from(
                   new Map(
                     cotizaciones
                       .filter((c) => c.responsableAsignado)
                       .map((c) => [c.responsableAsignado!.id, c.responsableAsignado!])
                   ).values()
-                ).map((r) => (
-                  <option key={r.id} value={r.id}>{r.nombre}</option>
-                ))}
-              </select>
+                )}
+                allLabel="Todos los responsables"
+                allValue="TODOS"
+                extraOptions={[{ value: "SIN_ASIGNAR", label: "Sin asignar" }]}
+              />
             </div>
             {/* Filtro por fecha */}
             <div className="flex items-center gap-2 flex-1 min-w-[200px]">
