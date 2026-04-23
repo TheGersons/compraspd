@@ -236,7 +236,7 @@ export default function Documents() {
     }, [searchParams, productos]);
 
     const cargarProductos = async () => {
-        try { setLoading(true); const filters: any = { pageSize: 50 }; if (filtroTipoCompra) filters.tipoCompra = filtroTipoCompra; const data = await api.getProductos(filters); setProductos((data.items || []).filter((p: any) => p.cotizacion?.tipo?.nombre?.toLowerCase() !== 'logistica')); }
+        try { setLoading(true); const filters: any = { pageSize: 2000 }; if (filtroTipoCompra) filters.tipoCompra = filtroTipoCompra; const data = await api.getProductos(filters); setProductos((data.items || []).filter((p: any) => p.cotizacion?.tipo?.nombre?.toLowerCase() !== 'logistica')); }
         catch (error) { addNotification("danger", "Error", "Error al cargar productos"); }
         finally { setLoading(false); }
     };

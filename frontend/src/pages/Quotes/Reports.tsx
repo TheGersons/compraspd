@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import PageMeta from "../../components/common/PageMeta";
 import { getToken } from "../../lib/api";
+import { matchesSearch } from "../../utils/utils";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -385,15 +386,14 @@ export default function Reports() {
     .filter((r) => {
       if (!incluirLogistica && r.tipo?.toLowerCase() === 'logistica') return false;
       if (filtroTipoCompra !== "TODAS" && r.tipoCompra !== filtroTipoCompra) return false;
-      if (!search) return true;
-      const q = search.toLowerCase();
-      return (
-        r.nombreCotizacion?.toLowerCase().includes(q) ||
-        r.numeroPO?.toLowerCase().includes(q) ||
-        r.proveedor?.toLowerCase().includes(q) ||
-        r.descripcionProducto?.toLowerCase().includes(q) ||
-        r.solicitante?.toLowerCase().includes(q) ||
-        r.area?.toLowerCase().includes(q)
+      return matchesSearch(
+        search,
+        r.nombreCotizacion,
+        r.numeroPO,
+        r.proveedor,
+        r.descripcionProducto,
+        r.solicitante,
+        r.area,
       );
     });
 
