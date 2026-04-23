@@ -619,7 +619,7 @@ export default function ShoppingFollowUps() {
   const autoAsignarAuxiliar = async (auxiliarId: string) => {
     // Assign auxiliaroperaciones as responsable to all logistica products that have none
     try {
-      const data = await api.getEstadosProductos({ pageSize: 200 });
+      const data = await api.getEstadosProductos({ pageSize: 2000 });
       const sinResponsable = (data.items || [])
         .filter((p: any) => p.cotizacion?.tipo?.nombre?.toLowerCase() === 'logistica' && !p.responsableSeguimiento);
       if (sinResponsable.length === 0) return;
@@ -631,7 +631,7 @@ export default function ShoppingFollowUps() {
   const cargarProductos = async () => {
     try {
       setLoading(true);
-      const filters: any = { pageSize: 50 };
+      const filters: any = { pageSize: 2000 };
       if (filtroNivel) filters.nivelCriticidad = filtroNivel;
       if (filtroTipoCompra) filters.tipoCompra = filtroTipoCompra;
 

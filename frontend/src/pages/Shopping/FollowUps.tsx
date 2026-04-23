@@ -629,7 +629,7 @@ export default function ShoppingFollowUps() {
   const cargarProductos = async () => {
     try {
       setLoading(true);
-      const filters: any = { pageSize: 50 };
+      const filters: any = { pageSize: 2000 };
       if (filtroNivel) filters.nivelCriticidad = filtroNivel;
       if (filtroTipoCompra) filters.tipoCompra = filtroTipoCompra;
 

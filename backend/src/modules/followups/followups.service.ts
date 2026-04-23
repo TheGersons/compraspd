@@ -63,7 +63,7 @@ export class FollowUpsService {
     const esComercial = rolNombreList.includes('comercial');
 
     const page = filters?.page || 1;
-    const pageSize = Math.min(filters?.pageSize || 20, 100);
+    const pageSize = Math.min(filters?.pageSize || 20, 2000);
     const skip = (page - 1) * pageSize;
 
     // Construir filtros

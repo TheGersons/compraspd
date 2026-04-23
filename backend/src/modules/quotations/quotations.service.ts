@@ -250,8 +250,8 @@ export class QuotationsService {
    * Incluye paginación
    */
   async listMine(user: UserJwt, page = 1, pageSize = 20) {
-    const skip = (Math.max(1, page) - 1) * Math.min(100, Math.max(1, pageSize));
-    const take = Math.min(100, Math.max(1, pageSize));
+    const skip = (Math.max(1, page) - 1) * Math.min(2000, Math.max(1, pageSize));
+    const take = Math.min(2000, Math.max(1, pageSize));
 
     const [total, items] = await this.prisma.$transaction([
       this.prisma.cotizacion.count({
@@ -593,8 +593,8 @@ export class QuotationsService {
 
     const page = filters?.page || 1;
     const pageSize = filters?.pageSize || 20;
-    const skip = (Math.max(1, page) - 1) * Math.min(100, Math.max(1, pageSize));
-    const take = Math.min(100, Math.max(1, pageSize));
+    const skip = (Math.max(1, page) - 1) * Math.min(2000, Math.max(1, pageSize));
+    const take = Math.min(2000, Math.max(1, pageSize));
 
     const where: any = {};
     if (filters?.estado) where.estado = filters.estado;

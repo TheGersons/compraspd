@@ -712,7 +712,7 @@ export default function FollowUps() {
   const cargarCotizaciones = async () => {
     try {
       setLoading(true);
-      const filters: any = { pageSize: 100 };
+      const filters: any = { pageSize: 2000 };
 
       if (searchTerm) {
         filters.search = searchTerm;

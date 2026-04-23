@@ -145,7 +145,7 @@ export class EstadoProductoService {
    */
   async list(filters: ListEstadoProductoQueryDto, user: UserJwt) {
     const page = filters.page || 1;
-    const pageSize = Math.min(filters.pageSize || 20, 100);
+    const pageSize = Math.min(filters.pageSize || 20, 2000);
     const skip = (page - 1) * pageSize;
 
     const where: any = {

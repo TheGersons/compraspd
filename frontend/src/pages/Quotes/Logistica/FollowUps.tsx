@@ -703,7 +703,7 @@ export default function FollowUps() {
   const autoAsignarAuxiliarQuotes = async (auxiliarId: string) => {
     try {
       const token = getToken();
-      const r = await fetch(`${API_BASE_URL}/api/v1/estado-productos?pageSize=200`, {
+      const r = await fetch(`${API_BASE_URL}/api/v1/estado-productos?pageSize=2000`, {
         credentials: 'include', headers: { Authorization: `Bearer ${token}` },
       });
       if (!r.ok) return;
@@ -719,7 +719,7 @@ export default function FollowUps() {
   const cargarCotizaciones = async () => {
     try {
       setLoading(true);
-      const filters: any = { pageSize: 100 };
+      const filters: any = { pageSize: 2000 };
 
       if (searchTerm) {
         filters.search = searchTerm;
