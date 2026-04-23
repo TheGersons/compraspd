@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { apiFetch, uploadWithProgress, getToken } from '../../lib/api';
+import { apiFetch, uploadWithProgress, getToken, UploadAbortedError } from '../../lib/api';
 import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 
@@ -56,6 +56,7 @@ const chatApi = {
     chatId: string,
     file: File,
     onProgress: (pct: number) => void,
+    signal?: AbortSignal,
   ): Promise<void> {
     const form = new FormData();
     form.append('file', file);
@@ -63,6 +64,7 @@ const chatApi = {
       `${API_BASE_URL}/api/v1/messages/${chatId}/upload`,
       form,
       onProgress,
+      signal,
     );
   },
 
@@ -132,9 +134,57 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
   // ── Upload progress ───────────────────────────────────────────────────────
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadFileName, setUploadFileName] = useState<string>('');
+  const [uploadFileSize, setUploadFileSize] = useState<number>(0);
+  const uploadAbortRef = useRef<AbortController | null>(null);
+  const CANCEL_THRESHOLD = 15 * 1024 * 1024; // 15MB
 
   // ── Drag-and-drop ─────────────────────────────────────────────────────────
   const [isDragging, setIsDragging] = useState(false);
+
+  // ── Archivos pendientes (staging antes de enviar) ─────────────────────────
+  type PendingFile = { file: File; previewUrl?: string; id: string };
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
+
+  const agregarArchivosPendientes = (files: File[]) => {
+    if (!files.length) return;
+    const tooLarge = files.filter((f) => f.size > MAX_FILE_SIZE);
+    if (tooLarge.length > 0) {
+      toast.error(`Archivo(s) superan 200MB: ${tooLarge.map((f) => f.name).join(', ')}`);
+    }
+    const validos = files.filter((f) => f.size <= MAX_FILE_SIZE);
+    const nuevos: PendingFile[] = validos.map((f) => ({
+      file: f,
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      previewUrl: f.type.startsWith('image/') ? URL.createObjectURL(f) : undefined,
+    }));
+    setPendingFiles((prev) => [...prev, ...nuevos]);
+  };
+
+  const removerArchivoPendiente = (id: string) => {
+    setPendingFiles((prev) => {
+      const target = prev.find((p) => p.id === id);
+      if (target?.previewUrl) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter((p) => p.id !== id);
+    });
+  };
+
+  const limpiarArchivosPendientes = () => {
+    pendingFiles.forEach((p) => { if (p.previewUrl) URL.revokeObjectURL(p.previewUrl); });
+    setPendingFiles([]);
+  };
+
+  useEffect(() => {
+    return () => {
+      pendingFiles.forEach((p) => { if (p.previewUrl) URL.revokeObjectURL(p.previewUrl); });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const formatBytes = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
 
   // ── Image modal ───────────────────────────────────────────────────────────
   const [imagenModal, setImagenModal] = useState<{
@@ -343,19 +393,28 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
 
   // ── Send message ──────────────────────────────────────────────────────────
   const enviarMensaje = async () => {
-    if (!texto.trim() || !chatId) return;
-
+    if (!chatId) return;
     const contenido = texto.trim();
+    const hayArchivos = pendingFiles.length > 0;
+    if (!contenido && !hayArchivos) return;
+
     const mencionIds = pendingMenciones.map((u) => u.id);
+    const filesSnapshot = pendingFiles.map((p) => p.file);
 
     try {
       setSendingMessage(true);
       setTexto('');
       setPendingMenciones([]);
       setMentionQuery(null);
+      limpiarArchivosPendientes();
 
-      await chatApi.sendMessage(chatId, contenido, mencionIds);
-      await cargarMensajes();
+      if (hayArchivos) {
+        await enviarArchivos(filesSnapshot);
+      }
+      if (contenido) {
+        await chatApi.sendMessage(chatId, contenido, mencionIds);
+        await cargarMensajes();
+      }
     } catch {
       toast.error('Error al enviar mensaje');
     } finally {
@@ -373,28 +432,43 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
     }
     setSendingFile(true);
     let errorCount = 0;
+    let cancelCount = 0;
     for (const file of files) {
       setUploadFileName(file.name);
+      setUploadFileSize(file.size);
       setUploadProgress(0);
+      const controller = new AbortController();
+      uploadAbortRef.current = controller;
       try {
-        await chatApi.sendFile(chatId, file, (pct) => setUploadProgress(pct));
+        await chatApi.sendFile(chatId, file, (pct) => setUploadProgress(pct), controller.signal);
       } catch (e: any) {
-        errorCount++;
-        toast.error(e.message || `Error al enviar ${file.name}`);
+        if (e instanceof UploadAbortedError) {
+          cancelCount++;
+          toast(`Subida cancelada: ${file.name}`, { icon: 'ℹ️' });
+        } else {
+          errorCount++;
+          toast.error(e.message || `Error al enviar ${file.name}`);
+        }
+      } finally {
+        uploadAbortRef.current = null;
       }
     }
     setUploadProgress(null);
     setUploadFileName('');
+    setUploadFileSize(0);
     setSendingFile(false);
     if (fileRef.current) fileRef.current.value = '';
-    if (errorCount < files.length) {
+    const enviados = files.length - errorCount - cancelCount;
+    if (enviados > 0) {
       await cargarMensajes();
-      if (files.length - errorCount > 0) {
-        toast.success(
-          files.length === 1 ? 'Archivo enviado' : `${files.length - errorCount} archivo(s) enviados`,
-        );
-      }
+      toast.success(
+        enviados === 1 ? 'Archivo enviado' : `${enviados} archivo(s) enviados`,
+      );
     }
+  };
+
+  const cancelarSubida = () => {
+    uploadAbortRef.current?.abort();
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -580,7 +654,22 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
           e.preventDefault();
           setIsDragging(false);
           const files = Array.from(e.dataTransfer.files);
-          if (files.length) enviarArchivos(files);
+          if (files.length) agregarArchivosPendientes(files);
+        }}
+        onPaste={(e) => {
+          const items = e.clipboardData?.items;
+          if (!items) return;
+          const files: File[] = [];
+          for (const item of Array.from(items)) {
+            if (item.kind === 'file') {
+              const f = item.getAsFile();
+              if (f) files.push(f);
+            }
+          }
+          if (files.length) {
+            e.preventDefault();
+            agregarArchivosPendientes(files);
+          }
         }}
       >
         {/* Drop overlay */}
@@ -741,6 +830,64 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
             </div>
           )}
 
+          {/* Preview de archivos pendientes */}
+          {pendingFiles.length > 0 && (
+            <div className="mb-2 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-800">
+              <div className="mb-1.5 flex items-center justify-between">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                  {pendingFiles.length} archivo{pendingFiles.length !== 1 ? 's' : ''} listo{pendingFiles.length !== 1 ? 's' : ''} para enviar
+                </span>
+                <button
+                  type="button"
+                  onClick={limpiarArchivosPendientes}
+                  className="text-xs text-red-600 hover:underline dark:text-red-400"
+                >
+                  Quitar todos
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {pendingFiles.map((pf) => (
+                  <div
+                    key={pf.id}
+                    className="relative flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-2 py-1.5 dark:border-gray-600 dark:bg-gray-700"
+                  >
+                    {pf.previewUrl ? (
+                      <img
+                        src={pf.previewUrl}
+                        alt={pf.file.name}
+                        className="h-10 w-10 flex-shrink-0 rounded object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded bg-blue-100 dark:bg-blue-900/30">
+                        <svg className="h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </div>
+                    )}
+                    <div className="min-w-0 max-w-[140px]">
+                      <p className="truncate text-xs font-medium text-gray-900 dark:text-white" title={pf.file.name}>
+                        {pf.file.name}
+                      </p>
+                      <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                        {formatBytes(pf.file.size)}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removerArchivoPendiente(pf.id)}
+                      title="Quitar"
+                      className="flex-shrink-0 rounded-full p-1 text-gray-400 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30"
+                    >
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Upload progress bar */}
           {uploadProgress !== null && (
             <div className="mb-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 dark:border-blue-800 dark:bg-blue-900/20">
@@ -748,9 +895,23 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
                 <span className="max-w-[220px] truncate text-xs font-medium text-blue-700 dark:text-blue-300">
                   {uploadFileName}
                 </span>
-                <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">
-                  {uploadProgress}%
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">
+                    {uploadProgress}%
+                  </span>
+                  {uploadFileSize >= CANCEL_THRESHOLD && uploadProgress < 100 && (
+                    <button
+                      type="button"
+                      onClick={cancelarSubida}
+                      title="Cancelar subida"
+                      className="rounded-full p-0.5 text-red-500 transition-colors hover:bg-red-100 hover:text-red-700 dark:hover:bg-red-900/30"
+                    >
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="h-1.5 overflow-hidden rounded-full bg-blue-100 dark:bg-blue-900/50">
                 <div
@@ -771,7 +932,8 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
               className="hidden"
               onChange={(e) => {
                 const files = Array.from(e.target.files || []);
-                if (files.length) enviarArchivos(files);
+                if (files.length) agregarArchivosPendientes(files);
+                if (fileRef.current) fileRef.current.value = '';
               }}
             />
 
@@ -812,7 +974,7 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
             <button
               type="button"
               onClick={enviarMensaje}
-              disabled={!texto.trim() || sendingMessage}
+              disabled={(!texto.trim() && pendingFiles.length === 0) || sendingMessage || sendingFile}
               className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600"
             >
               {sendingMessage ? (

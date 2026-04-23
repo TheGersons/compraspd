@@ -239,13 +239,21 @@ export async function apiNoRefresh<T>(
  * Sube un FormData con reporte de progreso (0-100).
  * Intenta refresh de token si recibe 401.
  */
+export class UploadAbortedError extends Error {
+  constructor(message = 'Subida cancelada') {
+    super(message);
+    this.name = 'UploadAbortedError';
+  }
+}
+
 export function uploadWithProgress(
   url: string,
   formData: FormData,
   onProgress: (percent: number) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
   const doUpload = (token: string | null) =>
-    new Promise<{ status: number; body: string }>((resolve) => {
+    new Promise<{ status: number; body: string; aborted?: boolean }>((resolve) => {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', url);
       if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
@@ -254,27 +262,41 @@ export function uploadWithProgress(
       };
       xhr.onload = () => resolve({ status: xhr.status, body: xhr.responseText });
       xhr.onerror = () => resolve({ status: 0, body: '' });
+      xhr.onabort = () => resolve({ status: 0, body: '', aborted: true });
+
+      const onAbort = () => xhr.abort();
+      if (signal) {
+        if (signal.aborted) {
+          xhr.abort();
+        } else {
+          signal.addEventListener('abort', onAbort, { once: true });
+        }
+      }
+
       xhr.send(formData);
     });
 
   return (async () => {
     let token = getToken();
-    let { status, body } = await doUpload(token);
+    let result = await doUpload(token);
 
-    if (status === 401 && getRefreshToken()) {
+    if (result.aborted) throw new UploadAbortedError();
+
+    if (result.status === 401 && getRefreshToken()) {
       const newToken = await refreshAccessToken();
-      if (newToken) ({ status, body } = await doUpload(newToken));
+      if (newToken) result = await doUpload(newToken);
+      if (result.aborted) throw new UploadAbortedError();
     }
 
-    if (status >= 200 && status < 300) {
+    if (result.status >= 200 && result.status < 300) {
       onProgress(100);
       return;
     }
     try {
-      const err = JSON.parse(body);
-      throw new Error(err.message || `Error ${status}`);
+      const err = JSON.parse(result.body);
+      throw new Error(err.message || `Error ${result.status}`);
     } catch {
-      throw new Error(`Error ${status}`);
+      throw new Error(`Error ${result.status}`);
     }
   })();
 }
