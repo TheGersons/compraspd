@@ -591,6 +591,7 @@ export default function FollowUps() {
   const [searchTerm, setSearchTerm] = useState("");
   const [responsableFiltro, setResponsableFiltro] = useState<string>("TODOS");
   const [solicitanteFiltro, setSolicitanteFiltro] = useState<string>("TODOS");
+  const [areaFiltro, setAreaFiltro] = useState<string>("TODOS");
   const [fechaFiltro, setFechaFiltro] = useState<string>("TODOS");
   const [fechaDesde, setFechaDesde] = useState<Date | null>(null);
   const [fechaHasta, setFechaHasta] = useState<Date | null>(null);
@@ -1111,6 +1112,10 @@ export default function FollowUps() {
         solicitanteFiltro === "TODOS" ||
         cot.solicitante.id === solicitanteFiltro;
 
+      const matchesArea =
+        areaFiltro === "TODOS" ||
+        cot.tipo?.area?.nombreArea === areaFiltro;
+
       const matchesFecha = (() => {
         if (fechaFiltro === "TODOS") return true;
         const now = new Date();
@@ -1142,7 +1147,7 @@ export default function FollowUps() {
         }
       })();
 
-      return matchesSearchTerm && matchesResponsable && matchesSolicitante && matchesFecha;
+      return matchesSearchTerm && matchesResponsable && matchesSolicitante && matchesArea && matchesFecha;
     });
     return filtered;
   })();
@@ -1696,6 +1701,25 @@ export default function FollowUps() {
                 allLabel="Todos los responsables"
                 allValue="TODOS"
                 extraOptions={[{ value: "SIN_ASIGNAR", label: "Sin asignar" }]}
+              />
+            </div>
+            {/* Filtro por área */}
+            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+              <label className="shrink-0 text-sm font-medium text-gray-700 dark:text-gray-300">
+                Área:
+              </label>
+              <SearchableSelect
+                value={areaFiltro}
+                onChange={(v) => { setAreaFiltro(v); setCurrentPage(1); }}
+                options={Array.from(
+                  new Set(
+                    cotizaciones
+                      .map((c) => c.tipo?.area?.nombreArea)
+                      .filter((n): n is string => !!n)
+                  )
+                ).sort().map((n) => ({ id: n, nombre: n }))}
+                allLabel="Todas las áreas"
+                allValue="TODOS"
               />
             </div>
             {/* Filtro por fecha */}

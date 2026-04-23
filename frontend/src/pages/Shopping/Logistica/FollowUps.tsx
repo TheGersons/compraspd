@@ -550,6 +550,7 @@ export default function ShoppingFollowUps() {
   const [supervisores, setSupervisores] = useState<{ id: string; nombre: string; email: string; rol: { nombre: string } }[]>([]);
   const [filtroResponsable, setFiltroResponsable] = useState<string>("");
   const [filtroSolicitante, setFiltroSolicitante] = useState<string>("");
+  const [filtroArea, setFiltroArea] = useState<string>("");
   const [menuAbierto, setMenuAbierto] = useState<string | null>(null); // id del producto con menú abierto
 
   // Vista agrupada por cotización
@@ -780,6 +781,11 @@ export default function ShoppingFollowUps() {
       if (p.cotizacion?.solicitante?.id !== filtroSolicitante) return false;
     }
 
+    // Filtro por área
+    if (filtroArea) {
+      if (p.cotizacion?.tipo?.area?.nombreArea !== filtroArea) return false;
+    }
+
     const estaCompletado = p.progreso === 100;
     if (verCompletados) {
       return estaCompletado;
@@ -801,6 +807,15 @@ export default function ShoppingFollowUps() {
     });
     return Array.from(map.entries()).map(([id, nombre]) => ({ id, nombre }));
   })();
+
+  // Áreas únicas derivadas de los productos cargados
+  const areasUnicas = Array.from(
+    new Set(
+      productos
+        .map(p => p.cotizacion?.tipo?.area?.nombreArea)
+        .filter((n): n is string => !!n)
+    )
+  ).sort().map(n => ({ id: n, nombre: n }));
 
   const handleAsignarResponsable = async (productoId: string, responsableId: string | null) => {
     try {
@@ -1074,6 +1089,17 @@ export default function ShoppingFollowUps() {
                 onChange={setFiltroResponsable}
                 options={supervisores}
                 allLabel="Todos los responsables"
+                allValue=""
+              />
+            </div>
+            {/* Área */}
+            <div className="flex items-center gap-2 flex-1 min-w-[180px]">
+              <label className="shrink-0 text-sm font-medium text-gray-700 dark:text-gray-300">Área:</label>
+              <SearchableSelect
+                value={filtroArea}
+                onChange={setFiltroArea}
+                options={areasUnicas}
+                allLabel="Todas las áreas"
                 allValue=""
               />
             </div>
