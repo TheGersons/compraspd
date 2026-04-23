@@ -13,6 +13,7 @@ import { es } from "date-fns/locale";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { Calendar } from "../../components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/popover";
+import { matchesSearch } from "../../utils/utils";
 
 // ============================================================================
 // TYPES
@@ -1107,9 +1108,11 @@ export default function FollowUps() {
 
   const filteredCotizaciones = (() => {
     const filtered = cotizaciones.filter((cot) => {
-      const matchesSearch =
-        cot.nombreCotizacion.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        cot.solicitante.nombre.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearchTerm = matchesSearch(
+        searchTerm,
+        cot.nombreCotizacion,
+        cot.solicitante.nombre,
+      );
 
       const matchesResponsable =
         responsableFiltro === "TODOS" ||
@@ -1155,7 +1158,7 @@ export default function FollowUps() {
       const matchesEstado = incluirCompletadas ||
         !['APROBADA_COMPLETA', 'COMPLETADA'].includes(cot.estado);
 
-      return matchesSearch && matchesResponsable && matchesSolicitante && matchesFecha && matchesEstado;
+      return matchesSearchTerm && matchesResponsable && matchesSolicitante && matchesFecha && matchesEstado;
     });
     return filtered;
   })();

@@ -10,6 +10,7 @@ import { Download, Eye, X, FileText, MoreVertical, UserCheck } from "lucide-reac
 
 import { Button } from "@/components/ui/button";
 import TimelineItem from "./components/TimeLineItem";
+import { matchesSearch } from "../../utils/utils";
 
 // ============================================================================
 // TYPES
@@ -755,11 +756,13 @@ export default function ShoppingFollowUps() {
     if (p.rechazado) return false;
 
     if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      const matchQuery = (
-        p.sku.toLowerCase().includes(query) ||
-        p.descripcion.toLowerCase().includes(query) ||
-        p.proveedor?.toLowerCase().includes(query)
+      const matchQuery = matchesSearch(
+        searchQuery,
+        p.sku,
+        p.descripcion,
+        p.proveedor,
+        p.cotizacion?.nombreCotizacion,
+        p.cotizacion?.solicitante?.nombre,
       );
       if (!matchQuery) return false;
     }
