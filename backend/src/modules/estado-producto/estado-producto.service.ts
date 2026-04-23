@@ -1028,6 +1028,14 @@ export class EstadoProductoService {
       },
     });
 
+    // Sync: mantener supervisorResponsableId de la cotización en sincronía
+    if (ep.cotizacionId) {
+      await this.prisma.cotizacion.update({
+        where: { id: ep.cotizacionId },
+        data: { supervisorResponsableId: responsableId },
+      });
+    }
+
     // Email al nuevo responsable (solo cuando se asigna, no cuando se remueve)
     if (responsableId && responsableId !== user.sub) {
       const resp = (updated as any).responsableSeguimiento as { id: string; nombre: string; email: string } | null;
@@ -1074,6 +1082,21 @@ export class EstadoProductoService {
       where: { id: { in: ids } },
       data: { responsableSeguimientoId: responsableId } as any,
     });
+
+    // Sync: actualizar supervisorResponsableId en todas las cotizaciones afectadas
+    const productos = await this.prisma.estadoProducto.findMany({
+      where: { id: { in: ids } },
+      select: { cotizacionId: true },
+    });
+    const cotizacionIds = [
+      ...new Set(productos.map((p) => p.cotizacionId).filter(Boolean) as string[]),
+    ];
+    if (cotizacionIds.length > 0) {
+      await this.prisma.cotizacion.updateMany({
+        where: { id: { in: cotizacionIds } },
+        data: { supervisorResponsableId: responsableId },
+      });
+    }
 
     // Email al nuevo responsable (solo cuando se asigna, no cuando se remueve)
     if (responsableId && responsableId !== user.sub) {
