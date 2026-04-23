@@ -232,6 +232,9 @@ export class EstadoProductoService {
           responsableSeguimiento: {
             select: { id: true, nombre: true, email: true },
           },
+          ordenCompra: {
+            select: { id: true, nombre: true, numeroOC: true, estado: true },
+          },
           cotizacionDetalle: {
             select: {
               id: true,

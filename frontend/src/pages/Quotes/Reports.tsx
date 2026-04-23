@@ -44,6 +44,7 @@ type Reporte = {
   saldoPendiente: number | null;
   statusPago: string;
   actualizado: string;
+  ordenesCompra?: Array<{ id: string; nombre: string; numeroOC?: string | null; estado: string }>;
 };
 
 type Log = {
@@ -407,6 +408,7 @@ export default function Reports() {
   const EXPORT_COLUMNS = [
     { key: "fechaSolicitud",       label: "Fecha Solicitud",      fmt: (v: any) => v ? new Date(v).toLocaleDateString("es-HN") : "" },
     { key: "nombreCotizacion",     label: "Cotización",           fmt: (v: any) => v ?? "" },
+    { key: "ordenesCompra",        label: "Órdenes de Compra",    fmt: (v: any) => Array.isArray(v) && v.length > 0 ? v.map((oc: any) => oc.numeroOC ? `${oc.nombre} (${oc.numeroOC})` : oc.nombre).join(" | ") : "" },
     { key: "estadoCotizacion",     label: "Estado Cot.",          fmt: (v: any) => ESTADO_COT[v]?.label ?? v ?? "" },
     { key: "area",                 label: "Área",                 fmt: (v: any) => v ?? "" },
     { key: "tipo",                 label: "Tipo",                 fmt: (v: any) => v ?? "" },
@@ -608,6 +610,7 @@ export default function Reports() {
                   <th className={`${th} w-[30px]`}></th>
                   <th className={th}>Fecha Solicitud</th>
                   <th className={th}>Cotización</th>
+                  <th className={th}>Órdenes de Compra</th>
                   <th className={th}>Estado Cot.</th>
                   <th className={th}>Área / Tipo</th>
                   <th className={th}>Solicitante</th>
@@ -665,6 +668,25 @@ export default function Reports() {
                         <span className="block max-w-[180px] truncate text-xs font-medium text-gray-700 dark:text-gray-200" title={r.nombreCotizacion}>
                           {r.nombreCotizacion || "—"}
                         </span>
+                      </td>
+
+                      {/* Órdenes de Compra — auto */}
+                      <td className={td}>
+                        {r.ordenesCompra && r.ordenesCompra.length > 0 ? (
+                          <div className="flex max-w-[220px] flex-col gap-0.5">
+                            {r.ordenesCompra.map((oc) => (
+                              <span
+                                key={oc.id}
+                                className="truncate text-xs text-purple-700 dark:text-purple-300"
+                                title={oc.numeroOC ? `${oc.nombre} (${oc.numeroOC})` : oc.nombre}
+                              >
+                                {oc.nombre}{oc.numeroOC ? ` (${oc.numeroOC})` : ''}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-300 dark:text-gray-600">—</span>
+                        )}
                       </td>
 
                       {/* Estado cotización — auto */}

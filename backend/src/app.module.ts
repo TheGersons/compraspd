@@ -16,6 +16,7 @@ import { QuotationDetailsModule } from './modules/quotations-details/quotation-d
 import { PreciosModule } from './modules/prices/precios.module';
 import { CompraDetalleModule } from './modules/compra-detalles/compra-detalle.module';
 import { CompraModule } from './modules/compras/compra.module';
+import { OrdenCompraModule } from './modules/ordenes-compra/orden-compra.module';
 import { AreasModule } from './modules/catalogs/areas/areas.module';
 import { ProyectosModule } from './modules/catalogs/proyectos/proyectos.module';
 import { TiposModule } from './modules/catalogs/tipos/tipos.module';
@@ -58,6 +59,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     DepartmentsModule,
     CompraDetalleModule,
     CompraModule,
+    OrdenCompraModule,
     PreciosModule,
     AreasModule,
     ProyectosModule,

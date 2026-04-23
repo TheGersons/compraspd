@@ -15,6 +15,7 @@ import { Calendar } from "../../components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/popover";
 import { matchesSearch } from "../../utils/utils";
 import { SearchableSelect } from "../../components/ui/searchable-select";
+import { SplitOrdenCompraModal } from "../../components/ordenes-compra/SplitOrdenCompraModal";
 
 // ============================================================================
 // TYPES
@@ -121,6 +122,20 @@ type Cotizacion = {
     aprobadoPorSupervisor: boolean;
     criticidad?: number;
     nivelCriticidad?: string;
+    ordenCompraId?: string | null;
+    descripcion?: string;
+    comprado?: boolean;
+    pagado?: boolean;
+    enFOB?: boolean;
+    enCIF?: boolean;
+    recibido?: boolean;
+    conBL?: boolean;
+  }>;
+  ordenesCompra?: Array<{
+    id: string;
+    nombre: string;
+    numeroOC?: string | null;
+    estado: string;
   }>;
 };
 
@@ -599,6 +614,9 @@ export default function FollowUps() {
   const [loading, setLoading] = useState(true);
   const [loadingDetalle, setLoadingDetalle] = useState(false);
   const accordionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  // Modal de split de OC
+  const [splitOcOpen, setSplitOcOpen] = useState(false);
 
   // Estados de filtros
   const [searchTerm, setSearchTerm] = useState("");
@@ -1998,6 +2016,18 @@ export default function FollowUps() {
                                   </span>
                                 </div>
                                 {canAsignarResponsable && (
+                                  <button
+                                    onClick={() => setSplitOcOpen(true)}
+                                    title="Crear una nueva Orden de Compra con un subset de los productos"
+                                    className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-purple-600 transition-colors hover:bg-purple-50 hover:text-purple-700 dark:text-purple-400 dark:hover:bg-purple-900/20"
+                                  >
+                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                    </svg>
+                                    Dividir OC
+                                  </button>
+                                )}
+                                {canAsignarResponsable && (
                                 <button
                                   onClick={eliminarCotizacionActual}
                                   className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
@@ -2550,6 +2580,33 @@ export default function FollowUps() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal: dividir en nueva OC */}
+      {cotizacionSeleccionada && (
+        <SplitOrdenCompraModal
+          open={splitOcOpen}
+          onClose={() => setSplitOcOpen(false)}
+          cotizacionId={cotizacionSeleccionada.id}
+          cotizacionNombre={cotizacionSeleccionada.nombreCotizacion}
+          productos={(cotizacionSeleccionada.estadosProductos || []).map((ep: any) => ({
+            id: ep.id,
+            sku: ep.sku,
+            descripcion: ep.descripcion || ep.sku,
+            comprado: ep.comprado,
+            pagado: ep.pagado,
+            enFOB: ep.enFOB,
+            enCIF: ep.enCIF,
+            recibido: ep.recibido,
+            conBL: ep.conBL,
+            ordenCompraId: ep.ordenCompraId,
+          }))}
+          ordenesExistentes={cotizacionSeleccionada.ordenesCompra || []}
+          onSuccess={() => {
+            if (cotizacionSeleccionada) seleccionarCotizacion(cotizacionSeleccionada);
+            cargarCotizaciones();
+          }}
+        />
       )}
     </>
   );

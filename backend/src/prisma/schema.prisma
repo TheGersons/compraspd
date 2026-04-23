@@ -313,6 +313,7 @@ model Cotizacion {
   // Relaciones existentes
   detalles                CotizacionDetalle[]
   compras                 Compra[]
+  ordenesCompra           OrdenCompra[]
   estadosProductos        EstadoProducto[]
   licitacion              Licitacion?
   oferta                  Oferta?
@@ -515,6 +516,7 @@ model EstadoProducto {
   cotizacionDetalleId String? @db.Uuid
   compraId            String? @db.Uuid
   compraDetalleId     String? @db.Uuid
+  ordenCompraId       String? @map("orden_compra_id") @db.Uuid
 
   // Identificación
   sku         String @db.VarChar(255)
@@ -640,6 +642,7 @@ model EstadoProducto {
   cotizacionDetalle        CotizacionDetalle? @relation(fields: [cotizacionDetalleId], references: [id], onDelete: Cascade)
   compra                   Compra?            @relation(fields: [compraId], references: [id], onDelete: Cascade)
   compraDetalle            CompraDetalle?     @relation(fields: [compraDetalleId], references: [id], onDelete: Cascade)
+  ordenCompra              OrdenCompra?       @relation(fields: [ordenCompraId], references: [id], onDelete: SetNull)
   aprobadoPorSupervisor    Boolean            @default(false) @map("aprobado_por_supervisor")
   fechaAprobacion          DateTime?          @map("fecha_aprobacion")
   tipoEntrega              String?            @map("tipo_entrega") @db.VarChar(20) // Incoterms: EXW, FOB, FCA, CIF, CIP, CPT, CPR, DAP, DDP
@@ -678,7 +681,31 @@ model EstadoProducto {
   @@index([nivelCriticidad])
   @@index([paisOrigenId])
   @@index([medioTransporte])
+  @@index([ordenCompraId])
   @@map("estado_producto")
+}
+
+// ============================================
+// ORDEN DE COMPRA - Agrupador de productos dentro de una cotización
+// para manejar múltiples proveedores/OCs por cotización
+// ============================================
+
+model OrdenCompra {
+  id           String   @id @default(uuid()) @db.Uuid
+  cotizacionId String   @map("cotizacion_id") @db.Uuid
+  nombre       String
+  numeroOC     String?  @map("numero_oc")
+  estado       String   @default("ACTIVA")
+  creacion     DateTime @default(now())
+  actualizado  DateTime @default(now()) @updatedAt
+
+  cotizacion       Cotizacion       @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  estadosProductos EstadoProducto[]
+
+  @@unique([cotizacionId, nombre])
+  @@index([cotizacionId])
+  @@index([estado])
+  @@map("orden_compra")
 }
 
 // ============================================

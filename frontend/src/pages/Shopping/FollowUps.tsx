@@ -41,6 +41,8 @@ export type EstadoProducto = {
   responsable?: string;
   observaciones?: string;
   responsableSeguimiento?: { id: string; nombre: string; email?: string } | null;
+  ordenCompraId?: string | null;
+  ordenCompra?: { id: string; nombre: string; numeroOC?: string | null; estado: string } | null;
 
   // 13 estados booleanos (ACTUALIZADO)
   cotizado: boolean;
@@ -824,16 +826,24 @@ export default function ShoppingFollowUps() {
     } catch (e: any) { toast.error(e.message); }
   };
 
-  // Agrupar productos por cotización
+  // Agrupar productos por OrdenCompra (si existe) o por cotización
   const productosAgrupados = productosFiltrados.reduce((acc, p) => {
-    const key = p.cotizacionId || p.cotizacion?.id || 'sin-cotizacion';
+    const cotId = p.cotizacionId || p.cotizacion?.id || 'sin-cotizacion';
+    const ocId = p.ordenCompraId || null;
+    const key = ocId ? `oc:${ocId}` : `cot:${cotId}`;
+    const cotNombre = p.cotizacion?.nombreCotizacion || 'Sin cotización';
+    const nombre = p.ordenCompra
+      ? `${cotNombre} → ${p.ordenCompra.nombre}`
+      : cotNombre;
     if (!acc[key]) {
       acc[key] = {
-        cotizacionId: key,
-        nombre: p.cotizacion?.nombreCotizacion || 'Sin cotización',
+        groupKey: key,
+        cotizacionId: cotId,
+        ordenCompraId: ocId,
+        nombre,
         tipoCompra: p.cotizacion?.tipoCompra || p.tipoCompra,
         chatId: p.cotizacion?.chatId || null,
-        ordenCompra: p.cotizacion?.ordenCompra || null,
+        ordenCompra: p.ordenCompra?.numeroOC || p.cotizacion?.ordenCompra || null,
         solicitante: p.cotizacion?.solicitante || null,
         tipo: p.cotizacion?.tipo || null,
         productos: [],
@@ -841,7 +851,7 @@ export default function ShoppingFollowUps() {
     }
     acc[key].productos.push(p);
     return acc;
-  }, {} as Record<string, { cotizacionId: string; nombre: string; tipoCompra: string; chatId: string | null; ordenCompra: string | null; solicitante: { id: string; nombre: string } | null; tipo: { nombre: string; area: { nombreArea: string } } | null; productos: EstadoProducto[] }>);
+  }, {} as Record<string, { groupKey: string; cotizacionId: string; ordenCompraId: string | null; nombre: string; tipoCompra: string; chatId: string | null; ordenCompra: string | null; solicitante: { id: string; nombre: string } | null; tipo: { nombre: string; area: { nombreArea: string } } | null; productos: EstadoProducto[] }>);
 
   const gruposOrdenados = Object.values(productosAgrupados).sort((a, b) => a.nombre.localeCompare(b.nombre));
 
@@ -1016,8 +1026,8 @@ export default function ShoppingFollowUps() {
   const requiereSeleccionFobCif = productoSeleccionado?.siguienteEstado === 'enFOB';
 
   // Handler para expandir/colapsar grupo en el acordeón
-  const handleToggleGrupo = (cotizacionId: string) => {
-    if (grupoExpandido === cotizacionId) {
+  const handleToggleGrupo = (groupKey: string) => {
+    if (grupoExpandido === groupKey) {
       setGrupoExpandido(null);
       setChatIdActivo(null);
       setProductoSeleccionado(null);
@@ -1026,8 +1036,8 @@ export default function ShoppingFollowUps() {
       return;
     }
     // Establecer chatId inmediatamente (mismo chat que Cotizaciones, sin esperar)
-    const chatIdDelGrupo = productosAgrupados[cotizacionId]?.chatId || null;
-    setGrupoExpandido(cotizacionId);
+    const chatIdDelGrupo = productosAgrupados[groupKey]?.chatId || null;
+    setGrupoExpandido(groupKey);
     setVistaActivaGrupo('productos');
     setProductoSeleccionado(null);
     setTimeline(null);
@@ -1171,19 +1181,19 @@ export default function ShoppingFollowUps() {
           ) : (
             <div className="divide-y divide-gray-200 dark:divide-gray-700">
               {gruposOrdenados.map((grupo) => {
-                const estaExpandido = grupoExpandido === grupo.cotizacionId;
+                const estaExpandido = grupoExpandido === grupo.groupKey;
                 const progresoPromedio = grupo.productos.length > 0
                   ? Math.round(grupo.productos.reduce((sum, p) => sum + (p.progreso || 0), 0) / grupo.productos.length)
                   : 0;
                 return (
                   <div
-                    key={grupo.cotizacionId}
-                    ref={(el) => { acordeonRefs.current[grupo.cotizacionId] = el; }}
+                    key={grupo.groupKey}
+                    ref={(el) => { acordeonRefs.current[grupo.groupKey] = el; }}
                     className={`transition-all ${estaExpandido ? 'border-l-4 border-blue-500' : 'border-l-4 border-transparent'}`}
                   >
                     {/* Header */}
                     <button
-                      onClick={() => handleToggleGrupo(grupo.cotizacionId)}
+                      onClick={() => handleToggleGrupo(grupo.groupKey)}
                       className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                     >
                       <div className="flex-1 min-w-0">

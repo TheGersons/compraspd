@@ -94,6 +94,10 @@ export class ReportesService {
           orderBy: { creacion: 'desc' },
           take: 1,
         },
+        ordenesCompra: {
+          select: { id: true, nombre: true, numeroOC: true, estado: true },
+          orderBy: { creacion: 'asc' },
+        },
         reporte: true,
       },
       orderBy: { fechaSolicitud: 'desc' },
@@ -231,6 +235,7 @@ export class ReportesService {
       // Auto – compra (si existe)
       statusOC: compra ? compra.estado : null,
       compraId: compra?.id ?? null,
+      ordenesCompra: c.ordenesCompra ?? [],
       // Manual
       numeroPO: r.numeroPO ?? '-',
       proveedor: r.proveedor ?? proveedorAuto,

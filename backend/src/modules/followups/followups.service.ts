@@ -138,10 +138,21 @@ export class FollowUpsService {
             select: {
               id: true,
               aprobadoPorSupervisor: true,
+              ordenCompraId: true,
               responsableSeguimiento: {
                 select: { id: true, nombre: true },
               },
             },
+          },
+          ordenesCompra: {
+            select: {
+              id: true,
+              nombre: true,
+              numeroOC: true,
+              estado: true,
+              creacion: true,
+            },
+            orderBy: { creacion: 'asc' },
           },
           tipo: {
             select: {
@@ -196,6 +207,7 @@ export class FollowUpsService {
         oferta: cot.oferta ?? null,
         chatId: cot.chatId,
         fechaEntregaNacional: cot.fechaEntregaNacional,
+        ordenesCompra: cot.ordenesCompra ?? [],
         totalProductos,
         productosAprobados,
         productosPendientes,
