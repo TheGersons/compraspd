@@ -33,7 +33,7 @@ interface Props {
 }
 
 const esProductoElegible = (p: Producto) =>
-  !(p.comprado || p.pagado || p.enFOB || p.enCIF || p.recibido || p.conBL);
+  !(p.enFOB || p.enCIF || p.recibido || p.conBL);
 
 export function MoverProductosOCModal({
   open,
@@ -182,8 +182,8 @@ export function MoverProductosOCModal({
 
             {elegibles.length === 0 ? (
               <div className="rounded-lg border border-gray-300 bg-gray-50 px-3 py-4 text-center text-xs text-gray-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-400">
-                No hay productos elegibles en esta OC. Solo se pueden mover
-                productos que aún no estén en estado "comprado" o posterior.
+                No hay productos elegibles en esta OC. Productos ya en
+                embarque (FOB/CIF/BL/recibido) no se pueden mover.
               </div>
             ) : (
               <div className="max-h-72 overflow-y-auto rounded-lg border border-gray-300 dark:border-gray-600">

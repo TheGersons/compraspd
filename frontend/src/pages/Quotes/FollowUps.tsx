@@ -2016,7 +2016,7 @@ export default function FollowUps() {
                                     {getEstadoLabel(cotizacionSeleccionada.estado)}
                                   </span>
                                 </div>
-                                {canDividirOC && (
+                                {canDividirOC && (cotizacionSeleccionada.estadosProductos?.length ?? 0) >= 2 && (
                                   <button
                                     onClick={() => setSplitOcOpen(true)}
                                     title="Crear una nueva Orden de Compra con un subset de los productos"

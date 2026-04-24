@@ -35,7 +35,7 @@ interface Props {
 }
 
 const esProductoElegible = (p: Producto) =>
-  !(p.comprado || p.pagado || p.enFOB || p.enCIF || p.recibido || p.conBL);
+  !(p.enFOB || p.enCIF || p.recibido || p.conBL);
 
 export function SplitOrdenCompraModal({
   open,
@@ -82,6 +82,11 @@ export function SplitOrdenCompraModal({
     setSeleccionados(nuevo);
   };
 
+  const hayCompradoSeleccionado = useMemo(
+    () => elegibles.some((p) => seleccionados.has(p.id) && p.comprado),
+    [elegibles, seleccionados],
+  );
+
   const validar = (): string | null => {
     const n = nombre.trim();
     if (!n) return "El nombre es obligatorio";
@@ -93,6 +98,9 @@ export function SplitOrdenCompraModal({
     );
     if (duplicado) return "Ya existe otra OC con ese nombre en esta cotización";
     if (seleccionados.size === 0) return "Seleccione al menos un producto";
+    if (hayCompradoSeleccionado && !numeroOC.trim()) {
+      return "El número de OC es obligatorio al dividir productos ya comprados";
+    }
     return null;
   };
 
@@ -174,17 +182,25 @@ export function SplitOrdenCompraModal({
             />
           </div>
 
-          {/* Número OC (opcional) */}
+          {/* Número OC */}
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">
-              Número de OC (opcional)
+              Número de OC {hayCompradoSeleccionado ? (
+                <span className="text-red-600 dark:text-red-400">(obligatorio — hay productos ya comprados)</span>
+              ) : (
+                <span className="text-gray-400">(opcional)</span>
+              )}
             </label>
             <input
               type="text"
               value={numeroOC}
               onChange={(e) => setNumeroOC(e.target.value)}
               placeholder="Ej. OC-2026-001"
-              className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              className={`w-full rounded-lg border-2 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none dark:bg-gray-700 dark:text-white ${
+                hayCompradoSeleccionado && !numeroOC.trim()
+                  ? "border-red-400 focus:border-red-500 dark:border-red-600"
+                  : "border-gray-300 focus:border-blue-500 dark:border-gray-600"
+              }`}
             />
           </div>
 
@@ -207,8 +223,8 @@ export function SplitOrdenCompraModal({
 
             {elegibles.length === 0 ? (
               <div className="rounded-lg border border-gray-300 bg-gray-50 px-3 py-4 text-center text-xs text-gray-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-400">
-                No hay productos elegibles. Solo se pueden splitear productos
-                que aún no estén en estado "comprado" o posterior.
+                No hay productos elegibles. Productos ya en embarque
+                (FOB/CIF/BL/recibido) no se pueden mover.
               </div>
             ) : (
               <div className="max-h-72 overflow-y-auto rounded-lg border border-gray-300 dark:border-gray-600">

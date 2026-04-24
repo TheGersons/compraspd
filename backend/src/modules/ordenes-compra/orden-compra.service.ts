@@ -19,25 +19,17 @@ export class OrdenCompraService {
   }
 
   /**
-   * Un producto es elegible para split si NO ha pasado de "comprado".
-   * Campos posteriores (pagado, enFOB, enCIF, recibido, etc.) bloquean el split.
+   * Un producto es elegible para split hasta el estado "pagado" inclusive.
+   * Campos posteriores (enFOB, enCIF, conBL, recibido) bloquean el split,
+   * porque ya tienen historia de embarque/aduana asociada.
    */
   private esProductoElegible(ep: {
-    comprado: boolean;
-    pagado: boolean;
     enFOB: boolean;
     enCIF: boolean;
     recibido: boolean;
     conBL: boolean;
   }): boolean {
-    return !(
-      ep.comprado ||
-      ep.pagado ||
-      ep.enFOB ||
-      ep.enCIF ||
-      ep.recibido ||
-      ep.conBL
-    );
+    return !(ep.enFOB || ep.enCIF || ep.recibido || ep.conBL);
   }
 
   /**
@@ -74,6 +66,16 @@ export class OrdenCompraService {
       );
     }
 
+    // Una cotización solo se puede dividir si tiene al menos 2 productos distintos
+    const totalDistintos = await this.prisma.estadoProducto.count({
+      where: { cotizacionId },
+    });
+    if (totalDistintos < 2) {
+      throw new BadRequestException(
+        'La cotización debe tener al menos 2 productos distintos para poder dividirse',
+      );
+    }
+
     const duplicado = await this.prisma.ordenCompra.findUnique({
       where: { cotizacionId_nombre: { cotizacionId, nombre: nombre.trim() } },
     });
@@ -103,7 +105,15 @@ export class OrdenCompraService {
     const noElegibles = productos.filter((p) => !this.esProductoElegible(p));
     if (noElegibles.length > 0) {
       throw new BadRequestException(
-        `${noElegibles.length} producto(s) ya pasaron de "comprado" y no se pueden mover`,
+        `${noElegibles.length} producto(s) ya entraron en embarque (FOB/CIF/BL/recibido) y no se pueden mover`,
+      );
+    }
+
+    // Si algún producto ya está "comprado", el numeroOC es obligatorio
+    const hayComprado = productos.some((p) => p.comprado);
+    if (hayComprado && !numeroOC?.trim()) {
+      throw new BadRequestException(
+        'El número de OC es obligatorio cuando se divide una OC con productos ya comprados',
       );
     }
 
@@ -228,7 +238,7 @@ export class OrdenCompraService {
     const noElegibles = productos.filter((p) => !this.esProductoElegible(p));
     if (noElegibles.length > 0) {
       throw new BadRequestException(
-        `${noElegibles.length} producto(s) ya pasaron de "comprado" y no se pueden mover`,
+        `${noElegibles.length} producto(s) ya entraron en embarque (FOB/CIF/BL/recibido) y no se pueden mover`,
       );
     }
 
@@ -251,14 +261,20 @@ export class OrdenCompraService {
 
     const orden = await this.prisma.ordenCompra.findUnique({
       where: { id },
-      include: { estadosProductos: { select: { id: true, comprado: true } } },
+      include: {
+        estadosProductos: {
+          select: { id: true, enFOB: true, enCIF: true, conBL: true, recibido: true },
+        },
+      },
     });
     if (!orden) throw new NotFoundException('Orden de compra no encontrada');
 
-    const conCompraAvanzada = orden.estadosProductos.some((ep) => ep.comprado);
-    if (conCompraAvanzada) {
+    const conEmbarque = orden.estadosProductos.some(
+      (ep) => ep.enFOB || ep.enCIF || ep.conBL || ep.recibido,
+    );
+    if (conEmbarque) {
       throw new BadRequestException(
-        'No se puede eliminar una OC con productos ya comprados. Mueva los productos primero.',
+        'No se puede eliminar una OC con productos en embarque (FOB/CIF/BL/recibido). Mueva los productos primero.',
       );
     }
 

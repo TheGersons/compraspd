@@ -1971,7 +1971,7 @@ export default function FollowUps() {
                                 <span className={`rounded-full px-3 py-1 text-xs font-medium ${getEstadoBadgeColor(cotizacionSeleccionada.estado)}`}>
                                   {getEstadoLabel(cotizacionSeleccionada.estado)}
                                 </span>
-                                {canDividirOC && (
+                                {canDividirOC && (cotizacionSeleccionada.estadosProductos?.length ?? 0) >= 2 && (
                                   <button
                                     onClick={() => setSplitOcOpen(true)}
                                     title="Crear una nueva Orden de Compra con un subset de los productos"

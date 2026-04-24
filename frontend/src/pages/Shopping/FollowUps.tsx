@@ -1262,21 +1262,25 @@ export default function ShoppingFollowUps() {
                           </svg>
                           {grupo.productos.length > 1 ? "Precios" : "Precio"}
                         </button>
-                        {canDividirOC && !grupo.ordenCompraId && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSplitOcGrupo({ cotizacionId: grupo.cotizacionId, nombre: grupo.nombre });
-                            }}
-                            title="Dividir en nueva Orden de Compra"
-                            className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-purple-600 transition-colors hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20"
-                          >
-                            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                            </svg>
-                            Dividir OC
-                          </button>
-                        )}
+                        {canDividirOC && !grupo.ordenCompraId && (() => {
+                          const totalProductosCot = productos.filter(p => p.cotizacionId === grupo.cotizacionId).length;
+                          if (totalProductosCot < 2) return null;
+                          return (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSplitOcGrupo({ cotizacionId: grupo.cotizacionId, nombre: grupo.nombre });
+                              }}
+                              title="Dividir en nueva Orden de Compra"
+                              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-purple-600 transition-colors hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20"
+                            >
+                              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                              </svg>
+                              Dividir OC
+                            </button>
+                          );
+                        })()}
                         {canDividirOC && grupo.ordenCompraId && (() => {
                           const otrasOCs = productos.filter(
                             (p) => p.cotizacionId === grupo.cotizacionId && p.ordenCompra && p.ordenCompra.id !== grupo.ordenCompraId,
