@@ -75,6 +75,151 @@ const chatApi = {
   },
 };
 
+// ─── EML Parser ──────────────────────────────────────────────────────────────
+
+interface EmlData {
+  subject?: string;
+  from?: string;
+  to?: string;
+  date?: string;
+  html?: string;
+  text?: string;
+}
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function decodeQuotedPrintable(input: string): string {
+  return input
+    .replace(/=\r?\n/g, '')
+    .replace(/=([0-9A-Fa-f]{2})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+}
+
+function decodeBody(body: string, encoding: string): string {
+  const enc = encoding.toLowerCase().trim();
+  if (enc === 'base64') {
+    try {
+      const cleaned = body.replace(/\s/g, '');
+      const binary = atob(cleaned);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      return new TextDecoder('utf-8').decode(bytes);
+    } catch {
+      return body;
+    }
+  } else if (enc === 'quoted-printable') {
+    return decodeQuotedPrintable(body);
+  }
+  return body;
+}
+
+function decodeMailHeader(header: string): string {
+  return header.replace(/=\?([^?]+)\?([BbQq])\?([^?]*)\?=/g, (_, charset, enc, text) => {
+    try {
+      let decoded: string;
+      if (enc.toLowerCase() === 'b') {
+        const binary = atob(text);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        decoded = new TextDecoder(charset).decode(bytes);
+      } else {
+        const qp = decodeQuotedPrintable(text.replace(/_/g, ' '));
+        const bytes = new Uint8Array(qp.length);
+        for (let i = 0; i < qp.length; i++) bytes[i] = qp.charCodeAt(i);
+        decoded = new TextDecoder(charset).decode(bytes);
+      }
+      return decoded;
+    } catch {
+      return text;
+    }
+  });
+}
+
+function parsePartHeaders(section: string): Record<string, string> {
+  const headers: Record<string, string> = {};
+  const lines = section.replace(/\r\n/g, '\n').split('\n');
+  let key = '';
+  let val = '';
+  for (const line of lines) {
+    if ((line.startsWith(' ') || line.startsWith('\t')) && key) {
+      val += ' ' + line.trim();
+    } else {
+      if (key) headers[key.toLowerCase()] = val.trim();
+      const colonIdx = line.indexOf(':');
+      if (colonIdx !== -1) {
+        key = line.slice(0, colonIdx).trim();
+        val = line.slice(colonIdx + 1).trim();
+      } else {
+        key = '';
+      }
+    }
+  }
+  if (key) headers[key.toLowerCase()] = val.trim();
+  return headers;
+}
+
+function splitHeaderBody(raw: string): [string, string] {
+  const crlfIdx = raw.indexOf('\r\n\r\n');
+  if (crlfIdx !== -1) return [raw.slice(0, crlfIdx), raw.slice(crlfIdx + 4)];
+  const lfIdx = raw.indexOf('\n\n');
+  if (lfIdx !== -1) return [raw.slice(0, lfIdx), raw.slice(lfIdx + 2)];
+  return [raw, ''];
+}
+
+function parseMultipart(body: string, boundary: string): { html?: string; text?: string } {
+  const delimiter = '--' + boundary;
+  const parts = body.split(new RegExp(escapeRegex(delimiter) + '(?:--)?\\s*(?:\\r?\\n|$)'));
+  let html: string | undefined;
+  let text: string | undefined;
+  for (const part of parts) {
+    if (!part.trim()) continue;
+    const [headerSection, partBody] = splitHeaderBody(part);
+    const ph = parsePartHeaders(headerSection);
+    const ct = ph['content-type'] || '';
+    const enc = ph['content-transfer-encoding'] || '';
+    if (ct.startsWith('multipart/')) {
+      const bm = ct.match(/boundary=["']?([^"';\s\r\n]+)["']?/i);
+      if (bm) {
+        const nested = parseMultipart(partBody, bm[1]);
+        if (!html && nested.html) html = nested.html;
+        if (!text && nested.text) text = nested.text;
+      }
+    } else if (ct.startsWith('text/html')) {
+      html = decodeBody(partBody.replace(/\r?\n$/, ''), enc);
+    } else if (ct.startsWith('text/plain')) {
+      text = decodeBody(partBody.replace(/\r?\n$/, ''), enc);
+    }
+  }
+  return { html, text };
+}
+
+function parseEml(raw: string): EmlData {
+  const [headerSection, body] = splitHeaderBody(raw);
+  const headers = parsePartHeaders(headerSection);
+  const result: EmlData = {
+    subject: decodeMailHeader(headers['subject'] || ''),
+    from: headers['from'] || '',
+    to: headers['to'] || '',
+    date: headers['date'] || '',
+  };
+  const ct = headers['content-type'] || '';
+  const enc = headers['content-transfer-encoding'] || '';
+  if (ct.startsWith('multipart/')) {
+    const bm = ct.match(/boundary=["']?([^"';\s\r\n]+)["']?/i);
+    if (bm) {
+      const { html, text } = parseMultipart(body, bm[1]);
+      result.html = html;
+      result.text = text;
+    }
+  } else if (ct.startsWith('text/html')) {
+    result.html = decodeBody(body, enc);
+  } else {
+    result.text = decodeBody(body, enc);
+  }
+  return result;
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function formatFecha(fecha: string) {
@@ -191,14 +336,15 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
     src: string; nombre: string; downloadUrl: string;
   } | null>(null);
 
-  // ── PDF / Excel modal ─────────────────────────────────────────────────────
-  type ArchivoModalTipo = 'pdf' | 'excel';
+  // ── PDF / Excel / EML modal ───────────────────────────────────────────────
+  type ArchivoModalTipo = 'pdf' | 'excel' | 'eml';
   const [archivoModal, setArchivoModal] = useState<{
     tipo: ArchivoModalTipo;
     nombre: string;
     downloadUrl: string;
     blobUrl?: string;
     excelData?: { name: string; headers: string[]; rows: string[][] }[];
+    emlData?: EmlData;
     loading: boolean;
     error?: string;
   } | null>(null);
@@ -218,6 +364,10 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
         const blob = await res.blob();
         const blobUrl = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
         setArchivoModal((prev) => prev ? { ...prev, blobUrl, loading: false } : null);
+      } else if (tipo === 'eml') {
+        const text = await res.text();
+        const emlData = parseEml(text);
+        setArchivoModal((prev) => prev ? { ...prev, emlData, loading: false } : null);
       } else {
         const arrayBuffer = await res.arrayBuffer();
         const workbook = XLSX.read(arrayBuffer, { type: 'array' });
@@ -523,14 +673,14 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
             {/* Header */}
             <div className="flex items-center justify-between gap-3 border-b border-gray-200 px-5 py-3 dark:border-gray-700">
               <div className="flex min-w-0 items-center gap-2">
-                <span className="text-xl">{archivoModal.tipo === 'pdf' ? '📄' : '📊'}</span>
+                <span className="text-xl">{archivoModal.tipo === 'pdf' ? '📄' : archivoModal.tipo === 'eml' ? '✉️' : '📊'}</span>
                 <span className="truncate text-sm font-semibold text-gray-800 dark:text-white">{archivoModal.nombre}</span>
               </div>
               <div className="flex items-center gap-2">
                 {archivoModal.tipo !== 'pdf' && (
                   <a
                     href={archivoModal.downloadUrl}
-                    download
+                    download={archivoModal.nombre}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
@@ -569,6 +719,56 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
                   className="h-[75vh] w-full rounded-b-2xl border-0"
                   title={archivoModal.nombre}
                 />
+              )}
+
+              {/* EML */}
+              {!archivoModal.loading && !archivoModal.error && archivoModal.tipo === 'eml' && archivoModal.emlData && (
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                  <div className="shrink-0 space-y-1 border-b border-gray-200 bg-gray-50 px-5 py-3 text-xs dark:border-gray-700 dark:bg-gray-800/50">
+                    {archivoModal.emlData.subject && (
+                      <div className="flex gap-2">
+                        <span className="w-12 shrink-0 font-semibold text-gray-500 dark:text-gray-400">Asunto</span>
+                        <span className="text-gray-800 dark:text-gray-200">{archivoModal.emlData.subject}</span>
+                      </div>
+                    )}
+                    {archivoModal.emlData.from && (
+                      <div className="flex gap-2">
+                        <span className="w-12 shrink-0 font-semibold text-gray-500 dark:text-gray-400">De</span>
+                        <span className="text-gray-700 dark:text-gray-300">{archivoModal.emlData.from}</span>
+                      </div>
+                    )}
+                    {archivoModal.emlData.to && (
+                      <div className="flex gap-2">
+                        <span className="w-12 shrink-0 font-semibold text-gray-500 dark:text-gray-400">Para</span>
+                        <span className="text-gray-700 dark:text-gray-300">{archivoModal.emlData.to}</span>
+                      </div>
+                    )}
+                    {archivoModal.emlData.date && (
+                      <div className="flex gap-2">
+                        <span className="w-12 shrink-0 font-semibold text-gray-500 dark:text-gray-400">Fecha</span>
+                        <span className="text-gray-600 dark:text-gray-400">{archivoModal.emlData.date}</span>
+                      </div>
+                    )}
+                  </div>
+                  {archivoModal.emlData.html ? (
+                    <iframe
+                      srcDoc={archivoModal.emlData.html}
+                      sandbox="allow-same-origin"
+                      className="min-h-0 flex-1 w-full rounded-b-2xl border-0 bg-white"
+                      title="Vista previa del correo"
+                    />
+                  ) : archivoModal.emlData.text ? (
+                    <div className="flex-1 overflow-auto p-5">
+                      <pre className="whitespace-pre-wrap text-sm text-gray-800 dark:text-gray-200">
+                        {archivoModal.emlData.text}
+                      </pre>
+                    </div>
+                  ) : (
+                    <div className="flex flex-1 items-center justify-center py-20 text-sm text-gray-500">
+                      No se pudo extraer el contenido del correo.
+                    </div>
+                  )}
+                </div>
               )}
 
               {/* Excel */}
@@ -717,6 +917,7 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
                               const nombre = adj.nombreArchivo || adj.direccionArchivo?.split('/').pop() || 'Archivo';
                               const esPdf = adj.tipoArchivo?.includes('pdf') || nombre.toLowerCase().endsWith('.pdf');
                               const esExcel = adj.tipoArchivo?.includes('sheet') || adj.tipoArchivo?.includes('excel') || /\.(xlsx?|ods|csv)$/i.test(nombre);
+                              const esEml = nombre.toLowerCase().endsWith('.eml') || adj.tipoArchivo === 'message/rfc822';
                               return (
                                 <div key={adj.id}>
                                   {esImagen && adj.previewUrl ? (
@@ -740,13 +941,13 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
                                         </span>
                                       </div>
                                     </div>
-                                  ) : (esPdf || esExcel) ? (
+                                  ) : (esPdf || esExcel || esEml) ? (
                                     <button
                                       type="button"
-                                      onClick={() => abrirArchivoModal(esPdf ? 'pdf' : 'excel', nombre, adj.direccionArchivo)}
+                                      onClick={() => abrirArchivoModal(esPdf ? 'pdf' : esEml ? 'eml' : 'excel', nombre, adj.direccionArchivo)}
                                       className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors ${esPropio ? 'border-blue-400 text-blue-100 hover:bg-blue-500' : 'border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-600'}`}
                                     >
-                                      <span className="text-base">{esPdf ? '📄' : '📊'}</span>
+                                      <span className="text-base">{esPdf ? '📄' : esEml ? '✉️' : '📊'}</span>
                                       <span className="max-w-[180px] truncate">{nombre}</span>
                                       <span className="text-[10px] opacity-70">
                                         {adj.tamanio ? `${(Number(adj.tamanio) / 1024).toFixed(0)}KB` : ''}
@@ -928,7 +1129,7 @@ export default function ChatPanel({ chatId, currentUserId, userRole }: ChatPanel
               ref={fileRef}
               type="file"
               multiple
-              accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.bmp,.tiff,.tif,.svg,.heic,.heif,.mp4,.mov,.avi,.mkv,.wmv,.flv,.webm,.m4v,.3gp,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp,.csv,.txt,.json,.xml,.zip,.rar,.7z,.tar,.gz,.dwg,.dxf,.dwf,.rvt,.ifc,.step,.stp,.iges,.igs,.stl,.mpp,.vsd,.vsdx"
+              accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.bmp,.tiff,.tif,.svg,.heic,.heif,.mp4,.mov,.avi,.mkv,.wmv,.flv,.webm,.m4v,.3gp,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp,.csv,.txt,.json,.xml,.zip,.rar,.7z,.tar,.gz,.dwg,.dxf,.dwf,.rvt,.ifc,.step,.stp,.iges,.igs,.stl,.mpp,.vsd,.vsdx,.eml"
               className="hidden"
               onChange={(e) => {
                 const files = Array.from(e.target.files || []);
