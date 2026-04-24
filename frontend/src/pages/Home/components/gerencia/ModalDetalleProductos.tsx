@@ -469,7 +469,7 @@ export default function ModalDetalleProductos({
                         <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
                           <div className="max-w-xs">{producto.descripcion}</div>
                           {producto.responsable && (
-                            <p className="mt-0.5 text-[10px] text-gray-400 dark:text-gray-500">
+                            <p className="mt-0.5 text-[10px] font-medium text-blue-500 dark:text-blue-400">
                               {producto.responsable}
                             </p>
                           )}
@@ -535,7 +535,7 @@ export default function ModalDetalleProductos({
                           <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
                             <div className="max-w-md">{producto.descripcion}</div>
                             {producto.responsable && (
-                              <p className="mt-0.5 text-[10px] text-gray-400 dark:text-gray-500">
+                              <p className="mt-0.5 text-[10px] font-medium text-blue-500 dark:text-blue-400">
                                 {producto.responsable}
                               </p>
                             )}
