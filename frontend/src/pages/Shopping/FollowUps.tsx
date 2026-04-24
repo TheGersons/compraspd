@@ -1043,8 +1043,9 @@ export default function ShoppingFollowUps() {
     setTimeline(null);
     setChatIdActivo(chatIdDelGrupo);
     // Registrar participante en background
-    participanteListoRef.current = chatIdDelGrupo
-      ? api.getCotizacionDetalle(cotizacionId).then(() => {}).catch(() => {})
+    const cotId = productosAgrupados[groupKey]?.cotizacionId;
+    participanteListoRef.current = chatIdDelGrupo && cotId
+      ? api.getCotizacionDetalle(cotId).then(() => {}).catch(() => {})
       : Promise.resolve();
   };
 
