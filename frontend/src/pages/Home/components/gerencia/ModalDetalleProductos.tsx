@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ProductoDetallado, EtapaDetalle } from '../../types/gerencia.types';
 import { useAuth } from '../../../../context/AuthContext';
+import { SearchableSelect } from '../../../../components/ui/searchable-select';
 
 const ROLES_FILTRO_RESPONSABLE = ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'];
 
@@ -234,10 +235,10 @@ export default function ModalDetalleProductos({
 
   const esVistaTotal = etapa === 'total';
 
-  // Responsables únicos para el filtro
+  // Responsables únicos para el filtro (formato { id, nombre } para SearchableSelect)
   const responsablesUnicos = useMemo(() => {
-    const set = new Set(productos.map(p => p.responsable || 'Sin asignar'));
-    return ['TODOS', ...Array.from(set).sort()];
+    const nombres = Array.from(new Set(productos.map(p => p.responsable || 'Sin asignar'))).sort();
+    return nombres.map(n => ({ id: n, nombre: n }));
   }, [productos]);
 
   // Reset filtro cuando cambia la etapa
@@ -393,20 +394,20 @@ export default function ModalDetalleProductos({
 
             {/* Filtro responsable + cerrar */}
             <div className="flex shrink-0 items-center gap-3">
-              {puedeVerFiltro && responsablesUnicos.length > 2 && (
+              {puedeVerFiltro && (
                 <div className="flex items-center gap-2">
                   <label className="text-xs font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">
                     Responsable:
                   </label>
-                  <select
+                  <SearchableSelect
                     value={filtroResponsable}
-                    onChange={e => { setFiltroResponsable(e.target.value); setCeldaSeleccionada(null); }}
-                    className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-                  >
-                    {responsablesUnicos.map(r => (
-                      <option key={r} value={r}>{r === 'TODOS' ? 'Todos' : r}</option>
-                    ))}
-                  </select>
+                    onChange={val => { setFiltroResponsable(val); setCeldaSeleccionada(null); }}
+                    options={responsablesUnicos}
+                    allValue="TODOS"
+                    allLabel="Todos"
+                    placeholder="Todos"
+                    className="w-48"
+                  />
                 </div>
               )}
               <button
