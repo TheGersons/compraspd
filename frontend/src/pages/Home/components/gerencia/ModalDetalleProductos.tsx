@@ -1,6 +1,9 @@
 // components/gerencia/ModalDetalleProductos.tsx
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ProductoDetallado, EtapaDetalle } from '../../types/gerencia.types';
+import { useAuth } from '../../../../context/AuthContext';
+
+const ROLES_FILTRO_RESPONSABLE = ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'];
 
 const ESTADO_LABELS: Record<string, string> = {
   cotizado: 'Cotizado',
@@ -226,6 +229,9 @@ export default function ModalDetalleProductos({
   const [filtroResponsable, setFiltroResponsable] = useState<string>('TODOS');
   const [celdaSeleccionada, setCeldaSeleccionada] = useState<CeldaSeleccionada | null>(null);
 
+  const { user } = useAuth();
+  const puedeVerFiltro = ROLES_FILTRO_RESPONSABLE.includes(user?.rol?.nombre ?? '');
+
   const esVistaTotal = etapa === 'total';
 
   // Responsables únicos para el filtro
@@ -387,7 +393,7 @@ export default function ModalDetalleProductos({
 
             {/* Filtro responsable + cerrar */}
             <div className="flex shrink-0 items-center gap-3">
-              {responsablesUnicos.length > 2 && (
+              {puedeVerFiltro && responsablesUnicos.length > 2 && (
                 <div className="flex items-center gap-2">
                   <label className="text-xs font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">
                     Responsable:
