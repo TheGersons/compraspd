@@ -334,6 +334,8 @@ export class StorageService {
       'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp',
       // Texto y datos
       'csv', 'txt', 'json', 'xml',
+      // Correos
+      'eml',
       // Comprimidos
       'zip', 'rar', '7z', 'tar', 'gz',
       // AutoCAD / Ingeniería
@@ -456,6 +458,8 @@ export class StorageService {
       iges: 'model/iges',
       igs: 'model/iges',
       stl: 'model/stl',
+      // Correos
+      eml: 'message/rfc822',
       // Otros técnicos
       mpp: 'application/vnd.ms-project',
       vsd: 'application/vnd.visio',
