@@ -153,6 +153,7 @@ export class DashboardService {
         tipoCompra,
         proyectoId: p.proyectoId,
         areaId: p.proyecto?.areaId,
+        responsable: p.responsable || 'Sin asignar',
         ...this.calcularEstadosDetallados(p, estadosAplicables),
       };
     });
@@ -456,19 +457,26 @@ export class DashboardService {
     const now = new Date();
     const estados: Record<string, string> = {};
     const diasAtraso: Record<string, number | undefined> = {};
+    const fechasLimite: Record<string, string | null> = {};
+    const fechasReales: Record<string, string | null> = {};
 
-    // Si el producto ya fue recibido, todos sus estados son completados
+    for (const estadoKey of estadosAplicables) {
+      const lim = producto[ESTADO_A_FECHA_LIMITE[estadoKey]];
+      const real = producto[ESTADO_A_FECHA[estadoKey]];
+      fechasLimite[estadoKey] = lim ? new Date(lim).toISOString() : null;
+      fechasReales[estadoKey] = real ? new Date(real).toISOString() : null;
+    }
+
     if (producto.recibido) {
       for (const estadoKey of estadosAplicables) {
         estados[estadoKey] = 'completado';
       }
-      return { estados, diasAtraso };
+      return { estados, diasAtraso, fechasLimite, fechasReales };
     }
 
     for (const estadoKey of estadosAplicables) {
       const completado = producto[estadoKey];
-      const fechaLimiteKey = ESTADO_A_FECHA_LIMITE[estadoKey];
-      const fechaLimite = producto[fechaLimiteKey];
+      const fechaLimite = producto[ESTADO_A_FECHA_LIMITE[estadoKey]];
 
       if (completado) {
         estados[estadoKey] = 'completado';
@@ -480,8 +488,7 @@ export class DashboardService {
             (now.getTime() - limite.getTime()) / (1000 * 60 * 60 * 24),
           );
         } else {
-          const fechaKey = ESTADO_A_FECHA[estadoKey];
-          const fechaInicio = producto[fechaKey] || producto.creado;
+          const fechaInicio = producto[ESTADO_A_FECHA[estadoKey]] || producto.creado;
           const totalMs = limite.getTime() - new Date(fechaInicio).getTime();
           const restanteMs = limite.getTime() - now.getTime();
           if (totalMs > 0 && restanteMs / totalMs < 0.3) {
@@ -495,7 +502,7 @@ export class DashboardService {
       }
     }
 
-    return { estados, diasAtraso };
+    return { estados, diasAtraso, fechasLimite, fechasReales };
   }
 
   private obtenerEstadoActual(producto: any): string {

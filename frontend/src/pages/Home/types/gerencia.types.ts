@@ -79,14 +79,20 @@ export interface ProductoDetallado {
   sku: string;
   descripcion: string;
   cotizacionNombre: string;
-  
   tipoCompra: 'NACIONAL' | 'INTERNACIONAL';
+  responsable?: string;
 
   // Estados por etapa
   estados: Record<string, 'completado' | 'en_proceso' | 'atrasado' | 'pendiente'>;
 
-  // Días de atraso por etapa
+  // Días de atraso por etapa (key: diasAtraso_<etapa>)
   diasAtraso: Record<string, number | undefined>;
+
+  // Fechas límite estimadas por etapa (ISO string o null)
+  fechasLimite?: Record<string, string | null>;
+
+  // Fechas reales de completado por etapa (ISO string o null)
+  fechasReales?: Record<string, string | null>;
 }
 
 // Para el modal
