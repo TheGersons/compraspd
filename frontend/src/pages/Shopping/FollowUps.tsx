@@ -13,6 +13,7 @@ import TimelineItem from "./components/TimeLineItem";
 import { matchesSearch } from "../../utils/utils";
 import { SearchableSelect } from "../../components/ui/searchable-select";
 import { SplitOrdenCompraModal } from "../../components/ordenes-compra/SplitOrdenCompraModal";
+import { MoverProductosOCModal } from "../../components/ordenes-compra/MoverProductosOCModal";
 
 // ============================================================================
 // TYPES
@@ -534,6 +535,7 @@ export default function ShoppingFollowUps() {
   const canAsignarResponsable = ['JEFE_COMPRAS', 'ADMIN'].includes(user?.rol?.nombre?.toUpperCase() || '');
   const canDividirOC = ['JEFE_COMPRAS', 'ADMIN', 'SUPERVISOR'].includes(user?.rol?.nombre?.toUpperCase() || '');
   const [splitOcGrupo, setSplitOcGrupo] = useState<{ cotizacionId: string; nombre: string } | null>(null);
+  const [moverOcGrupo, setMoverOcGrupo] = useState<{ cotizacionId: string; ordenCompraId: string } | null>(null);
   const [searchParams] = useSearchParams();
 
   // Estados principales
@@ -1275,6 +1277,30 @@ export default function ShoppingFollowUps() {
                             Dividir OC
                           </button>
                         )}
+                        {canDividirOC && grupo.ordenCompraId && (() => {
+                          const otrasOCs = productos.filter(
+                            (p) => p.cotizacionId === grupo.cotizacionId && p.ordenCompra && p.ordenCompra.id !== grupo.ordenCompraId,
+                          ).length;
+                          const hayBase = productos.some(
+                            (p) => p.cotizacionId === grupo.cotizacionId && !p.ordenCompraId,
+                          );
+                          if (otrasOCs === 0 && !hayBase) return null;
+                          return (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setMoverOcGrupo({ cotizacionId: grupo.cotizacionId, ordenCompraId: grupo.ordenCompraId! });
+                              }}
+                              title="Mover productos a otra OC"
+                              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-indigo-600 transition-colors hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-900/20"
+                            >
+                              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                              </svg>
+                              Mover
+                            </button>
+                          );
+                        })()}
                         {canAsignarResponsable && (
                           <div className="relative" onClick={(e) => e.stopPropagation()}>
                             <button
@@ -2017,6 +2043,47 @@ export default function ShoppingFollowUps() {
           </div>
         </div>
       )}
+
+      {/* Modal: mover productos a otra OC */}
+      {moverOcGrupo && (() => {
+        const productosDeOC = productos.filter(
+          (p) => p.ordenCompraId === moverOcGrupo.ordenCompraId,
+        );
+        const ordenOrigen = productosDeOC[0]?.ordenCompra;
+        if (!ordenOrigen) return null;
+        const ordenesDestino = Array.from(
+          new Map(
+            productos
+              .filter(
+                (p) =>
+                  p.cotizacionId === moverOcGrupo.cotizacionId &&
+                  p.ordenCompra &&
+                  p.ordenCompra.id !== moverOcGrupo.ordenCompraId,
+              )
+              .map((p) => [p.ordenCompra!.id, p.ordenCompra!]),
+          ).values(),
+        );
+        return (
+          <MoverProductosOCModal
+            open={!!moverOcGrupo}
+            onClose={() => setMoverOcGrupo(null)}
+            ordenOrigen={ordenOrigen}
+            ordenesDestino={ordenesDestino}
+            productos={productosDeOC.map((p: any) => ({
+              id: p.id,
+              sku: p.sku,
+              descripcion: p.descripcion,
+              comprado: p.comprado,
+              pagado: p.pagado,
+              enFOB: p.enFOB,
+              enCIF: p.enCIF,
+              recibido: p.recibido,
+              conBL: p.conBL,
+            }))}
+            onSuccess={() => { cargarProductos(); }}
+          />
+        );
+      })()}
 
       {/* Modal: dividir en nueva OC */}
       {splitOcGrupo && (() => {
