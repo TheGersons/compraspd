@@ -1,15 +1,15 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
+import {
+  Controller,
+  Get,
+  Post,
   Delete,
-  Param, 
-  UploadedFile, 
-  UseGuards, 
+  Param,
+  UploadedFile,
+  UseGuards,
   UseInterceptors,
   ParseUUIDPipe,
   Body,
-  BadRequestException
+  BadRequestException,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
@@ -18,15 +18,15 @@ import { AttachmentsService } from './attachments.service';
 import { UploadAttachmentDto } from './dto/upload-attachment.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { diskStorage } from 'multer';
-import { v4 as uuid } from 'uuid';
+import { randomUUID } from 'crypto';
 import { extname } from 'path';
 
 type UserJwt = { sub: string; role?: string };
 
 /**
  * Controller para gestión de adjuntos/archivos
- * 
- * Endpoints:
+ *
+ * Endpoints:R
  * - POST /attachments/upload - Subir archivo
  * - GET /attachments/message/:mensajeId - Listar adjuntos de un mensaje
  * - GET /attachments/:id - Obtener adjunto específico
@@ -42,11 +42,11 @@ export class AttachmentsController {
   /**
    * POST /api/v1/attachments/upload
    * Sube un archivo al servidor
-   * 
+   *
    * El archivo puede:
    * 1. Asociarse directamente a un mensaje (mensajeId en body)
    * 2. Quedar temporal para asociarse después al crear mensaje
-   * 
+   *
    * Archivos temporales (sin mensajeId) se limpian después de 24h
    */
   @ApiConsumes('multipart/form-data')
@@ -56,7 +56,7 @@ export class AttachmentsController {
         destination: './uploads', // Asegúrate de que esta carpeta existe
         filename: (_req, file, cb) => {
           // Generar nombre único: uuid-timestamp.ext
-          const uniqueName = `${uuid()}-${Date.now()}${extname(file.originalname)}`;
+          const uniqueName = `${randomUUID()}-${Date.now()}${extname(file.originalname)}`;
           cb(null, uniqueName);
         },
       }),
@@ -107,7 +107,7 @@ export class AttachmentsController {
         tamanio: file.size,
         mensajeId: dto.mensajeId, // Puede ser undefined
       },
-      user.sub
+      user.sub,
     );
 
     // Convertir BigInt a string para JSON
@@ -146,10 +146,7 @@ export class AttachmentsController {
    * Solo el dueño del mensaje puede eliminarlo
    */
   @Delete(':id')
-  delete(
-    @CurrentUser() user: UserJwt,
-    @Param('id', ParseUUIDPipe) id: string
-  ) {
+  delete(@CurrentUser() user: UserJwt, @Param('id', ParseUUIDPipe) id: string) {
     return this.service.delete(id, user.sub);
   }
 

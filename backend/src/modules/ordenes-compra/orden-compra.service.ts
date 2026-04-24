@@ -56,7 +56,7 @@ export class OrdenCompraService {
 
     const cotizacion = await this.prisma.cotizacion.findUnique({
       where: { id: cotizacionId },
-      select: { id: true, nombreCotizacion: true },
+      select: { id: true, nombreCotizacion: true, supervisorResponsableId: true },
     });
     if (!cotizacion) throw new NotFoundException('Cotización no encontrada');
 
@@ -125,10 +125,18 @@ export class OrdenCompraService {
           numeroOC: numeroOC?.trim() || null,
         },
       });
+
+      const epData: any = { ordenCompraId: orden.id };
+      // Heredar el responsable de la cotización en los productos de la nueva OC
+      if (cotizacion.supervisorResponsableId) {
+        epData.responsableSeguimientoId = cotizacion.supervisorResponsableId;
+      }
+
       await tx.estadoProducto.updateMany({
         where: { id: { in: estadoProductoIds } },
-        data: { ordenCompraId: orden.id },
+        data: epData,
       });
+
       return tx.ordenCompra.findUnique({
         where: { id: orden.id },
         include: { estadosProductos: { select: { id: true, sku: true } } },
