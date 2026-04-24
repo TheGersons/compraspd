@@ -639,6 +639,7 @@ export default function FollowUps() {
   const userRoleName = user?.rol?.nombre?.toUpperCase() || '';
   const canAsignarResponsable = ['JEFE_COMPRAS', 'ADMIN'].includes(userRoleName);
   const canEditNombre = ['JEFE_COMPRAS', 'ADMIN'].includes(userRoleName);
+  const canDividirOC = ['JEFE_COMPRAS', 'ADMIN', 'SUPERVISOR'].includes(userRoleName);
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -2015,7 +2016,7 @@ export default function FollowUps() {
                                     {getEstadoLabel(cotizacionSeleccionada.estado)}
                                   </span>
                                 </div>
-                                {canAsignarResponsable && (
+                                {canDividirOC && (
                                   <button
                                     onClick={() => setSplitOcOpen(true)}
                                     title="Crear una nueva Orden de Compra con un subset de los productos"
