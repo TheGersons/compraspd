@@ -82,6 +82,7 @@ export class DashboardService {
             fechaSolicitud: true,
             fechaLimite: true,
             solicitante: { select: { nombre: true } },
+            supervisorResponsable: { select: { nombre: true } },
           },
         },
       },
@@ -153,7 +154,7 @@ export class DashboardService {
         tipoCompra,
         proyectoId: p.proyectoId,
         areaId: p.proyecto?.areaId,
-        responsable: p.responsable || 'Sin asignar',
+        responsable: p.cotizacion?.supervisorResponsable?.nombre || p.responsable || 'Sin asignar',
         ...this.calcularEstadosDetallados(p, estadosAplicables),
       };
     });
