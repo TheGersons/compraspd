@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import TimelineItem from "./components/TimeLineItem";
 import { matchesSearch } from "../../utils/utils";
 import { SearchableSelect } from "../../components/ui/searchable-select";
+import { SplitOrdenCompraModal } from "../../components/ordenes-compra/SplitOrdenCompraModal";
 
 // ============================================================================
 // TYPES
@@ -531,6 +532,8 @@ export default function ShoppingFollowUps() {
   const { user } = useAuth();
   const isComercial = user?.rol?.nombre?.toUpperCase() === 'COMERCIAL';
   const canAsignarResponsable = ['JEFE_COMPRAS', 'ADMIN'].includes(user?.rol?.nombre?.toUpperCase() || '');
+  const canDividirOC = ['JEFE_COMPRAS', 'ADMIN', 'SUPERVISOR'].includes(user?.rol?.nombre?.toUpperCase() || '');
+  const [splitOcGrupo, setSplitOcGrupo] = useState<{ cotizacionId: string; nombre: string } | null>(null);
   const [searchParams] = useSearchParams();
 
   // Estados principales
@@ -1257,6 +1260,21 @@ export default function ShoppingFollowUps() {
                           </svg>
                           {grupo.productos.length > 1 ? "Precios" : "Precio"}
                         </button>
+                        {canDividirOC && !grupo.ordenCompraId && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSplitOcGrupo({ cotizacionId: grupo.cotizacionId, nombre: grupo.nombre });
+                            }}
+                            title="Dividir en nueva Orden de Compra"
+                            className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-purple-600 transition-colors hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20"
+                          >
+                            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                            </svg>
+                            Dividir OC
+                          </button>
+                        )}
                         {canAsignarResponsable && (
                           <div className="relative" onClick={(e) => e.stopPropagation()}>
                             <button
@@ -1999,6 +2017,41 @@ export default function ShoppingFollowUps() {
           </div>
         </div>
       )}
+
+      {/* Modal: dividir en nueva OC */}
+      {splitOcGrupo && (() => {
+        const grupoSel = productosAgrupados[`cot:${splitOcGrupo.cotizacionId}`];
+        const productosGrupo = grupoSel?.productos || [];
+        const ordenesDelGrupo = Array.from(
+          new Map(
+            productos
+              .filter(p => p.cotizacionId === splitOcGrupo.cotizacionId && p.ordenCompra)
+              .map(p => [p.ordenCompra!.id, p.ordenCompra!])
+          ).values()
+        );
+        return (
+          <SplitOrdenCompraModal
+            open={!!splitOcGrupo}
+            onClose={() => setSplitOcGrupo(null)}
+            cotizacionId={splitOcGrupo.cotizacionId}
+            cotizacionNombre={splitOcGrupo.nombre}
+            productos={productosGrupo.map((p: any) => ({
+              id: p.id,
+              sku: p.sku,
+              descripcion: p.descripcion,
+              comprado: p.comprado,
+              pagado: p.pagado,
+              enFOB: p.enFOB,
+              enCIF: p.enCIF,
+              recibido: p.recibido,
+              conBL: p.conBL,
+              ordenCompraId: p.ordenCompraId,
+            }))}
+            ordenesExistentes={ordenesDelGrupo}
+            onSuccess={() => { cargarProductos(); }}
+          />
+        );
+      })()}
     </>
   );
 }
