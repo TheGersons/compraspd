@@ -16,6 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "../../../components/ui/
 import { matchesSearch } from "../../../utils/utils";
 import { SearchableSelect } from "../../../components/ui/searchable-select";
 import { SplitOrdenCompraModal } from "../../../components/ordenes-compra/SplitOrdenCompraModal";
+import { ApelarResponsableModal } from "../../../components/estado-producto/ApelarResponsableModal";
 
 // ============================================================================
 // TYPES
@@ -622,6 +623,9 @@ export default function FollowUps() {
   const canAsignarResponsable = ['JEFE_COMPRAS', 'ADMIN'].includes(user?.rol?.nombre?.toUpperCase() || '');
   const canDividirOC = ['JEFE_COMPRAS', 'ADMIN', 'SUPERVISOR'].includes(user?.rol?.nombre?.toUpperCase() || '');
   const [splitOcOpen, setSplitOcOpen] = useState(false);
+  const [apelarOpen, setApelarOpen] = useState(false);
+  const [apelarCotId, setApelarCotId] = useState("");
+  const [apelarCotNombre, setApelarCotNombre] = useState("");
   const canEditNombre = ['JEFE_COMPRAS', 'ADMIN'].includes(user?.rol?.nombre?.toUpperCase() || '');
   if (isLoading) {
     return (
@@ -1983,6 +1987,29 @@ export default function FollowUps() {
                                     Dividir OC
                                   </button>
                                 )}
+                                {(() => {
+                                  const esResponsable = cotizacionSeleccionada.supervisorResponsable?.id === user?.id;
+                                  const noPasoPagado = !cotizacionSeleccionada.estadosProductos?.some(
+                                    ep => ep.enFOB || ep.enCIF || ep.conBL || ep.recibido,
+                                  );
+                                  if (!esResponsable || !noPasoPagado) return null;
+                                  return (
+                                    <button
+                                      onClick={() => {
+                                        setApelarCotId(cotizacionSeleccionada.id);
+                                        setApelarCotNombre(cotizacionSeleccionada.nombreCotizacion);
+                                        setApelarOpen(true);
+                                      }}
+                                      title="Rechazar mi asignación como responsable"
+                                      className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-amber-600 transition-colors hover:bg-amber-50 hover:text-amber-700 dark:text-amber-400 dark:hover:bg-amber-900/20"
+                                    >
+                                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                      </svg>
+                                      Apelar asignación
+                                    </button>
+                                  );
+                                })()}
                                 {canAsignarResponsable && (
                                 <button
                                   onClick={eliminarCotizacionActual}
@@ -2460,6 +2487,18 @@ export default function FollowUps() {
           </div>
         )}
       </div>
+
+      {/* Modal: apelar asignación de responsable */}
+      <ApelarResponsableModal
+        open={apelarOpen}
+        onClose={() => setApelarOpen(false)}
+        cotizacionId={apelarCotId}
+        cotizacionNombre={apelarCotNombre}
+        onSuccess={() => {
+          cargarCotizaciones();
+          if (cotizacionSeleccionada?.id === apelarCotId) seleccionarCotizacion(cotizacionSeleccionada);
+        }}
+      />
 
       {/* Modal: dividir en nueva OC */}
       {cotizacionSeleccionada && (

@@ -21,6 +21,8 @@ import {
 } from './dto/estado-producto.dto';
 import console from 'console';
 import { MailService } from '../Mail/mail.service';
+import { NotificacionService } from '../notifications/notificacion.service';
+import { TipoNotificacion } from '../notifications/dto/notificacion.dto';
 
 type UserJwt = { sub: string; role?: string };
 
@@ -74,6 +76,7 @@ export class EstadoProductoService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
+    private readonly notificacionService: NotificacionService,
   ) {}
 
   /**
@@ -1127,6 +1130,89 @@ export class EstadoProductoService {
     return {
       message: `Responsable ${responsableId ? 'asignado' : 'removido'} de ${ids.length} productos`,
     };
+  }
+
+  /**
+   * Apelar/rechazar una asignación de responsable
+   * Solo puede llamarlo el usuario actualmente asignado como responsable.
+   * Limpia ambos campos sincronizados y notifica a todos los supervisores/jefes.
+   */
+  async apelarResponsable(
+    cotizacionId: string,
+    motivo: string,
+    user: UserJwt,
+  ) {
+    const cot = await this.prisma.cotizacion.findUnique({
+      where: { id: cotizacionId },
+      include: {
+        supervisorResponsable: { select: { id: true, nombre: true } },
+        estadosProductos: {
+          select: {
+            id: true,
+            primerSeguimiento: true,
+            enFOB: true,
+            enCIF: true,
+            conBL: true,
+            recibido: true,
+          },
+        },
+      },
+    });
+    if (!cot) throw new NotFoundException('Cotización no encontrada');
+
+    if (cot.supervisorResponsableId !== user.sub) {
+      throw new ForbiddenException('Solo el responsable asignado puede apelar su asignación');
+    }
+
+    const pasoPagado = (cot as any).estadosProductos?.some(
+      (ep: any) => ep.primerSeguimiento || ep.enFOB || ep.enCIF || ep.conBL || ep.recibido,
+    );
+    if (pasoPagado) {
+      throw new BadRequestException(
+        'No se puede apelar una asignación cuando los productos ya superaron el estado de Pagado',
+      );
+    }
+
+    // Limpiar responsable en cotización y en todos sus estadoProductos
+    await this.prisma.cotizacion.update({
+      where: { id: cotizacionId },
+      data: { supervisorResponsableId: null },
+    });
+    await this.prisma.estadoProducto.updateMany({
+      where: { cotizacionId },
+      data: { responsableSeguimientoId: null } as any,
+    });
+
+    // Apelante
+    const apelante = await this.prisma.usuario.findUnique({
+      where: { id: user.sub },
+      select: { nombre: true },
+    });
+    const nombreApelante = apelante?.nombre || 'Un usuario';
+    const titulo = `Asignación rechazada: ${cot.nombreCotizacion}`;
+    const descripcion = `${nombreApelante} rechazó la asignación de responsable en "${cot.nombreCotizacion}". Motivo: ${motivo}`;
+
+    // Notificar a todos los supervisores y jefes de compras
+    const receptores = await this.prisma.usuario.findMany({
+      where: {
+        activo: true,
+        rol: { nombre: { in: ['SUPERVISOR', 'JEFE_COMPRAS', 'ADMIN'] } },
+        id: { not: user.sub },
+      },
+      select: { id: true },
+    });
+
+    for (const receptor of receptores) {
+      const notif = await this.notificacionService.create({
+        userId: receptor.id,
+        tipo: TipoNotificacion.ASIGNACION_RECHAZADA,
+        titulo,
+        descripcion,
+      });
+      this.notificacionService.emitToUser(receptor.id, notif);
+    }
+
+    return { message: 'Asignación rechazada. Los supervisores han sido notificados.' };
   }
 
   /**

@@ -374,6 +374,16 @@ export class EstadoProductoController {
     return this.service.asignarResponsable(id, body.responsableId, user);
   }
 
+  @Patch('apelar-responsable')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Apelar/rechazar asignación de responsable' })
+  apelarResponsable(
+    @Body() body: { cotizacionId: string; motivo: string },
+    @CurrentUser() user: UserJwt,
+  ) {
+    return this.service.apelarResponsable(body.cotizacionId, body.motivo, user);
+  }
+
   @Patch('avanzar-masivo')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
