@@ -383,7 +383,6 @@ export default function New() {
   const [comentarios, setComentarios] = useState("");
   const [tipoId, setTipoId] = useState("");
   const [monedaId, setMonedaId] = useState("");
-  const [monedaTocada, setMonedaTocada] = useState(false);
   const { monedas, defaultPorTipoCompra } = useMonedas();
   const { user, isLoading } = useAuth();
 
@@ -530,15 +529,16 @@ export default function New() {
     }
   }, [proyectoId]);
 
-  // Default de moneda según tipoCompra (mientras el usuario no la haya tocado manualmente)
+  // Moneda asignada automáticamente según tipoCompra
+  // (NACIONAL → HNL, INTERNACIONAL → USD). El usuario no la elige aquí.
+  // En los followups sí se puede cambiar después si fuera necesario.
   useEffect(() => {
-    if (monedaTocada) return;
     if (monedas.length === 0) return;
     const sugerida = defaultPorTipoCompra(tipoCompra);
     if (sugerida && sugerida.id !== monedaId) {
       setMonedaId(sugerida.id);
     }
-  }, [tipoCompra, monedas, monedaTocada]);
+  }, [tipoCompra, monedas]);
 
   // ── Early returns (después de todos los hooks para no violar las reglas de React) ──
   if (isLoading) {
@@ -872,7 +872,6 @@ export default function New() {
     if (!nombreBase.trim()) return "El nombre de la cotización es obligatorio";
     if (!tipoId) return "Debe seleccionar un tipo de cotización";
     if (!solicitanteId) return "Debe seleccionar un solicitante";
-    if (!monedaId) return "Debe seleccionar una moneda";
     if (!proyectoId && lugarEntrega === 'PROYECTO') {
       return "Debe seleccionar un proyecto cuando el lugar de entrega es 'Proyecto'";
     }
@@ -1109,44 +1108,20 @@ export default function New() {
               />
             </div>
 
-            {/* Tipo de Compra + Moneda */}
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Tipo de Compra <span className="text-rose-500">*</span>
-                </label>
-                <select
-                  value={tipoCompra}
-                  onChange={(e) => setTipoCompra(e.target.value as TipoCompra)}
-                  className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-2.5 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
-                  required
-                >
-                  <option value="NACIONAL">Nacional</option>
-                  <option value="INTERNACIONAL">Internacional</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Moneda <span className="text-rose-500">*</span>
-                </label>
-                <select
-                  value={monedaId}
-                  onChange={(e) => { setMonedaId(e.target.value); setMonedaTocada(true); }}
-                  className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-2.5 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
-                  required
-                >
-                  <option value="">Seleccione una moneda</option>
-                  {monedas.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.codigo} — {m.nombre} ({m.simbolo})
-                    </option>
-                  ))}
-                </select>
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Default según tipo de compra. Editable.
-                </p>
-              </div>
+            {/* Tipo de Compra */}
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Tipo de Compra <span className="text-rose-500">*</span>
+              </label>
+              <select
+                value={tipoCompra}
+                onChange={(e) => setTipoCompra(e.target.value as TipoCompra)}
+                className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-2.5 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+                required
+              >
+                <option value="NACIONAL">Nacional (Lempira)</option>
+                <option value="INTERNACIONAL">Internacional (Dólar)</option>
+              </select>
             </div>
 
             {/* Tipo */}
