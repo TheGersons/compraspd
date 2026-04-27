@@ -337,11 +337,12 @@ const calcularStats = (productos: EstadoProducto[]): Stats => {
   return stats;
 };
 
+// Nota: este total agregado puede mezclar productos en HNL y USD —
+// por eso ya no se asume HNL. Se muestra solo el número formateado.
 const formatCurrency = (value: number): string => {
   return new Intl.NumberFormat('es-HN', {
-    style: 'currency',
-    currency: 'HNL',
     minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(value);
 };
 

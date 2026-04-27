@@ -82,6 +82,7 @@ export class CompraService {
       });
 
       // 2. Crear detalles de compra desde los items de cotización
+      // La moneda se hereda de la cotización padre y queda persistida por línea
       const detallesData = cotizacion.detalles.map(detalle => ({
         compraId: compra.id,
         sku: detalle.sku,
@@ -91,6 +92,7 @@ export class CompraService {
         notas: detalle.notas,
         precio: detalle.precios!.precioDescuento || detalle.precios!.precio,
         proveedorId: detalle.precios!.proveedorId as string,
+        monedaId: cotizacion.monedaId || null,
         estado: 'PRE-COMPRA'
       }));
 

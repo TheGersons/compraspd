@@ -15,6 +15,7 @@ import { SearchableSelect } from "../../components/ui/searchable-select";
 import { SplitOrdenCompraModal } from "../../components/ordenes-compra/SplitOrdenCompraModal";
 import { MoverProductosOCModal } from "../../components/ordenes-compra/MoverProductosOCModal";
 import { ApelarResponsableModal } from "../../components/estado-producto/ApelarResponsableModal";
+import { MonedaBadge } from "../../components/moneda/MonedaBadge";
 
 // ============================================================================
 // TYPES
@@ -134,6 +135,8 @@ export type EstadoProducto = {
     tipoCompra: 'NACIONAL' | 'INTERNACIONAL';
     chatId?: string | null;
     ordenCompra?: string | null;
+    monedaId?: string | null;
+    moneda?: { id: string; codigo: string; nombre: string; simbolo: string; decimales: number } | null;
     solicitante?: { id: string; nombre: string; email?: string } | null;
     tipo?: { nombre: string; area: { nombreArea: string } } | null;
   };
@@ -853,6 +856,7 @@ export default function ShoppingFollowUps() {
         tipoCompra: p.cotizacion?.tipoCompra || p.tipoCompra,
         chatId: p.cotizacion?.chatId || null,
         ordenCompra: p.ordenCompra?.numeroOC || p.cotizacion?.ordenCompra || null,
+        monedaId: p.cotizacion?.monedaId || null,
         solicitante: p.cotizacion?.solicitante || null,
         tipo: p.cotizacion?.tipo || null,
         productos: [],
@@ -860,7 +864,7 @@ export default function ShoppingFollowUps() {
     }
     acc[key].productos.push(p);
     return acc;
-  }, {} as Record<string, { groupKey: string; cotizacionId: string; ordenCompraId: string | null; nombre: string; tipoCompra: string; chatId: string | null; ordenCompra: string | null; solicitante: { id: string; nombre: string } | null; tipo: { nombre: string; area: { nombreArea: string } } | null; productos: EstadoProducto[] }>);
+  }, {} as Record<string, { groupKey: string; cotizacionId: string; ordenCompraId: string | null; nombre: string; tipoCompra: string; chatId: string | null; ordenCompra: string | null; monedaId: string | null; solicitante: { id: string; nombre: string } | null; tipo: { nombre: string; area: { nombreArea: string } } | null; productos: EstadoProducto[] }>);
 
   const gruposOrdenados = Object.values(productosAgrupados).sort((a, b) => a.nombre.localeCompare(b.nombre));
 
@@ -1240,6 +1244,14 @@ export default function ShoppingFollowUps() {
                               : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
                           }`}>
                             {grupo.tipoCompra === 'NACIONAL' ? 'Nacional' : 'Internacional'}
+                          </span>
+                          <span onClick={(e) => e.stopPropagation()}>
+                            <MonedaBadge
+                              cotizacionId={grupo.cotizacionId}
+                              monedaId={grupo.monedaId}
+                              tipoCompra={grupo.tipoCompra as any}
+                              onChange={() => cargarProductos()}
+                            />
                           </span>
                         </div>
                         <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500 dark:text-gray-400">

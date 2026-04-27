@@ -20,6 +20,7 @@ import { OrdenCompraModule } from './modules/ordenes-compra/orden-compra.module'
 import { AreasModule } from './modules/catalogs/areas/areas.module';
 import { ProyectosModule } from './modules/catalogs/proyectos/proyectos.module';
 import { TiposModule } from './modules/catalogs/tipos/tipos.module';
+import { MonedasModule } from './modules/catalogs/monedas/monedas.module';
 import { ProveedoresModule } from './modules/catalogs/proveedores/proveedores.module';
 import { NotificacionModule } from './modules/notifications/notificacion.module';
 import { SeguimientoModule } from './modules/seguimientos/seguimiento.module';
@@ -64,6 +65,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     AreasModule,
     ProyectosModule,
     TiposModule,
+    MonedasModule,
     ProveedoresModule,
     NotificacionModule,
     SeguimientoModule,

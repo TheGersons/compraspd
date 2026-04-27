@@ -301,11 +301,13 @@ model Cotizacion {
   fechaAprobacion          DateTime? @map("fecha_aprobacion")
   fechaEntregaNacional     DateTime? @map("fecha_entrega_nacional")
   ordenCompra              String?   @map("orden_compra")
+  monedaId                 String?   @map("moneda_id") @db.Uuid
 
   // Relaciones existentes
   tipo        Tipo      @relation(fields: [tipoId], references: [id], onDelete: Restrict)
   solicitante Usuario   @relation("UsuarioSolicitante", fields: [solicitanteId], references: [id], onDelete: Restrict)
   proyecto    Proyecto? @relation(fields: [proyectoId], references: [id], onDelete: SetNull)
+  moneda      Moneda?   @relation(fields: [monedaId], references: [id], onDelete: Restrict)
 
   // ========================================
   // NUEVAS RELACIONES
@@ -330,6 +332,7 @@ model Cotizacion {
   @@index([fechaSolicitud])
   @@index([supervisorResponsableId]) // ← NUEVO
   @@index([chatId]) // ← NUEVO
+  @@index([monedaId])
   @@map("cotizacion")
 }
 
@@ -369,6 +372,33 @@ model Pais {
 
   @@index([activo])
   @@map("pais")
+}
+
+// ============================================
+// MONEDAS
+// ============================================
+
+model Moneda {
+  id        String  @id @default(uuid()) @db.Uuid
+  codigo    String  @unique @db.VarChar(3) // "HNL", "USD"
+  nombre    String  @db.VarChar(50) // "Lempira", "Dólar estadounidense"
+  simbolo   String  @db.VarChar(5) // "L.", "$"
+  decimales Int     @default(2)
+  activo    Boolean @default(true)
+  orden     Int     @default(0)
+
+  creado      DateTime @default(now())
+  actualizado DateTime @default(now()) @updatedAt
+
+  cotizaciones        Cotizacion[]
+  precios             Precios[]
+  comprasDetalle      CompraDetalle[]
+  estadosProductos    EstadoProducto[]
+  licitacionProductos LicitacionProducto[]
+  ofertaProductos     OfertaProducto[]
+
+  @@index([activo])
+  @@map("moneda")
 }
 
 model TimelineSKU {
@@ -443,14 +473,17 @@ model Precios {
   proveedorId          String?  @map("proveedor_id") @db.Uuid
   fechaConsulta        DateTime @default(now()) @map("fecha_consulta")
   ComprobanteDescuento String?  @map("comprobante_descuento")
+  monedaId             String?  @map("moneda_id") @db.Uuid
 
   cotizacionDetalle CotizacionDetalle @relation("PreciosPorDetalle", fields: [cotizacionDetalleId], references: [id], onDelete: Cascade)
   proveedor         Proveedor?        @relation(fields: [proveedorId], references: [id], onDelete: Restrict)
+  moneda            Moneda?           @relation(fields: [monedaId], references: [id], onDelete: Restrict)
 
   cotizacionDetalleSeleccionado CotizacionDetalle[] @relation("PrecioSeleccionado")
 
   @@index([cotizacionDetalleId])
   @@index([proveedorId])
+  @@index([monedaId])
   @@map("precios")
 }
 
@@ -493,9 +526,11 @@ model CompraDetalle {
   fechaCif                 DateTime? @map("fecha_cif")
   fechaRecibido            DateTime? @map("fecha_recibido")
   fechaUltimaActualizacion DateTime  @default(now()) @updatedAt @map("fecha_ultima_actualizacion")
+  monedaId                 String?   @map("moneda_id") @db.Uuid
 
   compra    Compra    @relation(fields: [compraId], references: [id], onDelete: Cascade)
   proveedor Proveedor @relation(fields: [proveedorId], references: [id], onDelete: Restrict)
+  moneda    Moneda?   @relation(fields: [monedaId], references: [id], onDelete: Restrict)
 
   seguimientos     Seguimiento[]    @relation("SeguimientoCompraDetalle")
   estadosProductos EstadoProducto[]
@@ -504,6 +539,7 @@ model CompraDetalle {
   @@index([proveedorId])
   @@index([estado])
   @@index([sku])
+  @@index([monedaId])
   @@map("compra_detalle")
 }
 
@@ -613,6 +649,7 @@ model EstadoProducto {
   responsable    String?  @db.VarChar(255)
   precioUnitario Decimal? @db.Decimal(15, 4)
   precioTotal    Decimal? @db.Decimal(15, 4)
+  monedaId       String?  @map("moneda_id") @db.Uuid
   cantidad       Int?
   observaciones  String?  @db.Text
   estadoGeneral  String   @default("warn") @db.VarChar(20) // "success", "warn", "danger"
@@ -647,6 +684,7 @@ model EstadoProducto {
   compra                   Compra?            @relation(fields: [compraId], references: [id], onDelete: Cascade)
   compraDetalle            CompraDetalle?     @relation(fields: [compraDetalleId], references: [id], onDelete: Cascade)
   ordenCompra              OrdenCompra?       @relation(fields: [ordenCompraId], references: [id], onDelete: SetNull)
+  moneda                   Moneda?            @relation(fields: [monedaId], references: [id], onDelete: Restrict)
   aprobadoPorSupervisor    Boolean            @default(false) @map("aprobado_por_supervisor")
   fechaAprobacion          DateTime?          @map("fecha_aprobacion")
   tipoEntrega              String?            @map("tipo_entrega") @db.VarChar(20) // Incoterms: EXW, FOB, FCA, CIF, CIP, CPT, CPR, DAP, DDP
@@ -686,6 +724,7 @@ model EstadoProducto {
   @@index([paisOrigenId])
   @@index([medioTransporte])
   @@index([ordenCompraId])
+  @@index([monedaId])
   @@map("estado_producto")
 }
 
@@ -984,6 +1023,7 @@ model LicitacionProducto {
   observaciones  String?  @db.Text
   tipoCompra     String?  @default("NACIONAL") @map("tipo_compra") @db.VarChar(20)
   responsableId  String?  @map("responsable_id") @db.Uuid
+  monedaId       String?  @map("moneda_id") @db.Uuid
 
   creado      DateTime @default(now())
   actualizado DateTime @default(now()) @updatedAt
@@ -991,8 +1031,10 @@ model LicitacionProducto {
   licitacion     Licitacion      @relation(fields: [licitacionId], references: [id], onDelete: Cascade)
   estadoProducto EstadoProducto? @relation(fields: [estadoProductoId], references: [id], onDelete: SetNull)
   responsable    Usuario?        @relation("ResponsableLicitacion", fields: [responsableId], references: [id], onDelete: SetNull)
+  moneda         Moneda?         @relation(fields: [monedaId], references: [id], onDelete: Restrict)
 
   @@index([licitacionId])
+  @@index([monedaId])
   @@map("licitacion_producto")
 }
 
@@ -1058,6 +1100,7 @@ model OfertaProducto {
   observaciones  String?  @db.Text
   tipoCompra     String?  @default("NACIONAL") @map("tipo_compra") @db.VarChar(20)
   responsableId  String?  @map("responsable_id") @db.Uuid
+  monedaId       String?  @map("moneda_id") @db.Uuid
 
   creado      DateTime @default(now())
   actualizado DateTime @default(now()) @updatedAt
@@ -1065,8 +1108,10 @@ model OfertaProducto {
   oferta         Oferta          @relation(fields: [ofertaId], references: [id], onDelete: Cascade)
   estadoProducto EstadoProducto? @relation(fields: [estadoProductoId], references: [id], onDelete: SetNull)
   responsable    Usuario?        @relation("ResponsableOferta", fields: [responsableId], references: [id], onDelete: SetNull)
+  moneda         Moneda?         @relation(fields: [monedaId], references: [id], onDelete: Restrict)
 
   @@index([ofertaId])
+  @@index([monedaId])
   @@map("oferta_producto")
 }
 

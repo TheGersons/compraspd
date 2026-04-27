@@ -103,6 +103,7 @@ export class QuotationsService {
           solicitanteId: quotationData.solicitanteId,
           tipoId: dto.tipoId,
           proyectoId: dto.proyectoId || null,
+          monedaId: dto.monedaId || null,
           chatId: chat.id,
 
           detalles: {
@@ -506,6 +507,7 @@ export class QuotationsService {
         comentarios: dto.comentarios ?? current.comentarios,
         tipoId: dto.tipoId ?? current.tipoId,
         proyectoId: dto.proyectoId ?? current.proyectoId,
+        monedaId: dto.monedaId !== undefined ? dto.monedaId : current.monedaId,
         fechaEntregaNacional: dto.fechaEntregaNacional
           ? new Date(dto.fechaEntregaNacional)
           : current.fechaEntregaNacional,

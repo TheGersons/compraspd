@@ -60,6 +60,10 @@ export class CreateQuotationDto {
   @IsUUID()
   proyectoId?: string; // projectId → proyectoId
 
+  @IsOptional()
+  @IsUUID()
+  monedaId?: string; // moneda en la que se cotiza (HNL, USD, etc.)
+
   @IsNotEmpty()
   @IsIn(['NACIONAL', 'INTERNACIONAL'])
   tipoCompra: 'NACIONAL' | 'INTERNACIONAL' ; // procurement → tipoCompra

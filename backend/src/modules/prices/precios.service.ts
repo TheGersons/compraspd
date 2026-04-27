@@ -38,7 +38,7 @@ export class PreciosService {
       where: { id: dto.cotizacionDetalleId },
       include: {
         cotizacion: {
-          select: { estado: true, nombreCotizacion: true },
+          select: { estado: true, nombreCotizacion: true, monedaId: true },
         },
       },
     });
@@ -85,6 +85,9 @@ export class PreciosService {
         precioDescuento: dto.precioDescuento || null,
         proveedorId: dto.proveedorId || undefined,
         ComprobanteDescuento: dto.comprobanteDescuento || null,
+        // Heredar moneda de la cotización padre al momento de crear el precio.
+        // Queda persistida en cada precio para auditabilidad.
+        monedaId: detalle.cotizacion.monedaId || undefined,
       },
       include: {
         proveedor: {

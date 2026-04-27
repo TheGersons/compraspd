@@ -38,8 +38,9 @@ const ESTADOS_LABELS: Record<string, string> = {
     segundoSeguimiento: "2do Seguimiento", enCIF: "En CIF", recibido: "Recibido",
 };
 
+// Nota: total agregado — puede mezclar monedas, se muestra sin símbolo fijo
 const formatCurrency = (v?: number | null) =>
-    v ? new Intl.NumberFormat("es-HN", { style: "currency", currency: "USD" }).format(v) : "—";
+    v ? new Intl.NumberFormat("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v) : "—";
 const formatDate = (d: string) =>
     new Date(d).toLocaleDateString("es-HN", { year: "numeric", month: "short", day: "numeric" });
 

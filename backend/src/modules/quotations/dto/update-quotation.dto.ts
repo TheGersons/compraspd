@@ -24,6 +24,10 @@ export class UpdateQuotationDto {
   proyectoId?: string;
 
   @IsOptional()
+  @IsUUID()
+  monedaId?: string;
+
+  @IsOptional()
   @IsIn(['NACIONAL', 'INTERNACIONAL'])
   tipoCompra?: 'NACIONAL' | 'INTERNACIONAL';
 

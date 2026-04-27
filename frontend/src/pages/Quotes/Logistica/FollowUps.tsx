@@ -17,6 +17,7 @@ import { matchesSearch } from "../../../utils/utils";
 import { SearchableSelect } from "../../../components/ui/searchable-select";
 import { SplitOrdenCompraModal } from "../../../components/ordenes-compra/SplitOrdenCompraModal";
 import { ApelarResponsableModal } from "../../../components/estado-producto/ApelarResponsableModal";
+import { MonedaBadge } from "../../../components/moneda/MonedaBadge";
 
 // ============================================================================
 // TYPES
@@ -87,6 +88,8 @@ type Cotizacion = {
   fechaLimite: string;
   aprobadaParcialmente: boolean;
   todosProductosAprobados: boolean;
+  monedaId?: string | null;
+  moneda?: { id: string; codigo: string; nombre: string; simbolo: string; decimales: number } | null;
   solicitante: {
     id: string;
     nombre: string;
@@ -1871,6 +1874,16 @@ export default function FollowUps() {
                             {getEstadoLabel(cot.estado)}
                           </span>
                           <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{cot.porcentajeAprobado || 0}%</span>
+                          <span onClick={(e) => e.stopPropagation()}>
+                            <MonedaBadge
+                              cotizacionId={cot.id}
+                              monedaId={cot.monedaId}
+                              tipoCompra={cot.tipoCompra}
+                              onChange={(nueva) => {
+                                setCotizaciones(prev => prev.map(c => c.id === cot.id ? { ...c, monedaId: nueva.id, moneda: nueva } : c));
+                              }}
+                            />
+                          </span>
                         </div>
                         <div className="mb-0.5 flex items-center gap-1.5 flex-wrap">
                           <h3 className="font-semibold text-gray-900 dark:text-white truncate">{cot.nombreCotizacion}</h3>
