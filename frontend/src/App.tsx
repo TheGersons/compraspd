@@ -37,6 +37,7 @@ import NotificationContainer from "./pages/Notifications/components/notification
 import NotificationPanel from "./pages/Notifications/components/notifications/NotificationPanel";
 import Projects from "./pages/projects/Projects";
 import NewProject from "./pages/projects/NewProject";
+import Types from "./pages/types/Types";
 import { useState, useEffect } from "react";
 import Profile from "./pages/Profile/Profile";
 import ResetPassword from "./pages/AuthPages/ResetPass";
@@ -359,6 +360,16 @@ export default function App() {
                 element={
                   <ProtectedRoute roles={STAFF_ROLES}>
                     <NewProject />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Tipos / Categorías - Solo STAFF */}
+              <Route
+                path="/types"
+                element={
+                  <ProtectedRoute roles={STAFF_ROLES}>
+                    <Types />
                   </ProtectedRoute>
                 }
               />

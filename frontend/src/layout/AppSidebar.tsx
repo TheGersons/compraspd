@@ -11,6 +11,7 @@ import {
   Link2,
   Ship,
   Forklift,
+  Tags,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
@@ -135,6 +136,12 @@ const othersItems: NavItem[] = [
       { name: "ver Proyectos", path: "/projects", pro: false },
       { name: "Nuevo Proyecto", path: "/projects/new", pro: false },
     ],
+  },
+  {
+    icon: <Tags size={20} />,
+    name: "Tipos",
+    roles: ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS"],
+    path: "/types",
   },
   {
     icon: <User />,

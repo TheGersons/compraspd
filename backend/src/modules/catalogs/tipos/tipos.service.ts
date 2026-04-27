@@ -34,7 +34,8 @@ export class TiposService {
         },
         _count: {
           select: {
-            cotizaciones: true // Contar cotizaciones con este tipo
+            cotizaciones: true,
+            proyectos: true,
           }
         }
       },
