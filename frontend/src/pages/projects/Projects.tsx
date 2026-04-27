@@ -15,6 +15,12 @@ interface Area {
   tipo: string;
 }
 
+interface Tipo {
+  id: string;
+  nombre: string;
+  areaId: string;
+}
+
 interface Proyecto {
   id: string;
   nombre: string;
@@ -23,7 +29,10 @@ interface Proyecto {
   estado: boolean;
   creado: string;
   actualizado: string;
+  areaId?: string;
+  tipoId?: string;
   area?: Area;
+  tipo?: Tipo;
   _count: { cotizaciones: number };
 }
 
@@ -53,6 +62,16 @@ const api = {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) throw new Error("Error al cargar áreas");
+    return res.json();
+  },
+
+  async getTiposByArea(areaId: string): Promise<Tipo[]> {
+    const token = getToken();
+    const res = await fetch(`${API_BASE_URL}/api/v1/tipos/area/${areaId}`, {
+      credentials: "include",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return [];
     return res.json();
   },
 
@@ -196,16 +215,28 @@ export default function Projects() {
 
   const [proyectos, setProyectos] = useState<Proyecto[]>([]);
   const [areas, setAreas] = useState<Area[]>([]);
+  const [tipos, setTipos] = useState<Tipo[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterEstado, setFilterEstado] = useState<"all" | "active" | "closed">("active");
   const [filterAreaId, setFilterAreaId] = useState<string>("");
+  const [filterTipoId, setFilterTipoId] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
   const [proyectoAEliminar, setProyectoAEliminar] = useState<Proyecto | null>(null);
 
   useEffect(() => {
     api.getAreas().then(setAreas).catch(() => {});
   }, []);
+
+  // Cargar tipos cuando cambia el área filtrada
+  useEffect(() => {
+    if (!filterAreaId) {
+      setTipos([]);
+      setFilterTipoId("");
+      return;
+    }
+    api.getTiposByArea(filterAreaId).then(setTipos).catch(() => setTipos([]));
+  }, [filterAreaId]);
 
   useEffect(() => {
     const estado = filterEstado === "all" ? undefined : filterEstado === "active";
@@ -217,10 +248,11 @@ export default function Projects() {
       .finally(() => setLoading(false));
   }, [filterEstado]);
 
-  // Búsqueda y filtro de área en frontend — reactivos al escribir
+  // Búsqueda + filtro de área/tipo en frontend — reactivos al escribir
   const proyectosFiltrados = useMemo(() => {
     let result = proyectos;
     if (filterAreaId) result = result.filter((p) => p.area?.id === filterAreaId);
+    if (filterTipoId) result = result.filter((p) => p.tipo?.id === filterTipoId);
     if (searchTerm.trim()) {
       const q = searchTerm.trim().toLowerCase();
       result = result.filter(
@@ -230,10 +262,10 @@ export default function Projects() {
       );
     }
     return result;
-  }, [proyectos, filterAreaId, searchTerm]);
+  }, [proyectos, filterAreaId, filterTipoId, searchTerm]);
 
   // Reset página al cambiar filtros
-  useEffect(() => { setCurrentPage(1); }, [filterEstado, filterAreaId, searchTerm]);
+  useEffect(() => { setCurrentPage(1); }, [filterEstado, filterAreaId, filterTipoId, searchTerm]);
 
   const totalPages = Math.ceil(proyectosFiltrados.length / PAGE_SIZE);
   const proyectosPaginados = proyectosFiltrados.slice(
@@ -316,7 +348,7 @@ export default function Projects() {
           </div>
 
           {/* Select Área */}
-          <div className="relative w-full sm:w-48">
+          <div className="relative w-full sm:w-44">
             <select
               value={filterAreaId}
               onChange={(e) => setFilterAreaId(e.target.value)}
@@ -325,6 +357,26 @@ export default function Projects() {
               <option value="">Todas las áreas</option>
               {areas.map((a) => (
                 <option key={a.id} value={a.id}>{a.nombreArea}</option>
+              ))}
+            </select>
+            <svg className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+
+          {/* Select Tipo (depende del área) */}
+          <div className="relative w-full sm:w-44">
+            <select
+              value={filterTipoId}
+              onChange={(e) => setFilterTipoId(e.target.value)}
+              disabled={!filterAreaId}
+              className="w-full appearance-none rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-8 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:disabled:bg-gray-800 dark:disabled:text-gray-500"
+            >
+              <option value="">
+                {!filterAreaId ? "Tipo (elige área)" : "Todos los tipos"}
+              </option>
+              {tipos.map((t) => (
+                <option key={t.id} value={t.id}>{t.nombre}</option>
               ))}
             </select>
             <svg className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -368,9 +420,9 @@ export default function Projects() {
           ) : (
             <>
               {/* Table header */}
-              <div className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-4 border-b border-gray-200 bg-gray-50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
+              <div className="grid grid-cols-[1.5fr_1fr_auto_auto_auto] items-center gap-4 border-b border-gray-200 bg-gray-50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
                 <span>Proyecto</span>
-                <span className="text-center">Área</span>
+                <span>Área / Tipo</span>
                 <span className="text-center">Criticidad</span>
                 <span className="text-center">Estado</span>
                 <span className="text-right">Acciones</span>
@@ -383,7 +435,7 @@ export default function Projects() {
                   return (
                     <div
                       key={proyecto.id}
-                      className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-4 px-4 py-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/40"
+                      className="grid grid-cols-[1.5fr_1fr_auto_auto_auto] items-center gap-4 px-4 py-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/40"
                     >
                       {/* Nombre + descripción */}
                       <div className="min-w-0">
@@ -397,10 +449,17 @@ export default function Projects() {
                         )}
                       </div>
 
-                      {/* Área */}
-                      <span className="whitespace-nowrap rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                        {proyecto.area?.nombreArea || "—"}
-                      </span>
+                      {/* Área / Tipo */}
+                      <div className="flex min-w-0 flex-col gap-0.5">
+                        <span className="truncate text-xs font-medium text-blue-700 dark:text-blue-400">
+                          {proyecto.area?.nombreArea || "—"}
+                        </span>
+                        <span className="truncate text-xs text-gray-500 dark:text-gray-400">
+                          {proyecto.tipo?.nombre || (
+                            <span className="italic text-amber-600 dark:text-amber-400">Sin tipo</span>
+                          )}
+                        </span>
+                      </div>
 
                       {/* Criticidad */}
                       <span className={`flex items-center gap-1.5 whitespace-nowrap text-xs font-medium ${crit.text}`}>

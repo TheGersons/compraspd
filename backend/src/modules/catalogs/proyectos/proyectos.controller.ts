@@ -30,12 +30,16 @@ export class ProyectosController {
   @ApiOperation({ summary: 'Listar proyectos con filtros' })
   @ApiQuery({ name: 'estado', required: false, type: Boolean, description: 'true=activos, false=cerrados' })
   @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'areaId', required: false, type: String })
+  @ApiQuery({ name: 'tipoId', required: false, type: String })
   @ApiResponse({ status: 200, description: 'Lista de proyectos obtenida' })
   list(
     @Query('estado', new ParseBoolPipe({ optional: true })) estado?: boolean,
-    @Query('search') search?: string
+    @Query('search') search?: string,
+    @Query('areaId') areaId?: string,
+    @Query('tipoId') tipoId?: string,
   ) {
-    return this.proyectosService.listProyectos({ estado, search });
+    return this.proyectosService.listProyectos({ estado, search, areaId, tipoId });
   }
 
   @Get(':id')

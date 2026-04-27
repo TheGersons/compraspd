@@ -7,6 +7,7 @@ import {
   IsString,
   IsNotEmpty,
   IsOptional,
+  IsUUID,
   MaxLength,
   IsInt,
   Min,
@@ -58,4 +59,14 @@ export class CreateProyectoDto {
   @IsString()
   @IsNotEmpty({ message: 'El área es obligatoria' })
   areaId: string;
+
+  @ApiProperty({
+    description:
+      'ID del tipo del proyecto (opcional durante migración, debe pertenecer al área seleccionada)',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+    required: false,
+  })
+  @IsUUID('4', { message: 'El tipo debe ser un UUID válido' })
+  @IsOptional()
+  tipoId?: string;
 }

@@ -8,6 +8,20 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateProyectoDto } from './dto/create-proyecto.dto';
 import { UpdateProyectoDto } from './dto/update-proyecto.dto';
 
+const PROYECTO_BASE_SELECT = {
+  id: true,
+  nombre: true,
+  descripcion: true,
+  criticidad: true,
+  estado: true,
+  creado: true,
+  actualizado: true,
+  areaId: true,
+  tipoId: true,
+  area: { select: { id: true, nombreArea: true, tipo: true } },
+  tipo: { select: { id: true, nombre: true, areaId: true } },
+} as const;
+
 @Injectable()
 export class ProyectosService {
   constructor(private prisma: PrismaService) {}
@@ -15,11 +29,24 @@ export class ProyectosService {
   /**
    * Listar proyectos con filtros
    */
-  async listProyectos(params?: { estado?: boolean; search?: string }) {
+  async listProyectos(params?: {
+    estado?: boolean;
+    search?: string;
+    areaId?: string;
+    tipoId?: string;
+  }) {
     const where: any = {};
 
     if (typeof params?.estado === 'boolean') {
       where.estado = params.estado;
+    }
+
+    if (params?.areaId) {
+      where.areaId = params.areaId;
+    }
+
+    if (params?.tipoId) {
+      where.tipoId = params.tipoId;
     }
 
     if (params?.search) {
@@ -32,19 +59,9 @@ export class ProyectosService {
     return this.prisma.proyecto.findMany({
       where,
       select: {
-        id: true,
-        nombre: true,
-        descripcion: true,
-        criticidad: true,
-        estado: true,
-        creado: true,
-        actualizado: true,
-        areaId: true,
-        area: { select: { id: true, nombreArea: true, tipo: true } },
+        ...PROYECTO_BASE_SELECT,
         _count: {
-          select: {
-            cotizaciones: true,
-          },
+          select: { cotizaciones: true },
         },
       },
       orderBy: { creado: 'desc' },
@@ -58,6 +75,8 @@ export class ProyectosService {
     const proyecto = await this.prisma.proyecto.findUnique({
       where: { id },
       include: {
+        area: { select: { id: true, nombreArea: true, tipo: true } },
+        tipo: { select: { id: true, nombre: true, areaId: true } },
         cotizaciones: {
           select: {
             id: true,
@@ -65,19 +84,13 @@ export class ProyectosService {
             estado: true,
             fechaSolicitud: true,
             solicitante: {
-              select: {
-                id: true,
-                nombre: true,
-                email: true,
-              },
+              select: { id: true, nombre: true, email: true },
             },
           },
           orderBy: { fechaSolicitud: 'desc' },
-          take: 10, // Últimas 10 cotizaciones
+          take: 10,
         },
-        _count: {
-          select: { cotizaciones: true },
-        },
+        _count: { select: { cotizaciones: true } },
       },
     });
 
@@ -92,13 +105,9 @@ export class ProyectosService {
    * Crear nuevo proyecto
    */
   async create(data: CreateProyectoDto) {
-    // Validar que el nombre no exista
     const exists = await this.prisma.proyecto.findFirst({
       where: {
-        nombre: {
-          equals: data.nombre,
-          mode: 'insensitive',
-        },
+        nombre: { equals: data.nombre, mode: 'insensitive' },
       },
     });
 
@@ -106,7 +115,6 @@ export class ProyectosService {
       throw new ConflictException('Ya existe un proyecto con ese nombre');
     }
 
-    // Validar criticidad (1-10)
     if (
       data.criticidad !== undefined &&
       (data.criticidad < 1 || data.criticidad > 10)
@@ -114,24 +122,20 @@ export class ProyectosService {
       throw new BadRequestException('La criticidad debe estar entre 1 y 10');
     }
 
+    if (data.tipoId) {
+      await this.validateTipoBelongsToArea(data.tipoId, data.areaId);
+    }
+
     return this.prisma.proyecto.create({
       data: {
         nombre: data.nombre,
         descripcion: data.descripcion,
         criticidad: data.criticidad ?? 5,
-        areaId: (data as any).areaId || null,
+        areaId: data.areaId || null,
+        tipoId: data.tipoId || null,
         estado: true,
       },
-      select: {
-        id: true,
-        nombre: true,
-        descripcion: true,
-        criticidad: true,
-        estado: true,
-        creado: true,
-        areaId: true,
-        area: { select: { id: true, nombreArea: true, tipo: true } },
-      },
+      select: PROYECTO_BASE_SELECT,
     });
   }
 
@@ -139,16 +143,19 @@ export class ProyectosService {
    * Actualizar proyecto
    */
   async update(id: string, data: UpdateProyectoDto) {
-    await this.ensureExists(id);
+    const existing = await this.prisma.proyecto.findUnique({
+      where: { id },
+      select: { id: true, areaId: true, tipoId: true },
+    });
 
-    // Validar nombre único si se actualiza
+    if (!existing) {
+      throw new NotFoundException('Proyecto no encontrado');
+    }
+
     if (data.nombre) {
       const exists = await this.prisma.proyecto.findFirst({
         where: {
-          nombre: {
-            equals: data.nombre,
-            mode: 'insensitive',
-          },
+          nombre: { equals: data.nombre, mode: 'insensitive' },
           id: { not: id },
         },
       });
@@ -158,12 +165,36 @@ export class ProyectosService {
       }
     }
 
-    // Validar criticidad si se proporciona
     if (
       data.criticidad !== undefined &&
       (data.criticidad < 1 || data.criticidad > 10)
     ) {
       throw new BadRequestException('La criticidad debe estar entre 1 y 10');
+    }
+
+    // Resolver área y tipo finales para validar consistencia
+    const finalAreaId =
+      data.areaId !== undefined ? data.areaId : existing.areaId;
+    const finalTipoId =
+      data.tipoId !== undefined ? data.tipoId : existing.tipoId;
+
+    if (finalTipoId) {
+      if (!finalAreaId) {
+        throw new BadRequestException(
+          'El proyecto debe tener un área antes de asignarle un tipo',
+        );
+      }
+      await this.validateTipoBelongsToArea(finalTipoId, finalAreaId);
+    }
+
+    // Si cambió el área pero no se reasignó tipo, limpiar el tipo (queda inconsistente)
+    let tipoIdToWrite: string | null | undefined;
+    if (data.tipoId !== undefined) {
+      tipoIdToWrite = data.tipoId || null;
+    } else if (data.areaId !== undefined && data.areaId !== existing.areaId) {
+      tipoIdToWrite = null;
+    } else {
+      tipoIdToWrite = undefined;
     }
 
     return this.prisma.proyecto.update({
@@ -172,60 +203,37 @@ export class ProyectosService {
         nombre: data.nombre,
         descripcion: data.descripcion,
         criticidad: data.criticidad,
-        areaId:
-          (data as any).areaId !== undefined ? (data as any).areaId : undefined,
+        areaId: data.areaId !== undefined ? data.areaId : undefined,
+        tipoId: tipoIdToWrite,
         estado: data.estado,
       },
-      select: {
-        id: true,
-        nombre: true,
-        descripcion: true,
-        criticidad: true,
-        estado: true,
-        actualizado: true,
-        areaId: true,
-        area: { select: { id: true, nombreArea: true, tipo: true } },
-      },
+      select: PROYECTO_BASE_SELECT,
     });
   }
 
-  /**
-   * Cerrar proyecto (cambiar estado a inactivo)
-   */
   async close(id: string) {
     await this.ensureExists(id);
-
     return this.prisma.proyecto.update({
       where: { id },
       data: { estado: false },
     });
   }
 
-  /**
-   * Abrir proyecto (cambiar estado a activo)
-   */
   async open(id: string) {
     await this.ensureExists(id);
-
     return this.prisma.proyecto.update({
       where: { id },
       data: { estado: true },
     });
   }
 
-  /**
-   * Eliminar proyecto (soft delete - solo si no tiene cotizaciones)
-   */
   async delete(id: string) {
     await this.ensureExists(id);
 
-    // Verificar que no tenga cotizaciones
     const proyecto = await this.prisma.proyecto.findUnique({
       where: { id },
       include: {
-        _count: {
-          select: { cotizaciones: true },
-        },
+        _count: { select: { cotizaciones: true } },
       },
     });
 
@@ -235,17 +243,10 @@ export class ProyectosService {
       );
     }
 
-    // Eliminar proyecto
-    await this.prisma.proyecto.delete({
-      where: { id },
-    });
-
+    await this.prisma.proyecto.delete({ where: { id } });
     return { message: 'Proyecto eliminado exitosamente' };
   }
 
-  /**
-   * Obtener estadísticas del proyecto
-   */
   async getStats(id: string) {
     await this.ensureExists(id);
 
@@ -284,13 +285,31 @@ export class ProyectosService {
     return stats;
   }
 
-  /**
-   * Método privado: Verificar que el proyecto existe
-   */
+  // ==========================================================================
+  // Helpers privados
+  // ==========================================================================
+
   private async ensureExists(id: string) {
     const proyecto = await this.prisma.proyecto.findUnique({ where: { id } });
     if (!proyecto) {
       throw new NotFoundException('Proyecto no encontrado');
+    }
+  }
+
+  private async validateTipoBelongsToArea(tipoId: string, areaId: string) {
+    const tipo = await this.prisma.tipo.findUnique({
+      where: { id: tipoId },
+      select: { id: true, areaId: true },
+    });
+
+    if (!tipo) {
+      throw new BadRequestException('El tipo seleccionado no existe');
+    }
+
+    if (tipo.areaId !== areaId) {
+      throw new BadRequestException(
+        'El tipo seleccionado no pertenece al área indicada',
+      );
     }
   }
 }

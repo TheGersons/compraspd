@@ -44,6 +44,7 @@ model Tipo {
 
   area         Area         @relation(fields: [areaId], references: [id], onDelete: Restrict)
   cotizaciones Cotizacion[]
+  proyectos    Proyecto[]
 
   @@unique([areaId, nombre])
   @@index([areaId])
@@ -77,14 +78,17 @@ model Proyecto {
   creado      DateTime @default(now())
   actualizado DateTime @default(now()) @updatedAt
   areaId      String?  @map("area_id") @db.Uuid
+  tipoId      String?  @map("tipo_id") @db.Uuid
 
   area Area? @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  tipo Tipo? @relation(fields: [tipoId], references: [id], onDelete: SetNull)
 
   cotizaciones     Cotizacion[]
   estadosProductos EstadoProducto[]
 
   @@index([criticidad])
   @@index([estado])
+  @@index([tipoId])
   @@map("proyecto")
 }
 

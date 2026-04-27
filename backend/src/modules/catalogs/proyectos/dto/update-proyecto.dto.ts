@@ -3,29 +3,30 @@
 // ============================================================================
 
 import { ApiProperty } from '@nestjs/swagger';
-import { 
-  IsString, 
-  IsOptional, 
-  IsBoolean, 
+import {
+  IsString,
+  IsOptional,
+  IsBoolean,
+  IsUUID,
   MaxLength,
   IsInt,
   Min,
-  Max
+  Max,
 } from 'class-validator';
 
 export class UpdateProyectoDto {
-  @ApiProperty({ 
+  @ApiProperty({
     description: 'Nombre del proyecto',
-    required: false 
+    required: false,
   })
   @IsString()
   @IsOptional()
   @MaxLength(200)
   nombre?: string;
 
-  @ApiProperty({ 
+  @ApiProperty({
     description: 'Descripción del proyecto',
-    required: false 
+    required: false,
   })
   @IsString()
   @IsOptional()
@@ -36,7 +37,7 @@ export class UpdateProyectoDto {
     description: 'Nivel de criticidad del proyecto (1-10)',
     required: false,
     minimum: 1,
-    maximum: 10
+    maximum: 10,
   })
   @IsInt({ message: 'La criticidad debe ser un número entero' })
   @Min(1, { message: 'La criticidad mínima es 1' })
@@ -44,11 +45,27 @@ export class UpdateProyectoDto {
   @IsOptional()
   criticidad?: number;
 
-  @ApiProperty({ 
+  @ApiProperty({
     description: 'Estado del proyecto (true=activo, false=cerrado)',
-    required: false 
+    required: false,
   })
   @IsBoolean()
   @IsOptional()
   estado?: boolean;
+
+  @ApiProperty({
+    description: 'ID del área del proyecto',
+    required: false,
+  })
+  @IsUUID('4', { message: 'El área debe ser un UUID válido' })
+  @IsOptional()
+  areaId?: string;
+
+  @ApiProperty({
+    description: 'ID del tipo del proyecto (debe pertenecer al área)',
+    required: false,
+  })
+  @IsUUID('4', { message: 'El tipo debe ser un UUID válido' })
+  @IsOptional()
+  tipoId?: string;
 }

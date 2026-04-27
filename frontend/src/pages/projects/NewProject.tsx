@@ -16,7 +16,9 @@ interface Proyecto {
   criticidad: number;
   estado: boolean;
   areaId?: string;
+  tipoId?: string;
   area?: { id: string; nombreArea: string };
+  tipo?: { id: string; nombre: string; areaId: string };
   creado: string;
   actualizado: string;
 }
@@ -27,15 +29,21 @@ interface Area {
   tipo: string;
 }
 
+interface Tipo {
+  id: string;
+  nombre: string;
+  areaId: string;
+}
+
 // ============================================================================
 // API SERVICE
 // ============================================================================
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api/v1";
-const token = getToken();
 
 const api = {
   async getProyecto(id: string): Promise<Proyecto> {
+    const token = getToken();
     const response = await fetch(`${API_BASE_URL}/api/v1/proyectos/${id}`, {
       credentials: "include",
       headers: { Authorization: `Bearer ${token}` },
@@ -44,7 +52,13 @@ const api = {
     return response.json();
   },
 
-  async crearProyecto(data: { nombre: string; descripcion: string }) {
+  async crearProyecto(data: {
+    nombre: string;
+    descripcion: string;
+    areaId?: string;
+    tipoId?: string;
+  }) {
+    const token = getToken();
     const response = await fetch(`${API_BASE_URL}/api/v1/proyectos`, {
       method: "POST",
       headers: {
@@ -63,7 +77,11 @@ const api = {
     return response.json();
   },
 
-  async actualizarProyecto(id: string, data: { nombre?: string; descripcion?: string; areaId?: string }) {
+  async actualizarProyecto(
+    id: string,
+    data: { nombre?: string; descripcion?: string; areaId?: string; tipoId?: string }
+  ) {
+    const token = getToken();
     const response = await fetch(`${API_BASE_URL}/api/v1/proyectos/${id}`, {
       method: "PATCH",
       headers: {
@@ -83,8 +101,20 @@ const api = {
   },
 
   async getAreas(): Promise<Area[]> {
+    const token = getToken();
     const response = await fetch(`${API_BASE_URL}/api/v1/areas`, {
-      credentials: "include", headers: { Authorization: `Bearer ${token}` },
+      credentials: "include",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) return [];
+    return response.json();
+  },
+
+  async getTiposByArea(areaId: string): Promise<Tipo[]> {
+    const token = getToken();
+    const response = await fetch(`${API_BASE_URL}/api/v1/tipos/area/${areaId}`, {
+      credentials: "include",
+      headers: { Authorization: `Bearer ${token}` },
     });
     if (!response.ok) return [];
     return response.json();
@@ -105,19 +135,37 @@ export default function NewProject() {
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [areaId, setAreaId] = useState("");
+  const [tipoId, setTipoId] = useState("");
+
+  // Catálogos
   const [areas, setAreas] = useState<Area[]>([]);
+  const [tipos, setTipos] = useState<Tipo[]>([]);
+  const [loadingTipos, setLoadingTipos] = useState(false);
 
   // Estados de carga
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(isEditing);
 
-  // Cargar proyecto si es edición
+  // Cargar áreas y proyecto si es edición
   useEffect(() => {
     api.getAreas().then(setAreas);
     if (isEditing) {
       cargarProyecto();
     }
   }, [id]);
+
+  // Cargar tipos cuando cambia el área
+  useEffect(() => {
+    if (!areaId) {
+      setTipos([]);
+      return;
+    }
+    setLoadingTipos(true);
+    api
+      .getTiposByArea(areaId)
+      .then(setTipos)
+      .finally(() => setLoadingTipos(false));
+  }, [areaId]);
 
   const cargarProyecto = async () => {
     try {
@@ -126,6 +174,7 @@ export default function NewProject() {
       setNombre(proyecto.nombre);
       setDescripcion(proyecto.descripcion || "");
       setAreaId(proyecto.areaId || "");
+      setTipoId(proyecto.tipoId || "");
     } catch (error: any) {
       console.error("Error al cargar proyecto:", error);
       addNotification("danger", "Error", error.message, { priority: "high" });
@@ -135,11 +184,20 @@ export default function NewProject() {
     }
   };
 
+  const handleAreaChange = (newAreaId: string) => {
+    setAreaId(newAreaId);
+    // Si cambia el área, resetear el tipo (queda inconsistente)
+    if (newAreaId !== areaId) {
+      setTipoId("");
+    }
+  };
+
   // Validación
   const validarFormulario = (): string | null => {
     if (!nombre.trim()) return "El nombre del proyecto es obligatorio";
     if (nombre.length > 200) return "El nombre no puede exceder 200 caracteres";
     if (descripcion.length > 1000) return "La descripción no puede exceder 1000 caracteres";
+    if (!areaId) return "Debes seleccionar un área";
     return null;
   };
 
@@ -147,7 +205,6 @@ export default function NewProject() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validar
     const error = validarFormulario();
     if (error) {
       addNotification("warn", "Validación", error, { priority: "medium" });
@@ -161,6 +218,7 @@ export default function NewProject() {
         nombre: nombre.trim(),
         descripcion: descripcion.trim() || "",
         areaId: areaId || undefined,
+        tipoId: tipoId || undefined,
       };
 
       if (isEditing) {
@@ -179,10 +237,9 @@ export default function NewProject() {
         );
       }
 
-      // Redirigir
       setTimeout(() => {
         navigate("/projects");
-      }, 1000);
+      }, 800);
     } catch (error: any) {
       console.error("Error:", error);
       addNotification(
@@ -212,7 +269,10 @@ export default function NewProject() {
 
   return (
     <>
-      <PageMeta description={isEditing ? "Editar Proyecto" : "Nuevo Proyecto"} title={isEditing ? "Editar Proyecto" : "Nuevo Proyecto"} />
+      <PageMeta
+        description={isEditing ? "Editar Proyecto" : "Nuevo Proyecto"}
+        title={isEditing ? "Editar Proyecto" : "Nuevo Proyecto"}
+      />
 
       <div className="mx-auto max-w-3xl">
         {/* Header */}
@@ -282,21 +342,57 @@ export default function NewProject() {
                 </p>
               </div>
 
-              {/* Área */}
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Área <span className="text-rose-500">*</span>
-                </label>
-                <select
-                  value={areaId}
-                  onChange={(e) => setAreaId(e.target.value)}
-                  className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-2.5 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
-                >
-                  <option value="">Seleccione un área</option>
-                  {areas.map(a => (
-                    <option key={a.id} value={a.id}>{a.nombreArea}</option>
-                  ))}
-                </select>
+              {/* Área + Tipo (categoría) */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                {/* Área */}
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Área <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={areaId}
+                    onChange={(e) => handleAreaChange(e.target.value)}
+                    className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-2.5 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+                  >
+                    <option value="">Seleccione un área</option>
+                    {areas.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.nombreArea}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Tipo */}
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Tipo / Categoría
+                  </label>
+                  <select
+                    value={tipoId}
+                    onChange={(e) => setTipoId(e.target.value)}
+                    disabled={!areaId || loadingTipos}
+                    className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-2.5 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400 dark:disabled:bg-gray-800 dark:disabled:text-gray-500"
+                  >
+                    <option value="">
+                      {!areaId
+                        ? "Primero seleccione un área"
+                        : loadingTipos
+                        ? "Cargando..."
+                        : tipos.length === 0
+                        ? "Sin tipos disponibles"
+                        : "Seleccione un tipo"}
+                    </option>
+                    {tipos.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.nombre}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Los tipos disponibles dependen del área seleccionada
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -311,11 +407,7 @@ export default function NewProject() {
             >
               Cancelar
             </Button>
-            <Button
-              variant="primary"
-              className="flex-1"
-              disabled={loading}
-            >
+            <Button variant="primary" className="flex-1" disabled={loading}>
               {loading ? (
                 <>
                   <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
