@@ -1170,7 +1170,7 @@ export default function ShoppingFollowUps() {
                   >
                     {/* Header */}
                     <button
-                      onClick={() => handleToggleGrupo(grupo.cotizacionId)}
+                      onClick={() => handleToggleGrupo(grupo.groupKey)}
                       className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                     >
                       <div className="flex-1 min-w-0">
