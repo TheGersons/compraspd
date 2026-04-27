@@ -67,7 +67,9 @@ interface Proyecto {
   descripcion: string;
   estado: boolean;
   areaId?: string;
+  tipoId?: string;
   area?: { id: string; nombreArea: string; tipo: string };
+  tipo?: { id: string; nombre: string; areaId: string };
 }
 
 interface AreaCategoria {
@@ -167,7 +169,7 @@ const api = {
     return response.json();
   },
 
-  async crearProyecto(data: { nombre: string; areaId: string }): Promise<Proyecto> {
+  async crearProyecto(data: { nombre: string; areaId: string; tipoId?: string }): Promise<Proyecto> {
     const token = await getToken();
     const response = await fetch(`${API_BASE_URL}/api/v1/proyectos`, {
       method: "POST", credentials: "include",
@@ -651,7 +653,7 @@ export default function New() {
           if (tipoSel?.area?.id) {
             setCreandoProyectoAuto(true);
             try {
-              const nuevo = await api.crearProyecto({ nombre: data.proyecto.trim(), areaId: tipoSel.area.id });
+              const nuevo = await api.crearProyecto({ nombre: data.proyecto.trim(), areaId: tipoSel.area.id, tipoId: tipoSel.id });
               const proyectosActualizados = await api.getProyectos();
               setProyectos((proyectosActualizados || []).filter((p: any) => p.estado));
               setProyectoId(nuevo.id);
@@ -1081,7 +1083,7 @@ export default function New() {
               </select>
             </div>
 
-            {/* Proyecto - Filtrado por área del tipo seleccionado */}
+            {/* Proyecto - Filtrado por tipo (con fallback al área si el proyecto aún no tiene tipo asignado) */}
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Proyecto <span className="text-rose-500">*</span>
@@ -1094,10 +1096,14 @@ export default function New() {
                 onChange={(val) => setProyectoId(val)}
                 options={(() => {
                   const tipoSeleccionado = tipos.find(t => t.id === tipoId);
-                  const areaNombre = tipoSeleccionado?.area?.nombreArea?.toLowerCase();
-                  return areaNombre
-                    ? proyectos.filter(p => p.area?.nombreArea?.toLowerCase() === areaNombre)
-                    : proyectos;
+                  if (!tipoSeleccionado) return proyectos;
+                  const areaIdSel = tipoSeleccionado.area?.id;
+                  return proyectos.filter(p => {
+                    // Si el proyecto tiene tipo asignado, debe coincidir exactamente
+                    if (p.tipoId) return p.tipoId === tipoId;
+                    // Fallback: proyectos legacy sin tipo asignado, filtrar por área
+                    return !!areaIdSel && p.areaId === areaIdSel;
+                  });
                 })()}
                 allValue=""
                 allLabel="Seleccione un proyecto"
@@ -1107,7 +1113,9 @@ export default function New() {
               {tipoId && (() => {
                 const tipoSeleccionado = tipos.find(t => t.id === tipoId);
                 return tipoSeleccionado?.area ? (
-                  <p className="mt-1 text-xs text-gray-500">Mostrando proyectos de: {tipoSeleccionado.area.nombreArea}</p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Mostrando proyectos de tipo "{tipoSeleccionado.nombre}" ({tipoSeleccionado.area.nombreArea})
+                  </p>
                 ) : null;
               })()}
             </div>
