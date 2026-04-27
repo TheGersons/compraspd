@@ -1,192 +1,176 @@
-# TailAdmin React - Free React Tailwind Admin Dashboard Template
+# Admin Dashboard - Sistema de Gestión de Compras
 
-TailAdmin is a free and open-source admin dashboard template built on **React and Tailwind CSS**, providing developers
-with everything they need to create a comprehensive, data-driven back-end,
-dashboard, or admin panel solution for upcoming web projects.
+Panel de administración especializado para la gestión integral de procesos de compras, cotizaciones y órdenes de compra con integración automática a Odoo.
 
-With TailAdmin, you get access to all the necessary dashboard UI components, elements, and pages required to build a
-feature-rich and complete dashboard or admin panel. Whether you're building dashboard or admin panel for a complex web
-application or a simple website, TailAdmin is the perfect solution to help you get up and running quickly.
+## 🎯 Descripción General
 
-![TailAdmin React.js Dashboard Preview](./banner.png)
+Este dashboard proporciona una interfaz centralizada para supervisores, jefes de compras y administradores para gestionar:
 
-## Overview
+- **Cotizaciones**: Registro, seguimiento y análisis de proveedores
+- **Órdenes de Compra**: Creación, edición y monitoreo de compras
+- **Productos**: Gestión de catálogo de productos y detalles técnicos
+- **Sincronización Odoo**: Integración automática con Odoo cada 5 minutos
+- **Reportes**: Análisis de compras, proveedores y rendimiento
 
-TailAdmin provides essential UI components and layouts for building feature-rich, data-driven admin dashboards and
-control panels. It's built on:
+## 🔧 Stack Tecnológico
 
-- React 19
-- TypeScript
-- Tailwind CSS
+- **React 19** - Framework UI moderno
+- **TypeScript** - Type safety y mejor DX
+- **Tailwind CSS v4** - Estilos responsivos y customizables
+- **React Router** - Navegación SPA
+- **ApexCharts** - Visualización de datos
 
-### Quick Links
+## ⚡ Características Principales
 
-- [✨ Visit Website](https://tailadmin.com)
-- [📄 Documentation](https://tailadmin.com/docs)
-- [⬇️ Download](https://tailadmin.com/download)
-- [🖌️ Figma Design File (Community Edition)](https://www.figma.com/community/file/1214477970819985778)
-- [⚡ Get PRO Version](https://tailadmin.com/pricing)
+### Control de Acceso por Roles
+- **ADMIN**: Acceso completo al sistema
+- **SUPERVISOR**: Supervisión de procesos y reportes
+- **JEFE_COMPRAS**: Gestión de compras y cotizaciones
+- Filtros dinámicos según permisos del usuario
 
-### Demos
+### Interfaz Interactiva
+- Tablas avanzadas con sorting, filtering y paginación
+- Celdas editables para fechas y campos críticos
+- Modales detallados con información completa
+- Selects buscables para responsables, proyectos y proveedores
+- Dark mode integrado 🌙
 
-- [Free Version](https://free-react-demo.tailadmin.com/)
-- [Pro Version](https://react-demo.tailadmin.com)
+### Integración Odoo
+- Sincronización automática cada 5 minutos
+- Importación de oportunidades con adjuntos Excel
+- Mapeo bidireccional de datos
+- Logs de sincronización y manejo de errores
 
-### Other Versions
+### Funcionalidades de Compras
+- Búsqueda y filtrado avanzado por múltiples criterios
+- Asignación de responsables con validación de roles
+- Bloqueo inteligente de campos según el estado
+- Historial de cambios y auditoría
+- Exportación de reportes
 
-- [HTML Version](https://github.com/TailAdmin/tailadmin-free-tailwind-dashboard-template)
-- [Next.js Version](https://github.com/TailAdmin/free-nextjs-admin-dashboard)
-- [Vue.js Version](https://github.com/TailAdmin/vue-tailwind-admin-dashboard)
+## 📋 Requisitos Previos
 
-## Installation
+- Node.js 18.x o superior (recomendado 20.x+)
+- npm o yarn
+- Acceso a instancia Odoo para sincronización
 
-### Prerequisites
+## 🚀 Instalación y Setup
 
-To get started with TailAdmin, ensure you have the following prerequisites installed and set up:
+1. **Clonar repositorio**
+   ```bash
+   git clone [repository-url]
+   cd admin-dashboard-main
+   ```
 
-- Node.js 18.x or later (recommended to use Node.js 20.x or later)
-
-### Cloning the Repository
-
-Clone the repository using the following command:
-
-```bash
-git clone https://github.com/TailAdmin/free-react-tailwind-admin-dashboard.git
-```
-
-> Windows Users: place the repository near the root of your drive if you face issues while cloning.
-
-1. Install dependencies:
-
+2. **Instalar dependencias**
    ```bash
    npm install
-   # or
+   # o
    yarn install
    ```
 
-   > Use the `--legacy-peer-deps` flag, if you face issues while installing.
+   > En caso de conflictos de peer dependencies: `npm install --legacy-peer-deps`
 
-2. Start the development server:
+3. **Configurar variables de entorno**
+   ```bash
+   cp .env.example .env.local
+   ```
+   Completar valores de Odoo y base de datos
+
+4. **Iniciar servidor de desarrollo**
    ```bash
    npm run dev
-   # or
+   # o
    yarn dev
    ```
+   Acceder en `http://localhost:5173`
 
-## Components
+## 📁 Estructura del Proyecto
 
-TailAdmin is a pre-designed starting point for building a web-based dashboard using React.js and Tailwind CSS. The
-template includes:
+```
+src/
+├── components/          # Componentes reutilizables
+│   ├── Tables/         # Tablas especializadas
+│   ├── Forms/          # Formularios de compras
+│   ├── Modals/         # Modales de detalle
+│   └── ...
+├── pages/              # Páginas/vistas principales
+│   ├── Compras/
+│   ├── Cotizaciones/
+│   ├── Productos/
+│   └── ...
+├── services/           # Lógica de negocio
+│   ├── odooSync.ts     # Integración Odoo
+│   ├── api.ts          # Llamadas a API
+│   └── ...
+├── types/              # Definiciones TypeScript
+├── hooks/              # Custom React hooks
+└── styles/             # Estilos globales
+```
 
-- Sophisticated and accessible sidebar
-- Data visualization components
-- Prebuilt profile management and 404 page
-- Tables and Charts(Line and Bar)
-- Authentication forms and input elements
-- Alerts, Dropdowns, Modals, Buttons and more
-- Can't forget Dark Mode 🕶️
+## 🔄 Flujos Principales
 
-All components are built with React and styled using Tailwind CSS for easy customization.
+### Gestión de Cotizaciones
+1. Crear o importar cotización desde Odoo
+2. Asignar responsable (validar rol)
+3. Editar detalles de productos
+4. Cambiar estado según avance
+5. Generar orden de compra
 
-## Feature Comparison
+### Sincronización Odoo
+- Cron automático cada 5 minutos
+- Importa nuevas oportunidades con adjuntos
+- Actualiza estado de órdenes
+- Maneja conflictos y errores
 
-### Free Version
+### Reportes y Análisis
+- Dashboard con métricas clave
+- Filtros por periodo, responsable, proveedor
+- Exportación a Excel para análisis externo
 
-- 1 Unique Dashboard
-- 30+ dashboard components
-- 50+ UI elements
-- Basic Figma design files
-- Community support
+## 🔐 Seguridad
 
-### Pro Version
+- Validación de permisos en cada acción
+- Control de acceso por rol en filtros y campos
+- Protección contra ediciones no autorizadas
+- Logs de auditoría para cambios críticos
 
-- 5 Unique Dashboards: Analytics, Ecommerce, Marketing, CRM, Stocks (more coming soon)
-- 400+ dashboard components and UI elements
-- Complete Figma design file
-- Email support
+## 📦 Scripts Disponibles
 
-To learn more about pro version features and pricing, visit our [pricing page](https://tailadmin.com/pricing).
+```bash
+npm run dev              # Inicia servidor de desarrollo
+npm run build            # Build para producción
+npm run lint             # Verificar código con ESLint
+npm run type-check       # Verificar tipos TypeScript
+npm run preview          # Preview del build de producción
+```
 
-## Changelog
+## 🐛 Problemas Conocidos y Soluciones
 
-### Version 2.0.2 - [March 25, 2025]
+**Sincronización Odoo no actualiza**: Verificar credenciales en variables de entorno y logs del cron
 
-- Upgraded to React 19
-- Included overrides for packages to prevent peer dependency errors.
-- Migrated from react-flatpickr to flatpickr package for React 19 support
+**Filtro de responsable no aparece**: Verificar que el usuario tiene rol ADMIN, SUPERVISOR o JEFE_COMPRAS
 
-### Version 2.0.1 - [February 27, 2025]
+**Celdas no editables en tabla**: Algunos campos se bloquean según el estado - verificar estado de compra
 
-#### Update Overview
+## 📝 Changelog
 
-- Upgraded to Tailwind CSS v4 for better performance and efficiency.
-- Updated class usage to match the latest syntax and features.
-- Replaced deprecated class and optimized styles.
+### v1.0.0 - Actual
+- Dashboard completo de compras
+- Integración Odoo con cron cada 5 min
+- Sistema de roles y permisos
+- Tablas interactivas con celdas editables
+- Filtros avanzados por responsable y proyecto
+- Dark mode
 
-#### Next Steps
+## 👨‍💻 Contacto y Soporte
 
-- Run npm install or yarn install to update dependencies.
-- Check for any style changes or compatibility issues.
-- Refer to the Tailwind CSS v4 [Migration Guide](https://tailwindcss.com/docs/upgrade-guide) on this release. if needed.
-- This update keeps the project up to date with the latest Tailwind improvements. 🚀
+Para reportar bugs o sugerir mejoras, contactar al equipo de desarrollo.
 
-### Version 2.0.0 - [February 2025]
+## 📄 Licencia
 
-A major update with comprehensive redesign and modern React patterns implementation.
+MIT License - Ver archivo LICENSE para detalles
 
-#### Major Improvements
+---
 
-- Complete UI redesign with modern React patterns
-- New features: collapsible sidebar, chat, and calendar
-- Improved performance and accessibility
-- Updated data visualization using ApexCharts
-
-#### Key Features
-
-- Redesigned dashboards (Ecommerce, Analytics, Marketing, CRM)
-- Enhanced navigation with React Router integration
-- Advanced tables with sorting and filtering
-- Calendar with drag-and-drop support
-- New UI components and improved existing ones
-
-#### Breaking Changes
-
-- Updated sidebar component API
-- Migrated charts to ApexCharts
-- Revised authentication system
-
-[Read more](https://tailadmin.com/docs/update-logs/react) on this release.
-
-### Version 1.3.7 - [June 20, 2024]
-
-#### Enhancements
-
-1. Remove Repetition of DefaultLayout in every Pages
-2. Add ClickOutside Component for reduce repeated functionality in Header Message, Notification and User Dropdowns.
-
-### Version 1.3.6 - [Jan 31, 2024]
-
-#### Enhancements
-
-1. Integrate flatpickr in [Date Picker/Form Elements]
-2. Change color after select an option [Select Element/Form Elements].
-3. Make it functional [Multiselect Dropdown/Form Elements].
-4. Make best value editable [Pricing Table One/Pricing Table].
-5. Rearrange Folder structure.
-
-### Version 1.2.0 - [Apr 28, 2023]
-
-- Add Typescript in TailAdmin React.
-
-### Version 1.0.0 - Initial Release - [Mar 13, 2023]
-
-- Initial release of TailAdmin React.
-
-## License
-
-TailAdmin React.js Free Version is released under the MIT License.
-
-## Support
-
-If you find this project helpful, please consider giving it a star on GitHub. Your support helps us continue developing
-and maintaining this template.
+**Nota**: Este dashboard está específicamente diseñado para los procesos de compra de la organización. Para cambios o extensiones, consultar con el equipo técnico.
