@@ -320,6 +320,51 @@ async function parseRequisa(file: File): Promise<RequisaData> {
 }
 
 // ============================================================================
+// ERROR MAPPING
+// ============================================================================
+
+const FIELD_LABELS: Record<string, string> = {
+  proyectoId: "proyecto",
+  solicitanteId: "solicitante",
+  tipoId: "tipo / categoría",
+  fechaLimite: "fecha límite",
+  fechaEstimada: "fecha estimada",
+  nombreCotizacion: "nombre de la cotización",
+};
+
+function humanizeBackendError(error: any): string {
+  const raw =
+    typeof error === "string"
+      ? error
+      : Array.isArray(error?.message)
+      ? error.message.join("; ")
+      : error?.message || "Ocurrió un error inesperado. Intenta nuevamente.";
+
+  const lower = raw.toLowerCase();
+
+  // class-validator: "<field> must be a UUID" → "Debe seleccionar un <field>"
+  for (const [key, label] of Object.entries(FIELD_LABELS)) {
+    const re = new RegExp(`${key}\\s+must\\s+be\\s+(a\\s+)?uuid`, "i");
+    if (re.test(raw)) {
+      return `Debe seleccionar un${label.startsWith("f") ? "a" : ""} ${label}.`;
+    }
+  }
+
+  // Patrones comunes de class-validator
+  if (lower.includes("must not be empty") || lower.includes("should not be empty")) {
+    return "Faltan campos obligatorios. Revisá el formulario.";
+  }
+  if (lower.includes("must be a string")) {
+    return "Hay un campo de texto inválido. Revisá el formulario.";
+  }
+  if (lower.includes("must be a date") || lower.includes("must be a valid iso")) {
+    return "Hay una fecha inválida. Revisá las fechas.";
+  }
+
+  return raw;
+}
+
+// ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
@@ -860,7 +905,7 @@ export default function New() {
         comentarios: comentarios.trim() || undefined,
         tipoId,
         solicitanteId,
-        proyectoId,
+        proyectoId: proyectoId || undefined,
         items: getFilledItems().map(item => ({
           descripcionProducto: (
             item.numeroParte.trim() && item.descripcionProducto.trim()
@@ -936,7 +981,7 @@ export default function New() {
       addNotification(
         "danger",
         "Error al crear cotización",
-        error.message || "Ocurrió un error inesperado. Intenta nuevamente.",
+        humanizeBackendError(error),
         { priority: "critical", source: "Nueva Cotización" }
       );
     } finally {
