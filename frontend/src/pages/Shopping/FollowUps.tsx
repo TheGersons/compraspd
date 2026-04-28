@@ -1077,7 +1077,7 @@ export default function ShoppingFollowUps() {
     // Registrar participante en background
     const cotId = productosAgrupados[groupKey]?.cotizacionId;
     participanteListoRef.current = chatIdDelGrupo && cotId
-      ? api.getCotizacionDetalle(cotId).then(() => {}).catch(() => {})
+      ? api.getCotizacionDetalle(cotId).then(() => { }).catch(() => { })
       : Promise.resolve();
   };
 
@@ -1257,11 +1257,10 @@ export default function ShoppingFollowUps() {
                               )}
                             </div>
                           )}
-                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                            grupo.tipoCompra === 'NACIONAL'
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${grupo.tipoCompra === 'NACIONAL'
                               ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                               : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                          }`}>
+                            }`}>
                             {grupo.tipoCompra === 'NACIONAL' ? 'Nacional' : 'Internacional'}
                           </span>
                           <span onClick={(e) => e.stopPropagation()}>
@@ -1388,21 +1387,19 @@ export default function ShoppingFollowUps() {
                           <div className="flex">
                             <button
                               onClick={() => setVistaActivaGrupo('productos')}
-                              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
-                                vistaActivaGrupo === 'productos'
+                              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${vistaActivaGrupo === 'productos'
                                   ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                                   : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-                              }`}
+                                }`}
                             >
                               Productos ({grupo.productos.length})
                             </button>
                             <button
                               onClick={handleActivarChat}
-                              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
-                                vistaActivaGrupo === 'chat'
+                              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${vistaActivaGrupo === 'chat'
                                   ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                                   : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-                              }`}
+                                }`}
                             >
                               Chat
                             </button>
@@ -1498,7 +1495,7 @@ export default function ShoppingFollowUps() {
                                                     className={`w-full rounded-md px-2 py-1.5 text-left text-xs transition-colors ${producto.responsableSeguimiento?.id === sup.id
                                                       ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
                                                       : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800'
-                                                    }`}>
+                                                      }`}>
                                                     {sup.nombre}
                                                   </button>
                                                 ))}
@@ -1624,13 +1621,13 @@ export default function ShoppingFollowUps() {
                                                         ? 'border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-900/10'
                                                         : 'border-green-300 bg-green-50 dark:border-green-800 dark:bg-green-900/10'
                                                       : 'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50'
-                                                    }`}>
+                                                      }`}>
                                                       <div className="flex items-start justify-between">
                                                         <div className="flex items-center gap-2">
                                                           <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm ${isCompletado
                                                             ? isRetrasado ? 'bg-red-200 dark:bg-red-800' : 'bg-green-200 dark:bg-green-800'
                                                             : 'bg-gray-200 dark:bg-gray-700'
-                                                          }`}>
+                                                            }`}>
                                                             {ESTADOS_ICONOS[item.estado] || '📌'}
                                                           </div>
                                                           <TimelineItem
@@ -1874,7 +1871,7 @@ export default function ShoppingFollowUps() {
       {/* Modal Avance Masivo */}
       {/* ── Modal Editar Precios ── */}
       {editPrecioGrupoId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="fixed inset-0 z-5000 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-2xl rounded-xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900">
             <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3 dark:border-gray-700">
               <h3 className="font-semibold text-gray-900 dark:text-white">
