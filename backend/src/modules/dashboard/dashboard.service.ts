@@ -95,6 +95,13 @@ export class DashboardService {
       },
     });
 
+    // Mapa de número de OC por cotización (para fallback cuando un producto
+    // no fue movido a una OC dividida).
+    const ordenCompraGlobalPorCotizacion = new Map<string, string | null>();
+    for (const cot of cotizaciones) {
+      ordenCompraGlobalPorCotizacion.set(cot.id, cot.ordenCompra ?? null);
+    }
+
     // 4. Construir lista unificada de productos: para cada CotizacionDetalle,
     //    si existe EstadoProducto vinculado se usan sus flags/fechas reales;
     //    si no existe, se crea un "producto virtual" con todas las flags en
@@ -246,7 +253,11 @@ export class DashboardService {
           p.responsableSeguimiento?.nombre ||
           p.cotizacion?.supervisorResponsable?.nombre ||
           'Sin asignar',
-        ordenCompra: p.ordenCompra?.numeroOC || p.ordenCompra?.nombre || null,
+        // Si el producto está en una OC dividida → usar su numeroOC (puede ser null).
+        // Si no está dividido → fallback al ordenCompra global de la cotización.
+        ordenCompra: p.ordenCompra
+          ? p.ordenCompra.numeroOC || null
+          : ordenCompraGlobalPorCotizacion.get(p.cotizacion?.id) || null,
         sinFechasDefinidas: !!p.sinFechasDefinidas,
         ...this.calcularEstadosDetallados(p, estadosAplicables),
       };
