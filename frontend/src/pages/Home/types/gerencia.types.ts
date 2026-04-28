@@ -81,6 +81,7 @@ export interface ProductoDetallado {
   cotizacionNombre: string;
   tipoCompra: 'NACIONAL' | 'INTERNACIONAL';
   responsable?: string;
+  ordenCompra?: string | null;
 
   // Estados por etapa
   estados: Record<string, 'completado' | 'en_proceso' | 'atrasado' | 'pendiente'>;

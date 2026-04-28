@@ -42,7 +42,7 @@ interface ModalDetalleProductosProps {
 }
 
 type EstadoProducto = 'completado' | 'en_proceso' | 'atrasado' | 'pendiente';
-type OrdenColumna = 'default' | 'sku' | 'descripcion' | 'estado' | 'dias';
+type OrdenColumna = 'default' | 'ordenCompra' | 'descripcion' | 'estado' | 'dias';
 type DireccionOrden = 'asc' | 'desc';
 
 interface CeldaSeleccionada {
@@ -228,12 +228,14 @@ export default function ModalDetalleProductos({
   const [ordenColumna, setOrdenColumna] = useState<OrdenColumna>('default');
   const [direccionOrden, setDireccionOrden] = useState<DireccionOrden>('asc');
   const [filtroResponsable, setFiltroResponsable] = useState<string>('TODOS');
+  const [filtroOrdenCompra, setFiltroOrdenCompra] = useState<string>('TODOS');
   const [celdaSeleccionada, setCeldaSeleccionada] = useState<CeldaSeleccionada | null>(null);
 
   const { user } = useAuth();
   const puedeVerFiltro = ROLES_FILTRO_RESPONSABLE.includes(user?.rol?.nombre ?? '');
 
   const esVistaTotal = etapa === 'total';
+  const esInternacional = tipoCompra === 'INTERNACIONAL';
 
   // Responsables únicos para el filtro (formato { id, nombre } para SearchableSelect)
   const responsablesUnicos = useMemo(() => {
@@ -241,9 +243,19 @@ export default function ModalDetalleProductos({
     return nombres.map(n => ({ id: n, nombre: n }));
   }, [productos]);
 
+  // Órdenes de compra únicas (solo internacional)
+  const ordenesCompraUnicas = useMemo(() => {
+    if (!esInternacional) return [];
+    const ocs = Array.from(
+      new Set(productos.map(p => p.ordenCompra).filter((v): v is string => !!v && v.trim() !== '')),
+    ).sort();
+    return ocs.map(oc => ({ id: oc, nombre: oc }));
+  }, [productos, esInternacional]);
+
   // Reset filtro cuando cambia la etapa
   useEffect(() => {
     setFiltroResponsable('TODOS');
+    setFiltroOrdenCompra('TODOS');
     setCeldaSeleccionada(null);
   }, [etapa]);
 
@@ -256,6 +268,10 @@ export default function ModalDetalleProductos({
 
     if (filtroResponsable !== 'TODOS') {
       resultado = resultado.filter(p => (p.responsable || 'Sin asignar') === filtroResponsable);
+    }
+
+    if (esInternacional && filtroOrdenCompra !== 'TODOS') {
+      resultado = resultado.filter(p => (p.ordenCompra || '') === filtroOrdenCompra);
     }
 
     resultado.sort((a, b) => {
@@ -273,8 +289,8 @@ export default function ModalDetalleProductos({
           Math.max(...Object.values(p.diasAtraso).map(v => v || 0), 0);
         return getDiasMax(b) - getDiasMax(a);
       }
-      if (ordenColumna === 'sku') {
-        const c = a.sku.localeCompare(b.sku);
+      if (ordenColumna === 'ordenCompra') {
+        const c = (a.ordenCompra || '').localeCompare(b.ordenCompra || '');
         return direccionOrden === 'asc' ? c : -c;
       }
       if (ordenColumna === 'descripcion') {
@@ -294,7 +310,7 @@ export default function ModalDetalleProductos({
     });
 
     return resultado;
-  }, [productos, etapa, esVistaTotal, ordenColumna, direccionOrden, filtroResponsable]);
+  }, [productos, etapa, esVistaTotal, esInternacional, ordenColumna, direccionOrden, filtroResponsable, filtroOrdenCompra]);
 
   if (!isOpen) return null;
 
@@ -383,7 +399,7 @@ export default function ModalDetalleProductos({
                 {ordenColumna !== 'default' && (
                   <span className="ml-2 text-blue-600 dark:text-blue-400">
                     • Ordenado por: {
-                      ordenColumna === 'sku' ? 'SKU' :
+                      ordenColumna === 'ordenCompra' ? 'Orden de Compra' :
                       ordenColumna === 'descripcion' ? 'Descripción' :
                       ordenColumna === 'estado' ? 'Estado' : 'Días de atraso'
                     }
@@ -392,8 +408,24 @@ export default function ModalDetalleProductos({
               </p>
             </div>
 
-            {/* Filtro responsable + cerrar */}
-            <div className="flex shrink-0 items-center gap-3">
+            {/* Filtros + cerrar */}
+            <div className="flex shrink-0 items-center gap-3 flex-wrap">
+              {esInternacional && ordenesCompraUnicas.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                    Orden de Compra:
+                  </label>
+                  <SearchableSelect
+                    value={filtroOrdenCompra}
+                    onChange={val => { setFiltroOrdenCompra(val); setCeldaSeleccionada(null); }}
+                    options={ordenesCompraUnicas}
+                    allValue="TODOS"
+                    allLabel="Todas"
+                    placeholder="Todas"
+                    className="w-48"
+                  />
+                </div>
+              )}
               {puedeVerFiltro && (
                 <div className="flex items-center gap-2">
                   <label className="text-xs font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">
@@ -442,15 +474,17 @@ export default function ModalDetalleProductos({
                 <table className="w-full text-sm">
                   <thead className="bg-gray-100 dark:bg-gray-900">
                     <tr>
-                      <HeaderOrdenable
-                        columna="sku"
-                        className="sticky left-0 z-10 bg-gray-100 px-4 py-3 text-left font-bold text-gray-700 dark:bg-gray-900 dark:text-gray-200"
-                      >
-                        SKU
-                      </HeaderOrdenable>
+                      {esInternacional && (
+                        <HeaderOrdenable
+                          columna="ordenCompra"
+                          className="sticky left-0 z-10 bg-gray-100 px-4 py-3 text-left font-bold text-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                        >
+                          Orden de Compra
+                        </HeaderOrdenable>
+                      )}
                       <HeaderOrdenable
                         columna="descripcion"
-                        className="px-4 py-3 text-left font-bold text-gray-700 dark:text-gray-200"
+                        className={`px-4 py-3 text-left font-bold text-gray-700 dark:text-gray-200 ${!esInternacional ? 'sticky left-0 z-10 bg-gray-100 dark:bg-gray-900' : ''}`}
                       >
                         Descripción
                       </HeaderOrdenable>
@@ -464,10 +498,12 @@ export default function ModalDetalleProductos({
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                     {productosFiltrados.map((producto) => (
                       <tr key={producto.id} className="transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                        <td className="sticky left-0 z-10 bg-white px-4 py-3 font-semibold text-gray-900 dark:bg-gray-800 dark:text-white">
-                          {producto.sku}
-                        </td>
-                        <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
+                        {esInternacional && (
+                          <td className="sticky left-0 z-10 bg-white px-4 py-3 font-mono text-xs font-semibold text-gray-900 dark:bg-gray-800 dark:text-white">
+                            {producto.ordenCompra || ''}
+                          </td>
+                        )}
+                        <td className={`px-4 py-3 text-gray-700 dark:text-gray-300 ${!esInternacional ? 'sticky left-0 z-10 bg-white dark:bg-gray-800' : ''}`}>
                           <div className="max-w-xs">{producto.descripcion}</div>
                           {producto.responsable && (
                             <p className="mt-0.5 text-[10px] font-medium text-blue-500 dark:text-blue-400">
@@ -505,9 +541,11 @@ export default function ModalDetalleProductos({
                 <table className="w-full text-sm">
                   <thead className="bg-gray-100 dark:bg-gray-900">
                     <tr>
-                      <HeaderOrdenable columna="sku" className="px-4 py-3 text-left font-bold text-gray-700 dark:text-gray-200">
-                        SKU
-                      </HeaderOrdenable>
+                      {esInternacional && (
+                        <HeaderOrdenable columna="ordenCompra" className="px-4 py-3 text-left font-bold text-gray-700 dark:text-gray-200">
+                          Orden de Compra
+                        </HeaderOrdenable>
+                      )}
                       <HeaderOrdenable columna="descripcion" className="px-4 py-3 text-left font-bold text-gray-700 dark:text-gray-200">
                         Descripción
                       </HeaderOrdenable>
@@ -530,9 +568,11 @@ export default function ModalDetalleProductos({
 
                       return (
                         <tr key={producto.id} className="transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                          <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white">
-                            {producto.sku}
-                          </td>
+                          {esInternacional && (
+                            <td className="px-4 py-3 font-mono text-xs font-semibold text-gray-900 dark:text-white">
+                              {producto.ordenCompra || ''}
+                            </td>
+                          )}
                           <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
                             <div className="max-w-md">{producto.descripcion}</div>
                             {producto.responsable && (

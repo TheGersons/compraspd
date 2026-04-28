@@ -75,6 +75,7 @@ export class DashboardService {
       include: {
         proyecto: { select: { id: true, nombre: true, areaId: true } },
         responsableSeguimiento: { select: { nombre: true } },
+        ordenCompra: { select: { id: true, nombre: true, numeroOC: true } },
         cotizacion: {
           select: {
             id: true,
@@ -162,6 +163,7 @@ export class DashboardService {
           p.responsableSeguimiento?.nombre ||
           p.cotizacion?.supervisorResponsable?.nombre ||
           'Sin asignar',
+        ordenCompra: p.ordenCompra?.numeroOC || p.ordenCompra?.nombre || null,
         ...this.calcularEstadosDetallados(p, estadosAplicables),
       };
     });
