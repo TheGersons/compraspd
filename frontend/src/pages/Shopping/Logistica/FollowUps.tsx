@@ -987,6 +987,10 @@ export default function ShoppingFollowUps() {
       toast.success("# Orden de Compra asignada");
       cerrarModalOC();
       await cargarProductos();
+      // Refrescar el producto seleccionado para que la OC se vea de inmediato sin recargar la página
+      if (productoSeleccionado) {
+        await seleccionarProducto(productoSeleccionado.id);
+      }
     } catch (e: any) {
       setOcError(e.message || "Error al asignar OC");
     } finally {
@@ -994,8 +998,8 @@ export default function ShoppingFollowUps() {
     }
   };
 
-  const handleAsignarResponsableGrupo = async (cotizacionId: string, responsableId: string | null) => {
-    const grupo = productosAgrupados[cotizacionId];
+  const handleAsignarResponsableGrupo = async (groupKey: string, responsableId: string | null) => {
+    const grupo = productosAgrupados[groupKey];
     if (!grupo) return;
     const ids = grupo.productos.map(p => p.id);
     try {
@@ -1292,14 +1296,14 @@ export default function ShoppingFollowUps() {
                                   <p className="px-2 py-1 text-[10px] font-semibold text-gray-400 uppercase">Asignar a todo el grupo:</p>
                                   {supervisores.map(sup => (
                                     <button key={sup.id}
-                                      onClick={() => handleAsignarResponsableGrupo(grupo.cotizacionId, sup.id)}
+                                      onClick={() => handleAsignarResponsableGrupo(grupo.groupKey, sup.id)}
                                       className="w-full rounded-md px-2 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800 transition-colors">
                                       {sup.nombre}
                                     </button>
                                   ))}
                                   <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
                                   <button
-                                    onClick={() => handleAsignarResponsableGrupo(grupo.cotizacionId, null)}
+                                    onClick={() => handleAsignarResponsableGrupo(grupo.groupKey, null)}
                                     className="w-full rounded-md px-2 py-1.5 text-left text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
                                     Quitar responsable de todos
                                   </button>

@@ -1002,6 +1002,10 @@ export default function ShoppingFollowUps() {
       toast.success("# Orden de Compra asignada");
       cerrarModalOC();
       await cargarProductos();
+      // Refrescar el producto seleccionado para que la OC se vea de inmediato sin recargar la página
+      if (productoSeleccionado) {
+        await seleccionarProducto(productoSeleccionado.id);
+      }
     } catch (e: any) {
       setOcError(e.message || "Error al asignar OC");
     } finally {
@@ -1009,8 +1013,8 @@ export default function ShoppingFollowUps() {
     }
   };
 
-  const abrirEditarPrecios = (cotizacionId: string) => {
-    const grupo = productosAgrupados[cotizacionId];
+  const abrirEditarPrecios = (groupKey: string) => {
+    const grupo = productosAgrupados[groupKey];
     if (!grupo) return;
     setPreciosEnEdicion(grupo.productos.map(p => ({
       id: p.id,
@@ -1020,7 +1024,7 @@ export default function ShoppingFollowUps() {
       cantidad: p.cantidad ?? null,
       precioTotal: p.precioTotal != null ? String(p.precioTotal) : "",
     })));
-    setEditPrecioGrupoId(cotizacionId);
+    setEditPrecioGrupoId(groupKey);
   };
 
   const handleGuardarPrecios = async () => {
@@ -1039,8 +1043,8 @@ export default function ShoppingFollowUps() {
     finally { setSavingPrecios(false); }
   };
 
-  const handleAsignarResponsableGrupo = async (cotizacionId: string, responsableId: string | null) => {
-    const grupo = productosAgrupados[cotizacionId];
+  const handleAsignarResponsableGrupo = async (groupKey: string, responsableId: string | null) => {
+    const grupo = productosAgrupados[groupKey];
     if (!grupo) return;
     const ids = grupo.productos.map(p => p.id);
     try {
@@ -1284,7 +1288,7 @@ export default function ShoppingFollowUps() {
                         </div>
                         {/* Botón editar precios */}
                         <button
-                          onClick={(e) => { e.stopPropagation(); abrirEditarPrecios(grupo.cotizacionId); }}
+                          onClick={(e) => { e.stopPropagation(); abrirEditarPrecios(grupo.groupKey); }}
                           className="flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-medium text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-400 dark:hover:bg-amber-900/30 transition-colors"
                           title="Editar precio(s)"
                         >
@@ -1351,14 +1355,14 @@ export default function ShoppingFollowUps() {
                                   <p className="px-2 py-1 text-[10px] font-semibold text-gray-400 uppercase">Asignar a todo el grupo:</p>
                                   {supervisores.map(sup => (
                                     <button key={sup.id}
-                                      onClick={() => handleAsignarResponsableGrupo(grupo.cotizacionId, sup.id)}
+                                      onClick={() => handleAsignarResponsableGrupo(grupo.groupKey, sup.id)}
                                       className="w-full rounded-md px-2 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800 transition-colors">
                                       {sup.nombre}
                                     </button>
                                   ))}
                                   <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
                                   <button
-                                    onClick={() => handleAsignarResponsableGrupo(grupo.cotizacionId, null)}
+                                    onClick={() => handleAsignarResponsableGrupo(grupo.groupKey, null)}
                                     className="w-full rounded-md px-2 py-1.5 text-left text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
                                     Quitar responsable de todos
                                   </button>
