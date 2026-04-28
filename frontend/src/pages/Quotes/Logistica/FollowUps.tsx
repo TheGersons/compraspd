@@ -1120,11 +1120,17 @@ export default function FollowUps() {
 
   const filteredCotizaciones = (() => {
     const filtered = cotizaciones.filter((cot) => {
-      const matchesSearchTerm = matchesSearch(
-        searchTerm,
+      // Match en cabecera, productos (detalles) y orden de compra
+      const haystack: (string | undefined)[] = [
         cot.nombreCotizacion,
         cot.solicitante.nombre,
-      );
+      ];
+      if (cot.detalles?.length) {
+        for (const d of cot.detalles) {
+          haystack.push(d.sku, d.descripcionProducto);
+        }
+      }
+      const matchesSearchTerm = matchesSearch(searchTerm, ...haystack);
 
       const matchesResponsable =
         responsableFiltro === "TODOS" ||
