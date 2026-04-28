@@ -277,7 +277,7 @@ async function parseRequisa(file: File): Promise<RequisaData> {
   const extract = (re: RegExp) => re.exec(txt)?.[1]?.trim();
 
   const requisaNo     = extract(/REQUISA\s+No[:\s]+([A-Z0-9/]+)/i);
-  const proyecto      = extract(/PROYECTO[:\s]+([\w\s\-.,()]+?)(?=\s+ACUERDO|\s+FECHA|\s+PRESUPUESTO)/i);
+  const proyecto      = extract(/PROYECTO[:\s]+(.+?)(?=\s+ACUERDO|\s+FECHA|\s+PRESUPUESTO)/i);
   const creador       = extract(/CREADOR[:\s]+([\wáéíóúñÁÉÍÓÚÑ\s]+?)(?=\s+ITEM|\s+RECIBIDO|\s*$)/i);
   const acuerdoCompra = extract(/ACUERDO\s+DE\s+COMPRA[:\s]+([A-Z0-9\-/]+)/i);
   const presupuesto   = extract(/PRESUPUESTO[:\s]+(\[[^\]]+\][\w\s]+?)(?=\s+DOCUMENTO|\s+CREADOR)/i);
@@ -698,7 +698,8 @@ export default function New() {
       // Nombre desde Acuerdo de Compra (queda en blanco si no existe en la requisa)
       if (data.acuerdoCompra) setNombreBase(data.acuerdoCompra);
 
-      // Proyecto: buscar match → si no existe, crear automáticamente
+      // Proyecto: si ya existe → respetar su tipo guardado en BD (integridad).
+      //           si no existe → crear con el tipo elegido por el usuario.
       if (data.proyecto) {
         const needle = data.proyecto.trim().toLowerCase();
         const match = proyectos.find(p => {
@@ -707,6 +708,16 @@ export default function New() {
         });
         if (match) {
           setProyectoId(match.id);
+          const tipoExistente = match.tipoId || match.tipo?.id;
+          if (tipoExistente && tipoExistente !== modalTipoId) {
+            setTipoId(tipoExistente);
+            const nombreTipoExistente = tipos.find(t => t.id === tipoExistente)?.nombre;
+            addNotification(
+              "info",
+              "Tipo ajustado",
+              `El proyecto "${match.nombre}" ya está asociado al tipo "${nombreTipoExistente ?? tipoExistente}". Se actualizó para respetar la relación existente.`,
+            );
+          }
         } else {
           // Crear proyecto automáticamente con el área del tipo seleccionado
           const tipoSel = tipos.find(t => t.id === modalTipoId);
@@ -723,6 +734,12 @@ export default function New() {
             } finally {
               setCreandoProyectoAuto(false);
             }
+          } else {
+            addNotification(
+              "warn",
+              "Proyecto no creado",
+              `No se pudo crear "${data.proyecto.trim()}" porque el tipo seleccionado no tiene un área asociada. Selecciónalo manualmente.`,
+            );
           }
         }
       }
