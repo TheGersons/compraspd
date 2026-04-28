@@ -97,7 +97,7 @@ export class FollowUpsService {
             nombre: { contains: filters.search, mode: 'insensitive' },
           },
         },
-        // Buscar también dentro de los productos de la cotización
+        // Buscar productos por sku/descripcionProducto en la cotización
         {
           detalles: {
             some: {
@@ -108,14 +108,18 @@ export class FollowUpsService {
             },
           },
         },
+        // Buscar productos por sku/descripcionProducto en las compras asociadas
         {
-          estadosProductos: {
+          compras: {
             some: {
-              OR: [
-                { sku: { contains: filters.search, mode: 'insensitive' } },
-                { descripcion: { contains: filters.search, mode: 'insensitive' } },
-                { proveedor: { contains: filters.search, mode: 'insensitive' } },
-              ],
+              detalles: {
+                some: {
+                  OR: [
+                    { sku: { contains: filters.search, mode: 'insensitive' } },
+                    { descripcionProducto: { contains: filters.search, mode: 'insensitive' } },
+                  ],
+                },
+              },
             },
           },
         },
