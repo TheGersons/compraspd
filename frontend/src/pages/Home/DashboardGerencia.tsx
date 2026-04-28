@@ -130,6 +130,20 @@ export default function DashboardGerencia() {
     setNavegacion((prev) => ({ ...prev, proyecto }));
   };
 
+  // Click en proyecto del carrusel (nivel 1) → navegar a nivel 2 con su área y dejarlo preseleccionado
+  const handleSelectProyectoFromCarousel = (proyecto: Proyecto) => {
+    const p = proyecto as any;
+    const areaProyecto =
+      areas.find((a) => a.id === p.areaId) ||
+      areas.find((a) => a.tipo === p.areaTipo);
+    if (!areaProyecto) {
+      console.warn('No se pudo determinar el área del proyecto', proyecto);
+      return;
+    }
+    setNavegacion({ nivel: 2, area: areaProyecto });
+    setProyectoSeleccionado(proyecto);
+  };
+
   // Handler para abrir modal desde tabla
   const handleVerDetalleEtapa = (etapaKey: string) => {
     setEtapaModal(etapaKey as EtapaDetalle);
@@ -270,7 +284,7 @@ export default function DashboardGerencia() {
                 Ordenados por criticidad
               </p>
             </div>
-            <ProyectoCarousel proyectos={getTodosProyectos()} />
+            <ProyectoCarousel proyectos={getTodosProyectos()} onProyectoClick={handleSelectProyectoFromCarousel} />
           </div>
 
           <GraficoComparativo

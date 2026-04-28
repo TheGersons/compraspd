@@ -5,11 +5,13 @@ import { Proyecto } from '../../types/gerencia.types';
 interface ProyectoCarouselProps {
   proyectos: Proyecto[];
   autoPlayInterval?: number;
+  onProyectoClick?: (proyecto: Proyecto) => void;
 }
 
 export default function ProyectoCarousel({
   proyectos,
-  autoPlayInterval = 6000
+  autoPlayInterval = 6000,
+  onProyectoClick
 }: ProyectoCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -145,10 +147,17 @@ export default function ProyectoCarousel({
               const progreso = calcularProgreso(proyecto);
               const diasRestantes = calcularDiasRestantes(proyecto.fechaLimite);
 
+              const isClickable = !!onProyectoClick;
               return (
                 <div
                   key={uniqueKey}
-                  className={`rounded-lg border p-3 shadow-sm ${theme.bg} ${theme.border}`}
+                  className={`rounded-lg border p-3 shadow-sm ${theme.bg} ${theme.border} ${isClickable ? 'cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500' : ''}`}
+                  onClick={isClickable ? () => onProyectoClick(proyecto) : undefined}
+                  onKeyDown={isClickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onProyectoClick(proyecto); } } : undefined}
+                  role={isClickable ? 'button' : undefined}
+                  tabIndex={isClickable ? 0 : undefined}
+                  aria-label={isClickable ? `Ver detalle de ${proyecto.nombre}` : undefined}
+                  title={isClickable ? `Ver resumen de ${proyecto.nombre}` : undefined}
                 >
                   <div className="mb-2 flex items-start justify-between gap-2">
                     <h4 className={`text-xs font-semibold ${theme.text} line-clamp-2 flex-1`}>
