@@ -632,12 +632,25 @@ export default function ShoppingFollowUps() {
     api.getSupervisores().then(setSupervisores).catch(() => { });
   }, [filtroNivel, filtroTipoCompra]);
 
+  const handledProductoParamRef = useRef<string | null>(null);
   useEffect(() => {
     const productoId = searchParams.get("producto");
-    if (productoId) {
-      seleccionarProducto(productoId);
-    }
-  }, [searchParams]);
+    if (!productoId) return;
+    if (loading) return; // esperar a que cargue la lista para poder expandir el grupo correcto
+    if (handledProductoParamRef.current === productoId) return;
+    handledProductoParamRef.current = productoId;
+    (async () => {
+      const detalle = await seleccionarProducto(productoId);
+      if (!detalle) return;
+      const ocId = detalle.ordenCompraId || null;
+      const cotId = detalle.cotizacionId || detalle.cotizacion?.id || 'sin-cotizacion';
+      const groupKey = ocId ? `oc:${ocId}` : `cot:${cotId}`;
+      setGrupoExpandido(groupKey);
+      setTimeout(() => {
+        acordeonRefs.current[groupKey]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 200);
+    })();
+  }, [searchParams, loading]);
 
   // ============================================================================
   // HANDLERS
@@ -672,7 +685,7 @@ export default function ShoppingFollowUps() {
     }
   };
 
-  const seleccionarProducto = async (id: string) => {
+  const seleccionarProducto = async (id: string): Promise<EstadoProducto | null> => {
     try {
       setLoadingDetalle(true);
       const [detalle, timelineData, documentosData] = await Promise.all([
@@ -701,9 +714,11 @@ export default function ShoppingFollowUps() {
 
       setProductoSeleccionado(detalle);
       setTimeline(timelineData);
+      return detalle;
     } catch (error) {
       console.error("Error al cargar detalle:", error);
       addNotification("danger", "Error", "Error al cargar detalle del producto");
+      return null;
     } finally {
       setLoadingDetalle(false);
     }

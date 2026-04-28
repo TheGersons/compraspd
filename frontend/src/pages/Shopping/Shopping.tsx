@@ -461,7 +461,7 @@ export default function Shopping() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {/* Total Productos */}
           <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
             <div className="flex items-center justify-between">
@@ -509,23 +509,6 @@ export default function Shopping() {
             </div>
           </div>
 
-          {/* Críticos */}
-          <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Críticos</p>
-                <p className="mt-1 text-2xl font-semibold text-red-600 dark:text-red-400">
-                  {stats.criticos}
-                </p>
-              </div>
-              <div className="rounded-lg bg-red-100 p-2 dark:bg-red-900/20">
-                <svg className="h-5 w-5 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
           {/* En Tiempo */}
           <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
             <div className="flex items-center justify-between">
@@ -543,20 +526,6 @@ export default function Shopping() {
             </div>
           </div>
 
-          {/* Valor Total */}
-          <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Valor Total</p>
-                <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white truncate" title={formatCurrency(stats.valorTotal)}>
-                  {formatCurrency(stats.valorTotal)}
-                </p>
-              </div>
-              <div className="rounded-lg bg-purple-100 p-2 dark:bg-purple-900/20">
-                <span className="text-lg">💰</span>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Productos Críticos */}

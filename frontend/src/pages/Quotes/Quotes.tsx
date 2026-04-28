@@ -391,19 +391,11 @@ export default function Quotes() {
           {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-24" />)}
         </div>
       ) : isSupervisor && estadisticas ? (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <KpiCard title="Total en proceso"        value={estadisticas.totalEnProceso}  hint="Cotizaciones activas"                        tone="brand"   />
           <KpiCard title="Pendientes de asignar"   value={estadisticas.totalPendientes} hint="Sin supervisor responsable"                  tone="warn"    />
           <KpiCard title="En configuración"        value={estadisticas.totalEnConfiguracion + estadisticas.totalAprobacionParcial} hint="Configurando / aprob. parcial" tone="purple"  />
           <KpiCard title="Mis asignadas"           value={estadisticas.misAsignadas}    hint="Activas bajo tu responsabilidad"             tone="teal"    />
-          {/* Card crítico */}
-          <KpiCard
-            title="⚠ Atención requerida"
-            value={criticas.length}
-            hint={`${sinResp.length} sin responsable · ${vencidas.length} vencidas`}
-            tone={criticas.length > 0 ? "danger" : "success"}
-            onClick={() => setCategoriaActiva(categoriaActiva === "criticas" ? "todas" : "criticas")}
-          />
         </div>
       ) : misKpis ? (
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -472,22 +464,6 @@ export default function Quotes() {
               <div className="mt-1 text-xs font-medium text-gray-500 dark:text-gray-400">Todas</div>
               <div className="mt-0.5 text-xl font-bold text-gray-800 dark:text-white">{cotizaciones.length}</div>
             </button>
-
-            {/* Tarjeta "Críticas" */}
-            {criticas.length > 0 && (
-              <button
-                onClick={() => setCategoriaActiva(categoriaActiva === "criticas" ? "todas" : "criticas")}
-                className={`rounded-xl border p-3 text-left transition hover:shadow-md ${
-                  categoriaActiva === "criticas"
-                    ? "border-rose-400 bg-rose-50 dark:border-rose-500 dark:bg-rose-900/20"
-                    : "border-rose-200 bg-rose-50/50 dark:border-rose-800 dark:bg-rose-900/10"
-                }`}
-              >
-                <div className="text-lg">⚠️</div>
-                <div className="mt-1 text-xs font-medium text-rose-500 dark:text-rose-400">Críticas</div>
-                <div className="mt-0.5 text-xl font-bold text-rose-600 dark:text-rose-400">{criticas.length}</div>
-              </button>
-            )}
 
             {/* Tarjetas por categoría */}
             {categoriasDisponibles.map((key) => {
