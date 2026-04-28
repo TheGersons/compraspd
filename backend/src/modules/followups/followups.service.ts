@@ -91,9 +91,32 @@ export class FollowUpsService {
     if (filters?.search) {
       where.OR = [
         { nombreCotizacion: { contains: filters.search, mode: 'insensitive' } },
+        { ordenCompra: { contains: filters.search, mode: 'insensitive' } },
         {
           solicitante: {
             nombre: { contains: filters.search, mode: 'insensitive' },
+          },
+        },
+        // Buscar también dentro de los productos de la cotización
+        {
+          detalles: {
+            some: {
+              OR: [
+                { sku: { contains: filters.search, mode: 'insensitive' } },
+                { descripcionProducto: { contains: filters.search, mode: 'insensitive' } },
+              ],
+            },
+          },
+        },
+        {
+          estadosProductos: {
+            some: {
+              OR: [
+                { sku: { contains: filters.search, mode: 'insensitive' } },
+                { descripcion: { contains: filters.search, mode: 'insensitive' } },
+                { proveedor: { contains: filters.search, mode: 'insensitive' } },
+              ],
+            },
           },
         },
       ];
