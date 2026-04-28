@@ -74,6 +74,7 @@ export class DashboardService {
       },
       include: {
         proyecto: { select: { id: true, nombre: true, areaId: true } },
+        responsableSeguimiento: { select: { nombre: true } },
         cotizacion: {
           select: {
             id: true,
@@ -129,7 +130,10 @@ export class DashboardService {
         estado: estadoVisual,
         criticidad: proy.criticidad,
         resumen: this.calcularResumen(productosProyecto),
-        responsable: productosProyecto[0]?.responsable || 'Sin asignar',
+        responsable:
+          productosProyecto[0]?.responsableSeguimiento?.nombre ||
+          productosProyecto[0]?.cotizacion?.supervisorResponsable?.nombre ||
+          'Sin asignar',
         fechaInicio: proy.creado.toISOString(),
         fechaLimite:
           productosProyecto[0]?.cotizacion?.fechaLimite?.toISOString() ||
@@ -154,7 +158,10 @@ export class DashboardService {
         tipoCompra,
         proyectoId: p.proyectoId,
         areaId: p.proyecto?.areaId,
-        responsable: p.cotizacion?.supervisorResponsable?.nombre || p.responsable || 'Sin asignar',
+        responsable:
+          p.responsableSeguimiento?.nombre ||
+          p.cotizacion?.supervisorResponsable?.nombre ||
+          'Sin asignar',
         ...this.calcularEstadosDetallados(p, estadosAplicables),
       };
     });
