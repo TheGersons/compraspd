@@ -794,6 +794,9 @@ export default function ShoppingFollowUps() {
         p.proveedor,
         p.cotizacion?.nombreCotizacion,
         p.cotizacion?.solicitante?.nombre,
+        // Campos canónicos del CotizacionDetalle
+        (p as any).cotizacionDetalle?.sku,
+        (p as any).cotizacionDetalle?.descripcionProducto,
       );
       if (!matchQuery) return false;
     }

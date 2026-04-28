@@ -235,6 +235,9 @@ export class FollowUpsService {
         chatId: cot.chatId,
         fechaEntregaNacional: cot.fechaEntregaNacional,
         ordenesCompra: cot.ordenesCompra ?? [],
+        // Exponer los detalles (productos) para que el filtro client-side
+        // pueda buscar por sku/descripcionProducto.
+        detalles: cot.detalles ?? [],
         totalProductos,
         productosAprobados,
         productosPendientes,

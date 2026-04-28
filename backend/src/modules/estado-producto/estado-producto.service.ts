@@ -241,6 +241,8 @@ export class EstadoProductoService {
           cotizacionDetalle: {
             select: {
               id: true,
+              sku: true,
+              descripcionProducto: true,
               preciosId: true,
               precios: {
                 select: {
