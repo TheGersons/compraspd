@@ -167,17 +167,22 @@ function PopoverFecha({ celda, producto, etapaLabel, onClose }: PopoverFechaProp
     }
 
     // pendiente
-    const restantes = fechaLimite ? diasEntre(today, fechaLimite) : null;
+    if (!fechaLimite) {
+      return (
+        <p className="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400">
+          Sin fechas definidas
+        </p>
+      );
+    }
+    const restantes = diasEntre(today, fechaLimite);
     return (
       <>
         <Row label="Fecha estimada" value={fmtFecha(fechaLimite)} />
-        {restantes !== null && (
-          <p className={`mt-2 text-sm font-bold ${restantes >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-            {restantes >= 0
-              ? `${restantes} ${restantes === 1 ? 'día restante' : 'días restantes'}`
-              : `Venció hace ${Math.abs(restantes)} ${Math.abs(restantes) === 1 ? 'día' : 'días'}`}
-          </p>
-        )}
+        <p className={`mt-2 text-sm font-bold ${restantes >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+          {restantes >= 0
+            ? `${restantes} ${restantes === 1 ? 'día restante' : 'días restantes'}`
+            : `Venció hace ${Math.abs(restantes)} ${Math.abs(restantes) === 1 ? 'día' : 'días'}`}
+        </p>
       </>
     );
   };
@@ -600,6 +605,10 @@ export default function ModalDetalleProductos({
                             ) : estado === 'en_proceso' ? (
                               <span className="font-medium text-amber-600 dark:text-amber-400">
                                 {diasAtraso === 0 ? 'A tiempo' : `+${diasAtraso} días`}
+                              </span>
+                            ) : producto.sinFechasDefinidas ? (
+                              <span className="text-xs italic text-gray-500 dark:text-gray-400">
+                                Sin fechas definidas
                               </span>
                             ) : (
                               <span className="text-gray-500 dark:text-gray-400">—</span>

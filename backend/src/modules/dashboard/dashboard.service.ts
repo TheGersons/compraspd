@@ -63,34 +63,117 @@ export class DashboardService {
       orderBy: { criticidad: 'desc' },
     });
 
-    // 3. Cargar TODOS los EstadoProducto aprobados con relaciones necesarias (excluir logistica)
-    const productos = await this.prisma.estadoProducto.findMany({
+    // 3. Cargar cotizaciones activas (excluir canceladas/rechazadas/completadas-archivadas
+    //    y excluir tipo "logistica"), traer sus detalles (CotizacionDetalle) y los
+    //    EstadoProducto vinculados para hacer un LEFT JOIN en memoria.
+    //    Esto permite ver productos desde el momento en que llega la solicitud,
+    //    aunque aún no exista un EstadoProducto creado.
+    const cotizaciones = await this.prisma.cotizacion.findMany({
       where: {
-        aprobadoPorSupervisor: true,
-        rechazado: false,
-        cotizacion: {
-          NOT: { tipo: { nombre: { equals: 'logistica', mode: 'insensitive' } } },
-        },
+        estado: { notIn: ['CANCELADA', 'RECHAZADA'] },
+        NOT: { tipo: { nombre: { equals: 'logistica', mode: 'insensitive' } } },
       },
       include: {
         proyecto: { select: { id: true, nombre: true, areaId: true } },
-        responsableSeguimiento: { select: { nombre: true } },
-        ordenCompra: { select: { id: true, nombre: true, numeroOC: true } },
-        cotizacion: {
+        solicitante: { select: { nombre: true } },
+        supervisorResponsable: { select: { nombre: true } },
+        detalles: {
           select: {
             id: true,
-            nombreCotizacion: true,
-            tipoCompra: true,
-            fechaSolicitud: true,
-            fechaLimite: true,
-            solicitante: { select: { nombre: true } },
-            supervisorResponsable: { select: { nombre: true } },
+            sku: true,
+            descripcionProducto: true,
+            cantidad: true,
+          },
+        },
+        estadosProductos: {
+          where: { rechazado: false },
+          include: {
+            responsableSeguimiento: { select: { nombre: true } },
+            ordenCompra: { select: { id: true, nombre: true, numeroOC: true } },
           },
         },
       },
     });
 
-    // 4. Agrupar productos por área y por proyecto
+    // 4. Construir lista unificada de productos: para cada CotizacionDetalle,
+    //    si existe EstadoProducto vinculado se usan sus flags/fechas reales;
+    //    si no existe, se crea un "producto virtual" con todas las flags en
+    //    false y fechas null (se mostrará como "Sin fechas definidas" en el UI).
+    const productos: any[] = [];
+    for (const cot of cotizaciones) {
+      // Map de EstadoProducto por cotizacionDetalleId para lookup rápido
+      const estadoPorDetalleId = new Map<string, any>();
+      for (const ep of cot.estadosProductos) {
+        if (ep.cotizacionDetalleId) {
+          estadoPorDetalleId.set(ep.cotizacionDetalleId, ep);
+        }
+      }
+
+      const cotizacionInfo = {
+        id: cot.id,
+        nombreCotizacion: cot.nombreCotizacion,
+        tipoCompra: cot.tipoCompra,
+        fechaSolicitud: cot.fechaSolicitud,
+        fechaLimite: cot.fechaLimite,
+        solicitante: cot.solicitante,
+        supervisorResponsable: cot.supervisorResponsable,
+      };
+
+      for (const detalle of cot.detalles) {
+        const ep = estadoPorDetalleId.get(detalle.id);
+        if (ep) {
+          // Producto con EstadoProducto: agregamos la cotización y el proyecto enriquecidos
+          productos.push({
+            ...ep,
+            sinFechasDefinidas: false,
+            cotizacion: cotizacionInfo,
+            proyecto: cot.proyecto,
+            proyectoId: cot.proyecto?.id ?? ep.proyectoId,
+          });
+        } else {
+          // Producto "virtual" — solo existe en CotizacionDetalle.
+          productos.push({
+            id: `virtual-${detalle.id}`,
+            sku: detalle.sku ?? '',
+            descripcion: detalle.descripcionProducto,
+            cantidad: detalle.cantidad,
+            proveedor: null,
+            precioUnitario: null,
+            precioTotal: null,
+            // Todas las flags de estado en false → 'pendiente'
+            cotizado: false,
+            conDescuento: false,
+            aprobacionCompra: false,
+            comprado: false,
+            pagado: false,
+            aprobacionPlanos: false,
+            primerSeguimiento: false,
+            enFOB: false,
+            cotizacionFleteInternacional: false,
+            conBL: false,
+            segundoSeguimiento: false,
+            enCIF: false,
+            recibido: false,
+            // Sin fechas reales ni límite
+            // (calcularEstadosDetallados leerá undefined → estado 'pendiente')
+            rechazado: false,
+            diasRetrasoActual: 0,
+            criticidad: 5,
+            nivelCriticidad: 'MEDIO',
+            creado: cot.fechaSolicitud,
+            actualizado: cot.fechaSolicitud,
+            sinFechasDefinidas: true,
+            cotizacion: cotizacionInfo,
+            proyecto: cot.proyecto,
+            proyectoId: cot.proyecto?.id ?? null,
+            responsableSeguimiento: null,
+            ordenCompra: null,
+          });
+        }
+      }
+    }
+
+    // 5. Agrupar productos por área y por proyecto
     const productosPorArea: Record<string, typeof productos> = {};
     const productosPorProyecto: Record<string, typeof productos> = {};
 
@@ -107,7 +190,7 @@ export class DashboardService {
       }
     }
 
-    // 5. Construir respuesta de áreas
+    // 6. Construir respuesta de áreas
     const areasConResumen = areas.map((area) => {
       const productosArea = productosPorArea[area.id] || [];
       return {
@@ -120,7 +203,7 @@ export class DashboardService {
       };
     });
 
-    // 6. Construir proyectos con resumen
+    // 7. Construir proyectos con resumen
     const proyectosConResumen = proyectos.map((proy) => {
       const productosProyecto = productosPorProyecto[proy.id] || [];
       const estadoVisual = this.calcularEstadoProyecto(productosProyecto);
@@ -144,7 +227,7 @@ export class DashboardService {
       };
     });
 
-    // 7. Construir productos detallados
+    // 8. Construir productos detallados (incluye flag sinFechasDefinidas)
     const productosDetallados = productos.map((p) => {
       const tipoCompra = p.cotizacion?.tipoCompra || 'INTERNACIONAL';
       const estadosAplicables =
@@ -164,6 +247,7 @@ export class DashboardService {
           p.cotizacion?.supervisorResponsable?.nombre ||
           'Sin asignar',
         ordenCompra: p.ordenCompra?.numeroOC || p.ordenCompra?.nombre || null,
+        sinFechasDefinidas: !!p.sinFechasDefinidas,
         ...this.calcularEstadosDetallados(p, estadosAplicables),
       };
     });

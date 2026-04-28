@@ -82,6 +82,9 @@ export interface ProductoDetallado {
   tipoCompra: 'NACIONAL' | 'INTERNACIONAL';
   responsable?: string;
   ordenCompra?: string | null;
+  // True cuando el producto aún no tiene EstadoProducto asociado
+  // (no se ha cargado el followup ni se calcularon fechas límite).
+  sinFechasDefinidas?: boolean;
 
   // Estados por etapa
   estados: Record<string, 'completado' | 'en_proceso' | 'atrasado' | 'pendiente'>;
