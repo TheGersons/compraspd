@@ -60,6 +60,7 @@ import LogisticaQuotesHistory from "./pages/Quotes/Logistica/History";
 import LogisticaQuotesRejected from "./pages/Quotes/Logistica/RejectedQuotes";
 import LogisticaShoppingFollowUps from "./pages/Shopping/Logistica/FollowUps";
 import LogisticaShoppingDocuments from "./pages/Shopping/Logistica/Documents";
+import AdminCotizaciones from "./pages/Admin/AdminCotizaciones";
 
 const SHOPPING_MANAGER_ROLES = ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS"];
 const QUOTES_SUPERVISOR_ROLES = ["SUPERVISOR", "ADMIN", "JEFE_COMPRAS"];
@@ -360,6 +361,16 @@ export default function App() {
                 element={
                   <ProtectedRoute roles={STAFF_ROLES}>
                     <NewProject />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Administración (ADMIN) - eliminar y editar cotizaciones a fondo */}
+              <Route
+                path="/admin/cotizaciones"
+                element={
+                  <ProtectedRoute roles={["ADMIN"]}>
+                    <AdminCotizaciones />
                   </ProtectedRoute>
                 }
               />

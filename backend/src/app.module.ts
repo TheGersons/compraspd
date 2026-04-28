@@ -41,6 +41,7 @@ import { ImportExportModule } from './modules/import-export/import-export.module
 import { CronServicesModule } from './modules/cron-services/cron.service.module';
 import { OdooModule } from './modules/odoo/odoo.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { AdminCotizacionesModule } from './modules/admin-cotizaciones/admin-cotizaciones.module';
 
 @Module({
   imports: [
@@ -82,6 +83,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     ReportesModule,
     ImportExportModule,
     DashboardModule,
+    AdminCotizacionesModule,
     OdooModule,
   ],
   providers: [SessionCleanupService],

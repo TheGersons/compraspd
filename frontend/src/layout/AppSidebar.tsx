@@ -12,6 +12,7 @@ import {
   Ship,
   Forklift,
   Tags,
+  ShieldAlert,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
@@ -157,6 +158,14 @@ const othersItems: NavItem[] = [
     name: "Odoo CRM",
     roles: ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS"],
     path: "/odoo/oportunidades",
+  },
+  {
+    icon: <ShieldAlert size={20} />,
+    name: "Administración",
+    roles: ["ADMIN"],
+    subItems: [
+      { name: "Cotizaciones", path: "/admin/cotizaciones", roles: ["ADMIN"] },
+    ],
   },
   /*{
     icon: <PieChartIcon />,
