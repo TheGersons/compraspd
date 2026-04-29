@@ -344,6 +344,14 @@ export class FollowUpsService {
             },
           },
         },
+        ordenesCompra: {
+          select: {
+            id: true,
+            nombre: true,
+            numeroOC: true,
+            estado: true,
+          },
+        },
         // Incluir chat con participantes para verificar
         chat: {
           select: {
