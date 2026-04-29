@@ -18,6 +18,7 @@ import { SearchableSelect } from "../../components/ui/searchable-select";
 import { SplitOrdenCompraModal } from "../../components/ordenes-compra/SplitOrdenCompraModal";
 import { MoverProductosOCModal } from "../../components/ordenes-compra/MoverProductosOCModal";
 import { AgregarProductosOCModal } from "../../components/ordenes-compra/AgregarProductosOCModal";
+import { AprobarYAsignarOCModal } from "../../components/ordenes-compra/AprobarYAsignarOCModal";
 import { ApelarResponsableModal } from "../../components/estado-producto/ApelarResponsableModal";
 import { MonedaBadge } from "../../components/moneda/MonedaBadge";
 
@@ -629,6 +630,8 @@ export default function FollowUps() {
   const [menuMoverOcOpen, setMenuMoverOcOpen] = useState(false);
   // Modal de agregar productos sueltos a una OC existente
   const [agregarOcOpen, setAgregarOcOpen] = useState(false);
+  // Modal de aprobar productos pendientes y asignarlos a OC en un paso
+  const [aprobarAsignarOcOpen, setAprobarAsignarOcOpen] = useState(false);
 
   // Modal de apelar responsable
   const [apelarOpen, setApelarOpen] = useState(false);
@@ -2049,6 +2052,18 @@ export default function FollowUps() {
                                     {getEstadoLabel(cotizacionSeleccionada.estado)}
                                   </span>
                                 </div>
+                                {canDividirOC && (cotizacionSeleccionada.ordenesCompra?.length ?? 0) > 0 && (cotizacionSeleccionada.detalles ?? []).some((d: any) => !d.estadoProducto?.aprobadoPorSupervisor && !d.estadoProducto?.rechazado && d.estadoProducto?.id) && (
+                                  <button
+                                    onClick={() => setAprobarAsignarOcOpen(true)}
+                                    title="Aprobar productos pendientes y asignarlos a una OC existente"
+                                    className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-green-600 transition-colors hover:bg-green-50 hover:text-green-700 dark:text-green-400 dark:hover:bg-green-900/20"
+                                  >
+                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Aprobar y asignar a OC
+                                  </button>
+                                )}
                                 {canDividirOC && (cotizacionSeleccionada.estadosProductos?.length ?? 0) >= 2 && (
                                   <button
                                     onClick={() => setSplitOcOpen(true)}
@@ -2744,6 +2759,29 @@ export default function FollowUps() {
               enCIF: ep.enCIF,
               recibido: ep.recibido,
               conBL: ep.conBL,
+            }))}
+          ordenesExistentes={cotizacionSeleccionada.ordenesCompra ?? []}
+          onSuccess={() => {
+            if (cotizacionSeleccionada) seleccionarCotizacion(cotizacionSeleccionada);
+            cargarCotizaciones();
+          }}
+        />
+      )}
+
+      {/* Modal: aprobar productos pendientes y asignar a OC existente */}
+      {cotizacionSeleccionada && (
+        <AprobarYAsignarOCModal
+          open={aprobarAsignarOcOpen}
+          onClose={() => setAprobarAsignarOcOpen(false)}
+          cotizacionId={cotizacionSeleccionada.id}
+          cotizacionNombre={cotizacionSeleccionada.nombreCotizacion}
+          productos={(cotizacionSeleccionada.detalles ?? [])
+            .filter((d: any) => !d.estadoProducto?.aprobadoPorSupervisor && !d.estadoProducto?.rechazado && d.estadoProducto?.id)
+            .map((d: any) => ({
+              estadoProductoId: d.estadoProducto.id,
+              cotizacionDetalleId: d.id,
+              sku: d.sku,
+              descripcion: d.descripcionProducto,
             }))}
           ordenesExistentes={cotizacionSeleccionada.ordenesCompra ?? []}
           onSuccess={() => {

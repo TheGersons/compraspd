@@ -21,6 +21,7 @@ import { FollowUpsService } from './followups.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AprobarProductosDto } from './dto/aprobar-productos.dto';
 import { ConfigurarCotizacionDto } from './dto/configurar-cotizacion.dto';
+import { AprobarYAsignarOCDto } from './dto/aprobar-y-asignar-oc.dto';
 
 type UserJwt = { sub: string; role?: string };
 
@@ -220,6 +221,28 @@ export class FollowUpsController {
     @Body() dto: AprobarProductosDto,
   ) {
     return this.followupsService.aprobarProductos(id, dto, user);
+  }
+
+  /**
+   * POST /api/v1/followups/:id/aprobar-y-asignar-oc
+   * Aprueba productos pendientes y los asigna a una OC existente en un solo paso
+   */
+  @Post(':id/aprobar-y-asignar-oc')
+  @ApiOperation({
+    summary: 'Aprobar y asignar a OC',
+    description:
+      'Aprueba productos pendientes configurando precio y comprobante, y los asigna directamente a una OC existente',
+  })
+  @ApiResponse({ status: 200, description: 'Productos aprobados y asignados' })
+  @ApiResponse({ status: 400, description: 'Datos inválidos o producto ya aprobado' })
+  @ApiResponse({ status: 403, description: 'Solo supervisores pueden aprobar' })
+  @ApiResponse({ status: 404, description: 'Cotización u OC no encontrada' })
+  aprobarYAsignarOC(
+    @CurrentUser() user: UserJwt,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AprobarYAsignarOCDto,
+  ) {
+    return this.followupsService.aprobarYAsignarOC(id, dto, user);
   }
 
   /**

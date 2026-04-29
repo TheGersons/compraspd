@@ -1238,6 +1238,202 @@ export class FollowUpsService {
   }
 
   /**
+   * Aprueba productos pendientes de la cotización base y los asigna directamente
+   * a una OC existente en una sola operación atómica.
+   * Útil cuando la cotización es APROBADA_PARCIAL y quedan productos sin aprobar
+   * que el supervisor quiere mover a una OC ya creada.
+   */
+  async aprobarYAsignarOC(
+    cotizacionId: string,
+    dto: {
+      ordenCompraId: string;
+      productos: Array<{
+        estadoProductoId: string;
+        precio: number;
+        comprobanteDescuento: string;
+        precioDescuento?: number;
+      }>;
+    },
+    user: UserJwt,
+  ) {
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id: user.sub },
+      include: { rol: true },
+    });
+    const rolNombre = usuario?.rol.nombre.toLowerCase() || '';
+    if (
+      !rolNombre.includes('supervisor') &&
+      !rolNombre.includes('admin') &&
+      !rolNombre.includes('jefe_compras')
+    ) {
+      throw new ForbiddenException(
+        'Solo supervisores pueden aprobar y asignar productos',
+      );
+    }
+
+    if (!dto.productos?.length) {
+      throw new BadRequestException('Debe seleccionar al menos un producto');
+    }
+
+    const cotizacion = await this.prisma.cotizacion.findUnique({
+      where: { id: cotizacionId },
+      include: { estadosProductos: true },
+    });
+    if (!cotizacion) throw new NotFoundException('Cotización no encontrada');
+
+    const oc = await this.prisma.ordenCompra.findUnique({
+      where: { id: dto.ordenCompraId },
+      select: { id: true, cotizacionId: true },
+    });
+    if (!oc) throw new NotFoundException('Orden de compra no encontrada');
+    if (oc.cotizacionId !== cotizacionId) {
+      throw new BadRequestException(
+        'La OC no pertenece a esta cotización',
+      );
+    }
+
+    // Pre-validate all products before the transaction
+    for (const item of dto.productos) {
+      const ep = cotizacion.estadosProductos.find(
+        (e) => e.id === item.estadoProductoId,
+      );
+      if (!ep) {
+        throw new BadRequestException(
+          `Producto ${item.estadoProductoId} no pertenece a esta cotización`,
+        );
+      }
+      if (ep.aprobadoPorSupervisor) {
+        throw new BadRequestException(
+          `El producto "${ep.sku}" ya está aprobado`,
+        );
+      }
+      if (!item.precio || item.precio <= 0) {
+        throw new BadRequestException(
+          `El precio para "${ep.sku}" debe ser mayor a 0`,
+        );
+      }
+      if (!item.comprobanteDescuento) {
+        throw new BadRequestException(
+          `Debe indicar si aplica o no aplica comprobante de descuento para "${ep.sku}"`,
+        );
+      }
+      if (
+        item.comprobanteDescuento !== 'no_aplica' &&
+        (!item.precioDescuento || item.precioDescuento <= 0)
+      ) {
+        throw new BadRequestException(
+          `El precio con descuento para "${ep.sku}" es requerido cuando aplica descuento`,
+        );
+      }
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const item of dto.productos) {
+        const ep = cotizacion.estadosProductos.find(
+          (e) => e.id === item.estadoProductoId,
+        )!;
+
+        const detalle = await tx.cotizacionDetalle.findFirst({
+          where: { cotizacionId, sku: ep.sku },
+        });
+        if (!detalle) {
+          throw new BadRequestException(
+            `Detalle no encontrado para "${ep.sku}"`,
+          );
+        }
+
+        const precioEfectivo =
+          item.comprobanteDescuento !== 'no_aplica' && item.precioDescuento
+            ? item.precioDescuento
+            : item.precio;
+
+        const nuevoPrecio = await tx.precios.create({
+          data: {
+            cotizacionDetalleId: detalle.id,
+            precio: item.precio,
+            ComprobanteDescuento: item.comprobanteDescuento,
+            precioDescuento:
+              item.comprobanteDescuento !== 'no_aplica'
+                ? item.precioDescuento ?? null
+                : null,
+          },
+        });
+
+        await tx.cotizacionDetalle.update({
+          where: { id: detalle.id },
+          data: { preciosId: nuevoPrecio.id },
+        });
+
+        await tx.estadoProducto.update({
+          where: { id: ep.id },
+          data: {
+            aprobadoPorSupervisor: true,
+            fechaAprobacion: new Date(),
+            cotizado: true,
+            fechaCotizado: ep.fechaCotizado || new Date(),
+            conDescuento: true,
+            fechaConDescuento: new Date(),
+            precioUnitario: precioEfectivo,
+            precioTotal: precioEfectivo * (ep.cantidad || 1),
+            ordenCompraId: dto.ordenCompraId,
+          },
+        });
+
+        await tx.historialCotizacion.create({
+          data: {
+            cotizacionId,
+            usuarioId: user.sub,
+            accion: 'PRODUCTO_APROBADO',
+            detalles: {
+              productoId: ep.id,
+              sku: ep.sku,
+              observaciones: 'Aprobado y asignado directamente a OC existente',
+            },
+          },
+        });
+      }
+
+      const todosEPs = await tx.estadoProducto.findMany({
+        where: { cotizacionId },
+        select: { aprobadoPorSupervisor: true },
+      });
+      const productosAprobados = todosEPs.filter(
+        (e) => e.aprobadoPorSupervisor,
+      ).length;
+      const totalProductos = todosEPs.length;
+      const todosAprobados =
+        productosAprobados === totalProductos && totalProductos > 0;
+      const algunoAprobado = productosAprobados > 0;
+
+      await tx.cotizacion.update({
+        where: { id: cotizacionId },
+        data: {
+          supervisorResponsableId: user.sub,
+          aprobadaParcialmente: algunoAprobado && !todosAprobados,
+          todosProductosAprobados: todosAprobados,
+          estado: todosAprobados
+            ? 'APROBADA_COMPLETA'
+            : algunoAprobado
+              ? 'APROBADA_PARCIAL'
+              : cotizacion.estado,
+          fechaAprobacion: todosAprobados
+            ? new Date()
+            : cotizacion.fechaAprobacion,
+        },
+      });
+    });
+
+    if (dto.productos.length > 0) {
+      await this.verificarYCrearLicitacion(cotizacionId);
+    }
+
+    return {
+      message: `${dto.productos.length} producto(s) aprobados y asignados a la OC`,
+      ordenCompraId: dto.ordenCompraId,
+    };
+  }
+
+  /**
    * Verifica si la cotización es tipo Licitación y crea la licitación
    * Se llama después de aprobar productos
    */
