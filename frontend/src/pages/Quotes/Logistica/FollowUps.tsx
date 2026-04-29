@@ -16,6 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "../../../components/ui/
 import { matchesSearch } from "../../../utils/utils";
 import { SearchableSelect } from "../../../components/ui/searchable-select";
 import { SplitOrdenCompraModal } from "../../../components/ordenes-compra/SplitOrdenCompraModal";
+import { MoverProductosOCModal } from "../../../components/ordenes-compra/MoverProductosOCModal";
 import { ApelarResponsableModal } from "../../../components/estado-producto/ApelarResponsableModal";
 import { MonedaBadge } from "../../../components/moneda/MonedaBadge";
 
@@ -626,6 +627,8 @@ export default function FollowUps() {
   const canAsignarResponsable = ['JEFE_COMPRAS', 'ADMIN'].includes(user?.rol?.nombre?.toUpperCase() || '');
   const canDividirOC = ['JEFE_COMPRAS', 'ADMIN', 'SUPERVISOR'].includes(user?.rol?.nombre?.toUpperCase() || '');
   const [splitOcOpen, setSplitOcOpen] = useState(false);
+  const [moverOcOrigen, setMoverOcOrigen] = useState<{ id: string; nombre: string; numeroOC?: string | null } | null>(null);
+  const [menuMoverOcOpen, setMenuMoverOcOpen] = useState(false);
   const [apelarOpen, setApelarOpen] = useState(false);
   const [apelarCotId, setApelarCotId] = useState("");
   const [apelarCotNombre, setApelarCotNombre] = useState("");
@@ -2006,6 +2009,43 @@ export default function FollowUps() {
                                     Dividir OC
                                   </button>
                                 )}
+                                {canDividirOC && (cotizacionSeleccionada.ordenesCompra?.length ?? 0) > 0 && (
+                                  <div className="relative">
+                                    <button
+                                      onClick={() => setMenuMoverOcOpen((s) => !s)}
+                                      title="Mover productos entre OCs (incluye devolver a la cotización base)"
+                                      className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-indigo-600 transition-colors hover:bg-indigo-50 hover:text-indigo-700 dark:text-indigo-400 dark:hover:bg-indigo-900/20"
+                                    >
+                                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                      </svg>
+                                      Mover entre OCs
+                                    </button>
+                                    {menuMoverOcOpen && (
+                                      <>
+                                        <div className="fixed inset-0 z-40" onClick={() => setMenuMoverOcOpen(false)} />
+                                        <div className="absolute right-0 top-full z-50 mt-1 min-w-[220px] rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
+                                          <p className="border-b border-gray-100 px-3 py-2 text-[10px] font-semibold uppercase text-gray-400 dark:border-gray-700">
+                                            Mover desde:
+                                          </p>
+                                          {(cotizacionSeleccionada.ordenesCompra ?? []).map((oc) => (
+                                            <button
+                                              key={oc.id}
+                                              onClick={() => {
+                                                setMoverOcOrigen({ id: oc.id, nombre: oc.nombre, numeroOC: oc.numeroOC });
+                                                setMenuMoverOcOpen(false);
+                                              }}
+                                              className="block w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
+                                            >
+                                              <span className="font-medium">{oc.nombre}</span>
+                                              {oc.numeroOC && <span className="ml-1 text-gray-500">({oc.numeroOC})</span>}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </>
+                                    )}
+                                  </div>
+                                )}
                                 {(() => {
                                   const esResponsable = cotizacionSeleccionada.supervisorResponsable?.id === user?.id;
                                   const noPasoPagado = !cotizacionSeleccionada.estadosProductos?.some(
@@ -2539,6 +2579,35 @@ export default function FollowUps() {
             ordenCompraId: ep.ordenCompraId,
           }))}
           ordenesExistentes={cotizacionSeleccionada.ordenesCompra || []}
+          onSuccess={() => {
+            if (cotizacionSeleccionada) seleccionarCotizacion(cotizacionSeleccionada);
+            cargarCotizaciones();
+          }}
+        />
+      )}
+
+      {/* Modal: mover productos entre OCs (o devolver a la cotización base) */}
+      {cotizacionSeleccionada && moverOcOrigen && (
+        <MoverProductosOCModal
+          open={!!moverOcOrigen}
+          onClose={() => setMoverOcOrigen(null)}
+          ordenOrigen={moverOcOrigen}
+          ordenesDestino={(cotizacionSeleccionada.ordenesCompra ?? []).filter(
+            (oc) => oc.id !== moverOcOrigen.id,
+          )}
+          productos={(cotizacionSeleccionada.estadosProductos ?? [])
+            .filter((ep: any) => ep.ordenCompraId === moverOcOrigen.id)
+            .map((ep: any) => ({
+              id: ep.id,
+              sku: ep.sku,
+              descripcion: ep.descripcion || ep.sku,
+              comprado: ep.comprado,
+              pagado: ep.pagado,
+              enFOB: ep.enFOB,
+              enCIF: ep.enCIF,
+              recibido: ep.recibido,
+              conBL: ep.conBL,
+            }))}
           onSuccess={() => {
             if (cotizacionSeleccionada) seleccionarCotizacion(cotizacionSeleccionada);
             cargarCotizaciones();

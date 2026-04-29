@@ -1261,13 +1261,12 @@ export default function ShoppingFollowUps() {
                           );
                         })()}
                         {canDividirOC && grupo.ordenCompraId && (() => {
-                          const otrasOCs = productos.filter(
-                            (p) => p.cotizacionId === grupo.cotizacionId && p.ordenCompra && p.ordenCompra.id !== grupo.ordenCompraId,
+                          // Mostrar el botón siempre que haya al menos un producto elegible.
+                          // El destino puede ser otra OC dividida o la cotización base.
+                          const elegiblesEnEstaOC = grupo.productos.filter(
+                            (p) => !(p.enFOB || p.enCIF || p.recibido || p.conBL),
                           ).length;
-                          const hayBase = productos.some(
-                            (p) => p.cotizacionId === grupo.cotizacionId && !p.ordenCompraId,
-                          );
-                          if (otrasOCs === 0 && !hayBase) return null;
+                          if (elegiblesEnEstaOC === 0) return null;
                           return (
                             <button
                               onClick={(e) => {
