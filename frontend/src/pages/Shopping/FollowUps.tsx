@@ -14,6 +14,7 @@ import { matchesSearch } from "../../utils/utils";
 import { SearchableSelect } from "../../components/ui/searchable-select";
 import { SplitOrdenCompraModal } from "../../components/ordenes-compra/SplitOrdenCompraModal";
 import { MoverProductosOCModal } from "../../components/ordenes-compra/MoverProductosOCModal";
+import { AgregarProductosOCModal } from "../../components/ordenes-compra/AgregarProductosOCModal";
 import { ApelarResponsableModal } from "../../components/estado-producto/ApelarResponsableModal";
 import { MonedaBadge } from "../../components/moneda/MonedaBadge";
 
@@ -540,6 +541,7 @@ export default function ShoppingFollowUps() {
   const canDividirOC = ['JEFE_COMPRAS', 'ADMIN', 'SUPERVISOR'].includes(user?.rol?.nombre?.toUpperCase() || '');
   const [splitOcGrupo, setSplitOcGrupo] = useState<{ cotizacionId: string; nombre: string } | null>(null);
   const [moverOcGrupo, setMoverOcGrupo] = useState<{ cotizacionId: string; ordenCompraId: string } | null>(null);
+  const [agregarOcGrupo, setAgregarOcGrupo] = useState<{ cotizacionId: string; nombre: string } | null>(null);
   const [apelarOpen, setApelarOpen] = useState(false);
   const [apelarCotId, setApelarCotId] = useState("");
   const [apelarCotNombre, setApelarCotNombre] = useState("");
@@ -1315,6 +1317,32 @@ export default function ShoppingFollowUps() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                               </svg>
                               Dividir OC
+                            </button>
+                          );
+                        })()}
+                        {canDividirOC && !grupo.ordenCompraId && (() => {
+                          // Solo en el grupo base: si la cotización ya tiene OCs creadas, permitir agregar productos sueltos a una OC existente
+                          const ocsExistentes = productos.filter(
+                            (p) => p.cotizacionId === grupo.cotizacionId && p.ordenCompra,
+                          );
+                          if (ocsExistentes.length === 0) return null;
+                          const elegiblesEnBase = grupo.productos.filter(
+                            (p) => !(p.enFOB || p.enCIF || p.recibido || p.conBL),
+                          ).length;
+                          if (elegiblesEnBase === 0) return null;
+                          return (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setAgregarOcGrupo({ cotizacionId: grupo.cotizacionId, nombre: grupo.nombre });
+                              }}
+                              title="Agregar productos sueltos a una OC existente"
+                              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-emerald-600 transition-colors hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
+                            >
+                              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                              </svg>
+                              Agregar a OC
                             </button>
                           );
                         })()}
@@ -2145,6 +2173,45 @@ export default function ShoppingFollowUps() {
               recibido: p.recibido,
               conBL: p.conBL,
             }))}
+            onSuccess={() => { cargarProductos(); }}
+          />
+        );
+      })()}
+
+      {/* Modal: agregar productos sueltos (sin OC) a una OC existente */}
+      {agregarOcGrupo && (() => {
+        const productosBase = productos.filter(
+          (p) =>
+            p.cotizacionId === agregarOcGrupo.cotizacionId &&
+            !p.ordenCompraId,
+        );
+        const ordenesExistentes = Array.from(
+          new Map(
+            productos
+              .filter(
+                (p) =>
+                  p.cotizacionId === agregarOcGrupo.cotizacionId && p.ordenCompra,
+              )
+              .map((p) => [p.ordenCompra!.id, p.ordenCompra!]),
+          ).values(),
+        );
+        return (
+          <AgregarProductosOCModal
+            open={!!agregarOcGrupo}
+            onClose={() => setAgregarOcGrupo(null)}
+            cotizacionNombre={agregarOcGrupo.nombre}
+            productosBase={productosBase.map((p: any) => ({
+              id: p.id,
+              sku: p.sku,
+              descripcion: p.descripcion,
+              comprado: p.comprado,
+              pagado: p.pagado,
+              enFOB: p.enFOB,
+              enCIF: p.enCIF,
+              recibido: p.recibido,
+              conBL: p.conBL,
+            }))}
+            ordenesExistentes={ordenesExistentes}
             onSuccess={() => { cargarProductos(); }}
           />
         );

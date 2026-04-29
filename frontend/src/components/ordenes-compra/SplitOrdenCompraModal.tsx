@@ -65,6 +65,11 @@ export function SplitOrdenCompraModal({
     }
   }, [open, cotizacionNombre, ordenesExistentes.length]);
 
+  const hayCompradoSeleccionado = useMemo(
+    () => elegibles.some((p) => seleccionados.has(p.id) && p.comprado),
+    [elegibles, seleccionados],
+  );
+
   if (!open) return null;
 
   const toggleTodos = () => {
@@ -81,11 +86,6 @@ export function SplitOrdenCompraModal({
     else nuevo.add(id);
     setSeleccionados(nuevo);
   };
-
-  const hayCompradoSeleccionado = useMemo(
-    () => elegibles.some((p) => seleccionados.has(p.id) && p.comprado),
-    [elegibles, seleccionados],
-  );
 
   const validar = (): string | null => {
     const n = nombre.trim();

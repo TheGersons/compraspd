@@ -17,6 +17,7 @@ import { matchesSearch } from "../../utils/utils";
 import { SearchableSelect } from "../../components/ui/searchable-select";
 import { SplitOrdenCompraModal } from "../../components/ordenes-compra/SplitOrdenCompraModal";
 import { MoverProductosOCModal } from "../../components/ordenes-compra/MoverProductosOCModal";
+import { AgregarProductosOCModal } from "../../components/ordenes-compra/AgregarProductosOCModal";
 import { ApelarResponsableModal } from "../../components/estado-producto/ApelarResponsableModal";
 import { MonedaBadge } from "../../components/moneda/MonedaBadge";
 
@@ -626,6 +627,8 @@ export default function FollowUps() {
   // Modal de mover productos entre OCs
   const [moverOcOrigen, setMoverOcOrigen] = useState<{ id: string; nombre: string; numeroOC?: string | null } | null>(null);
   const [menuMoverOcOpen, setMenuMoverOcOpen] = useState(false);
+  // Modal de agregar productos sueltos a una OC existente
+  const [agregarOcOpen, setAgregarOcOpen] = useState(false);
 
   // Modal de apelar responsable
   const [apelarOpen, setApelarOpen] = useState(false);
@@ -2058,6 +2061,18 @@ export default function FollowUps() {
                                     Dividir OC
                                   </button>
                                 )}
+                                {canDividirOC && (cotizacionSeleccionada.ordenesCompra?.length ?? 0) > 0 && (cotizacionSeleccionada.estadosProductos ?? []).some((ep: any) => !ep.ordenCompraId && !(ep.enFOB || ep.enCIF || ep.recibido || ep.conBL)) && (
+                                  <button
+                                    onClick={() => setAgregarOcOpen(true)}
+                                    title="Agregar productos sueltos a una OC existente"
+                                    className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-emerald-600 transition-colors hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
+                                  >
+                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                    </svg>
+                                    Agregar a OC existente
+                                  </button>
+                                )}
                                 {canDividirOC && (cotizacionSeleccionada.ordenesCompra?.length ?? 0) > 0 && (
                                   <div className="relative">
                                     <button
@@ -2704,6 +2719,33 @@ export default function FollowUps() {
             ordenCompraId: ep.ordenCompraId,
           }))}
           ordenesExistentes={cotizacionSeleccionada.ordenesCompra || []}
+          onSuccess={() => {
+            if (cotizacionSeleccionada) seleccionarCotizacion(cotizacionSeleccionada);
+            cargarCotizaciones();
+          }}
+        />
+      )}
+
+      {/* Modal: agregar productos sueltos (sin OC) a una OC existente */}
+      {cotizacionSeleccionada && (
+        <AgregarProductosOCModal
+          open={agregarOcOpen}
+          onClose={() => setAgregarOcOpen(false)}
+          cotizacionNombre={cotizacionSeleccionada.nombreCotizacion}
+          productosBase={(cotizacionSeleccionada.estadosProductos ?? [])
+            .filter((ep: any) => !ep.ordenCompraId)
+            .map((ep: any) => ({
+              id: ep.id,
+              sku: ep.sku,
+              descripcion: ep.descripcion || ep.sku,
+              comprado: ep.comprado,
+              pagado: ep.pagado,
+              enFOB: ep.enFOB,
+              enCIF: ep.enCIF,
+              recibido: ep.recibido,
+              conBL: ep.conBL,
+            }))}
+          ordenesExistentes={cotizacionSeleccionada.ordenesCompra ?? []}
           onSuccess={() => {
             if (cotizacionSeleccionada) seleccionarCotizacion(cotizacionSeleccionada);
             cargarCotizaciones();

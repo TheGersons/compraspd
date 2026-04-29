@@ -66,6 +66,18 @@ export class OrdenCompraController {
     return this.service.moverProductos(id, body, user);
   }
 
+  @Patch(':id/agregar-productos')
+  @ApiOperation({
+    summary: 'Agregar productos sin OC (cotización base) a una OC existente',
+  })
+  agregarProductosDesdeBase(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { estadoProductoIds: string[] },
+    @CurrentUser() user: UserJwt,
+  ) {
+    return this.service.agregarProductosDesdeBase(id, body, user);
+  }
+
   @Delete(':id')
   @ApiOperation({ summary: 'Eliminar una OC (los productos quedan sin asignar)' })
   eliminar(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: UserJwt) {

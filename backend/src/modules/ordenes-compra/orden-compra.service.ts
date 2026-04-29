@@ -259,6 +259,74 @@ export class OrdenCompraService {
   }
 
   /**
+   * Agregar productos sin OC (cotización base) a una OC existente.
+   * Útil cuando dividiste una OC y querés agregar más productos de la base
+   * a esa OC sin tener que crear una nueva.
+   */
+  async agregarProductosDesdeBase(
+    id: string,
+    dto: { estadoProductoIds: string[] },
+    user: UserJwt,
+  ) {
+    if (!this.isSupervisorOrAdmin(user)) {
+      throw new ForbiddenException(
+        'Solo supervisores/admin pueden agregar productos a una OC',
+      );
+    }
+
+    const { estadoProductoIds } = dto;
+    if (!estadoProductoIds?.length) {
+      throw new BadRequestException('Debe seleccionar al menos un producto');
+    }
+
+    const destino = await this.prisma.ordenCompra.findUnique({
+      where: { id },
+      select: { id: true, cotizacionId: true },
+    });
+    if (!destino) throw new NotFoundException('Orden de compra destino no encontrada');
+
+    const productos = await this.prisma.estadoProducto.findMany({
+      where: {
+        id: { in: estadoProductoIds },
+        cotizacionId: destino.cotizacionId,
+        ordenCompraId: null,
+      },
+      select: {
+        id: true,
+        comprado: true,
+        pagado: true,
+        enFOB: true,
+        enCIF: true,
+        recibido: true,
+        conBL: true,
+      },
+    });
+
+    if (productos.length !== estadoProductoIds.length) {
+      throw new BadRequestException(
+        'Algunos productos no pertenecen a la cotización base de esta OC o ya están asignados a otra OC',
+      );
+    }
+
+    const noElegibles = productos.filter((p) => !this.esProductoElegible(p));
+    if (noElegibles.length > 0) {
+      throw new BadRequestException(
+        `${noElegibles.length} producto(s) ya entraron en embarque (FOB/CIF/BL/recibido) y no se pueden mover`,
+      );
+    }
+
+    await this.prisma.estadoProducto.updateMany({
+      where: { id: { in: estadoProductoIds } },
+      data: { ordenCompraId: id },
+    });
+
+    return {
+      message: `${estadoProductoIds.length} producto(s) agregados a la OC`,
+      ordenCompraId: id,
+    };
+  }
+
+  /**
    * Eliminar una OC. Los productos que tuviera asignados quedan con ordenCompraId=null
    * (gracias a onDelete: SetNull en la FK).
    */
