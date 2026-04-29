@@ -186,7 +186,17 @@ export class OdooClientService implements OnModuleInit {
   } = {}): Promise<{ leads: OdooLead[]; total: number }> {
     const domain: any[] = [['type', '=', 'opportunity']];
 
-    if (opts.desde) domain.push(['create_date', '>=', `${opts.desde} 00:00:00`]);
+    // Si no se especifica fecha de inicio, limitar a los últimos 5 días
+    // para no traer todo el historial de Odoo.
+    if (opts.desde) {
+      domain.push(['create_date', '>=', `${opts.desde} 00:00:00`]);
+    } else {
+      const hace5dias = new Date();
+      hace5dias.setDate(hace5dias.getDate() - 5);
+      const ts = hace5dias.toISOString().slice(0, 10); // YYYY-MM-DD
+      domain.push(['create_date', '>=', `${ts} 00:00:00`]);
+    }
+
     if (opts.hasta) domain.push(['create_date', '<=', `${opts.hasta} 23:59:59`]);
     if (opts.search) domain.push(['name', 'ilike', opts.search]);
 
@@ -235,7 +245,16 @@ export class OdooClientService implements OnModuleInit {
       ['res_model', '=', ODOO_MODELS.LEAD],
       ['mimetype', 'in', EXCEL_MIME_TYPES],
     ];
-    if (desde) domain.push(['create_date', '>=', desde.toISOString().replace('T', ' ').slice(0, 19)]);
+
+    // Si no viene fecha explícita (primera ejecución tras reinicio),
+    // limitar igualmente a los últimos 5 días para no traer todo el historial.
+    const fechaBase = desde ?? (() => {
+      const d = new Date();
+      d.setDate(d.getDate() - 5);
+      return d;
+    })();
+    domain.push(['create_date', '>=', fechaBase.toISOString().replace('T', ' ').slice(0, 19)]);
+
     return this.searchRead<OdooAttachment>(
       ODOO_MODELS.ATTACHMENT, domain,
       ['id', 'name', 'mimetype', 'res_id', 'res_model', 'create_date', 'write_date'],

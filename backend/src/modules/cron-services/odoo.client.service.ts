@@ -188,11 +188,15 @@ export class OdooClientService implements OnModuleInit {
       ['mimetype', 'in', EXCEL_MIME_TYPES],
     ];
 
-    if (desde) {
-      // Odoo acepta fechas en formato 'YYYY-MM-DD HH:mm:ss'
-      const ts = desde.toISOString().replace('T', ' ').slice(0, 19);
-      domain.push(['create_date', '>=', ts]);
-    }
+    // Si no viene fecha explícita (primera ejecución tras reinicio),
+    // limitar a los últimos 5 días para no traer todo el historial de Odoo.
+    const fechaBase = desde ?? (() => {
+      const d = new Date();
+      d.setDate(d.getDate() - 5);
+      return d;
+    })();
+    // Odoo acepta fechas en formato 'YYYY-MM-DD HH:mm:ss'
+    domain.push(['create_date', '>=', fechaBase.toISOString().replace('T', ' ').slice(0, 19)]);
 
     return this.searchRead<OdooAttachment>(
       ODOO_MODELS.ATTACHMENT,
