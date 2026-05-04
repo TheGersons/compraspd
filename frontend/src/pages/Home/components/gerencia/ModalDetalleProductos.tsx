@@ -44,6 +44,10 @@ interface ModalDetalleProductosProps {
 type EstadoProducto = 'completado' | 'en_proceso' | 'atrasado' | 'pendiente';
 type OrdenColumna = 'default' | 'ordenCompra' | 'descripcion' | 'estado' | 'dias';
 type DireccionOrden = 'asc' | 'desc';
+type EstadoFiltro = 'TODOS' | EstadoProducto;
+type Bucket = 'activos' | 'cotizacion' | 'completados';
+
+const OPCIONES_ITEMS_POR_PAGINA = [20, 40, 60, 80, 100];
 
 interface CeldaSeleccionada {
   productoId: string;
@@ -234,6 +238,12 @@ export default function ModalDetalleProductos({
   const [direccionOrden, setDireccionOrden] = useState<DireccionOrden>('asc');
   const [filtroResponsable, setFiltroResponsable] = useState<string>('TODOS');
   const [filtroOrdenCompra, setFiltroOrdenCompra] = useState<string>('TODOS');
+  const [busqueda, setBusqueda] = useState<string>('');
+  const [filtroEstado, setFiltroEstado] = useState<EstadoFiltro>('TODOS');
+  const [mostrarCotizacion, setMostrarCotizacion] = useState<boolean>(false);
+  const [mostrarCompletados, setMostrarCompletados] = useState<boolean>(false);
+  const [paginaActual, setPaginaActual] = useState<number>(1);
+  const [itemsPorPagina, setItemsPorPagina] = useState<number>(20);
   const [celdaSeleccionada, setCeldaSeleccionada] = useState<CeldaSeleccionada | null>(null);
 
   const { user } = useAuth();
@@ -257,16 +267,72 @@ export default function ModalDetalleProductos({
     return ocs.map(oc => ({ id: oc, nombre: oc }));
   }, [productos, esInternacional]);
 
+  // Etapas relevantes según tipo de compra
+  const etapasRelevantes = useMemo(
+    () => (esInternacional ? ESTADOS_INTERNACIONAL : ESTADOS_NACIONAL),
+    [esInternacional],
+  );
+
+  // Bucket: activos (>=1 completado, <100%) | cotizacion (0 completados) | completados (100%)
+  const getBucket = useMemo(() => {
+    return (p: ProductoDetallado): Bucket => {
+      const completadosCount = etapasRelevantes.filter(e => p.estados[e] === 'completado').length;
+      if (completadosCount === etapasRelevantes.length) return 'completados';
+      if (completadosCount === 0) return 'cotizacion';
+      return 'activos';
+    };
+  }, [etapasRelevantes]);
+
+  // Conteos por bucket (sobre el dataset crudo, sin filtros aplicados)
+  const conteos = useMemo(() => {
+    return productos.reduce(
+      (acc, p) => {
+        acc[getBucket(p)]++;
+        return acc;
+      },
+      { activos: 0, cotizacion: 0, completados: 0 } as Record<Bucket, number>,
+    );
+  }, [productos, getBucket]);
+
   // Reset filtro cuando cambia la etapa
   useEffect(() => {
     setFiltroResponsable('TODOS');
     setFiltroOrdenCompra('TODOS');
+    setBusqueda('');
+    setFiltroEstado('TODOS');
+    setMostrarCotizacion(false);
+    setMostrarCompletados(false);
+    setPaginaActual(1);
     setCeldaSeleccionada(null);
   }, [etapa]);
+
+  // Reset paginación al cambiar cualquier filtro/orden/page-size
+  useEffect(() => {
+    setPaginaActual(1);
+  }, [
+    busqueda,
+    filtroEstado,
+    mostrarCotizacion,
+    mostrarCompletados,
+    filtroResponsable,
+    filtroOrdenCompra,
+    ordenColumna,
+    direccionOrden,
+    itemsPorPagina,
+  ]);
 
   const productosFiltrados = useMemo(() => {
     let resultado = [...productos];
 
+    // Filtro por bucket (toggles cotización / completados)
+    resultado = resultado.filter(p => {
+      const bucket = getBucket(p);
+      if (bucket === 'cotizacion' && !mostrarCotizacion) return false;
+      if (bucket === 'completados' && !mostrarCompletados) return false;
+      return true;
+    });
+
+    // Vista por etapa: ocultar pendientes en esa etapa
     if (!esVistaTotal) {
       resultado = resultado.filter(p => p.estados[etapa] !== 'pendiente');
     }
@@ -279,20 +345,58 @@ export default function ModalDetalleProductos({
       resultado = resultado.filter(p => (p.ordenCompra || '') === filtroOrdenCompra);
     }
 
+    // Búsqueda: descripción + OC
+    const q = busqueda.trim().toLowerCase();
+    if (q) {
+      resultado = resultado.filter(
+        p =>
+          (p.descripcion || '').toLowerCase().includes(q) ||
+          (p.ordenCompra || '').toLowerCase().includes(q),
+      );
+    }
+
+    // Filtro por estado
+    if (filtroEstado !== 'TODOS') {
+      if (esVistaTotal) {
+        resultado = resultado.filter(p =>
+          etapasRelevantes.some(e => p.estados[e] === filtroEstado),
+        );
+      } else {
+        resultado = resultado.filter(p => p.estados[etapa] === filtroEstado);
+      }
+    }
+
+    // Buckets siempre como criterio primario de orden
+    const bucketOrden: Record<Bucket, number> = { activos: 1, cotizacion: 2, completados: 3 };
+    const tieneEstado = (p: ProductoDetallado, est: EstadoProducto) =>
+      etapasRelevantes.some(e => p.estados[e] === est);
+    const countCompletados = (p: ProductoDetallado) =>
+      etapasRelevantes.filter(e => p.estados[e] === 'completado').length;
+    const maxDiasAtraso = (p: ProductoDetallado) =>
+      Math.max(...Object.values(p.diasAtraso).map(v => v || 0), 0);
+
     resultado.sort((a, b) => {
+      // 1. Bucket primero, siempre
+      const ba = bucketOrden[getBucket(a)];
+      const bb = bucketOrden[getBucket(b)];
+      if (ba !== bb) return ba - bb;
+
+      // 2. Dentro del bucket: aplica orden seleccionado
       if (ordenColumna === 'default') {
-        const getEstadoMasCritico = (p: ProductoDetallado): EstadoProducto => {
-          if (ESTADOS_INTERNACIONAL.some(e => p.estados[e] === 'atrasado')) return 'atrasado';
-          if (ESTADOS_INTERNACIONAL.some(e => p.estados[e] === 'en_proceso')) return 'en_proceso';
-          return 'completado';
-        };
-        const estadoA = esVistaTotal ? getEstadoMasCritico(a) : (a.estados[etapa] as EstadoProducto);
-        const estadoB = esVistaTotal ? getEstadoMasCritico(b) : (b.estados[etapa] as EstadoProducto);
-        const prio: Record<EstadoProducto, number> = { atrasado: 1, en_proceso: 2, completado: 3, pendiente: 4 };
-        if (prio[estadoA] !== prio[estadoB]) return prio[estadoA] - prio[estadoB];
-        const getDiasMax = (p: ProductoDetallado) =>
-          Math.max(...Object.values(p.diasAtraso).map(v => v || 0), 0);
-        return getDiasMax(b) - getDiasMax(a);
+        // Atrasados arriba
+        const aA = tieneEstado(a, 'atrasado') ? 1 : 0;
+        const bA = tieneEstado(b, 'atrasado') ? 1 : 0;
+        if (aA !== bA) return bA - aA;
+        // En proceso siguiente
+        const aP = tieneEstado(a, 'en_proceso') ? 1 : 0;
+        const bP = tieneEstado(b, 'en_proceso') ? 1 : 0;
+        if (aP !== bP) return bP - aP;
+        // Más completados arriba
+        const aC = countCompletados(a);
+        const bC = countCompletados(b);
+        if (aC !== bC) return bC - aC;
+        // Más días atraso arriba
+        return maxDiasAtraso(b) - maxDiasAtraso(a);
       }
       if (ordenColumna === 'ordenCompra') {
         const c = (a.ordenCompra || '').localeCompare(b.ordenCompra || '');
@@ -303,19 +407,50 @@ export default function ModalDetalleProductos({
         return direccionOrden === 'asc' ? c : -c;
       }
       if (ordenColumna === 'estado' && !esVistaTotal) {
-        const prio: Record<EstadoProducto, number> = { atrasado: 1, en_proceso: 2, completado: 3, pendiente: 4 };
-        const c = (prio[a.estados[etapa] as EstadoProducto] || 4) - (prio[b.estados[etapa] as EstadoProducto] || 4);
+        const prio: Record<EstadoProducto, number> = {
+          atrasado: 1, en_proceso: 2, completado: 3, pendiente: 4,
+        };
+        const c =
+          (prio[a.estados[etapa] as EstadoProducto] || 4) -
+          (prio[b.estados[etapa] as EstadoProducto] || 4);
         return direccionOrden === 'asc' ? c : -c;
       }
       if (ordenColumna === 'dias' && !esVistaTotal) {
-        const c = (a.diasAtraso[`diasAtraso_${etapa}`] || 0) - (b.diasAtraso[`diasAtraso_${etapa}`] || 0);
+        const c =
+          (a.diasAtraso[`diasAtraso_${etapa}`] || 0) -
+          (b.diasAtraso[`diasAtraso_${etapa}`] || 0);
         return direccionOrden === 'asc' ? c : -c;
       }
       return 0;
     });
 
     return resultado;
-  }, [productos, etapa, esVistaTotal, esInternacional, ordenColumna, direccionOrden, filtroResponsable, filtroOrdenCompra]);
+  }, [
+    productos,
+    etapa,
+    esVistaTotal,
+    esInternacional,
+    ordenColumna,
+    direccionOrden,
+    filtroResponsable,
+    filtroOrdenCompra,
+    busqueda,
+    filtroEstado,
+    mostrarCotizacion,
+    mostrarCompletados,
+    etapasRelevantes,
+    getBucket,
+  ]);
+
+  // Paginación
+  const totalItems = productosFiltrados.length;
+  const totalPaginas = Math.max(1, Math.ceil(totalItems / itemsPorPagina));
+  const paginaSegura = Math.min(Math.max(1, paginaActual), totalPaginas);
+  const inicio = (paginaSegura - 1) * itemsPorPagina;
+  const productosPagina = useMemo(
+    () => productosFiltrados.slice(inicio, inicio + itemsPorPagina),
+    [productosFiltrados, inicio, itemsPorPagina],
+  );
 
   if (!isOpen) return null;
 
@@ -400,7 +535,7 @@ export default function ModalDetalleProductos({
                 {nombresEtapas[etapa]}
               </h3>
               <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                Proyecto: {nombreProyecto} • {productosFiltrados.length} productos
+                Proyecto: {nombreProyecto} • {totalItems} productos
                 {ordenColumna !== 'default' && (
                   <span className="ml-2 text-blue-600 dark:text-blue-400">
                     • Ordenado por: {
@@ -458,9 +593,83 @@ export default function ModalDetalleProductos({
             </div>
           </div>
 
+          {/* Toolbar de filtros */}
+          <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-6 py-3 dark:border-gray-700 dark:bg-gray-800 flex-wrap">
+            {/* Búsqueda */}
+            <div className="relative flex-1 min-w-[220px] max-w-md">
+              <svg
+                className="absolute left-2.5 top-2 h-4 w-4 text-gray-400 pointer-events-none"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
+              </svg>
+              <input
+                type="text"
+                value={busqueda}
+                onChange={e => setBusqueda(e.target.value)}
+                placeholder="Buscar descripción u OC..."
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 pl-9 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+              />
+              {busqueda && (
+                <button
+                  type="button"
+                  onClick={() => setBusqueda('')}
+                  className="absolute right-2 top-1.5 rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700"
+                  title="Limpiar búsqueda"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            {/* Filtro Estado */}
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                Estado:
+              </label>
+              <select
+                value={filtroEstado}
+                onChange={e => setFiltroEstado(e.target.value as EstadoFiltro)}
+                className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+              >
+                <option value="TODOS">Todos</option>
+                <option value="atrasado">⚠ Atrasado</option>
+                <option value="en_proceso">⏳ En proceso</option>
+                <option value="completado">✓ Completado</option>
+                <option value="pendiente">○ Pendiente</option>
+              </select>
+            </div>
+
+            {/* Toggle cotización */}
+            <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800">
+              <input
+                type="checkbox"
+                checked={mostrarCotizacion}
+                onChange={e => setMostrarCotizacion(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span>En cotización ({conteos.cotizacion})</span>
+            </label>
+
+            {/* Toggle completados */}
+            <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800">
+              <input
+                type="checkbox"
+                checked={mostrarCompletados}
+                onChange={e => setMostrarCompletados(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span>Completados ({conteos.completados})</span>
+            </label>
+          </div>
+
           {/* Body */}
-          <div className="overflow-y-auto p-6" style={{ maxHeight: 'calc(90vh - 100px)' }}>
-            {productosFiltrados.length === 0 ? (
+          <div className="overflow-y-auto p-6" style={{ maxHeight: 'calc(90vh - 220px)' }}>
+            {totalItems === 0 ? (
               <div className="flex h-64 items-center justify-center">
                 <div className="text-center">
                   <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700">
@@ -501,7 +710,7 @@ export default function ModalDetalleProductos({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {productosFiltrados.map((producto) => (
+                    {productosPagina.map((producto) => (
                       <tr key={producto.id} className="transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50">
                         {esInternacional && (
                           <td className="sticky left-0 z-10 bg-white px-4 py-3 font-mono text-xs font-semibold text-gray-900 dark:bg-gray-800 dark:text-white">
@@ -563,7 +772,7 @@ export default function ModalDetalleProductos({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {productosFiltrados.map((producto) => {
+                    {productosPagina.map((producto) => {
                       const estado = (producto.estados[etapa] || 'pendiente') as EstadoProducto;
                       const badge = getEstadoBadge(estado);
                       const diasAtraso = producto.diasAtraso[`diasAtraso_${etapa}`] || 0;
@@ -623,11 +832,68 @@ export default function ModalDetalleProductos({
             )}
           </div>
 
-          {/* Footer */}
-          <div className="border-t-2 border-gray-200 bg-gray-50 px-6 py-3 dark:border-gray-700 dark:bg-gray-900">
-            <p className="text-xs text-gray-600 dark:text-gray-400">
-              💡 <strong>Tip:</strong> Haz click en los encabezados para ordenar • Haz click en una celda de estado para ver fechas
-            </p>
+          {/* Footer: paginación */}
+          <div className="flex items-center justify-between gap-3 border-t-2 border-gray-200 bg-gray-50 px-6 py-3 dark:border-gray-700 dark:bg-gray-900 flex-wrap">
+            <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+              <span>Mostrar:</span>
+              <select
+                value={itemsPorPagina}
+                onChange={e => setItemsPorPagina(Number(e.target.value))}
+                className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+              >
+                {OPCIONES_ITEMS_POR_PAGINA.map(n => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+              <span className="text-gray-400">•</span>
+              <span>
+                {totalItems === 0
+                  ? '0 de 0'
+                  : `${inicio + 1}-${Math.min(inicio + itemsPorPagina, totalItems)} de ${totalItems}`}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setPaginaActual(1)}
+                disabled={paginaSegura === 1}
+                className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                title="Primera página"
+              >
+                «
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaginaActual(p => Math.max(1, p - 1))}
+                disabled={paginaSegura === 1}
+                className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                title="Anterior"
+              >
+                ‹
+              </button>
+              <span className="px-2 text-xs font-medium text-gray-700 dark:text-gray-300">
+                Página {paginaSegura} de {totalPaginas}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPaginaActual(p => Math.min(totalPaginas, p + 1))}
+                disabled={paginaSegura === totalPaginas}
+                className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                title="Siguiente"
+              >
+                ›
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaginaActual(totalPaginas)}
+                disabled={paginaSegura === totalPaginas}
+                className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                title="Última página"
+              >
+                »
+              </button>
+            </div>
           </div>
         </div>
       </div>
