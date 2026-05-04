@@ -47,7 +47,10 @@ type DireccionOrden = 'asc' | 'desc';
 type EstadoFiltro = 'TODOS' | EstadoProducto | 'cotizacion';
 type Bucket = 'activos' | 'cotizacion' | 'completados';
 
-const OPCIONES_ITEMS_POR_PAGINA = [20, 40, 60, 80, 100];
+const ITEMS_POR_PAGINA_DEFAULT = 80;
+const ITEMS_POR_PAGINA_STEP = 20;
+const ITEMS_POR_PAGINA_MIN = 20;
+const ITEMS_POR_PAGINA_MAX = 200;
 
 interface CeldaSeleccionada {
   productoId: string;
@@ -241,7 +244,7 @@ export default function ModalDetalleProductos({
   const [busqueda, setBusqueda] = useState<string>('');
   const [filtroEstado, setFiltroEstado] = useState<EstadoFiltro>('TODOS');
   const [paginaActual, setPaginaActual] = useState<number>(1);
-  const [itemsPorPagina, setItemsPorPagina] = useState<number>(20);
+  const [itemsPorPagina, setItemsPorPagina] = useState<number>(ITEMS_POR_PAGINA_DEFAULT);
   const [celdaSeleccionada, setCeldaSeleccionada] = useState<CeldaSeleccionada | null>(null);
 
   const { user } = useAuth();
@@ -809,65 +812,59 @@ export default function ModalDetalleProductos({
           </div>
 
           {/* Footer: paginación */}
-          <div className="flex items-center justify-between gap-3 border-t-2 border-gray-200 bg-gray-50 px-6 py-3 dark:border-gray-700 dark:bg-gray-900 flex-wrap">
-            <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-              <span>Mostrar:</span>
-              <select
-                value={itemsPorPagina}
-                onChange={e => setItemsPorPagina(Number(e.target.value))}
-                className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-              >
-                {OPCIONES_ITEMS_POR_PAGINA.map(n => (
-                  <option key={n} value={n}>{n}</option>
-                ))}
-              </select>
-              <span className="text-gray-400">•</span>
-              <span>
+          <div className="flex items-center justify-between gap-4 border-t-2 border-gray-200 bg-gray-50 px-6 py-4 dark:border-gray-700 dark:bg-gray-900 flex-wrap">
+            {/* Contador + controles de items por página */}
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-700 dark:text-gray-300">
                 {totalItems === 0
-                  ? '0 de 0'
-                  : `${inicio + 1}-${Math.min(inicio + itemsPorPagina, totalItems)} de ${totalItems}`}
+                  ? '0 resultados'
+                  : `Mostrando ${inicio + 1} a ${Math.min(inicio + itemsPorPagina, totalItems)} de ${totalItems}`}
               </span>
+              <div className="flex items-center gap-1 rounded-lg border border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-800">
+                <button
+                  type="button"
+                  onClick={() => setItemsPorPagina(n => Math.max(ITEMS_POR_PAGINA_MIN, n - ITEMS_POR_PAGINA_STEP))}
+                  disabled={itemsPorPagina <= ITEMS_POR_PAGINA_MIN}
+                  className="px-3 py-1.5 text-sm font-bold text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed dark:text-gray-300 dark:hover:bg-gray-700 rounded-l-lg transition-colors"
+                  title="Mostrar menos"
+                >
+                  −
+                </button>
+                <span className="px-3 py-1.5 text-sm font-medium text-gray-900 dark:text-white border-x border-gray-300 dark:border-gray-600 select-none">
+                  {itemsPorPagina} por pág.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setItemsPorPagina(n => Math.min(ITEMS_POR_PAGINA_MAX, n + ITEMS_POR_PAGINA_STEP))}
+                  disabled={itemsPorPagina >= ITEMS_POR_PAGINA_MAX}
+                  className="px-3 py-1.5 text-sm font-bold text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed dark:text-gray-300 dark:hover:bg-gray-700 rounded-r-lg transition-colors"
+                  title="Mostrar más"
+                >
+                  +
+                </button>
+              </div>
             </div>
 
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => setPaginaActual(1)}
-                disabled={paginaSegura === 1}
-                className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-                title="Primera página"
-              >
-                «
-              </button>
+            {/* Navegación de páginas */}
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setPaginaActual(p => Math.max(1, p - 1))}
                 disabled={paginaSegura === 1}
-                className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-                title="Anterior"
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 transition-colors"
               >
-                ‹
+                ← Anterior
               </button>
-              <span className="px-2 text-xs font-medium text-gray-700 dark:text-gray-300">
+              <span className="px-4 text-sm text-gray-700 dark:text-gray-300 font-medium">
                 Página {paginaSegura} de {totalPaginas}
               </span>
               <button
                 type="button"
                 onClick={() => setPaginaActual(p => Math.min(totalPaginas, p + 1))}
                 disabled={paginaSegura === totalPaginas}
-                className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-                title="Siguiente"
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 transition-colors"
               >
-                ›
-              </button>
-              <button
-                type="button"
-                onClick={() => setPaginaActual(totalPaginas)}
-                disabled={paginaSegura === totalPaginas}
-                className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-                title="Última página"
-              >
-                »
+                Siguiente →
               </button>
             </div>
           </div>
