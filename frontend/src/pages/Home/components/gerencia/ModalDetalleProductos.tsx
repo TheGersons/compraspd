@@ -44,7 +44,7 @@ interface ModalDetalleProductosProps {
 type EstadoProducto = 'completado' | 'en_proceso' | 'atrasado' | 'pendiente';
 type OrdenColumna = 'default' | 'ordenCompra' | 'descripcion' | 'estado' | 'dias';
 type DireccionOrden = 'asc' | 'desc';
-type EstadoFiltro = 'TODOS' | EstadoProducto;
+type EstadoFiltro = 'TODOS' | EstadoProducto | 'cotizacion';
 type Bucket = 'activos' | 'cotizacion' | 'completados';
 
 const OPCIONES_ITEMS_POR_PAGINA = [20, 40, 60, 80, 100];
@@ -240,8 +240,6 @@ export default function ModalDetalleProductos({
   const [filtroOrdenCompra, setFiltroOrdenCompra] = useState<string>('TODOS');
   const [busqueda, setBusqueda] = useState<string>('');
   const [filtroEstado, setFiltroEstado] = useState<EstadoFiltro>('TODOS');
-  const [mostrarCotizacion, setMostrarCotizacion] = useState<boolean>(false);
-  const [mostrarCompletados, setMostrarCompletados] = useState<boolean>(false);
   const [paginaActual, setPaginaActual] = useState<number>(1);
   const [itemsPorPagina, setItemsPorPagina] = useState<number>(20);
   const [celdaSeleccionada, setCeldaSeleccionada] = useState<CeldaSeleccionada | null>(null);
@@ -300,8 +298,6 @@ export default function ModalDetalleProductos({
     setFiltroOrdenCompra('TODOS');
     setBusqueda('');
     setFiltroEstado('TODOS');
-    setMostrarCotizacion(false);
-    setMostrarCompletados(false);
     setPaginaActual(1);
     setCeldaSeleccionada(null);
   }, [etapa]);
@@ -312,8 +308,6 @@ export default function ModalDetalleProductos({
   }, [
     busqueda,
     filtroEstado,
-    mostrarCotizacion,
-    mostrarCompletados,
     filtroResponsable,
     filtroOrdenCompra,
     ordenColumna,
@@ -324,16 +318,32 @@ export default function ModalDetalleProductos({
   const productosFiltrados = useMemo(() => {
     let resultado = [...productos];
 
-    // Filtro por bucket (toggles cotización / completados)
-    resultado = resultado.filter(p => {
-      const bucket = getBucket(p);
-      if (bucket === 'cotizacion' && !mostrarCotizacion) return false;
-      if (bucket === 'completados' && !mostrarCompletados) return false;
-      return true;
-    });
+    // Filtro por bucket según filtroEstado:
+    // cotizacion/completado como valor especial → muestra solo ese bucket
+    // atrasado/en_proceso/pendiente → solo activos filtrados por ese estado
+    // TODOS → solo activos (comportamiento default)
+    if (filtroEstado === 'cotizacion') {
+      resultado = resultado.filter(p => getBucket(p) === 'cotizacion');
+    } else if (filtroEstado === 'completado') {
+      resultado = resultado.filter(p => getBucket(p) === 'completados');
+    } else {
+      // activos únicamente
+      resultado = resultado.filter(p => getBucket(p) === 'activos');
 
-    // Vista por etapa: ocultar pendientes en esa etapa
-    if (!esVistaTotal) {
+      // Dentro de activos, filtrar por estado concreto si aplica
+      if (filtroEstado !== 'TODOS') {
+        if (esVistaTotal) {
+          resultado = resultado.filter(p =>
+            etapasRelevantes.some(e => p.estados[e] === filtroEstado),
+          );
+        } else {
+          resultado = resultado.filter(p => p.estados[etapa] === filtroEstado);
+        }
+      }
+    }
+
+    // Vista por etapa: ocultar pendientes en esa etapa (solo en activos)
+    if (!esVistaTotal && filtroEstado !== 'cotizacion' && filtroEstado !== 'completado') {
       resultado = resultado.filter(p => p.estados[etapa] !== 'pendiente');
     }
 
@@ -353,17 +363,6 @@ export default function ModalDetalleProductos({
           (p.descripcion || '').toLowerCase().includes(q) ||
           (p.ordenCompra || '').toLowerCase().includes(q),
       );
-    }
-
-    // Filtro por estado
-    if (filtroEstado !== 'TODOS') {
-      if (esVistaTotal) {
-        resultado = resultado.filter(p =>
-          etapasRelevantes.some(e => p.estados[e] === filtroEstado),
-        );
-      } else {
-        resultado = resultado.filter(p => p.estados[etapa] === filtroEstado);
-      }
     }
 
     // Buckets siempre como criterio primario de orden
@@ -436,8 +435,6 @@ export default function ModalDetalleProductos({
     filtroOrdenCompra,
     busqueda,
     filtroEstado,
-    mostrarCotizacion,
-    mostrarCompletados,
     etapasRelevantes,
     getBucket,
   ]);
@@ -629,42 +626,21 @@ export default function ModalDetalleProductos({
             {/* Filtro Estado */}
             <div className="flex items-center gap-2">
               <label className="text-xs font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                Estado:
+                Mostrar:
               </label>
               <select
                 value={filtroEstado}
                 onChange={e => setFiltroEstado(e.target.value as EstadoFiltro)}
                 className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
               >
-                <option value="TODOS">Todos</option>
-                <option value="atrasado">⚠ Atrasado</option>
+                <option value="TODOS">Activos</option>
+                <option value="atrasado">⚠ Atrasados</option>
                 <option value="en_proceso">⏳ En proceso</option>
-                <option value="completado">✓ Completado</option>
-                <option value="pendiente">○ Pendiente</option>
+                <option value="pendiente">○ Pendientes</option>
+                <option value="cotizacion">📋 En cotización ({conteos.cotizacion})</option>
+                <option value="completado">✓ Completados ({conteos.completados})</option>
               </select>
             </div>
-
-            {/* Toggle cotización */}
-            <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800">
-              <input
-                type="checkbox"
-                checked={mostrarCotizacion}
-                onChange={e => setMostrarCotizacion(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <span>En cotización ({conteos.cotizacion})</span>
-            </label>
-
-            {/* Toggle completados */}
-            <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800">
-              <input
-                type="checkbox"
-                checked={mostrarCompletados}
-                onChange={e => setMostrarCompletados(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <span>Completados ({conteos.completados})</span>
-            </label>
           </div>
 
           {/* Body */}
