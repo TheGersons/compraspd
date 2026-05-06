@@ -16,6 +16,7 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   '/quotes/my-quotes': [],
   '/quotes/history': [],
   '/reportes': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'],
+  '/reportes/productos': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'],
   '/quotes/follow-ups': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS', 'COMERCIAL'],
   '/quotes/assignment': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'],
   '/quotes/rejected': ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'],

@@ -47,6 +47,7 @@ import Proveedores from "./pages/Proveedores/Proveedores";
 import AprobacionCompras from "./pages/Shopping/AprobacionCompras";
 import RejectedQuotes from "./pages/Quotes/Rejectedquotes";
 import Reports from "./pages/Quotes/Reports";
+import ReportesProductos from "./pages/Quotes/ReportesProductos";
 import Licitaciones from "./pages/Licitaciones/Licitaciones";
 import Archivadas from "./pages/Licitaciones/Archivadas";
 import OfertasArchivadas from "./pages/Ofertas/OfertasArchivadas";
@@ -325,6 +326,14 @@ export default function App() {
                 element={
                   <ProtectedRoute roles={STAFF_ROLES}>
                     <Reports />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/reportes/productos"
+                element={
+                  <ProtectedRoute roles={STAFF_ROLES}>
+                    <ReportesProductos />
                   </ProtectedRoute>
                 }
               />

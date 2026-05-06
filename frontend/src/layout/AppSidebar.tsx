@@ -118,7 +118,10 @@ const navItems: NavItem[] = [
     icon: <BoxCubeIcon />,
     name: "Reportes",
     roles: ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS"],
-    path: "/reportes",
+    subItems: [
+      { name: "Seguimiento de Compras", path: "/reportes",          pro: false },
+      { name: "Por Producto",           path: "/reportes/productos", pro: false },
+    ],
   },
 ];
 

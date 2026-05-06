@@ -10,6 +10,17 @@ type UserJwt = { sub: string; role?: string };
 const ESTADOS_FINALES = ['RECHAZADA', 'CANCELADA'];
 const ROLES_PERMITIDOS = ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS', 'GERENCIA'];
 
+const ESTADOS_PRODUCTO_ORDEN = [
+  'recibido', 'enCIF', 'segundoSeguimiento', 'conBL',
+  'cotizacionFleteInternacional', 'enFOB', 'primerSeguimiento',
+  'aprobacionPlanos', 'pagado', 'comprado',
+  'aprobacionCompra', 'conDescuento', 'cotizado',
+] as const;
+
+function derivarEstatus(ep: any): string {
+  return ESTADOS_PRODUCTO_ORDEN.find((k) => ep[k]) ?? 'pendiente';
+}
+
 const CAMPO_LABELS: Record<string, string> = {
   numeroPO: '#PO',
   proveedor: 'Proveedor',
@@ -189,6 +200,118 @@ export class ReportesService {
     return updated;
   }
 
+  // ── Reporte por producto ──────────────────────────────────────────────────
+
+  async getFiltrosProductos(user: UserJwt) {
+    await this.verificarAcceso(user);
+    const [proyectos, responsables] = await Promise.all([
+      this.prisma.proyecto.findMany({
+        where: { estado: true },
+        select: { id: true, nombre: true },
+        orderBy: { nombre: 'asc' },
+      }),
+      this.prisma.usuario.findMany({
+        where: { activo: true, rol: { nombre: { in: ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'] } } },
+        select: { id: true, nombre: true },
+        orderBy: { nombre: 'asc' },
+      }),
+    ]);
+    return { proyectos, responsables };
+  }
+
+  async listarProductos(
+    user: UserJwt,
+    filters: {
+      desde?: string;
+      hasta?: string;
+      tipoCompra?: string;
+      vista?: string;
+      proyectoId?: string;
+      responsableId?: string;
+      proveedor?: string;
+      oc?: string;
+      descripcion?: string;
+    },
+  ) {
+    await this.verificarAcceso(user);
+
+    const cotizacionWhere: any = {
+      estado: { notIn: ESTADOS_FINALES },
+      NOT: { tipo: { nombre: { contains: 'logistica', mode: 'insensitive' } } },
+    };
+
+    if (filters.tipoCompra && filters.tipoCompra !== 'TODAS') {
+      cotizacionWhere.tipoCompra = filters.tipoCompra;
+    }
+
+    if (filters.desde || filters.hasta) {
+      cotizacionWhere.fechaSolicitud = {};
+      if (filters.desde) cotizacionWhere.fechaSolicitud.gte = new Date(filters.desde);
+      if (filters.hasta) {
+        const fin = new Date(filters.hasta);
+        fin.setHours(23, 59, 59, 999);
+        cotizacionWhere.fechaSolicitud.lte = fin;
+      }
+    }
+
+    const where: any = {
+      rechazado: false,
+      cotizacionId: { not: null },
+      cotizacion: cotizacionWhere,
+    };
+
+    if (filters.vista === 'COTIZACION') where.compraId = null;
+    if (filters.vista === 'COMPRA') where.compraId = { not: null };
+
+    if (filters.proyectoId && filters.proyectoId !== 'TODOS') {
+      where.proyectoId = filters.proyectoId;
+    }
+    if (filters.responsableId && filters.responsableId !== 'TODOS') {
+      where.responsableSeguimientoId = filters.responsableId;
+    }
+    if (filters.proveedor) {
+      where.proveedor = { contains: filters.proveedor, mode: 'insensitive' };
+    }
+    if (filters.oc) {
+      where.ordenCompra = {
+        OR: [
+          { nombre:   { contains: filters.oc, mode: 'insensitive' } },
+          { numeroOC: { contains: filters.oc, mode: 'insensitive' } },
+        ],
+      };
+    }
+    if (filters.descripcion) {
+      where.OR = [
+        { descripcion: { contains: filters.descripcion, mode: 'insensitive' } },
+        { cotizacionDetalle: { descripcionProducto: { contains: filters.descripcion, mode: 'insensitive' } } },
+      ];
+    }
+
+    const productos = await this.prisma.estadoProducto.findMany({
+      where,
+      include: {
+        proyecto:               { select: { id: true, nombre: true } },
+        ordenCompra:            { select: { id: true, nombre: true, numeroOC: true } },
+        responsableSeguimiento: { select: { id: true, nombre: true } },
+        cotizacionDetalle:      { select: { descripcionProducto: true, cantidad: true } },
+        cotizacion: {
+          select: {
+            id: true,
+            nombreCotizacion: true,
+            tipoCompra: true,
+            estado: true,
+            fechaSolicitud: true,
+            tipo: { select: { nombre: true, area: { select: { nombreArea: true } } } },
+            supervisorResponsable: { select: { id: true, nombre: true } },
+          },
+        },
+      },
+      orderBy: [{ cotizacion: { fechaSolicitud: 'desc' } }, { creado: 'desc' }],
+    });
+
+    return productos.map((ep) => this.mapProductoRow(ep));
+  }
+
   // ── Private mapper ────────────────────────────────────────────────────────
 
   private mapRow(c: any) {
@@ -256,6 +379,41 @@ export class ReportesService {
       saldoPendiente,
       statusPago,
       actualizado: r.actualizado,
+    };
+  }
+
+  private mapProductoRow(ep: any) {
+    const descripcion =
+      ep.cotizacionDetalle?.descripcionProducto ?? ep.descripcion ?? '';
+    const cantidad = ep.cotizacionDetalle?.cantidad ?? ep.cantidad ?? null;
+
+    return {
+      id: ep.id,
+      cotizacionId: ep.cotizacionId,
+      nombreCotizacion: ep.cotizacion?.nombreCotizacion ?? null,
+      estadoCotizacion: ep.cotizacion?.estado ?? null,
+      tipoCompra: ep.cotizacion?.tipoCompra ?? null,
+      fechaSolicitud: ep.cotizacion?.fechaSolicitud ?? null,
+      area: ep.cotizacion?.tipo?.area?.nombreArea ?? null,
+      tipo: ep.cotizacion?.tipo?.nombre ?? null,
+      supervisorCotizacion: ep.cotizacion?.supervisorResponsable
+        ? { id: ep.cotizacion.supervisorResponsable.id, nombre: ep.cotizacion.supervisorResponsable.nombre }
+        : null,
+      proyecto: ep.proyecto ? { id: ep.proyecto.id, nombre: ep.proyecto.nombre } : null,
+      ordenCompra: ep.ordenCompra
+        ? { id: ep.ordenCompra.id, nombre: ep.ordenCompra.nombre, numeroOC: ep.ordenCompra.numeroOC ?? null }
+        : null,
+      descripcion,
+      cantidad,
+      sku: ep.sku ?? null,
+      proveedor: ep.proveedor ?? null,
+      estatusActual: derivarEstatus(ep),
+      estadoGeneral: ep.estadoGeneral ?? 'warn',
+      diasRetrasoActual: ep.diasRetrasoActual ?? 0,
+      responsable: ep.responsableSeguimiento
+        ? { id: ep.responsableSeguimiento.id, nombre: ep.responsableSeguimiento.nombre }
+        : null,
+      compraId: ep.compraId ?? null,
     };
   }
 }

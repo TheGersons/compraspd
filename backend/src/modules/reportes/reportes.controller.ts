@@ -24,14 +24,48 @@ export class ReportesController {
 
   @Get()
   @ApiOperation({ summary: 'Listar reportes de cotizaciones en proceso' })
-  @ApiQuery({ name: 'desde', required: false, description: 'Fecha inicio (YYYY-MM-DD)' })
-  @ApiQuery({ name: 'hasta', required: false, description: 'Fecha fin (YYYY-MM-DD), por defecto hoy' })
+  @ApiQuery({ name: 'desde', required: false })
+  @ApiQuery({ name: 'hasta', required: false })
   listar(
     @CurrentUser() user: UserJwt,
     @Query('desde') desde?: string,
     @Query('hasta') hasta?: string,
   ) {
     return this.service.listar(user, { desde, hasta });
+  }
+
+  @Get('productos/filtros')
+  @ApiOperation({ summary: 'Opciones de filtro para el reporte por producto' })
+  getFiltrosProductos(@CurrentUser() user: UserJwt) {
+    return this.service.getFiltrosProductos(user);
+  }
+
+  @Get('productos')
+  @ApiOperation({ summary: 'Reporte de productos en seguimiento' })
+  @ApiQuery({ name: 'desde',         required: false })
+  @ApiQuery({ name: 'hasta',         required: false })
+  @ApiQuery({ name: 'tipoCompra',    required: false, description: 'TODAS|NACIONAL|INTERNACIONAL' })
+  @ApiQuery({ name: 'vista',         required: false, description: 'AMBOS|COTIZACION|COMPRA' })
+  @ApiQuery({ name: 'proyectoId',    required: false })
+  @ApiQuery({ name: 'responsableId', required: false })
+  @ApiQuery({ name: 'proveedor',     required: false })
+  @ApiQuery({ name: 'oc',            required: false })
+  @ApiQuery({ name: 'descripcion',   required: false })
+  listarProductos(
+    @CurrentUser() user: UserJwt,
+    @Query('desde')         desde?: string,
+    @Query('hasta')         hasta?: string,
+    @Query('tipoCompra')    tipoCompra?: string,
+    @Query('vista')         vista?: string,
+    @Query('proyectoId')    proyectoId?: string,
+    @Query('responsableId') responsableId?: string,
+    @Query('proveedor')     proveedor?: string,
+    @Query('oc')            oc?: string,
+    @Query('descripcion')   descripcion?: string,
+  ) {
+    return this.service.listarProductos(user, {
+      desde, hasta, tipoCompra, vista, proyectoId, responsableId, proveedor, oc, descripcion,
+    });
   }
 
   @Get(':id/logs')
