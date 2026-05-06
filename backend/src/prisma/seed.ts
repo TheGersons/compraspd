@@ -59,6 +59,26 @@ async function main() {
     },
   });
 
+  await prisma.rol.upsert({
+    where: { nombre: 'GERENCIA' },
+    update: {},
+    create: {
+      nombre: 'GERENCIA',
+      descripcion: 'Gerencia: acceso de solo lectura a todos los módulos, sin interacción con procesos',
+      activo: true,
+    },
+  });
+
+  await prisma.rol.upsert({
+    where: { nombre: 'IMPORT_EXPORT' },
+    update: {},
+    create: {
+      nombre: 'IMPORT_EXPORT',
+      descripcion: 'Import/Export: acceso equivalente a Supervisor, solo procesos internacionales en seguimientos',
+      activo: true,
+    },
+  });
+
   console.log('✅ Roles creados\n');
 
   // ==========================================================================

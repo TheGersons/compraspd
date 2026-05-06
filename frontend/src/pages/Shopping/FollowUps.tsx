@@ -537,6 +537,7 @@ export default function ShoppingFollowUps() {
   const { addNotification } = useNotifications();
   const { user } = useAuth();
   const isComercial = user?.rol?.nombre?.toUpperCase() === 'COMERCIAL';
+  const isImportExport = user?.rol?.nombre?.toUpperCase() === 'IMPORT_EXPORT';
   const canAsignarResponsable = ['JEFE_COMPRAS', 'ADMIN'].includes(user?.rol?.nombre?.toUpperCase() || '');
   const canDividirOC = ['JEFE_COMPRAS', 'ADMIN', 'SUPERVISOR'].includes(user?.rol?.nombre?.toUpperCase() || '');
   const [splitOcGrupo, setSplitOcGrupo] = useState<{ cotizacionId: string; nombre: string } | null>(null);
@@ -627,6 +628,11 @@ export default function ShoppingFollowUps() {
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
+
+  // Forzar solo procesos internacionales para IMPORT_EXPORT
+  useEffect(() => {
+    if (isImportExport) setFiltroTipoCompra('INTERNACIONAL');
+  }, [isImportExport]);
 
   // Efectos
   useEffect(() => {
@@ -1184,7 +1190,8 @@ export default function ShoppingFollowUps() {
                 allValue=""
               />
             </div>
-            {/* Tipo de compra */}
+            {/* Tipo de compra — oculto para IMPORT_EXPORT (solo ven INTERNACIONAL) */}
+            {!isImportExport && (
             <div className="flex items-center gap-2 flex-1 min-w-[180px]">
               <label className="shrink-0 text-sm font-medium text-gray-700 dark:text-gray-300">Tipo:</label>
               <select
@@ -1197,6 +1204,7 @@ export default function ShoppingFollowUps() {
                 <option value="INTERNACIONAL">Internacional</option>
               </select>
             </div>
+            )}
           </div>
         </div>
 

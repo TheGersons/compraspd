@@ -657,6 +657,7 @@ export default function FollowUps() {
   const { user, isLoading } = useAuth();
   const isComercial = user?.rol?.nombre?.toUpperCase() === 'COMERCIAL';
   const userRoleName = user?.rol?.nombre?.toUpperCase() || '';
+  const isImportExport = userRoleName === 'IMPORT_EXPORT';
   const canAsignarResponsable = ['JEFE_COMPRAS', 'ADMIN'].includes(userRoleName);
   const canEditNombre = ['JEFE_COMPRAS', 'ADMIN'].includes(userRoleName);
   const canDividirOC = ['JEFE_COMPRAS', 'ADMIN', 'SUPERVISOR'].includes(userRoleName);
@@ -1209,7 +1210,8 @@ export default function FollowUps() {
       const matchesEstado = incluirCompletadas ||
         !['APROBADA_COMPLETA', 'COMPLETADA'].includes(cot.estado);
 
-      return matchesSearchTerm && matchesResponsable && matchesSolicitante && matchesArea && matchesFecha && matchesEstado;
+      const matchesTipoCompra = !isImportExport || cot.tipoCompra === 'INTERNACIONAL';
+      return matchesSearchTerm && matchesResponsable && matchesSolicitante && matchesArea && matchesFecha && matchesEstado && matchesTipoCompra;
     });
     return filtered;
   })();

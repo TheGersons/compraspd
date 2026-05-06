@@ -64,10 +64,10 @@ import LogisticaShoppingDocuments from "./pages/Shopping/Logistica/Documents";
 import AdminCotizaciones from "./pages/Admin/AdminCotizaciones";
 import NuevaVersionBanner from "./components/NuevaVersionBanner";
 
-const SHOPPING_MANAGER_ROLES = ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS"];
-const QUOTES_SUPERVISOR_ROLES = ["SUPERVISOR", "ADMIN", "JEFE_COMPRAS"];
-const STAFF_ROLES = ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS"]; // Todos menos USUARIO/COMERCIAL
-const COMERCIAL_ROLES = ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS", "COMERCIAL"]; // Compras/Licitaciones/Ofertas comerciales
+const SHOPPING_MANAGER_ROLES = ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS", "GERENCIA", "IMPORT_EXPORT"];
+const QUOTES_SUPERVISOR_ROLES = ["SUPERVISOR", "ADMIN", "JEFE_COMPRAS", "GERENCIA", "IMPORT_EXPORT"];
+const STAFF_ROLES = ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS", "GERENCIA", "IMPORT_EXPORT"];
+const COMERCIAL_ROLES = ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS", "COMERCIAL", "GERENCIA", "IMPORT_EXPORT"];
 
 export default function App() {
   const [accessDenied, setAccessDenied] = useState({ open: false, message: '' });
@@ -400,7 +400,7 @@ export default function App() {
               <Route
                 path="/Profiles"
                 element={
-                  <ProtectedRoute roles={["ADMIN", "SUPERVISOR", "JEFE_COMPRAS"]}>
+                  <ProtectedRoute roles={["ADMIN", "SUPERVISOR", "JEFE_COMPRAS", "GERENCIA", "IMPORT_EXPORT"]}>
                     <Profiles />
                   </ProtectedRoute>
                 }

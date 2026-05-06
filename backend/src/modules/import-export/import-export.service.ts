@@ -4,7 +4,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { MailService } from '../Mail/mail.service';
 import { NotificacionService } from '../notifications/notificacion.service';
 
 type UserJwt = { sub: string; role?: string };
@@ -85,14 +84,12 @@ const CAMPOS_BOOLEAN = new Set<string>([
 
 const CAMPOS_EDITABLES = Object.keys(CAMPO_LABELS);
 
-const IMPORT_EXPORT_NOTIFICATION_EMAIL = 'importexport@energiapd.com';
-const ROLES_NOTIFICAR = ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'];
+const ROLES_NOTIFICAR = ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS', 'IMPORT_EXPORT'];
 
 @Injectable()
 export class ImportExportService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly mailService: MailService,
     private readonly notificacionService: NotificacionService,
   ) {}
 
@@ -107,7 +104,8 @@ export class ImportExportService {
       !rol.includes('admin') &&
       !rol.includes('jefe') &&
       !rol.includes('gerencia') &&
-      !rol.includes('compras')
+      !rol.includes('compras') &&
+      !rol.includes('import_export')
     ) {
       throw new ForbiddenException('Acceso restringido');
     }
@@ -178,16 +176,6 @@ export class ImportExportService {
       for (const c of faltantes) {
         const nombre = (c as any).nombreCotizacion ?? c.id;
         const solicitante = (c as any).solicitante?.nombre ?? '—';
-
-        // Email
-        this.mailService
-          .sendNuevoSeguimientoNotification(
-            IMPORT_EXPORT_NOTIFICATION_EMAIL,
-            nombre,
-            solicitante,
-            url,
-          )
-          .catch(() => {});
 
         // In-app notifications
         if (userIds.length > 0) {

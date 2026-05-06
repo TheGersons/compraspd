@@ -362,7 +362,7 @@ export class MessagesService {
     return this.prisma.usuario.findMany({
       where: {
         activo: true,
-        rol: { nombre: { in: ['SUPERVISOR', 'JEFE_COMPRAS'] } },
+        rol: { nombre: { in: ['SUPERVISOR', 'USUARIO', 'IMPORT_EXPORT', 'COMERCIAL'] } },
       },
       select: { id: true, nombre: true, email: true, rol: { select: { nombre: true } } },
       orderBy: { nombre: 'asc' },

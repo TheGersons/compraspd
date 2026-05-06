@@ -626,6 +626,7 @@ export default function FollowUps() {
   const [notasAbiertas, setNotasAbiertas] = useState<string | null>(null);
   const { user, isLoading } = useAuth();
   const isComercial = user?.rol?.nombre?.toUpperCase() === 'COMERCIAL';
+  const isImportExport = user?.rol?.nombre?.toUpperCase() === 'IMPORT_EXPORT';
   const canAsignarResponsable = ['JEFE_COMPRAS', 'ADMIN'].includes(user?.rol?.nombre?.toUpperCase() || '');
   const canDividirOC = ['JEFE_COMPRAS', 'ADMIN', 'SUPERVISOR'].includes(user?.rol?.nombre?.toUpperCase() || '');
   const [splitOcOpen, setSplitOcOpen] = useState(false);
@@ -1184,7 +1185,8 @@ export default function FollowUps() {
         }
       })();
 
-      return matchesSearchTerm && matchesResponsable && matchesSolicitante && matchesArea && matchesFecha;
+      const matchesTipoCompra = !isImportExport || cot.tipoCompra === 'INTERNACIONAL';
+      return matchesSearchTerm && matchesResponsable && matchesSolicitante && matchesArea && matchesFecha && matchesTipoCompra;
     });
     return filtered;
   })();
