@@ -332,6 +332,7 @@ const ESTADO_COT: Record<string, { label: string; cls: string }> = {
 export default function Reports() {
   const [reportes, setReportes] = useState<Reporte[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
   const [logReporteId, setLogReporteId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -343,12 +344,18 @@ export default function Reports() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const params = new URLSearchParams();
       if (desde) params.set("desde", desde);
       if (hasta) params.set("hasta", hasta);
       const data = await apiFetch<Reporte[]>(`/api/v1/reportes?${params}`);
       setReportes(data);
+    } catch (e: any) {
+      const msg = e?.message === "403"
+        ? "No tienes permiso para ver esta página."
+        : `Error al cargar los reportes (${e?.message ?? "desconocido"}). Verifica tu conexión.`;
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -580,6 +587,17 @@ export default function Reports() {
       {loading ? (
         <div className="flex h-64 items-center justify-center">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+        </div>
+      ) : error ? (
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-rose-200 bg-rose-50 py-16 text-center dark:border-rose-800 dark:bg-rose-900/20">
+          <span className="text-3xl mb-3">⚠️</span>
+          <p className="text-sm font-medium text-rose-700 dark:text-rose-400">{error}</p>
+          <button
+            onClick={fetchData}
+            className="mt-4 rounded-lg border border-rose-300 px-4 py-2 text-xs text-rose-600 hover:bg-rose-100 dark:border-rose-700 dark:text-rose-400 dark:hover:bg-rose-900/30"
+          >
+            Reintentar
+          </button>
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white py-20 text-center dark:border-gray-700 dark:bg-gray-800">

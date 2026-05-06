@@ -38,12 +38,9 @@ export class ReportesService {
       where: { id: user.sub },
       include: { rol: true },
     });
-    const rol = usuario?.rol.nombre.toLowerCase() ?? '';
-    if (
-      !rol.includes('supervisor') &&
-      !rol.includes('admin') &&
-      !rol.includes('gerencia')
-    ) {
+    const rol = usuario?.rol.nombre.toUpperCase() ?? '';
+    const rolesPermitidos = ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS', 'GERENCIA'];
+    if (!rolesPermitidos.includes(rol)) {
       throw new ForbiddenException('Acceso restringido a supervisores y gerencia');
     }
     return usuario!;
