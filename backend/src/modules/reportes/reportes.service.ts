@@ -8,6 +8,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 type UserJwt = { sub: string; role?: string };
 
 const ESTADOS_FINALES = ['RECHAZADA', 'CANCELADA'];
+const ROLES_PERMITIDOS = ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS', 'GERENCIA'];
 
 const CAMPO_LABELS: Record<string, string> = {
   numeroPO: '#PO',
@@ -39,8 +40,7 @@ export class ReportesService {
       include: { rol: true },
     });
     const rol = usuario?.rol.nombre.toUpperCase() ?? '';
-    const rolesPermitidos = ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS', 'GERENCIA'];
-    if (!rolesPermitidos.includes(rol)) {
+    if (!ROLES_PERMITIDOS.includes(rol)) {
       throw new ForbiddenException('Acceso restringido a supervisores y gerencia');
     }
     return usuario!;
