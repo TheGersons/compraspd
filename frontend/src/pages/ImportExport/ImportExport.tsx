@@ -8,6 +8,11 @@ import autoTable from "jspdf-autotable";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const PIN_MAX = 10;
+const LOG_COL_WIDTH = 44; // px — ancho fijo de la columna LOG (siempre sticky)
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Seguimiento = {
@@ -82,26 +87,71 @@ type Log = {
   fecha: string;
 };
 
+// ─── Column definitions ───────────────────────────────────────────────────────
+
+type ColDef = { key: string; label: string; width: number };
+
+const COL_DEFS: ColDef[] = [
+  { key: "tipoOperacion",              label: "TIPO OPER.",             width: 110 },
+  { key: "tipoImportacion",            label: "TIPO IMP/EXP",           width: 115 },
+  { key: "estado",                     label: "ESTADO",                 width: 130 },
+  { key: "numeroOC",                   label: "# OC",                   width: 100 },
+  { key: "prioridad",                  label: "PRIORIDAD",              width: 105 },
+  { key: "seguimiento",                label: "SEGUIMIENTO",            width: 160 },
+  { key: "detalles",                   label: "DETALLES",               width: 160 },
+  { key: "solicitante",                label: "SOLICITANTE",            width: 125 },
+  { key: "proyecto",                   label: "PROYECTO",               width: 125 },
+  { key: "descripcionProducto",        label: "DESCRIPCION",            width: 185 },
+  { key: "proveedor",                  label: "PROVEEDOR",              width: 130 },
+  { key: "marcaModelo",                label: "MARCA / MODELO",         width: 130 },
+  { key: "nombreMaterial",             label: "NOMBRE MATERIAL",        width: 130 },
+  { key: "paisOrigenEdit",             label: "PAIS ORIGEN",            width: 115 },
+  { key: "destino",                    label: "DESTINO",                width: 115 },
+  { key: "incoterms",                  label: "INCOTERMS",              width: 105 },
+  { key: "terminosPago",               label: "TERMINOS PAGO",          width: 125 },
+  { key: "formaPago",                  label: "FORMA PAGO",             width: 115 },
+  { key: "tipoTransporte",             label: "TIPO TRANSP.",           width: 115 },
+  { key: "tipoEmbarque",               label: "TIPO EMBARQUE",          width: 120 },
+  { key: "bookingBl",                  label: "BL / TRACKING",          width: 145 },
+  { key: "actualizacion",              label: "ACTUALIZACION",          width: 135 },
+  { key: "puertoSalida",               label: "PUERTO ORIGEN",          width: 125 },
+  { key: "puertoLlegada",              label: "PUERTO DESTINO",         width: 125 },
+  { key: "agenteAduanal",              label: "AGENTE ADUANAL",         width: 135 },
+  { key: "naviera",                    label: "NAVIERA / FORWARDER",    width: 155 },
+  { key: "contenedor",                 label: "CONTENEDOR",             width: 125 },
+  { key: "fechaOc",                    label: "F. OC",                  width: 95  },
+  { key: "fechaListoEmbarque",         label: "F. LISTO EMB.",          width: 108 },
+  { key: "fechaEmbarque",              label: "F. ETD",                 width: 88  },
+  { key: "fechaLlegadaPuerto",         label: "F. ETA",                 width: 88  },
+  { key: "fechaRetiroPuerto",          label: "F. MANIFIESTO",          width: 115 },
+  { key: "fechaEmisionBoletinImpuesto",label: "F. EMIS. BOLETIN IMP.", width: 148 },
+  { key: "fechaPagoBoletin",           label: "F. PAGO BOLETIN",        width: 125 },
+  { key: "fechaSelectivo",             label: "F. SELECTIVO",           width: 112 },
+  { key: "fechaRevision",              label: "F. REVISION",            width: 108 },
+  { key: "fechaLevante",               label: "F. LEVANTE",             width: 105 },
+  { key: "fechaGatePass",              label: "F. GATE PASS",           width: 108 },
+  { key: "fechaEntregaFinal",          label: "F. ENTREGA FINAL",       width: 125 },
+  { key: "diasEntrega",                label: "T. ENTREGA (GATE-MANIF.)",width: 148},
+  { key: "observaciones",              label: "OBSERVACIONES",          width: 165 },
+];
+
 // ─── Estado config ─────────────────────────────────────────────────────────
 
 const ESTADO_OPTIONS = ["EN PROCESO", "EN COORDINACION", "EN TRANSITO", "EN ADUANA", "RECIBIDO", "CANCELADO"] as const;
 
 const ESTADO_STYLES: Record<string, { bg: string; text: string }> = {
-  "EN PROCESO": { bg: "bg-orange-100 dark:bg-orange-900/30", text: "text-orange-800 dark:text-orange-300" },
-  "EN COORDINACION": { bg: "bg-pink-100 dark:bg-pink-900/20", text: "text-pink-700 dark:text-pink-300" },
-  "EN TRANSITO": { bg: "bg-yellow-100 dark:bg-yellow-900/20", text: "text-yellow-800 dark:text-yellow-400" },
-  "EN ADUANA": { bg: "bg-blue-100 dark:bg-blue-900/20", text: "text-blue-800 dark:text-blue-300" },
-  "RECIBIDO": { bg: "bg-emerald-100 dark:bg-emerald-900/20", text: "text-emerald-800 dark:text-emerald-300" },
-  "CANCELADO": { bg: "bg-red-100 dark:bg-red-900/20", text: "text-red-800 dark:text-red-300" },
+  "EN PROCESO":      { bg: "bg-orange-100 dark:bg-orange-900/30",  text: "text-orange-800 dark:text-orange-300" },
+  "EN COORDINACION": { bg: "bg-pink-100 dark:bg-pink-900/20",      text: "text-pink-700 dark:text-pink-300" },
+  "EN TRANSITO":     { bg: "bg-yellow-100 dark:bg-yellow-900/20",  text: "text-yellow-800 dark:text-yellow-400" },
+  "EN ADUANA":       { bg: "bg-blue-100 dark:bg-blue-900/20",      text: "text-blue-800 dark:text-blue-300" },
+  "RECIBIDO":        { bg: "bg-emerald-100 dark:bg-emerald-900/20",text: "text-emerald-800 dark:text-emerald-300" },
+  "CANCELADO":       { bg: "bg-red-100 dark:bg-red-900/20",        text: "text-red-800 dark:text-red-300" },
 };
 
 const ESTADO_RGB: Record<string, [number, number, number]> = {
-  "EN PROCESO": [254, 215, 170],
-  "EN COORDINACION": [251, 207, 232],
-  "EN TRANSITO": [254, 240, 138],
-  "EN ADUANA": [191, 219, 254],
-  "RECIBIDO": [167, 243, 208],
-  "CANCELADO": [254, 202, 202],
+  "EN PROCESO": [254, 215, 170], "EN COORDINACION": [251, 207, 232],
+  "EN TRANSITO": [254, 240, 138], "EN ADUANA": [191, 219, 254],
+  "RECIBIDO": [167, 243, 208], "CANCELADO": [254, 202, 202],
 };
 
 // ─── Prioridad config ───────────────────────────────────────────────────────
@@ -109,15 +159,13 @@ const ESTADO_RGB: Record<string, [number, number, number]> = {
 const PRIORIDAD_OPTIONS = ["NORMAL", "URGENTE", "CRITICO"] as const;
 
 const PRIORIDAD_STYLES: Record<string, { bg: string; text: string }> = {
-  "NORMAL": { bg: "bg-blue-100 dark:bg-blue-900/30", text: "text-blue-800 dark:text-blue-300" },
-  "URGENTE": { bg: "bg-orange-100 dark:bg-orange-900/30", text: "text-orange-800 dark:text-orange-300" },
-  "CRITICO": { bg: "bg-red-100 dark:bg-red-900/20", text: "text-red-800 dark:text-red-300" },
+  "NORMAL":  { bg: "bg-blue-100 dark:bg-blue-900/30",   text: "text-blue-800 dark:text-blue-300" },
+  "URGENTE": { bg: "bg-orange-100 dark:bg-orange-900/30",text: "text-orange-800 dark:text-orange-300" },
+  "CRITICO": { bg: "bg-red-100 dark:bg-red-900/20",      text: "text-red-800 dark:text-red-300" },
 };
 
 const PRIORIDAD_RGB: Record<string, [number, number, number]> = {
-  "NORMAL": [191, 219, 254],
-  "URGENTE": [254, 215, 170],
-  "CRITICO": [254, 202, 202],
+  "NORMAL": [191, 219, 254], "URGENTE": [254, 215, 170], "CRITICO": [254, 202, 202],
 };
 
 // ─── Campo labels ───────────────────────────────────────────────────────────
@@ -210,6 +258,25 @@ function calcDiasEntrega(r: Seguimiento): string {
   return `${dias} días`;
 }
 
+// ─── Pin icon ─────────────────────────────────────────────────────────────────
+
+function PinIcon({ pinned }: { pinned: boolean }) {
+  return pinned ? (
+    // Filled pin (anclada)
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+      <path d="M12 2C8.69 2 6 4.69 6 8c0 3.86 4.45 9.12 5.53 10.37.24.28.7.28.94 0C13.55 17.12 18 11.86 18 8c0-3.31-2.69-6-6-6zm0 8.5A2.5 2.5 0 1 1 12 5.5a2.5 2.5 0 0 1 0 5z"/>
+      <line x1="12" y1="18" x2="12" y2="22" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  ) : (
+    // Outline pin (no anclada)
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2C8.69 2 6 4.69 6 8c0 3.86 4.45 9.12 5.53 10.37.24.28.7.28.94 0C13.55 17.12 18 11.86 18 8c0-3.31-2.69-6-6-6z"/>
+      <circle cx="12" cy="8" r="2.5"/>
+      <line x1="12" y1="18" x2="12" y2="22"/>
+    </svg>
+  );
+}
+
 // ─── Inline editors ───────────────────────────────────────────────────────────
 
 function TextCell({ value, onSave, minWidth = "80px" }: { value: string | null; onSave: (v: string | null) => void; minWidth?: string }) {
@@ -220,9 +287,7 @@ function TextCell({ value, onSave, minWidth = "80px" }: { value: string | null; 
 
   if (!editing)
     return (
-      <span
-        tabIndex={0}
-        style={{ minWidth }}
+      <span tabIndex={0} style={{ minWidth }}
         className="block cursor-pointer rounded px-1 py-0.5 text-xs hover:bg-blue-50 dark:hover:bg-blue-900/20 focus:outline-none focus:ring-1 focus:ring-blue-400 focus:ring-offset-0"
         onClick={() => { setDraft(value ?? ""); setEditing(true); }}
         onFocus={() => { setDraft(value ?? ""); setEditing(true); }}
@@ -248,8 +313,7 @@ function LongTextCell({ value, onSave, label }: { value: string | null; onSave: 
   const [draft, setDraft] = useState(value ?? "");
   return (
     <>
-      <span
-        tabIndex={0}
+      <span tabIndex={0}
         className="block max-w-[200px] cursor-pointer truncate rounded px-1 py-0.5 text-xs hover:bg-blue-50 dark:hover:bg-blue-900/20 focus:outline-none focus:ring-1 focus:ring-blue-400"
         onClick={() => { setDraft(value ?? ""); setOpen(true); }}
         onFocus={() => { setDraft(value ?? ""); setOpen(true); }}
@@ -280,12 +344,9 @@ function DateCell({ value, onSave }: { value: string | null; onSave: (v: string 
 
   if (!editing)
     return (
-      <span
-        tabIndex={0}
+      <span tabIndex={0}
         className="block cursor-pointer rounded px-1 py-0.5 text-xs hover:bg-blue-50 dark:hover:bg-blue-900/20 focus:outline-none focus:ring-1 focus:ring-blue-400"
-        onClick={() => setEditing(true)}
-        onFocus={() => setEditing(true)}
-        title="Clic para editar fecha">
+        onClick={() => setEditing(true)} onFocus={() => setEditing(true)} title="Clic para editar fecha">
         {value ? fmtDateDMY(value) : <span className="text-gray-300 dark:text-gray-600">—</span>}
       </span>
     );
@@ -334,65 +395,14 @@ function PrioridadCell({ value, onSave }: { value: string | null; onSave: (v: st
 function TipoOperacionCell({ value, onSave }: { value: string | null; onSave: (v: string | null) => void }) {
   return (
     <select value={value ?? ""} onChange={(e) => onSave(e.target.value || null)}
-      className={`cursor-pointer rounded px-1.5 py-0.5 text-xs font-medium outline-none border-0 ${value === "IMPORTACION" ? "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300" :
+      className={`cursor-pointer rounded px-1.5 py-0.5 text-xs font-medium outline-none border-0 ${
+        value === "IMPORTACION" ? "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300" :
         value === "EXPORTACION" ? "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300" :
-          "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400"
-        }`}>
+        "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400"}`}>
       <option value="">— Tipo</option>
       <option value="IMPORTACION">Importación</option>
       <option value="EXPORTACION">Exportación</option>
     </select>
-  );
-}
-
-function BLTrackingCell({ bookingBl, tracking, onSavebl, onSaveTracking }: {
-  bookingBl: string | null;
-  tracking: string | null;
-  onSavebl: (v: string | null) => void;
-  onSaveTracking: (v: string | null) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draftBl, setDraftBl] = useState(bookingBl ?? "");
-  const [draftTrack, setDraftTrack] = useState(tracking ?? "");
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const blRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => { if (editing) blRef.current?.focus(); }, [editing]);
-
-  const save = () => {
-    setEditing(false);
-    onSavebl(draftBl.trim() || null);
-    onSaveTracking(draftTrack.trim() || null);
-  };
-
-  if (!editing) {
-    const display = [bookingBl, tracking].filter(Boolean).join(" / ") || null;
-    return (
-      <span
-        tabIndex={0}
-        className="block max-w-[180px] cursor-pointer truncate rounded px-1 py-0.5 text-xs hover:bg-blue-50 dark:hover:bg-blue-900/20 focus:outline-none focus:ring-1 focus:ring-blue-400"
-        onClick={() => { setDraftBl(bookingBl ?? ""); setDraftTrack(tracking ?? ""); setEditing(true); }}
-        onFocus={() => { setDraftBl(bookingBl ?? ""); setDraftTrack(tracking ?? ""); setEditing(true); }}
-        title="Clic para editar">
-        {display || <span className="text-gray-300 dark:text-gray-600">—</span>}
-      </span>
-    );
-  }
-
-  return (
-    <div ref={wrapRef} className="flex flex-col gap-0.5 min-w-[150px]"
-      onBlur={(e) => { if (!wrapRef.current?.contains(e.relatedTarget as Node)) save(); }}>
-      <input ref={blRef}
-        className="rounded border border-blue-400 px-1.5 py-0.5 text-xs outline-none dark:bg-gray-700 dark:text-white"
-        placeholder="Booking / BL"
-        value={draftBl} onChange={(e) => setDraftBl(e.target.value)}
-        onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }} />
-      <input
-        className="rounded border border-blue-400 px-1.5 py-0.5 text-xs outline-none dark:bg-gray-700 dark:text-white"
-        placeholder="Tracking"
-        value={draftTrack} onChange={(e) => setDraftTrack(e.target.value)}
-        onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }} />
-    </div>
   );
 }
 
@@ -401,18 +411,18 @@ function ActualizacionCell({ remesa, bl, poliza, factura, onToggle }: {
   onToggle: (k: "remesaNotificado" | "blTelexReleased" | "polizaSeguroRecibida" | "factura", v: boolean) => void;
 }) {
   const items: { key: "remesaNotificado" | "blTelexReleased" | "polizaSeguroRecibida" | "factura"; label: string; value: boolean }[] = [
-    { key: "remesaNotificado", label: "Packing List", value: remesa },
-    { key: "blTelexReleased", label: "BL Telex", value: bl },
-    { key: "polizaSeguroRecibida", label: "Póliza", value: poliza },
-    { key: "factura", label: "Factura", value: factura },
+    { key: "remesaNotificado",     label: "Packing List", value: remesa },
+    { key: "blTelexReleased",      label: "BL Telex",     value: bl },
+    { key: "polizaSeguroRecibida", label: "Póliza",        value: poliza },
+    { key: "factura",              label: "Factura",       value: factura },
   ];
   return (
     <div className="flex flex-col gap-1">
       {items.map((it) => (
         <button key={it.key} onClick={() => onToggle(it.key, !it.value)}
-          className={`flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors ${it.value
-            ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300"
-            : "bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-300"}`}>
+          className={`flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
+            it.value ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300"
+                     : "bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-300"}`}>
           <span>{it.value ? "✓" : "✗"}</span>
           <span className="whitespace-nowrap">{it.label}</span>
         </button>
@@ -492,53 +502,53 @@ function LogDrawer({ seguimientoId, onClose }: { seguimientoId: string; onClose:
 type ExportCol = { label: string; get: (r: Seguimiento) => string };
 
 const EXPORT_COLS: ExportCol[] = [
-  { label: "Tipo Operación", get: (r) => r.tipoOperacion ?? "" },
-  { label: "Tipo Import/Export", get: (r) => r.tipoImportacion ?? "" },
-  { label: "Estado", get: (r) => r.estado ?? "" },
-  { label: "# OC", get: (r) => r.numeroOC ?? r.ordenCompraCotizacion ?? "" },
-  { label: "Prioridad", get: (r) => r.prioridad ?? "" },
-  { label: "Seguimiento", get: (r) => r.seguimiento ?? "" },
-  { label: "Detalles", get: (r) => r.detalles ?? "" },
-  { label: "Solicitante", get: (r) => r.solicitante ?? "" },
-  { label: "Proyecto", get: (r) => r.proyecto ?? "" },
-  { label: "Descripción", get: (r) => r.descripcionProducto },
-  { label: "Proveedor", get: (r) => r.proveedor ?? "" },
-  { label: "Marca / Modelo", get: (r) => r.marcaModelo ?? "" },
-  { label: "Nombre Material", get: (r) => r.nombreMaterial ?? "" },
-  { label: "País Origen", get: (r) => r.paisOrigenEdit ?? r.paisOrigen ?? "" },
-  { label: "Destino", get: (r) => r.destino ?? "" },
-  { label: "Incoterms", get: (r) => r.incoterms ?? r.tipoEntrega ?? "" },
-  { label: "Términos Pago", get: (r) => r.terminosPago ?? "" },
-  { label: "Forma Pago", get: (r) => r.formaPago ?? "" },
-  { label: "Tipo Transporte", get: (r) => r.tipoTransporte ?? r.medioTransporte ?? "" },
-  { label: "Tipo Embarque", get: (r) => r.tipoEmbarque ?? "" },
-  { label: "BL / Tracking", get: (r) => [r.bookingBl, r.tracking].filter(Boolean).join(" / ") },
-  { label: "Packing List", get: (r) => r.remesaNotificado ? "Sí" : "No" },
-  { label: "BL Telex Released", get: (r) => r.blTelexReleased ? "Sí" : "No" },
-  { label: "Póliza Seguro", get: (r) => r.polizaSeguroRecibida ? "Sí" : "No" },
-  { label: "Factura", get: (r) => r.factura ? "Sí" : "No" },
-  { label: "Puerto Origen", get: (r) => r.puertoSalida ?? "" },
-  { label: "Puerto Destino", get: (r) => r.puertoLlegada ?? "" },
-  { label: "Agente Aduanal", get: (r) => r.agenteAduanal ?? "" },
-  { label: "Naviera / Forwarder", get: (r) => r.naviera ?? "" },
-  { label: "Contenedor", get: (r) => r.contenedor ?? "" },
-  { label: "F. OC", get: (r) => fmtDateDMY(r.fechaOc) },
-  { label: "F. Listo Emb.", get: (r) => fmtDateDMY(r.fechaListoEmbarque) },
-  { label: "F. ETD", get: (r) => fmtDateDMY(r.fechaEmbarque) },
-  { label: "F. ETA", get: (r) => fmtDateDMY(r.fechaLlegadaPuerto) },
-  { label: "F. de Manifiesto", get: (r) => fmtDateDMY(r.fechaRetiroPuerto) },
-  { label: "F. Emis. Boletín Imp.", get: (r) => fmtDateDMY(r.fechaEmisionBoletinImpuesto) },
-  { label: "F. Pago Boletín", get: (r) => fmtDateDMY(r.fechaPagoBoletin) },
-  { label: "F. Selectivo", get: (r) => fmtDateDMY(r.fechaSelectivo) },
-  { label: "F. Revisión", get: (r) => fmtDateDMY(r.fechaRevision) },
-  { label: "F. Levante", get: (r) => fmtDateDMY(r.fechaLevante) },
-  { label: "F. Gate Pass", get: (r) => fmtDateDMY(r.fechaGatePass) },
-  { label: "F. Entrega Final", get: (r) => fmtDateDMY(r.fechaEntregaFinal) },
-  { label: "T. Entrega (Gate-Manif.)", get: (r) => calcDiasEntrega(r) },
-  { label: "Observaciones", get: (r) => r.observaciones ?? "" },
+  { label: "Tipo Operación",          get: (r) => r.tipoOperacion ?? "" },
+  { label: "Tipo Import/Export",      get: (r) => r.tipoImportacion ?? "" },
+  { label: "Estado",                  get: (r) => r.estado ?? "" },
+  { label: "# OC",                    get: (r) => r.numeroOC ?? r.ordenCompraCotizacion ?? "" },
+  { label: "Prioridad",               get: (r) => r.prioridad ?? "" },
+  { label: "Seguimiento",             get: (r) => r.seguimiento ?? "" },
+  { label: "Detalles",                get: (r) => r.detalles ?? "" },
+  { label: "Solicitante",             get: (r) => r.solicitante ?? "" },
+  { label: "Proyecto",                get: (r) => r.proyecto ?? "" },
+  { label: "Descripción",             get: (r) => r.descripcionProducto },
+  { label: "Proveedor",               get: (r) => r.proveedor ?? "" },
+  { label: "Marca / Modelo",          get: (r) => r.marcaModelo ?? "" },
+  { label: "Nombre Material",         get: (r) => r.nombreMaterial ?? "" },
+  { label: "País Origen",             get: (r) => r.paisOrigenEdit ?? r.paisOrigen ?? "" },
+  { label: "Destino",                 get: (r) => r.destino ?? "" },
+  { label: "Incoterms",               get: (r) => r.incoterms ?? r.tipoEntrega ?? "" },
+  { label: "Términos Pago",           get: (r) => r.terminosPago ?? "" },
+  { label: "Forma Pago",              get: (r) => r.formaPago ?? "" },
+  { label: "Tipo Transporte",         get: (r) => r.tipoTransporte ?? r.medioTransporte ?? "" },
+  { label: "Tipo Embarque",           get: (r) => r.tipoEmbarque ?? "" },
+  { label: "BL / Tracking",           get: (r) => [r.bookingBl, r.tracking].filter(Boolean).join(" / ") },
+  { label: "Packing List",            get: (r) => r.remesaNotificado ? "Sí" : "No" },
+  { label: "BL Telex Released",       get: (r) => r.blTelexReleased ? "Sí" : "No" },
+  { label: "Póliza Seguro",           get: (r) => r.polizaSeguroRecibida ? "Sí" : "No" },
+  { label: "Factura",                 get: (r) => r.factura ? "Sí" : "No" },
+  { label: "Puerto Origen",           get: (r) => r.puertoSalida ?? "" },
+  { label: "Puerto Destino",          get: (r) => r.puertoLlegada ?? "" },
+  { label: "Agente Aduanal",          get: (r) => r.agenteAduanal ?? "" },
+  { label: "Naviera / Forwarder",     get: (r) => r.naviera ?? "" },
+  { label: "Contenedor",              get: (r) => r.contenedor ?? "" },
+  { label: "F. OC",                   get: (r) => fmtDateDMY(r.fechaOc) },
+  { label: "F. Listo Emb.",           get: (r) => fmtDateDMY(r.fechaListoEmbarque) },
+  { label: "F. ETD",                  get: (r) => fmtDateDMY(r.fechaEmbarque) },
+  { label: "F. ETA",                  get: (r) => fmtDateDMY(r.fechaLlegadaPuerto) },
+  { label: "F. de Manifiesto",        get: (r) => fmtDateDMY(r.fechaRetiroPuerto) },
+  { label: "F. Emis. Boletín Imp.",   get: (r) => fmtDateDMY(r.fechaEmisionBoletinImpuesto) },
+  { label: "F. Pago Boletín",         get: (r) => fmtDateDMY(r.fechaPagoBoletin) },
+  { label: "F. Selectivo",            get: (r) => fmtDateDMY(r.fechaSelectivo) },
+  { label: "F. Revisión",             get: (r) => fmtDateDMY(r.fechaRevision) },
+  { label: "F. Levante",              get: (r) => fmtDateDMY(r.fechaLevante) },
+  { label: "F. Gate Pass",            get: (r) => fmtDateDMY(r.fechaGatePass) },
+  { label: "F. Entrega Final",        get: (r) => fmtDateDMY(r.fechaEntregaFinal) },
+  { label: "T. Entrega (Gate-Manif.)",get: (r) => calcDiasEntrega(r) },
+  { label: "Observaciones",           get: (r) => r.observaciones ?? "" },
 ];
 
-const ESTADO_COL_IDX = EXPORT_COLS.findIndex((c) => c.label === "Estado");
+const ESTADO_COL_IDX    = EXPORT_COLS.findIndex((c) => c.label === "Estado");
 const PRIORIDAD_COL_IDX = EXPORT_COLS.findIndex((c) => c.label === "Prioridad");
 
 function exportExcel(rows: Seguimiento[]) {
@@ -547,11 +557,8 @@ function exportExcel(rows: Seguimiento[]) {
     EXPORT_COLS.map((c) => c.label),
     ...rows.map((r) => EXPORT_COLS.map((c) => c.get(r))),
   ]);
-
   ws["!cols"] = EXPORT_COLS.map(() => ({ wch: 18 }));
-
   rows.forEach((r, rowIdx) => {
-    // Estado color
     const estado = r.estado;
     if (estado && ESTADO_RGB[estado]) {
       const [red, green, blue] = ESTADO_RGB[estado];
@@ -560,7 +567,6 @@ function exportExcel(rows: Seguimiento[]) {
       if (!ws[addr]) ws[addr] = { t: "s", v: estado };
       ws[addr].s = { fill: { patternType: "solid", fgColor: { rgb: hex } }, font: { bold: true } };
     }
-    // Prioridad color
     const prioridad = r.prioridad;
     if (prioridad && PRIORIDAD_RGB[prioridad]) {
       const [red, green, blue] = PRIORIDAD_RGB[prioridad];
@@ -569,12 +575,11 @@ function exportExcel(rows: Seguimiento[]) {
       if (!ws[addr]) ws[addr] = { t: "s", v: prioridad };
       ws[addr].s = { fill: { patternType: "solid", fgColor: { rgb: hex } }, font: { bold: true } };
     }
-    // Actualizacion indicators
     const actCols = [
-      { key: "remesaNotificado", idx: EXPORT_COLS.findIndex((c) => c.label === "Packing List") },
-      { key: "blTelexReleased", idx: EXPORT_COLS.findIndex((c) => c.label === "BL Telex Released") },
-      { key: "polizaSeguroRecibida", idx: EXPORT_COLS.findIndex((c) => c.label === "Póliza Seguro") },
-      { key: "factura", idx: EXPORT_COLS.findIndex((c) => c.label === "Factura") },
+      { key: "remesaNotificado",    idx: EXPORT_COLS.findIndex((c) => c.label === "Packing List") },
+      { key: "blTelexReleased",     idx: EXPORT_COLS.findIndex((c) => c.label === "BL Telex Released") },
+      { key: "polizaSeguroRecibida",idx: EXPORT_COLS.findIndex((c) => c.label === "Póliza Seguro") },
+      { key: "factura",             idx: EXPORT_COLS.findIndex((c) => c.label === "Factura") },
     ];
     actCols.forEach(({ key, idx }) => {
       const addr = XLSX.utils.encode_cell({ r: rowIdx + 1, c: idx });
@@ -586,7 +591,6 @@ function exportExcel(rows: Seguimiento[]) {
       };
     });
   });
-
   XLSX.utils.book_append_sheet(wb, ws, "Import-Export");
   XLSX.writeFile(wb, `ImportExport_${todayISO()}.xlsx`);
 }
@@ -595,9 +599,7 @@ function exportPDF(rows: Seguimiento[]) {
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a2" });
   doc.setFontSize(12);
   doc.text(`Import-Export — ${todayISO()}`, 40, 30);
-
   const body = rows.map((r) => EXPORT_COLS.map((c) => c.get(r)));
-
   autoTable(doc, {
     head: [EXPORT_COLS.map((c) => c.label)],
     body,
@@ -628,7 +630,6 @@ function exportPDF(rows: Seguimiento[]) {
       }
     },
   });
-
   doc.save(`ImportExport_${todayISO()}.pdf`);
 }
 
@@ -645,10 +646,36 @@ export default function ImportExport() {
   const [hasta, setHasta] = useState("");
   const [searchCol, setSearchCol] = useState("nombreCotizacion");
   const [searchQuery, setSearchQuery] = useState("");
-
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 
+  // ── Pin state ──────────────────────────────────────────────────────────────
+  const [pinnedCols, setPinnedCols] = useState<string[]>([]);
+
+  const togglePin = useCallback((key: string) => {
+    setPinnedCols((prev) => {
+      if (prev.includes(key)) return prev.filter((k) => k !== key);
+      if (prev.length >= PIN_MAX) return prev;
+      return [...prev, key];
+    });
+  }, []);
+
+  // Ordered: pinned columns first (preserving original COL_DEFS order), then the rest
+  const pinnedInOrder = COL_DEFS.filter((c) => pinnedCols.includes(c.key));
+  const unpinned      = COL_DEFS.filter((c) => !pinnedCols.includes(c.key));
+  const allColsOrdered = [...pinnedInOrder, ...unpinned];
+
+  // Compute sticky left offsets for each pinned column
+  const pinInfo: Record<string, { left: number; isLast: boolean }> = {};
+  {
+    let left = LOG_COL_WIDTH;
+    pinnedInOrder.forEach((col, i) => {
+      pinInfo[col.key] = { left, isLast: i === pinnedInOrder.length - 1 };
+      left += col.width;
+    });
+  }
+
+  // ── Data ───────────────────────────────────────────────────────────────────
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -688,10 +715,81 @@ export default function ImportExport() {
   });
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const safePage = Math.min(page, totalPages);
-  const paginated = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
-  const colLabel = SEARCH_COLUMNS.find((c) => c.key === searchCol)?.label ?? "columna";
+  const safePage   = Math.min(page, totalPages);
+  const paginated  = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const colLabel   = SEARCH_COLUMNS.find((c) => c.key === searchCol)?.label ?? "columna";
 
+  // ── Cell renderer ──────────────────────────────────────────────────────────
+  const renderCell = (colKey: string, r: Seguimiento): React.ReactNode => {
+    const save = (campo: string) => (v: string | null) => actualizarCampo(r.id, campo, v);
+    switch (colKey) {
+      case "tipoOperacion":   return <TipoOperacionCell value={r.tipoOperacion} onSave={save("tipoOperacion")} />;
+      case "tipoImportacion": return <SelectCell value={r.tipoImportacion} options={TIPO_IMPORTACION_OPTIONS} onSave={save("tipoImportacion")} />;
+      case "estado":          return <EstadoCell value={r.estado} onSave={save("estado")} />;
+      case "numeroOC":        return <TextCell value={r.numeroOC || r.ordenCompraCotizacion} onSave={save("numeroOC")} />;
+      case "prioridad":       return <PrioridadCell value={r.prioridad} onSave={save("prioridad")} />;
+      case "seguimiento":     return <LongTextCell value={r.seguimiento} onSave={save("seguimiento")} label="Seguimiento" />;
+      case "detalles":        return <LongTextCell value={r.detalles} onSave={save("detalles")} label="Detalles" />;
+      case "solicitante":     return <>{r.solicitante || "—"}</>;
+      case "proyecto":        return <>{r.proyecto || "—"}</>;
+      case "descripcionProducto": return <span className="block max-w-[200px] truncate" title={r.descripcionProducto}>{r.descripcionProducto}</span>;
+      case "proveedor":       return <TextCell value={r.proveedor} onSave={save("proveedor")} />;
+      case "marcaModelo":     return <TextCell value={r.marcaModelo} onSave={save("marcaModelo")} />;
+      case "nombreMaterial":  return <TextCell value={r.nombreMaterial} onSave={save("nombreMaterial")} />;
+      case "paisOrigenEdit":  return <TextCell value={r.paisOrigenEdit ?? r.paisOrigen} onSave={save("paisOrigenEdit")} />;
+      case "destino":         return <TextCell value={r.destino} onSave={save("destino")} />;
+      case "incoterms":       return <TextCell value={r.incoterms || r.tipoEntrega} onSave={save("incoterms")} />;
+      case "terminosPago":    return <TextCell value={r.terminosPago} onSave={save("terminosPago")} />;
+      case "formaPago":       return <TextCell value={r.formaPago} onSave={save("formaPago")} />;
+      case "tipoTransporte":  return <TextCell value={r.tipoTransporte || r.medioTransporte} onSave={save("tipoTransporte")} />;
+      case "tipoEmbarque":    return <SelectCell value={r.tipoEmbarque} options={TIPO_EMBARQUE_OPTIONS} onSave={save("tipoEmbarque")} />;
+      case "bookingBl":       return <TextCell value={r.bookingBl} onSave={save("bookingBl")} minWidth="120px" />;
+      case "actualizacion":
+        return (
+          <ActualizacionCell
+            remesa={r.remesaNotificado} bl={r.blTelexReleased}
+            poliza={r.polizaSeguroRecibida} factura={r.factura}
+            onToggle={(k, v) => actualizarCampo(r.id, k, v)}
+          />
+        );
+      case "puertoSalida":    return <TextCell value={r.puertoSalida} onSave={save("puertoSalida")} />;
+      case "puertoLlegada":   return <TextCell value={r.puertoLlegada} onSave={save("puertoLlegada")} />;
+      case "agenteAduanal":   return <TextCell value={r.agenteAduanal} onSave={save("agenteAduanal")} />;
+      case "naviera":         return <TextCell value={r.naviera} onSave={save("naviera")} />;
+      case "contenedor":      return <TextCell value={r.contenedor} onSave={save("contenedor")} />;
+      case "fechaOc":         return <DateCell value={r.fechaOc} onSave={save("fechaOc")} />;
+      case "fechaListoEmbarque":          return <DateCell value={r.fechaListoEmbarque} onSave={save("fechaListoEmbarque")} />;
+      case "fechaEmbarque":               return <DateCell value={r.fechaEmbarque} onSave={save("fechaEmbarque")} />;
+      case "fechaLlegadaPuerto":          return <DateCell value={r.fechaLlegadaPuerto} onSave={save("fechaLlegadaPuerto")} />;
+      case "fechaRetiroPuerto":           return <DateCell value={r.fechaRetiroPuerto} onSave={save("fechaRetiroPuerto")} />;
+      case "fechaEmisionBoletinImpuesto": return <DateCell value={r.fechaEmisionBoletinImpuesto} onSave={save("fechaEmisionBoletinImpuesto")} />;
+      case "fechaPagoBoletin":            return <DateCell value={r.fechaPagoBoletin} onSave={save("fechaPagoBoletin")} />;
+      case "fechaSelectivo":              return <DateCell value={r.fechaSelectivo} onSave={save("fechaSelectivo")} />;
+      case "fechaRevision":               return <DateCell value={r.fechaRevision} onSave={save("fechaRevision")} />;
+      case "fechaLevante":                return <DateCell value={r.fechaLevante} onSave={save("fechaLevante")} />;
+      case "fechaGatePass":               return <DateCell value={r.fechaGatePass} onSave={save("fechaGatePass")} />;
+      case "fechaEntregaFinal":           return <DateCell value={r.fechaEntregaFinal} onSave={save("fechaEntregaFinal")} />;
+      case "diasEntrega":     return <span className="block whitespace-nowrap px-1 py-0.5 text-xs font-medium text-gray-600 dark:text-gray-300">{calcDiasEntrega(r)}</span>;
+      case "observaciones":   return <TextCell value={r.observaciones} onSave={save("observaciones")} minWidth="160px" />;
+      default: return null;
+    }
+  };
+
+  // Extra td class for special-colored columns
+  const getCellBgClass = (colKey: string, r: Seguimiento): string => {
+    switch (colKey) {
+      case "tipoOperacion":
+        return r.tipoOperacion === "IMPORTACION" ? "bg-indigo-50 dark:bg-indigo-900/10" :
+               r.tipoOperacion === "EXPORTACION" ? "bg-teal-50 dark:bg-teal-900/10" : "";
+      case "estado":
+        return r.estado ? `${ESTADO_STYLES[r.estado].bg} ${ESTADO_STYLES[r.estado].text}` : "";
+      case "prioridad":
+        return r.prioridad ? `${PRIORIDAD_STYLES[r.prioridad].bg} ${PRIORIDAD_STYLES[r.prioridad].text}` : "";
+      default: return "";
+    }
+  };
+
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <>
       <PageMeta title="Import-Export" description="Seguimiento de importaciones" />
@@ -755,6 +853,15 @@ export default function ImportExport() {
             </button>
           )}
           <div className="ml-auto flex items-center gap-2 self-end">
+            {/* Pin count indicator */}
+            {pinnedCols.length > 0 && (
+              <span className="flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                <PinIcon pinned={true} />
+                {pinnedCols.length}/{PIN_MAX} ancladas
+                <button onClick={() => setPinnedCols([])} title="Desanclar todas"
+                  className="ml-1 text-blue-400 hover:text-blue-700 dark:hover:text-blue-200">✕</button>
+              </span>
+            )}
             <label className="text-xs text-gray-500 dark:text-gray-400">Filas por página</label>
             <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
               className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-white">
@@ -773,8 +880,6 @@ export default function ImportExport() {
 
         {/* Tabla */}
         <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
-
-          {/* Tabla con columna Log sticky */}
           <div className="bg-white dark:bg-gray-900">
             {loading ? (
               <div className="flex items-center justify-center py-20">
@@ -784,103 +889,105 @@ export default function ImportExport() {
               <div className="py-20 text-center text-sm text-gray-500">Sin cotizaciones internacionales en estado "Comprado" todavía.</div>
             ) : (
               <table className="min-w-full text-xs">
-                <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-800">
+                <thead className="sticky top-0 z-10">
                   <tr className="text-left">
-                    <th className="sticky left-0 z-20 whitespace-nowrap border-b border-r border-gray-200 bg-gray-50 px-2 py-2 text-[10px] font-semibold uppercase tracking-wider text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">LOG</th>
-                    <Th>TIPO OPER.</Th><Th>TIPO IMP/EXP</Th><Th>ESTADO</Th><Th># OC</Th><Th>PRIORIDAD</Th>
-                    <Th>SEGUIMIENTO</Th><Th>DETALLES</Th>
-                    <Th>SOLICITANTE</Th><Th>PROYECTO</Th><Th>DESCRIPCION</Th>
-                    <Th>PROVEEDOR</Th><Th>MARCA / MODELO</Th><Th>NOMBRE MATERIAL</Th>
-                    <Th>PAIS ORIGEN</Th><Th>DESTINO</Th>
-                    <Th>INCOTERMS</Th><Th>TERMINOS PAGO</Th><Th>FORMA PAGO</Th>
-                    <Th>TIPO TRANSP.</Th><Th>TIPO EMBARQUE</Th>
-                    <Th>BL / TRACKING</Th><Th>ACTUALIZACION</Th>
-                    <Th>PUERTO ORIGEN</Th><Th>PUERTO DESTINO</Th>
-                    <Th>AGENTE ADUANAL</Th><Th>NAVIERA / FORWARDER</Th><Th>CONTENEDOR</Th>
-                    <Th>F. OC</Th><Th>F. LISTO EMB.</Th><Th>F. ETD</Th><Th>F. ETA</Th>
-                    <Th>F. MANIFIESTO</Th><Th>F. EMIS. BOLETIN IMP.</Th>
-                    <Th>F. PAGO BOLETIN</Th><Th>F. SELECTIVO</Th>
-                    <Th>F. REVISION</Th><Th>F. LEVANTE</Th>
-                    <Th>F. GATE PASS</Th><Th>F. ENTREGA FINAL</Th>
-                    <Th>T. ENTREGA (GATE-MANIF.)</Th>
-                    <Th>OBSERVACIONES</Th>
+                    {/* LOG — siempre sticky en left-0 */}
+                    <th style={{ width: LOG_COL_WIDTH, minWidth: LOG_COL_WIDTH }}
+                      className="sticky left-0 z-20 whitespace-nowrap border-b border-r border-gray-200 bg-gray-50 px-2 py-2 text-[10px] font-semibold uppercase tracking-wider text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
+                      LOG
+                    </th>
+
+                    {/* Columnas de datos */}
+                    {allColsOrdered.map((col) => {
+                      const isPinned   = col.key in pinInfo;
+                      const isLastPin  = isPinned && pinInfo[col.key].isLast;
+                      const atMax      = !isPinned && pinnedCols.length >= PIN_MAX;
+
+                      return (
+                        <th key={col.key}
+                          style={{
+                            minWidth: col.width,
+                            ...(isPinned ? { position: "sticky", left: pinInfo[col.key].left, zIndex: 20 } : {}),
+                          }}
+                          className={[
+                            "group whitespace-nowrap border-b px-2 py-2 text-[10px] font-semibold uppercase tracking-wider",
+                            isPinned
+                              ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                              : "bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+                            isLastPin ? "border-r-2 border-r-blue-300 dark:border-r-blue-700" : "border-gray-200 dark:border-gray-700",
+                          ].join(" ")}>
+                          <div className="flex items-center gap-1 pr-1">
+                            <span className="flex-1">{col.label}</span>
+                            <button
+                              onClick={() => togglePin(col.key)}
+                              disabled={atMax}
+                              title={
+                                isPinned ? "Desanclar columna"
+                                : atMax  ? `Máximo ${PIN_MAX} columnas ancladas`
+                                :          "Anclar columna"
+                              }
+                              className={[
+                                "flex-shrink-0 rounded p-0.5 transition-all",
+                                // siempre visible si está anclada; solo en hover si no
+                                isPinned
+                                  ? "text-blue-600 opacity-100 dark:text-blue-400"
+                                  : "opacity-0 group-hover:opacity-100 text-gray-400 hover:text-blue-500 dark:text-gray-500 dark:hover:text-blue-400",
+                                atMax ? "cursor-not-allowed opacity-30 group-hover:opacity-30" : "cursor-pointer",
+                              ].join(" ")}>
+                              <PinIcon pinned={isPinned} />
+                            </button>
+                          </div>
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
+
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                  {paginated.map((r) => {
-                    const estadoStyle = r.estado ? ESTADO_STYLES[r.estado] : null;
-                    const prioridadStyle = r.prioridad ? PRIORIDAD_STYLES[r.prioridad] : null;
-                    const tipoOpBg =
-                      r.tipoOperacion === "IMPORTACION" ? "bg-indigo-50 dark:bg-indigo-900/10" :
-                        r.tipoOperacion === "EXPORTACION" ? "bg-teal-50 dark:bg-teal-900/10" : "";
-                    return (
-                      <tr key={r.id}
-                        className={`${saving === r.id ? "bg-blue-50/50 dark:bg-blue-900/10" : ""} hover:bg-gray-50 dark:hover:bg-gray-800/50`}>
-                        <td className="sticky left-0 z-[5] whitespace-nowrap border-r border-gray-100 bg-white px-2 py-1.5 align-middle dark:border-gray-800 dark:bg-gray-900">
-                          <button onClick={() => setLogId(r.id)} title="Ver historial de cambios"
-                            className="flex items-center justify-center rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-gray-700 dark:hover:text-blue-400">
-                            <History className="h-4 w-4" />
-                          </button>
-                        </td>
-                        <td className={`whitespace-nowrap px-2 py-1.5 align-middle text-xs ${tipoOpBg}`}>
-                          <TipoOperacionCell value={r.tipoOperacion} onSave={(v) => actualizarCampo(r.id, "tipoOperacion", v)} />
-                        </td>
-                        <Td><SelectCell value={r.tipoImportacion} options={TIPO_IMPORTACION_OPTIONS} onSave={(v) => actualizarCampo(r.id, "tipoImportacion", v)} /></Td>
-                        <td className={`whitespace-nowrap px-2 py-1.5 align-middle text-xs ${estadoStyle ? `${estadoStyle.bg} ${estadoStyle.text}` : ""}`}>
-                          <EstadoCell value={r.estado} onSave={(v) => actualizarCampo(r.id, "estado", v)} />
-                        </td>
-                        <Td><TextCell value={r.numeroOC || r.ordenCompraCotizacion} onSave={(v) => actualizarCampo(r.id, "numeroOC", v)} /></Td>
-                        <td className={`whitespace-nowrap px-2 py-1.5 align-middle text-xs ${prioridadStyle ? `${prioridadStyle.bg} ${prioridadStyle.text}` : ""}`}>
-                          <PrioridadCell value={r.prioridad} onSave={(v) => actualizarCampo(r.id, "prioridad", v)} />
-                        </td>
-                        <Td><LongTextCell value={r.seguimiento} onSave={(v) => actualizarCampo(r.id, "seguimiento", v)} label="Seguimiento" /></Td>
-                        <Td><LongTextCell value={r.detalles} onSave={(v) => actualizarCampo(r.id, "detalles", v)} label="Detalles" /></Td>
-                        <Td>{r.solicitante || "—"}</Td>
-                        <Td>{r.proyecto || "—"}</Td>
-                        <Td><span className="block max-w-[200px] truncate" title={r.descripcionProducto}>{r.descripcionProducto}</span></Td>
-                        <Td><TextCell value={r.proveedor} onSave={(v) => actualizarCampo(r.id, "proveedor", v)} /></Td>
-                        <Td><TextCell value={r.marcaModelo} onSave={(v) => actualizarCampo(r.id, "marcaModelo", v)} /></Td>
-                        <Td><TextCell value={r.nombreMaterial} onSave={(v) => actualizarCampo(r.id, "nombreMaterial", v)} /></Td>
-                        <Td><TextCell value={r.paisOrigenEdit ?? r.paisOrigen} onSave={(v) => actualizarCampo(r.id, "paisOrigenEdit", v)} /></Td>
-                        <Td><TextCell value={r.destino} onSave={(v) => actualizarCampo(r.id, "destino", v)} /></Td>
-                        <Td><TextCell value={r.incoterms || r.tipoEntrega} onSave={(v) => actualizarCampo(r.id, "incoterms", v)} /></Td>
-                        <Td><TextCell value={r.terminosPago} onSave={(v) => actualizarCampo(r.id, "terminosPago", v)} /></Td>
-                        <Td><TextCell value={r.formaPago} onSave={(v) => actualizarCampo(r.id, "formaPago", v)} /></Td>
-                        <Td><TextCell value={r.tipoTransporte || r.medioTransporte} onSave={(v) => actualizarCampo(r.id, "tipoTransporte", v)} /></Td>
-                        <Td><SelectCell value={r.tipoEmbarque} options={TIPO_EMBARQUE_OPTIONS} onSave={(v) => actualizarCampo(r.id, "tipoEmbarque", v)} /></Td>
-                        <Td><TextCell value={r.bookingBl} onSave={(v) => actualizarCampo(r.id, "bookingBl", v)} minWidth="120px" /></Td>
-                        <Td>
-                          <ActualizacionCell remesa={r.remesaNotificado} bl={r.blTelexReleased} poliza={r.polizaSeguroRecibida} factura={r.factura}
-                            onToggle={(k, v) => actualizarCampo(r.id, k, v)} />
-                        </Td>
-                        <Td><TextCell value={r.puertoSalida} onSave={(v) => actualizarCampo(r.id, "puertoSalida", v)} /></Td>
-                        <Td><TextCell value={r.puertoLlegada} onSave={(v) => actualizarCampo(r.id, "puertoLlegada", v)} /></Td>
-                        <Td><TextCell value={r.agenteAduanal} onSave={(v) => actualizarCampo(r.id, "agenteAduanal", v)} /></Td>
-                        <Td><TextCell value={r.naviera} onSave={(v) => actualizarCampo(r.id, "naviera", v)} /></Td>
-                        <Td><TextCell value={r.contenedor} onSave={(v) => actualizarCampo(r.id, "contenedor", v)} /></Td>
-                        <Td><DateCell value={r.fechaOc} onSave={(v) => actualizarCampo(r.id, "fechaOc", v)} /></Td>
-                        <Td><DateCell value={r.fechaListoEmbarque} onSave={(v) => actualizarCampo(r.id, "fechaListoEmbarque", v)} /></Td>
-                        <Td><DateCell value={r.fechaEmbarque} onSave={(v) => actualizarCampo(r.id, "fechaEmbarque", v)} /></Td>
-                        <Td><DateCell value={r.fechaLlegadaPuerto} onSave={(v) => actualizarCampo(r.id, "fechaLlegadaPuerto", v)} /></Td>
-                        <Td><DateCell value={r.fechaRetiroPuerto} onSave={(v) => actualizarCampo(r.id, "fechaRetiroPuerto", v)} /></Td>
-                        <Td><DateCell value={r.fechaEmisionBoletinImpuesto} onSave={(v) => actualizarCampo(r.id, "fechaEmisionBoletinImpuesto", v)} /></Td>
-                        <Td><DateCell value={r.fechaPagoBoletin} onSave={(v) => actualizarCampo(r.id, "fechaPagoBoletin", v)} /></Td>
-                        <Td><DateCell value={r.fechaSelectivo} onSave={(v) => actualizarCampo(r.id, "fechaSelectivo", v)} /></Td>
-                        <Td><DateCell value={r.fechaRevision} onSave={(v) => actualizarCampo(r.id, "fechaRevision", v)} /></Td>
-                        <Td><DateCell value={r.fechaLevante} onSave={(v) => actualizarCampo(r.id, "fechaLevante", v)} /></Td>
-                        <Td><DateCell value={r.fechaGatePass} onSave={(v) => actualizarCampo(r.id, "fechaGatePass", v)} /></Td>
-                        <Td><DateCell value={r.fechaEntregaFinal} onSave={(v) => actualizarCampo(r.id, "fechaEntregaFinal", v)} /></Td>
-                        <Td><span className="block whitespace-nowrap px-1 py-0.5 text-xs font-medium text-gray-600 dark:text-gray-300">{calcDiasEntrega(r)}</span></Td>
-                        <Td><TextCell value={r.observaciones} onSave={(v) => actualizarCampo(r.id, "observaciones", v)} minWidth="160px" /></Td>
-                      </tr>
-                    );
-                  })}
+                  {paginated.map((r) => (
+                    <tr key={r.id}
+                      className={`${saving === r.id ? "bg-blue-50/50 dark:bg-blue-900/10" : ""} hover:bg-gray-50/80 dark:hover:bg-gray-800/50`}>
+
+                      {/* LOG cell — siempre sticky */}
+                      <td style={{ width: LOG_COL_WIDTH }}
+                        className="sticky left-0 z-[5] whitespace-nowrap border-r border-gray-100 bg-white px-2 py-1.5 align-middle dark:border-gray-800 dark:bg-gray-900">
+                        <button onClick={() => setLogId(r.id)} title="Ver historial de cambios"
+                          className="flex items-center justify-center rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-gray-700 dark:hover:text-blue-400">
+                          <History className="h-4 w-4" />
+                        </button>
+                      </td>
+
+                      {/* Columnas de datos */}
+                      {allColsOrdered.map((col) => {
+                        const isPinned  = col.key in pinInfo;
+                        const isLastPin = isPinned && pinInfo[col.key].isLast;
+                        const bgClass   = getCellBgClass(col.key, r);
+
+                        return (
+                          <td key={col.key}
+                            style={{
+                              ...(isPinned
+                                ? { position: "sticky", left: pinInfo[col.key].left, zIndex: 5 }
+                                : {}),
+                            }}
+                            className={[
+                              "whitespace-nowrap px-2 py-1.5 align-middle text-xs text-gray-700 dark:text-gray-300",
+                              bgClass,
+                              // sticky cells need an explicit bg to cover scrolled content
+                              isPinned && !bgClass ? "bg-white dark:bg-gray-900" : "",
+                              isLastPin ? "border-r-2 border-r-blue-200 dark:border-r-blue-800" : "",
+                            ].join(" ")}>
+                            {renderCell(col.key, r)}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             )}
           </div>
         </div>
-
 
         {/* Paginación */}
         {!loading && totalPages > 1 && (
@@ -923,21 +1030,5 @@ export default function ImportExport() {
         {logId && <LogDrawer seguimientoId={logId} onClose={() => setLogId(null)} />}
       </div>
     </>
-  );
-}
-
-function Th({ children }: { children: React.ReactNode }) {
-  return (
-    <th className="whitespace-nowrap border-b border-gray-200 px-2 py-2 text-[10px] font-semibold uppercase tracking-wider text-gray-600 dark:border-gray-700 dark:text-gray-400">
-      {children}
-    </th>
-  );
-}
-
-function Td({ children }: { children: React.ReactNode }) {
-  return (
-    <td className="whitespace-nowrap px-2 py-1.5 align-middle text-xs text-gray-700 dark:text-gray-300">
-      {children}
-    </td>
   );
 }
