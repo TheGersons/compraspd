@@ -879,7 +879,7 @@ export default function ImportExport() {
         )}
 
         {/* Tabla */}
-        <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
+        <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-260px)] rounded-xl border border-gray-200 dark:border-gray-700">
           <div className="bg-white dark:bg-gray-900">
             {loading ? (
               <div className="flex items-center justify-center py-20">
