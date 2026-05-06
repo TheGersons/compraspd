@@ -62,6 +62,7 @@ import LogisticaQuotesRejected from "./pages/Quotes/Logistica/RejectedQuotes";
 import LogisticaShoppingFollowUps from "./pages/Shopping/Logistica/FollowUps";
 import LogisticaShoppingDocuments from "./pages/Shopping/Logistica/Documents";
 import AdminCotizaciones from "./pages/Admin/AdminCotizaciones";
+import NuevaVersionBanner from "./components/NuevaVersionBanner";
 
 const SHOPPING_MANAGER_ROLES = ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS"];
 const QUOTES_SUPERVISOR_ROLES = ["SUPERVISOR", "ADMIN", "JEFE_COMPRAS"];
@@ -136,6 +137,7 @@ export default function App() {
           }}
         />
 
+        <NuevaVersionBanner />
         <ScrollToTop />
 
         <Routes>

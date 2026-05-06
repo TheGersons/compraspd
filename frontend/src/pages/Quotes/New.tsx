@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { preflightVersion } from "../../utils/version";
 import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx";
 import PageMeta from "../../components/common/PageMeta";
@@ -921,6 +922,9 @@ export default function New() {
       addNotification("warn", "Validación", error, { priority: "medium" });
       return;
     }
+
+    const ok = await preflightVersion('Hay una nueva versión. Para evitar errores, vamos a recargar antes de continuar.');
+    if (!ok) return;
 
     try {
       setLoading(true);

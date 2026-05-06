@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { preflightVersion } from "../../utils/version";
 import { useSearchParams } from "react-router-dom";
 import PageMeta from "../../components/common/PageMeta";
 import { getToken } from "../../lib/api";
@@ -263,6 +264,8 @@ export default function Documents() {
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]; if (!file || !productoSeleccionado || !uploadingFor) return;
+        const ok = await preflightVersion('Hay una nueva versión. Para evitar errores, vamos a recargar antes de continuar.');
+        if (!ok) return;
         const toastId = toast.loading("Subiendo documento...");
         try { await api.uploadDocumento(file, { estadoProductoId: productoSeleccionado.id, documentoRequeridoId: uploadingFor.requeridoId, estado: uploadingFor.estado, nombreDocumento: uploadingFor.requeridoNombre }); toast.success("Documento subido correctamente", { id: toastId }); await recargarDocumentos(); }
         catch (error: any) { toast.error(error.message || "Error al subir documento", { id: toastId }); }
@@ -329,6 +332,8 @@ export default function Documents() {
     const handleUploadMasivo = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file || !uploadMasivoConfig || productosParaUpload.length === 0) return;
+        const ok = await preflightVersion('Hay una nueva versión. Para evitar errores, vamos a recargar antes de continuar.');
+        if (!ok) return;
         setUploadingMasivo(true);
         const toastId = toast.loading(`Subiendo a ${productosParaUpload.length} producto(s)...`);
 

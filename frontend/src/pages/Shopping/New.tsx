@@ -1,5 +1,6 @@
 // pages/Quotes/New.tsx
 import { useMemo, useState, useEffect, useCallback } from "react";
+import { preflightVersion } from "../../utils/version";
 import ScrollArea from "../../components/common/ScrollArea";
 import DatePicker from "../../components/form/date-picker";
 import Button from "../../components/ui/button/Button";
@@ -531,6 +532,9 @@ export default function QuotesNew() {
     if (Object.keys(validationErrors).length > 0) {
       return;
     }
+
+    const ok = await preflightVersion('Hay una nueva versión. Para evitar errores, vamos a recargar antes de continuar.');
+    if (!ok) return;
 
     setIsSubmitting(true);
 
