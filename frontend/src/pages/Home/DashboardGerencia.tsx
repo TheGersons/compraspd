@@ -96,9 +96,14 @@ export default function DashboardGerencia() {
   // Obtener productos detallados para el proyecto seleccionado (filtrados por tipoCompra)
   const getProductosDetalladosProyecto = (): ProductoDetallado[] => {
     if (!proyectoSeleccionado) return [];
-    return productosDetallados.filter(
-      (p: any) => p.proyectoId === proyectoSeleccionado.id && p.tipoCompra === filtroTipoCompra
-    );
+    const todos = productosDetallados.filter((p: any) => p.proyectoId === proyectoSeleccionado.id);
+    const filtrados = todos.filter((p: any) => p.tipoCompra === filtroTipoCompra);
+    console.log('[DEBUG] proyectoSeleccionado.id:', proyectoSeleccionado.id);
+    console.log('[DEBUG] filtroTipoCompra:', filtroTipoCompra);
+    console.log('[DEBUG] total productosDetallados:', productosDetallados.length);
+    console.log('[DEBUG] con proyectoId match:', todos.length, todos.map((p:any) => ({ id: p.id, sku: p.sku, tipoCompra: p.tipoCompra, proyectoId: p.proyectoId })));
+    console.log('[DEBUG] filtrados (proyectoId + tipoCompra):', filtrados.length);
+    return filtrados;
   };
 
   // Calcular resumen desde los productos filtrados
