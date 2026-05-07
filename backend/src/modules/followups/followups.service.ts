@@ -601,11 +601,12 @@ export class FollowUpsService {
         }
 
         // 4. Crear o actualizar EstadoProducto
-        // ✅ Buscar primero
+        // Buscar por cotizacionDetalleId (NO por SKU): si el SKU del detalle
+        // cambió luego de creado el EP, comparar por SKU produce duplicados.
         const estadoExistente = await transaction.estadoProducto.findFirst({
           where: {
             cotizacionId: cotizacionId,
-            sku: productoConfig.sku,
+            cotizacionDetalleId: detalle.id,
           },
         });
 
