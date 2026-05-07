@@ -440,7 +440,6 @@ export default function MyQuotes() {
 
     // Filtro de notificación
     const [notifFiltroId, setNotifFiltroId] = useState<string | null>(null);
-    const [notifFiltroNombre, setNotifFiltroNombre] = useState<string>('');
     const handledNotifRef = useRef<string | null>(null);
 
     // Estados de UI
@@ -478,9 +477,7 @@ export default function MyQuotes() {
         handledNotifRef.current = cotizacionId;
 
         const target = cotizaciones.find((c: any) => c.id === cotizacionId) ?? ({ id: cotizacionId } as any);
-        const nombre = (target as any).nombreCotizacion || '';
         setNotifFiltroId(cotizacionId);
-        if (nombre) setNotifFiltroNombre(nombre);
         seleccionarCotizacion(target);
     }, [loading, (location.state as any)?.notifCotizacionId]);
 
@@ -766,11 +763,11 @@ export default function MyQuotes() {
                             <div className="mb-3">
                                 {notifFiltroId ? (
                                     <div className="flex items-center gap-2 rounded-lg border-2 border-blue-300 bg-blue-50 px-3 py-2 dark:border-blue-700 dark:bg-blue-900/20">
-                                        <span className="text-sm font-medium text-blue-800 dark:text-blue-200 flex-1 truncate">
-                                            🔔 {notifFiltroNombre || 'Filtro activo'}
+                                        <span className="text-sm font-medium text-blue-800 dark:text-blue-200 flex-1">
+                                            🔔 Mostrando cotización de notificación
                                         </span>
                                         <button
-                                            onClick={() => { setNotifFiltroId(null); setNotifFiltroNombre(''); }}
+                                            onClick={() => setNotifFiltroId(null)}
                                             className="flex-shrink-0 text-blue-500 hover:text-blue-700 dark:text-blue-400"
                                             title="Ver todas"
                                         >

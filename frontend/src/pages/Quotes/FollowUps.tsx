@@ -642,7 +642,6 @@ export default function FollowUps() {
 
   // Filtro de notificación — muestra solo una cotización cuando se navega desde una notif
   const [notifFiltroId, setNotifFiltroId] = useState<string | null>(null);
-  const [notifFiltroNombre, setNotifFiltroNombre] = useState<string>('');
   const handledNotifRef = useRef<string | null>(null);
 
   // Estados de filtros
@@ -762,9 +761,7 @@ export default function FollowUps() {
     handledNotifRef.current = cotizacionId;
 
     const target = cotizaciones.find((c: any) => c.id === cotizacionId) ?? ({ id: cotizacionId } as Cotizacion);
-    const nombre = (target as any).nombreCotizacion || '';
     setNotifFiltroId(cotizacionId);
-    if (nombre) setNotifFiltroNombre(nombre);
     const tab: 'detalle' | 'chat' | 'historial' = ns?.notifOpenChat ? 'chat' : 'detalle';
     seleccionarCotizacion(target, tab);
     setTimeout(() => {
@@ -1765,11 +1762,11 @@ export default function FollowUps() {
           <div className="relative mb-3">
             {notifFiltroId ? (
               <div className="flex items-center gap-2 rounded-lg border-2 border-blue-300 bg-blue-50 px-3 py-2 dark:border-blue-700 dark:bg-blue-900/20">
-                <span className="text-sm font-medium text-blue-800 dark:text-blue-200 flex-1 truncate">
-                  🔔 {notifFiltroNombre || 'Filtro de notificación activo'}
+                <span className="text-sm font-medium text-blue-800 dark:text-blue-200 flex-1">
+                  🔔 Mostrando cotización de notificación
                 </span>
                 <button
-                  onClick={() => { setNotifFiltroId(null); setNotifFiltroNombre(''); }}
+                  onClick={() => setNotifFiltroId(null)}
                   className="flex-shrink-0 text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-200 p-0.5"
                   title="Ver todas las cotizaciones"
                 >

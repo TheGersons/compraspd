@@ -551,7 +551,6 @@ export default function ShoppingFollowUps() {
 
   // Filtro de notificación — muestra solo una cotización cuando se navega desde una notif
   const [notifFiltroId, setNotifFiltroId] = useState<string | null>(null);
-  const [notifFiltroNombre, setNotifFiltroNombre] = useState<string>('');
   const handledNotifRef = useRef<string | null>(null);
 
   // Estados principales
@@ -686,27 +685,27 @@ export default function ShoppingFollowUps() {
 
     if (cotizacionId) setNotifFiltroId(cotizacionId);
 
-    if (estadoProductoId) {
-      (async () => {
-        const detalle = await seleccionarProducto(estadoProductoId);
-        if (!detalle) return;
-        const ocId = detalle.ordenCompraId || null;
-        const cotId = detalle.cotizacionId || detalle.cotizacion?.id || 'sin-cotizacion';
-        const groupKey = ocId ? `oc:${ocId}` : `cot:${cotId}`;
-        setGrupoExpandido(groupKey);
-        if (detalle.cotizacion?.nombreCotizacion) setNotifFiltroNombre(detalle.cotizacion.nombreCotizacion);
-        if (detalle.cotizacion?.chatId) setChatIdActivo(detalle.cotizacion.chatId);
-        if (openChat) setVistaActivaGrupo('chat');
-        setTimeout(() => {
-          acordeonRefs.current[groupKey]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 200);
-      })();
-    } else if (cotizacionId) {
-      // Solo filtro sin producto específico — expandir el grupo si ya existe en la lista
-      const grupoKey = `cot:${cotizacionId}`;
-      setGrupoExpandido(grupoKey);
+    (async () => {
+      // Resolver el estadoProductoId: si viene en el payload usarlo, si no buscar el primero de la cotización
+      let productoId = estadoProductoId;
+      if (!productoId && cotizacionId) {
+        const data = await api.getEstadosProductos({ cotizacionId, pageSize: 1 });
+        productoId = data?.items?.[0]?.id ?? null;
+      }
+      if (!productoId) return;
+
+      const detalle = await seleccionarProducto(productoId);
+      if (!detalle) return;
+      const ocId = detalle.ordenCompraId || null;
+      const cotId = detalle.cotizacionId || detalle.cotizacion?.id || 'sin-cotizacion';
+      const groupKey = ocId ? `oc:${ocId}` : `cot:${cotId}`;
+      setGrupoExpandido(groupKey);
+      if (detalle.cotizacion?.chatId) setChatIdActivo(detalle.cotizacion.chatId);
       if (openChat) setVistaActivaGrupo('chat');
-    }
+      setTimeout(() => {
+        acordeonRefs.current[groupKey]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 200);
+    })();
   }, [loading, (location.state as any)?.notifCotizacionId, (location.state as any)?.notifEstadoProductoId]);
 
   // ============================================================================
@@ -1200,10 +1199,10 @@ export default function ShoppingFollowUps() {
               {notifFiltroId ? (
                 <div className="flex items-center gap-2 rounded-lg border-2 border-blue-300 bg-blue-50 px-3 py-2 dark:border-blue-700 dark:bg-blue-900/20">
                   <span className="text-sm font-medium text-blue-800 dark:text-blue-200 flex-1 truncate">
-                    🔔 {notifFiltroNombre || 'Filtro de notificación activo'}
+                    🔔 Mostrando cotización de notificación
                   </span>
                   <button
-                    onClick={() => { setNotifFiltroId(null); setNotifFiltroNombre(''); }}
+                    onClick={() => setNotifFiltroId(null)}
                     className="flex-shrink-0 text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-200"
                     title="Ver todas las compras"
                   >
