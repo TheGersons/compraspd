@@ -178,6 +178,21 @@ export class DashboardService {
           });
         }
       }
+
+      // EPs sin cotizacionDetalleId (creados desde el flujo de compras, ej. compraDetalleId presente
+      // pero cotizacionDetalleId null) no entran al mapa y quedan completamente ignorados.
+      // Se agregan aquí para que sus estados reales sean visibles en el dashboard.
+      for (const ep of cot.estadosProductos) {
+        if (!ep.cotizacionDetalleId) {
+          productos.push({
+            ...ep,
+            sinFechasDefinidas: false,
+            cotizacion: cotizacionInfo,
+            proyecto: cot.proyecto,
+            proyectoId: cot.proyecto?.id ?? ep.proyectoId,
+          });
+        }
+      }
     }
 
     // 5. Agrupar productos por área y por proyecto
