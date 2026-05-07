@@ -10,66 +10,35 @@ import {
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
-/**
- * Devuelve la ruta a la que debe navegar una notificación según su tipo,
- * los IDs disponibles y el rol del usuario.
- */
-function resolveNotifUrl(
+function resolveNotifNav(
   n: BackendNotification,
   userRole: string | undefined,
-): string | null {
+): { path: string; state: object } {
   const isSupervisorOrAbove = ["SUPERVISOR", "ADMIN", "JEFE_COMPRAS", "COMERCIAL", "IMPORT_EXPORT"].includes(userRole ?? "");
-  const shoppingFollowUps = "/shopping/follow-ups";
-  const quotesFollowUps = "/quotes/follow-ups";
-  const myQuotes = "/quotes/my-quotes";
+  const state = {
+    notifCotizacionId: n.cotizacionId ?? null,
+    notifEstadoProductoId: n.estadoProductoId ?? null,
+    notifOpenChat: n.tipo === "COMENTARIO_NUEVO",
+  };
 
-  // Nueva cotización para revisar → supervisores a quotes/follow-ups, USUARIO a my-quotes
-  if (n.tipo === "COMPRA_CREADA") {
-    if (isSupervisorOrAbove) {
-      if (n.cotizacionId) return `${quotesFollowUps}?cotizacion=${n.cotizacionId}`;
-      return quotesFollowUps;
-    }
-    if (n.cotizacionId) return `${myQuotes}?cotizacion=${n.cotizacionId}`;
-    return myQuotes;
-  }
+  if (n.tipo === "IMPORT_EXPORT") return { path: "/import-export", state: {} };
 
-  // Asignación rechazada → supervisores a quotes/follow-ups, USUARIO a my-quotes
-  if (n.tipo === "ASIGNACION_RECHAZADA") {
-    if (isSupervisorOrAbove) {
-      if (n.cotizacionId) return `${quotesFollowUps}?cotizacion=${n.cotizacionId}`;
-      return quotesFollowUps;
-    }
-    if (n.cotizacionId) return `${myQuotes}?cotizacion=${n.cotizacionId}`;
-    return myQuotes;
-  }
-
-  // Mensaje nuevo → supervisores van a shopping via ?producto= (mecanismo probado),
-  // solicitantes van a mis cotizaciones
   if (n.tipo === "COMENTARIO_NUEVO") {
-    if (isSupervisorOrAbove) {
-      if (n.estadoProductoId) return `${shoppingFollowUps}?producto=${n.estadoProductoId}&tab=chat`;
-      if (n.cotizacionId) return `${shoppingFollowUps}?cotizacion=${n.cotizacionId}&tab=chat`;
-      return shoppingFollowUps;
-    }
-    if (n.cotizacionId) return `${myQuotes}?cotizacion=${n.cotizacionId}&tab=chat`;
-    return myQuotes;
+    if (isSupervisorOrAbove) return { path: "/shopping/follow-ups", state };
+    return { path: "/quotes/my-quotes", state };
   }
 
-  // Estado actualizado / compra completada → shopping
+  if (n.tipo === "COMPRA_CREADA" || n.tipo === "ASIGNACION_RECHAZADA") {
+    if (isSupervisorOrAbove) return { path: "/quotes/follow-ups", state };
+    return { path: "/quotes/my-quotes", state };
+  }
+
   if (n.tipo === "ESTADO_ACTUALIZADO" || n.tipo === "COMPRA_COMPLETADA") {
-    if (isSupervisorOrAbove) {
-      if (n.cotizacionId) return `${shoppingFollowUps}?cotizacion=${n.cotizacionId}`;
-      return shoppingFollowUps;
-    }
-    if (n.cotizacionId) return `${myQuotes}?cotizacion=${n.cotizacionId}`;
-    return myQuotes;
+    if (isSupervisorOrAbove) return { path: "/shopping/follow-ups", state };
+    return { path: "/quotes/my-quotes", state };
   }
 
-  if (n.tipo === "IMPORT_EXPORT") {
-    return "/import-export";
-  }
-
-  return null;
+  return { path: isSupervisorOrAbove ? "/shopping/follow-ups" : "/quotes/my-quotes", state };
 }
 
 // Iconos por tipo de notificación
@@ -155,7 +124,6 @@ export default function NotificationDropdown() {
     const opening = !isOpen;
     setIsOpen(opening);
     if (opening) {
-      // Al abrir, marcar todas como leídas y refrescar lista
       const token = getToken();
       if (token && unreadCount > 0) {
         fetch(`${API_BASE_URL}/api/v1/notificaciones/read-all`, {
@@ -231,21 +199,21 @@ export default function NotificationDropdown() {
           )}
 
           {notifications.map((n) => {
-            const destUrl = resolveNotifUrl(n, userRole);
+            const { path: destPath, state: destState } = resolveNotifNav(n, userRole);
             const handleClick = () => {
               setIsOpen(false);
-              if (destUrl) navigate(destUrl);
+              navigate(destPath, { state: destState });
             };
             return (
               <li key={n.id}>
                 <div
-                  role={destUrl ? "button" : undefined}
-                  tabIndex={destUrl ? 0 : undefined}
-                  onClick={destUrl ? handleClick : undefined}
-                  onKeyDown={destUrl ? (e) => e.key === "Enter" && handleClick() : undefined}
-                  className={`flex gap-3 rounded-lg border-b border-gray-100 px-3 py-3 transition-colors dark:border-gray-800 ${
+                  role="button"
+                  tabIndex={0}
+                  onClick={handleClick}
+                  onKeyDown={(e) => e.key === "Enter" && handleClick()}
+                  className={`flex gap-3 rounded-lg border-b border-gray-100 px-3 py-3 transition-colors dark:border-gray-800 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 ${
                     !n.completada ? "bg-blue-50/40 dark:bg-blue-900/10" : ""
-                  } ${destUrl ? "cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5" : ""}`}
+                  }`}
                 >
                   <NotifIcon tipo={n.tipo} />
                   <div className="min-w-0 flex-1">
@@ -262,11 +230,9 @@ export default function NotificationDropdown() {
                       <p className="text-xs text-gray-400 dark:text-gray-500">
                         {timeAgo(n.creada)}
                       </p>
-                      {destUrl && (
-                        <span className="text-[10px] font-medium text-blue-500 dark:text-blue-400">
-                          Ver →
-                        </span>
-                      )}
+                      <span className="text-[10px] font-medium text-blue-500 dark:text-blue-400">
+                        Ver →
+                      </span>
                     </div>
                   </div>
                 </div>

@@ -5,7 +5,7 @@ import { useNotifications } from "../Notifications/context/NotificationContext";
 import Historial from "./components/Historial";
 import { useAuth } from "../../context/AuthContext";
 import toast from "react-hot-toast";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import ChatPanel from "../../components/chat/ChatPanel";
 import DescuentoActions from "./components/DescuentoActions";
 import { format } from "date-fns";
@@ -638,6 +638,13 @@ export default function FollowUps() {
   const [apelarCotId, setApelarCotId] = useState("");
   const [apelarCotNombre, setApelarCotNombre] = useState("");
 
+  const location = useLocation();
+
+  // Filtro de notificación — muestra solo una cotización cuando se navega desde una notif
+  const [notifFiltroId, setNotifFiltroId] = useState<string | null>(null);
+  const [notifFiltroNombre, setNotifFiltroNombre] = useState<string>('');
+  const handledNotifRef = useRef<string | null>(null);
+
   // Estados de filtros
   const [searchTerm, setSearchTerm] = useState("");
   const [responsableFiltro, setResponsableFiltro] = useState<string>("TODOS");
@@ -745,6 +752,25 @@ export default function FollowUps() {
       accordionRefs.current[targetId]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 300);
   }, [searchParams]);
+
+  // Efecto de notificación — aplica filtro + selección cuando se navega desde NotificationDropdown
+  useEffect(() => {
+    const ns = location.state as any;
+    const cotizacionId: string | null = ns?.notifCotizacionId ?? null;
+    if (!cotizacionId || loading) return;
+    if (handledNotifRef.current === cotizacionId) return;
+    handledNotifRef.current = cotizacionId;
+
+    const target = cotizaciones.find((c: any) => c.id === cotizacionId) ?? ({ id: cotizacionId } as Cotizacion);
+    const nombre = (target as any).nombreCotizacion || '';
+    setNotifFiltroId(cotizacionId);
+    if (nombre) setNotifFiltroNombre(nombre);
+    const tab: 'detalle' | 'chat' | 'historial' = ns?.notifOpenChat ? 'chat' : 'detalle';
+    seleccionarCotizacion(target, tab);
+    setTimeout(() => {
+      accordionRefs.current[cotizacionId]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 300);
+  }, [loading, (location.state as any)?.notifCotizacionId]);
 
   // Scroll al acordeón expandido
   useEffect(() => {
@@ -1171,6 +1197,8 @@ export default function FollowUps() {
 
   const filteredCotizaciones = (() => {
     const filtered = cotizaciones.filter((cot) => {
+      // Filtro de notificación — solo la cotización relevante
+      if (notifFiltroId && cot.id !== notifFiltroId) return false;
       // Match en cabecera, productos (detalles) y orden de compra
       const haystack: (string | undefined)[] = [
         cot.nombreCotizacion,
@@ -1735,17 +1763,34 @@ export default function FollowUps() {
         <div className="rounded-lg border-2 border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
           {/* Barra de búsqueda */}
           <div className="relative mb-3">
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && cargarCotizaciones()}
-              placeholder="Buscar cotización o solicitante..."
-              className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 pl-10 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
-            />
-            <svg className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+            {notifFiltroId ? (
+              <div className="flex items-center gap-2 rounded-lg border-2 border-blue-300 bg-blue-50 px-3 py-2 dark:border-blue-700 dark:bg-blue-900/20">
+                <span className="text-sm font-medium text-blue-800 dark:text-blue-200 flex-1 truncate">
+                  🔔 {notifFiltroNombre || 'Filtro de notificación activo'}
+                </span>
+                <button
+                  onClick={() => { setNotifFiltroId(null); setNotifFiltroNombre(''); }}
+                  className="flex-shrink-0 text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-200 p-0.5"
+                  title="Ver todas las cotizaciones"
+                >
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && cargarCotizaciones()}
+                  placeholder="Buscar cotización o solicitante..."
+                  className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 pl-10 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+                />
+                <svg className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </>
+            )}
           </div>
           {/* Filtros en fila */}
           <div className="flex flex-wrap items-center gap-3">

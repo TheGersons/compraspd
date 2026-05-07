@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import PageMeta from "../../components/common/PageMeta";
 import { getToken } from "../../lib/api";
 import { useNotifications } from "../Notifications/context/NotificationContext";
 import { useAuth } from "../../context/AuthContext";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import toast from "react-hot-toast";
 import ChatPanel from "../../components/chat/ChatPanel";
 
@@ -436,6 +436,12 @@ export default function MyQuotes() {
     const [vistaActual, setVistaActual] = useState<'cotizaciones' | 'enCompras' | 'completadas'>('cotizaciones');
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
+    const location = useLocation();
+
+    // Filtro de notificación
+    const [notifFiltroId, setNotifFiltroId] = useState<string | null>(null);
+    const [notifFiltroNombre, setNotifFiltroNombre] = useState<string>('');
+    const handledNotifRef = useRef<string | null>(null);
 
     // Estados de UI
     const [showProductos, setShowProductos] = useState(false);
@@ -462,6 +468,21 @@ export default function MyQuotes() {
     useEffect(() => {
         cargarMisCotizaciones();
     }, []);
+
+    // Efecto de notificación
+    useEffect(() => {
+        const ns = location.state as any;
+        const cotizacionId: string | null = ns?.notifCotizacionId ?? null;
+        if (!cotizacionId || loading) return;
+        if (handledNotifRef.current === cotizacionId) return;
+        handledNotifRef.current = cotizacionId;
+
+        const target = cotizaciones.find((c: any) => c.id === cotizacionId) ?? ({ id: cotizacionId } as any);
+        const nombre = (target as any).nombreCotizacion || '';
+        setNotifFiltroId(cotizacionId);
+        if (nombre) setNotifFiltroNombre(nombre);
+        seleccionarCotizacion(target);
+    }, [loading, (location.state as any)?.notifCotizacionId]);
 
     // ============================================================================
     // FUNCTIONS
@@ -515,6 +536,8 @@ export default function MyQuotes() {
 
     // Filtrar cotizaciones según la vista
     const filteredCotizaciones = cotizaciones.filter((cot) => {
+        // Filtro de notificación
+        if (notifFiltroId && cot.id !== notifFiltroId) return false;
         const matchesSearch =
             cot.nombreCotizacion.toLowerCase().includes(searchQuery.toLowerCase()) ||
             cot.proyecto?.nombre?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -741,13 +764,28 @@ export default function MyQuotes() {
                         <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
                             {/* Buscador */}
                             <div className="mb-3">
-                                <input
-                                    type="text"
-                                    placeholder="Buscar por nombre o proyecto..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                                />
+                                {notifFiltroId ? (
+                                    <div className="flex items-center gap-2 rounded-lg border-2 border-blue-300 bg-blue-50 px-3 py-2 dark:border-blue-700 dark:bg-blue-900/20">
+                                        <span className="text-sm font-medium text-blue-800 dark:text-blue-200 flex-1 truncate">
+                                            🔔 {notifFiltroNombre || 'Filtro activo'}
+                                        </span>
+                                        <button
+                                            onClick={() => { setNotifFiltroId(null); setNotifFiltroNombre(''); }}
+                                            className="flex-shrink-0 text-blue-500 hover:text-blue-700 dark:text-blue-400"
+                                            title="Ver todas"
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <input
+                                        type="text"
+                                        placeholder="Buscar por nombre o proyecto..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                                    />
+                                )}
                             </div>
 
                             {/* Título según vista */}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import PageMeta from "../../components/common/PageMeta";
 import { getToken } from "../../lib/api";
@@ -547,6 +547,12 @@ export default function ShoppingFollowUps() {
   const [apelarCotId, setApelarCotId] = useState("");
   const [apelarCotNombre, setApelarCotNombre] = useState("");
   const [searchParams] = useSearchParams();
+  const location = useLocation();
+
+  // Filtro de notificación — muestra solo una cotización cuando se navega desde una notif
+  const [notifFiltroId, setNotifFiltroId] = useState<string | null>(null);
+  const [notifFiltroNombre, setNotifFiltroNombre] = useState<string>('');
+  const handledNotifRef = useRef<string | null>(null);
 
   // Estados principales
   const [productos, setProductos] = useState<EstadoProducto[]>([]);
@@ -666,6 +672,42 @@ export default function ShoppingFollowUps() {
       }, 200);
     })();
   }, [searchParams, loading]);
+
+  // Efecto de notificación — aplica filtro + selección cuando se navega desde NotificationDropdown
+  useEffect(() => {
+    const ns = location.state as any;
+    const cotizacionId: string | null = ns?.notifCotizacionId ?? null;
+    const estadoProductoId: string | null = ns?.notifEstadoProductoId ?? null;
+    const openChat: boolean = ns?.notifOpenChat ?? false;
+    const notifKey = estadoProductoId || cotizacionId;
+    if (!notifKey || loading) return;
+    if (handledNotifRef.current === notifKey) return;
+    handledNotifRef.current = notifKey;
+
+    if (cotizacionId) setNotifFiltroId(cotizacionId);
+
+    if (estadoProductoId) {
+      (async () => {
+        const detalle = await seleccionarProducto(estadoProductoId);
+        if (!detalle) return;
+        const ocId = detalle.ordenCompraId || null;
+        const cotId = detalle.cotizacionId || detalle.cotizacion?.id || 'sin-cotizacion';
+        const groupKey = ocId ? `oc:${ocId}` : `cot:${cotId}`;
+        setGrupoExpandido(groupKey);
+        if (detalle.cotizacion?.nombreCotizacion) setNotifFiltroNombre(detalle.cotizacion.nombreCotizacion);
+        if (detalle.cotizacion?.chatId) setChatIdActivo(detalle.cotizacion.chatId);
+        if (openChat) setVistaActivaGrupo('chat');
+        setTimeout(() => {
+          acordeonRefs.current[groupKey]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 200);
+      })();
+    } else if (cotizacionId) {
+      // Solo filtro sin producto específico — expandir el grupo si ya existe en la lista
+      const grupoKey = `cot:${cotizacionId}`;
+      setGrupoExpandido(grupoKey);
+      if (openChat) setVistaActivaGrupo('chat');
+    }
+  }, [loading, (location.state as any)?.notifCotizacionId, (location.state as any)?.notifEstadoProductoId]);
 
   // ============================================================================
   // HANDLERS
@@ -798,6 +840,8 @@ export default function ShoppingFollowUps() {
 
   // Filtrar productos por búsqueda, estado y responsable
   const productosFiltrados = productos.filter(p => {
+    // Filtro de notificación — solo la cotización relevante
+    if (notifFiltroId && p.cotizacionId !== notifFiltroId && p.cotizacion?.id !== notifFiltroId) return false;
     // Ocultar rechazados del flujo
     if (p.rechazado) return false;
 
@@ -1153,16 +1197,33 @@ export default function ShoppingFollowUps() {
               </button>
             </div>
             <div className="relative flex-1">
-              <input
-                type="text"
-                placeholder="Buscar por SKU, descripción o proveedor..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 pl-10 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
-              />
-              <svg className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
+              {notifFiltroId ? (
+                <div className="flex items-center gap-2 rounded-lg border-2 border-blue-300 bg-blue-50 px-3 py-2 dark:border-blue-700 dark:bg-blue-900/20">
+                  <span className="text-sm font-medium text-blue-800 dark:text-blue-200 flex-1 truncate">
+                    🔔 {notifFiltroNombre || 'Filtro de notificación activo'}
+                  </span>
+                  <button
+                    onClick={() => { setNotifFiltroId(null); setNotifFiltroNombre(''); }}
+                    className="flex-shrink-0 text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-200"
+                    title="Ver todas las compras"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    placeholder="Buscar por SKU, descripción o proveedor..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full rounded-lg border-2 border-gray-300 bg-white px-3 py-2 pl-10 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+                  />
+                  <svg className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </>
+              )}
             </div>
           </div>
           {/* Filtros en fila */}
