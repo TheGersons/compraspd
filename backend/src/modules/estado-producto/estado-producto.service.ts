@@ -876,6 +876,38 @@ export class EstadoProductoService {
               data: detData,
             });
           }
+
+          // Cascade precio → Precios table so the Quotes UI price column stays in sync.
+          // Skip for products already transferred to a purchase (compraDetalleId set).
+          if (precioUnitario != null && !ep.compraDetalleId) {
+            const cotDetalle = await this.prisma.cotizacionDetalle.findUnique({
+              where: { id: ep.cotizacionDetalleId },
+              select: {
+                preciosId: true,
+                cotizacion: { select: { monedaId: true } },
+              },
+            });
+            if (cotDetalle) {
+              if (cotDetalle.preciosId) {
+                await this.prisma.precios.update({
+                  where: { id: cotDetalle.preciosId },
+                  data: { precio: precioUnitario },
+                });
+              } else {
+                const nuevoPrecio = await this.prisma.precios.create({
+                  data: {
+                    cotizacionDetalleId: ep.cotizacionDetalleId,
+                    precio: precioUnitario,
+                    monedaId: cotDetalle.cotizacion?.monedaId ?? undefined,
+                  },
+                });
+                await this.prisma.cotizacionDetalle.update({
+                  where: { id: ep.cotizacionDetalleId },
+                  data: { preciosId: nuevoPrecio.id },
+                });
+              }
+            }
+          }
         }
 
         // Cascade a CompraDetalle si hay vínculo

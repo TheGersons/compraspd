@@ -885,9 +885,9 @@ export default function FollowUps() {
     }
   };
 
-  const seleccionarCotizacion = async (cotizacion: Cotizacion, initialTab: "detalle" | "chat" | "historial" = "detalle") => {
-    // Toggle: collapse if already selected
-    if (cotizacionSeleccionada?.id === cotizacion.id) {
+  const seleccionarCotizacion = async (cotizacion: Cotizacion, initialTab: "detalle" | "chat" | "historial" = "detalle", force = false) => {
+    // Toggle: collapse if already selected (skip if force-reloading after a save)
+    if (!force && cotizacionSeleccionada?.id === cotizacion.id) {
       setCotizacionSeleccionada(null);
       return;
     }
@@ -997,7 +997,7 @@ export default function FollowUps() {
       await api.actualizarPrecioMasivo(items);
       toast.success("Guardado correctamente");
       setShowEditPrecioModal(false);
-      if (cotizacionSeleccionada) await seleccionarCotizacion(cotizacionSeleccionada);
+      if (cotizacionSeleccionada) await seleccionarCotizacion(cotizacionSeleccionada, vistaActiva, true);
     } catch (e: any) { toast.error(e.message); }
     finally { setSavingPrecios(false); }
   };
