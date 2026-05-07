@@ -143,11 +143,11 @@ export class StorageService {
       );
     }
 
-    // Validar tamaño (máximo 10MB)
-    const maxSize = 10 * 1024 * 1024;
+    // Validar tamaño (máximo 150MB)
+    const maxSize = 150 * 1024 * 1024;
     if (file.length > maxSize) {
       throw new BadRequestException(
-        'El archivo excede el tamaño máximo de 10MB',
+        'El archivo excede el tamaño máximo de 150MB',
       );
     }
 
