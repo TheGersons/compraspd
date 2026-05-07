@@ -251,8 +251,8 @@ export default function Quotes() {
       if (isSupervisor) {
         const [stats, lista, comprasList] = await Promise.allSettled([
           apiFetch<EstadisticasSupervisor>("/api/v1/followups/estadisticas"),
-          apiFetch<{ items: CotizacionItem[]; total: number }>("/api/v1/followups?pageSize=100"),
-          apiFetch<{ items: any[]; total: number }>("/api/v1/compras?pageSize=100"),
+          apiFetch<{ items: CotizacionItem[]; total: number }>("/api/v1/followups?pageSize=9999"),
+          apiFetch<{ items: any[]; total: number }>("/api/v1/compras?pageSize=9999"),
         ]);
         if (stats.status === "fulfilled") setEstadisticas(stats.value);
         if (lista.status === "fulfilled") setCotizaciones(lista.value.items ?? []);
