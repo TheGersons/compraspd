@@ -19,24 +19,41 @@ function resolveNotifUrl(
   userRole: string | undefined,
 ): string | null {
   const isSupervisorOrAbove = ["SUPERVISOR", "ADMIN", "JEFE_COMPRAS", "COMERCIAL"].includes(userRole ?? "");
-  const followUps = "/quotes/follow-ups";
+  const shoppingFollowUps = "/shopping/follow-ups";
+  const quotesFollowUps = "/quotes/follow-ups";
   const myQuotes = "/quotes/my-quotes";
 
-  if (n.tipo === "COMPRA_CREADA" || n.tipo === "ASIGNACION_RECHAZADA") {
-    if (n.cotizacionId) return `${followUps}?cotizacion=${n.cotizacionId}`;
-    return followUps;
+  // Nueva cotización para revisar → siempre en quotes (fase de cotización)
+  if (n.tipo === "COMPRA_CREADA") {
+    if (n.cotizacionId) return `${quotesFollowUps}?cotizacion=${n.cotizacionId}`;
+    return quotesFollowUps;
   }
 
+  // Asignación rechazada → siempre en quotes
+  if (n.tipo === "ASIGNACION_RECHAZADA") {
+    if (n.cotizacionId) return `${quotesFollowUps}?cotizacion=${n.cotizacionId}`;
+    return quotesFollowUps;
+  }
+
+  // Mensaje nuevo → supervisores van a shopping primero (con fallback a quotes si no existe),
+  // solicitantes van a mis cotizaciones
   if (n.tipo === "COMENTARIO_NUEVO") {
-    const base = isSupervisorOrAbove ? followUps : myQuotes;
-    if (n.cotizacionId) return `${base}?cotizacion=${n.cotizacionId}&tab=chat`;
-    return base;
+    if (isSupervisorOrAbove) {
+      if (n.cotizacionId) return `${shoppingFollowUps}?cotizacion=${n.cotizacionId}&tab=chat`;
+      return shoppingFollowUps;
+    }
+    if (n.cotizacionId) return `${myQuotes}?cotizacion=${n.cotizacionId}&tab=chat`;
+    return myQuotes;
   }
 
+  // Estado actualizado / compra completada → shopping
   if (n.tipo === "ESTADO_ACTUALIZADO" || n.tipo === "COMPRA_COMPLETADA") {
-    const base = isSupervisorOrAbove ? followUps : myQuotes;
-    if (n.cotizacionId) return `${base}?cotizacion=${n.cotizacionId}`;
-    return base;
+    if (isSupervisorOrAbove) {
+      if (n.cotizacionId) return `${shoppingFollowUps}?cotizacion=${n.cotizacionId}`;
+      return shoppingFollowUps;
+    }
+    if (n.cotizacionId) return `${myQuotes}?cotizacion=${n.cotizacionId}`;
+    return myQuotes;
   }
 
   if (n.tipo === "IMPORT_EXPORT") {
