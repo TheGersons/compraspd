@@ -271,7 +271,7 @@ export class EstadoProductoController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Actualizar precio final de múltiples productos' })
   actualizarPrecioMasivo(
-    @Body() body: { items: { id: string; precioUnitario?: number | null; precioTotal?: number | null }[] },
+    @Body() body: { items: { id: string; precioUnitario?: number | null; precioTotal?: number | null; sku?: string | null; descripcion?: string | null; cantidad?: number | null }[] },
     @CurrentUser() user: UserJwt,
   ) {
     return this.service.actualizarPrecioMasivo(body.items, user);

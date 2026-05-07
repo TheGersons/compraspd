@@ -835,18 +835,64 @@ export class EstadoProductoService {
   }
 
   async actualizarPrecioMasivo(
-    items: { id: string; precioUnitario?: number | null; precioTotal?: number | null }[],
+    items: {
+      id: string;
+      precioUnitario?: number | null;
+      precioTotal?: number | null;
+      sku?: string | null;
+      descripcion?: string | null;
+      cantidad?: number | null;
+    }[],
     user: UserJwt,
   ) {
     if (!this.isSupervisorOrAdmin(user)) {
       throw new ForbiddenException('Solo supervisores/admin pueden editar precios');
     }
+
     const results = await Promise.all(
-      items.map(({ id, precioUnitario, precioTotal }) => {
-        const updateData: any = { actualizado: new Date() };
-        if (precioUnitario !== undefined) updateData.precioUnitario = precioUnitario;
-        if (precioTotal !== undefined) updateData.precioTotal = precioTotal;
-        return this.prisma.estadoProducto.update({ where: { id }, data: updateData });
+      items.map(async ({ id, precioUnitario, precioTotal, sku, descripcion, cantidad }) => {
+        const epData: any = { actualizado: new Date() };
+        if (precioUnitario !== undefined) epData.precioUnitario = precioUnitario;
+        if (precioTotal !== undefined) epData.precioTotal = precioTotal;
+        if (sku !== undefined && sku !== null) epData.sku = sku.trim();
+        if (descripcion !== undefined && descripcion !== null) epData.descripcion = descripcion.trim();
+        if (cantidad !== undefined && cantidad !== null) epData.cantidad = cantidad;
+
+        const ep = await this.prisma.estadoProducto.update({
+          where: { id },
+          data: epData,
+          select: { cotizacionDetalleId: true, compraDetalleId: true },
+        });
+
+        // Cascade a CotizacionDetalle si hay vínculo
+        if (ep.cotizacionDetalleId) {
+          const detData: any = {};
+          if (sku !== undefined && sku !== null) detData.sku = sku.trim();
+          if (descripcion !== undefined && descripcion !== null) detData.descripcionProducto = descripcion.trim();
+          if (cantidad !== undefined && cantidad !== null) detData.cantidad = cantidad;
+          if (Object.keys(detData).length > 0) {
+            await this.prisma.cotizacionDetalle.update({
+              where: { id: ep.cotizacionDetalleId },
+              data: detData,
+            });
+          }
+        }
+
+        // Cascade a CompraDetalle si hay vínculo
+        if (ep.compraDetalleId) {
+          const detData: any = {};
+          if (sku !== undefined && sku !== null) detData.sku = sku.trim();
+          if (descripcion !== undefined && descripcion !== null) detData.descripcionProducto = descripcion.trim();
+          if (cantidad !== undefined && cantidad !== null) detData.cantidad = cantidad;
+          if (Object.keys(detData).length > 0) {
+            await this.prisma.compraDetalle.update({
+              where: { id: ep.compraDetalleId },
+              data: detData,
+            });
+          }
+        }
+
+        return ep;
       }),
     );
     return { updated: results.length };

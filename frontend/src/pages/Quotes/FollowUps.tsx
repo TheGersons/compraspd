@@ -261,7 +261,7 @@ const api = {
     return response.json();
   },
 
-  async actualizarPrecioMasivo(items: { id: string; precioUnitario?: number | null; precioTotal?: number | null }[]) {
+  async actualizarPrecioMasivo(items: { id: string; precioUnitario?: number | null; precioTotal?: number | null; sku?: string | null; descripcion?: string | null; cantidad?: number | null }[]) {
     const token = getToken();
     const response = await fetch(`${API_BASE_URL}/api/v1/estado-productos/precio-masivo`, {
       method: "PATCH", credentials: "include",
@@ -615,7 +615,7 @@ export default function FollowUps() {
   const [menuResponsableCot, setMenuResponsableCot] = useState(false);
   const [responsableCotAsignado, setResponsableCotAsignado] = useState<{ id: string; nombre: string } | null>(null);
   const [showEditPrecioModal, setShowEditPrecioModal] = useState(false);
-  const [preciosEnEdicion, setPreciosEnEdicion] = useState<{ id: string; sku: string; descripcion: string; precioUnitario: string; cantidad: number | null; precioTotal: string }[]>([]);
+  const [preciosEnEdicion, setPreciosEnEdicion] = useState<{ id: string; sku: string; descripcion: string; precioUnitario: string; cantidad: string; precioTotal: string }[]>([]);
   const [savingPrecios, setSavingPrecios] = useState(false);
   const [cotizacionSeleccionada, setCotizacionSeleccionada] = useState<Cotizacion | null>(null);
   const [loading, setLoading] = useState(true);
@@ -933,10 +933,10 @@ export default function FollowUps() {
     if (!cotizacionSeleccionada?.estadosProductos?.length) return;
     setPreciosEnEdicion(cotizacionSeleccionada.estadosProductos.map((ep: any) => ({
       id: ep.id,
-      sku: ep.sku,
-      descripcion: ep.descripcion,
+      sku: ep.sku ?? "",
+      descripcion: ep.descripcion ?? "",
       precioUnitario: ep.precioUnitario != null ? String(ep.precioUnitario) : "",
-      cantidad: ep.cantidad ?? null,
+      cantidad: ep.cantidad != null ? String(ep.cantidad) : "",
       precioTotal: ep.precioTotal != null ? String(ep.precioTotal) : "",
     })));
     setShowEditPrecioModal(true);
@@ -947,11 +947,14 @@ export default function FollowUps() {
       id: p.id,
       precioUnitario: p.precioUnitario !== "" ? parseFloat(p.precioUnitario) : null,
       precioTotal: p.precioTotal !== "" ? parseFloat(p.precioTotal) : null,
+      sku: p.sku || null,
+      descripcion: p.descripcion || null,
+      cantidad: p.cantidad != null && p.cantidad !== "" ? parseInt(String(p.cantidad), 10) : null,
     }));
     setSavingPrecios(true);
     try {
       await api.actualizarPrecioMasivo(items);
-      toast.success("Precios actualizados");
+      toast.success("Guardado correctamente");
       setShowEditPrecioModal(false);
       if (cotizacionSeleccionada) await seleccionarCotizacion(cotizacionSeleccionada);
     } catch (e: any) { toast.error(e.message); }
@@ -2047,7 +2050,7 @@ export default function FollowUps() {
                                       <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                       </svg>
-                                      {cotizacionSeleccionada.estadosProductos.length > 1 ? "Editar precios" : "Editar precio"}
+                                      {cotizacionSeleccionada.estadosProductos.length > 1 ? "Editar precios/unidades" : "Editar precio/unidades"}
                                     </button>
                                   )}
                                   <span className={`rounded-full px-3 py-1 text-xs font-medium ${getEstadoBadgeColor(cotizacionSeleccionada.estado)}`}>
@@ -2634,7 +2637,7 @@ export default function FollowUps() {
           <div className="w-full max-w-2xl rounded-xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900">
             <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3 dark:border-gray-700">
               <h3 className="font-semibold text-gray-900 dark:text-white">
-                Editar {preciosEnEdicion.length === 1 ? "precio" : "precios"} — {cotizacionSeleccionada?.nombreCotizacion}
+                Editar {preciosEnEdicion.length === 1 ? "precio/unidades" : "precios/unidades"} — {cotizacionSeleccionada?.nombreCotizacion}
               </h3>
               <button onClick={() => setShowEditPrecioModal(false)} className="rounded p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -2654,8 +2657,24 @@ export default function FollowUps() {
                 <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
                   {preciosEnEdicion.map((p, i) => (
                     <tr key={p.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/30">
-                      <td className="py-2 pr-3 font-mono text-xs text-gray-600 dark:text-gray-400 align-middle">{p.sku}</td>
-                      <td className="py-2 pr-3 text-xs text-gray-700 dark:text-gray-300 max-w-[180px] truncate align-middle" title={p.descripcion}>{p.descripcion}</td>
+                      <td className="py-2 pr-2 align-middle">
+                        <input
+                          type="text"
+                          value={p.sku}
+                          onChange={(e) => setPreciosEnEdicion(prev => prev.map((item, idx) => idx === i ? { ...item, sku: e.target.value } : item))}
+                          className="w-20 rounded border border-gray-200 bg-gray-50 px-2 py-1 font-mono text-xs outline-none focus:border-amber-400 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                          placeholder="SKU"
+                        />
+                      </td>
+                      <td className="py-2 pr-2 align-middle">
+                        <input
+                          type="text"
+                          value={p.descripcion}
+                          onChange={(e) => setPreciosEnEdicion(prev => prev.map((item, idx) => idx === i ? { ...item, descripcion: e.target.value } : item))}
+                          className="w-40 rounded border border-gray-200 bg-gray-50 px-2 py-1 text-xs outline-none focus:border-amber-400 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                          placeholder="Descripción"
+                        />
+                      </td>
                       <td className="py-2 pr-2 align-middle">
                         <input
                           type="number" min="0" step="0.01"
@@ -2664,7 +2683,7 @@ export default function FollowUps() {
                             const val = e.target.value;
                             setPreciosEnEdicion(prev => prev.map((item, idx) => {
                               if (idx !== i) return item;
-                              const cant = item.cantidad ?? 1;
+                              const cant = item.cantidad !== "" ? parseFloat(item.cantidad) : 1;
                               const newTotal = val !== "" ? String(parseFloat(val) * cant) : item.precioTotal;
                               return { ...item, precioUnitario: val, precioTotal: newTotal };
                             }));
@@ -2673,7 +2692,23 @@ export default function FollowUps() {
                           placeholder="0.00"
                         />
                       </td>
-                      <td className="py-2 pr-2 text-right text-xs text-gray-500 align-middle">{p.cantidad ?? "—"}</td>
+                      <td className="py-2 pr-2 align-middle">
+                        <input
+                          type="number" min="1" step="1"
+                          value={p.cantidad}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setPreciosEnEdicion(prev => prev.map((item, idx) => {
+                              if (idx !== i) return item;
+                              const pu = item.precioUnitario !== "" ? parseFloat(item.precioUnitario) : null;
+                              const newTotal = pu != null && val !== "" ? String(pu * parseFloat(val)) : item.precioTotal;
+                              return { ...item, cantidad: val, precioTotal: newTotal };
+                            }));
+                          }}
+                          className="w-16 rounded border border-gray-200 bg-gray-50 px-2 py-1 text-right text-xs outline-none focus:border-amber-400 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                          placeholder="1"
+                        />
+                      </td>
                       <td className="py-2 align-middle">
                         <input
                           type="number" min="0" step="0.01"
@@ -2697,7 +2732,7 @@ export default function FollowUps() {
                 disabled={savingPrecios}
                 className="rounded-lg bg-amber-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50"
               >
-                {savingPrecios ? "Guardando..." : "Guardar precios"}
+                {savingPrecios ? "Guardando..." : "Guardar"}
               </button>
             </div>
           </div>

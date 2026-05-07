@@ -10,17 +10,18 @@ import TablaResumen from './components/gerencia/TablaResumen';
 import GraficoComparativo from './components/gerencia/GraficoComparativo';
 import ModalDetalleProductos from './components/gerencia/ModalDetalleProductos';
 import Button from '../../components/ui/button/Button';
+import DatePicker from '../../components/common/DatePicker';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 
-function defaultDesde() {
+function defaultDesde(): Date {
   const d = new Date();
   d.setMonth(d.getMonth() - 3);
-  return d.toISOString().slice(0, 10);
+  return d;
 }
-function defaultHasta() {
-  return new Date().toISOString().slice(0, 10);
+function defaultHasta(): Date {
+  return new Date();
 }
 
 export default function DashboardGerencia() {
@@ -31,8 +32,8 @@ export default function DashboardGerencia() {
 
   // Filtros
   const [filtroTipoCompra, setFiltroTipoCompra] = useState<'NACIONAL' | 'INTERNACIONAL'>('INTERNACIONAL');
-  const [desde, setDesde] = useState(defaultDesde());
-  const [hasta, setHasta] = useState(defaultHasta());
+  const [desde, setDesde] = useState<Date | null>(defaultDesde());
+  const [hasta, setHasta] = useState<Date | null>(defaultHasta());
 
   // Estados para el modal
   const [modalAbierto, setModalAbierto] = useState(false);
@@ -50,8 +51,8 @@ export default function DashboardGerencia() {
       setLoading(true);
       const token = getToken();
       const params = new URLSearchParams();
-      if (desde) params.set('desde', desde);
-      if (hasta) params.set('hasta', hasta);
+      if (desde) params.set('desde', desde.toISOString().slice(0, 10));
+      if (hasta) params.set('hasta', hasta.toISOString().slice(0, 10));
       const response = await fetch(`${API_BASE_URL}/api/v1/dashboard/gerencia?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -229,21 +230,26 @@ export default function DashboardGerencia() {
         {/* Fechas */}
         <div className="flex items-center gap-1.5">
           <label className="text-[11px] font-medium text-gray-400 dark:text-gray-500">Desde</label>
-          <input
-            type="date"
-            value={desde}
-            onChange={(e) => setDesde(e.target.value)}
-            className="rounded border border-gray-200 bg-gray-50 px-1.5 py-1 text-[11px] outline-none focus:border-blue-400 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-          />
+          <div className="w-36">
+            <DatePicker
+              selected={desde}
+              onChange={setDesde}
+              maxDate={hasta ?? undefined}
+              placeholder="Fecha inicio"
+              className="h-7 px-2 py-0 text-[11px] rounded border border-gray-200 border-2-0"
+            />
+          </div>
         </div>
         <div className="flex items-center gap-1.5">
           <label className="text-[11px] font-medium text-gray-400 dark:text-gray-500">Hasta</label>
-          <input
-            type="date"
-            value={hasta}
-            onChange={(e) => setHasta(e.target.value)}
-            className="rounded border border-gray-200 bg-gray-50 px-1.5 py-1 text-[11px] outline-none focus:border-blue-400 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-          />
+          <div className="w-36">
+            <DatePicker
+              selected={hasta}
+              onChange={setHasta}
+              minDate={desde ?? undefined}
+              placeholder="Fecha fin"
+            />
+          </div>
         </div>
         <button
           onClick={() => { setDesde(defaultDesde()); setHasta(defaultHasta()); setFiltroTipoCompra('INTERNACIONAL'); }}

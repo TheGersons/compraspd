@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { DashboardService } from './dashboard.service';
@@ -16,8 +16,8 @@ export class DashboardController {
     description: 'Retorna áreas, proyectos con resumen de procesos, y productos detallados',
   })
   @ApiResponse({ status: 200, description: 'Datos gerenciales obtenidos' })
-  getGerencia() {
-    return this.dashboardService.getGerencia();
+  getGerencia(@Query('desde') desde?: string, @Query('hasta') hasta?: string) {
+    return this.dashboardService.getGerencia(desde, hasta);
   }
 
   @Get('kpis')

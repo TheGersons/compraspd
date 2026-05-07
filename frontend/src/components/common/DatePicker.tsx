@@ -14,6 +14,7 @@ interface DatePickerProps {
   maxDate?: Date;
   placeholder?: string;
   disabled?: boolean;
+  className?: string;
 }
 
 export default function DatePicker({
@@ -23,6 +24,7 @@ export default function DatePicker({
   maxDate,
   placeholder = "Seleccionar fecha",
   disabled = false,
+  className,
 }: DatePickerProps) {
   const [open, setOpen] = useState(false);
 
@@ -35,7 +37,8 @@ export default function DatePicker({
           className={cn(
             "w-full justify-start text-left font-normal h-11 px-4 rounded-lg border-2 border-gray-300 bg-white hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-600",
             !selected && "text-gray-500 dark:text-gray-400",
-            selected && "text-gray-900 dark:text-white"
+            selected && "text-gray-900 dark:text-white",
+            className
           )}
         >
           <CalendarIcon className="mr-2 h-4 w-4 text-gray-400" />

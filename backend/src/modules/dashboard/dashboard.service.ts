@@ -48,7 +48,7 @@ export class DashboardService {
   // DASHBOARD GERENCIA
   // ============================================================================
 
-  async getGerencia() {
+  async getGerencia(desde?: string, hasta?: string) {
     // 1. Cargar todas las áreas
     const areas = await this.prisma.area.findMany({
       orderBy: { creado: 'asc' },
@@ -68,10 +68,21 @@ export class DashboardService {
     //    EstadoProducto vinculados para hacer un LEFT JOIN en memoria.
     //    Esto permite ver productos desde el momento en que llega la solicitud,
     //    aunque aún no exista un EstadoProducto creado.
+    const fechaDesde = desde ? new Date(desde) : undefined;
+    const fechaHasta = hasta ? new Date(new Date(hasta).setHours(23, 59, 59, 999)) : undefined;
+
     const cotizaciones = await this.prisma.cotizacion.findMany({
       where: {
         estado: { notIn: ['CANCELADA', 'RECHAZADA'] },
         NOT: { tipo: { nombre: { equals: 'logistica', mode: 'insensitive' } } },
+        ...(fechaDesde || fechaHasta
+          ? {
+              fechaSolicitud: {
+                ...(fechaDesde ? { gte: fechaDesde } : {}),
+                ...(fechaHasta ? { lte: fechaHasta } : {}),
+              },
+            }
+          : {}),
       },
       include: {
         proyecto: { select: { id: true, nombre: true, areaId: true } },
