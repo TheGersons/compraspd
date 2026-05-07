@@ -397,12 +397,17 @@ export class FollowUpsService {
       }
     }
     // =====================================================
-    const skusExistentes = new Set(
-      cotizacion.estadosProductos.map((ep) => ep.sku),
+    // Backfill por cotizacionDetalleId, NO por SKU. Si el SKU del detalle
+    // cambia (sync con Odoo u otra fuente), comparar por SKU produce
+    // duplicados — el EP existente sigue ligado al mismo detalle.
+    const detalleIdsConEP = new Set(
+      cotizacion.estadosProductos
+        .map((ep) => ep.cotizacionDetalleId)
+        .filter((x): x is string => !!x),
     );
 
     for (const detalle of cotizacion.detalles) {
-      if (detalle.sku && !skusExistentes.has(detalle.sku)) {
+      if (detalle.sku && !detalleIdsConEP.has(detalle.id)) {
         try {
           const nuevo = await this.prisma.estadoProducto.create({
             data: {
@@ -421,7 +426,7 @@ export class FollowUpsService {
             paisOrigen: null,
             responsableSeguimiento: null,
           });
-          skusExistentes.add(detalle.sku);
+          detalleIdsConEP.add(detalle.id);
         } catch {
           // Ignorar si ya existe por race condition
         }
