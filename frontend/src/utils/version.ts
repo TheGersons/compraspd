@@ -1,5 +1,7 @@
-export const APP_VERSION =
-  typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev';
+// _initialVersion === undefined → todavía no se hizo el primer fetch
+// _initialVersion === null     → el servidor no tiene version.json (dev local sin build)
+// _initialVersion === "..."    → versión capturada al cargar la app
+let _initialVersion: string | null | undefined = undefined;
 
 export async function fetchServerVersion(): Promise<string | null> {
   try {
@@ -14,7 +16,17 @@ export async function fetchServerVersion(): Promise<string | null> {
 
 export async function hayNuevaVersion(): Promise<boolean> {
   const remote = await fetchServerVersion();
-  return remote !== null && remote !== APP_VERSION;
+
+  if (_initialVersion === undefined) {
+    // Primer fetch exitoso → establecer baseline; no hay "nueva versión" todavía
+    _initialVersion = remote;
+    return false;
+  }
+
+  // Sin version.json en el servidor → modo dev, no hacer nada
+  if (_initialVersion === null) return false;
+
+  return remote !== null && remote !== _initialVersion;
 }
 
 export async function preflightVersion(mensaje?: string): Promise<boolean> {

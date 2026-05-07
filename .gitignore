@@ -28,6 +28,7 @@ dist-ssr/
 /generated/prisma
 *.tsbuildinfo
 frontend/vite.config.ts
+frontend/public/version.json
 
 # Editor y OS
 .vscode/*
