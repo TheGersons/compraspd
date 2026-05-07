@@ -131,6 +131,8 @@ export class StorageService {
       'xml',
       'rar',
       'tar',
+      '7z',
+      'zip',
       'gz',
     ];
     const ext = originalName.split('.').pop()?.toLowerCase();
