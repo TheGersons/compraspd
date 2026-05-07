@@ -77,6 +77,12 @@ export class AttachmentsController {
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           'text/plain',
           'text/csv',
+          'application/zip',
+          'application/x-zip-compressed',
+          'application/x-rar-compressed',
+          'application/vnd.rar',
+          'application/x-7z-compressed',
+          'application/octet-stream',
         ];
 
         if (allowedMimes.includes(file.mimetype)) {

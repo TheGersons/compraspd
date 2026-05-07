@@ -444,7 +444,7 @@ export function AprobarYAsignarOCModal({
                                 }}
                                 type="file"
                                 className="hidden"
-                                accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx"
+                                accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx,.zip,.rar,.7z"
                                 onChange={(e) => {
                                   const file = e.target.files?.[0];
                                   if (file)

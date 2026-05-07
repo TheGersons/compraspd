@@ -273,7 +273,7 @@ export default function DescuentoActions({
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.txt,.dwg,.dxf,.xls,.xlsx"
+              accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.txt,.dwg,.dxf,.xls,.xlsx,.zip,.rar,.7z"
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) handleUploadFile(file);

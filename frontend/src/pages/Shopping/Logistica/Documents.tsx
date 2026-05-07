@@ -377,7 +377,7 @@ export default function Documents() {
     return (
         <>
             <PageMeta title="Logística — Documentos" description="Gestión de documentos logística" />
-            <input ref={fileInputRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.txt,.dwg,.dxf,.xls,.xlsx" onChange={handleFileUpload} className="hidden" />
+            <input ref={fileInputRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.txt,.dwg,.dxf,.xls,.xlsx,.zip,.rar,.7z" onChange={handleFileUpload} className="hidden" />
 
             <div className="space-y-6">
                 {/* Header */}
@@ -789,7 +789,7 @@ export default function Documents() {
             )}
 
             {/* Input oculto para upload masivo */}
-            <input ref={fileMasivoRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.txt,.dwg,.dxf,.xls,.xlsx" onChange={handleUploadMasivo} className="hidden" />
+            <input ref={fileMasivoRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.txt,.dwg,.dxf,.xls,.xlsx,.zip,.rar,.7z" onChange={handleUploadMasivo} className="hidden" />
 
             {/* Modal Upload Masivo */}
             {showUploadMasivoModal && uploadMasivoConfig && (

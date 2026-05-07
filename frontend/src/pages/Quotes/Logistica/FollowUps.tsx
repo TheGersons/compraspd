@@ -2387,7 +2387,7 @@ export default function FollowUps() {
                                                               <span className="truncate max-w-[110px]">{subiendoComprobante === producto.id ? 'Subiendo...' : 'Subir comprobante'}</span>
                                                               <input
                                                                 type="file"
-                                                                accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.txt,.dwg,.dxf,.xls,.xlsx"
+                                                                accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.txt,.dwg,.dxf,.xls,.xlsx,.zip,.rar,.7z"
                                                                 className="hidden"
                                                                 disabled={!!subiendoComprobante}
                                                                 onChange={(e) => {
