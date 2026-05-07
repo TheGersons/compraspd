@@ -124,6 +124,14 @@ export class StorageService {
       'txt',
       'dwg',
       'dxf',
+      'xls',
+      'xlsx',
+      'csv',
+      'json',
+      'xml',
+      'rar',
+      'tar',
+      'gz',
     ];
     const ext = originalName.split('.').pop()?.toLowerCase();
 
