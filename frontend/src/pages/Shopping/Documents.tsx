@@ -94,10 +94,12 @@ const ESTADOS_ICONOS: Record<string, string> = {
 // ============================================================================
 const api = {
     getToken: () => getToken(),
-    async getProductos(filters?: { tipoCompra?: string; pageSize?: number }) {
+    async getProductos(filters?: { tipoCompra?: string; pageSize?: number; page?: number; cotizacionId?: string }) {
         const token = this.getToken();
         const params = new URLSearchParams();
         if (filters?.tipoCompra) params.append("tipoCompra", filters.tipoCompra);
+        if (filters?.cotizacionId) params.append("cotizacionId", filters.cotizacionId);
+        if (filters?.page) params.append("page", String(filters.page));
         params.append("pageSize", String(filters?.pageSize || 50));
         const response = await fetch(`${API_BASE_URL}/api/v1/estado-productos?${params}`,
             { credentials: "include", headers: { Authorization: `Bearer ${token}` } });
@@ -235,9 +237,27 @@ export default function Documents() {
     }, [searchParams, productos]);
 
     const cargarProductos = async () => {
-        try { setLoading(true); const filters: any = { pageSize: 2000 }; if (filtroTipoCompra) filters.tipoCompra = filtroTipoCompra; const data = await api.getProductos(filters); setProductos((data.items || []).filter((p: any) => p.cotizacion?.tipo?.nombre?.toLowerCase() !== 'logistica')); }
-        catch (error) { addNotification("danger", "Error", "Error al cargar productos"); }
-        finally { setLoading(false); }
+        try {
+            setLoading(true);
+            const cotizacionId = searchParams.get("cotizacion") || undefined;
+            const PAGE_SIZE = 500;
+            const first = await api.getProductos({ tipoCompra: filtroTipoCompra, cotizacionId, pageSize: PAGE_SIZE, page: 1 });
+            let allItems: any[] = first.items || [];
+            if (first.total > allItems.length) {
+                const totalPages = Math.ceil(first.total / PAGE_SIZE);
+                const extraPages = await Promise.all(
+                    Array.from({ length: totalPages - 1 }, (_, i) =>
+                        api.getProductos({ tipoCompra: filtroTipoCompra, cotizacionId, pageSize: PAGE_SIZE, page: i + 2 })
+                    )
+                );
+                allItems = [...allItems, ...extraPages.flatMap((d: any) => d.items || [])];
+            }
+            setProductos(allItems.filter((p: any) => p.cotizacion?.tipo?.nombre?.toLowerCase() !== 'logistica'));
+        } catch (error) {
+            addNotification("danger", "Error", "Error al cargar productos");
+        } finally {
+            setLoading(false);
+        }
     };
     const seleccionarProducto = async (producto: Producto) => {
         setProductoSeleccionado(producto); setLoadingDocs(true);
