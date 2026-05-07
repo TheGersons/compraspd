@@ -447,10 +447,14 @@ export class FollowUpsService {
           });
         }
 
-        // Buscar estado producto correspondiente
-        const estadoProducto = cotizacion.estadosProductos.find(
-          (ep) => ep.sku === detalle.sku,
-        );
+        // Buscar estado producto correspondiente por cotizacionDetalleId.
+        // Comparar por SKU rompe cuando los SKU del detalle y del EP divergen
+        // (sync con Odoo, edición manual): el front no encuentra el EP y
+        // pierde el "precio confirmado", aunque exista en BD.
+        const estadoProducto =
+          cotizacion.estadosProductos.find(
+            (ep) => ep.cotizacionDetalleId === detalle.id,
+          ) ?? cotizacion.estadosProductos.find((ep) => ep.sku === detalle.sku);
 
         return {
           ...detalle,
@@ -964,23 +968,36 @@ export class FollowUpsService {
           );
         }
 
-        // Buscar el detalle correspondiente por SKU
-        const detalle = await this.prisma.cotizacionDetalle.findFirst({
-          where: {
-            cotizacionId: cotizacionId,
-            sku: estadoProducto.sku,
-          },
-          include: {
-            precios: {
-              select: {
-                id: true,
-                precio: true,
-                precioDescuento: true,
-                ComprobanteDescuento: true,
+        // Buscar el detalle correspondiente. Preferir cotizacionDetalleId
+        // (la llave real); caer en SKU solo como fallback para EPs viejos
+        // sin link al detalle.
+        const detalle = estadoProducto.cotizacionDetalleId
+          ? await this.prisma.cotizacionDetalle.findFirst({
+              where: { id: estadoProducto.cotizacionDetalleId, cotizacionId },
+              include: {
+                precios: {
+                  select: {
+                    id: true,
+                    precio: true,
+                    precioDescuento: true,
+                    ComprobanteDescuento: true,
+                  },
+                },
               },
-            },
-          },
-        });
+            })
+          : await this.prisma.cotizacionDetalle.findFirst({
+              where: { cotizacionId, sku: estadoProducto.sku },
+              include: {
+                precios: {
+                  select: {
+                    id: true,
+                    precio: true,
+                    precioDescuento: true,
+                    ComprobanteDescuento: true,
+                  },
+                },
+              },
+            });
 
         if (!detalle) {
           throw new BadRequestException(
@@ -1055,18 +1072,17 @@ export class FollowUpsService {
 
         // Actualizar aprobación y estados relacionados
         if (aprobacion.aprobado) {
-          // Obtener el detalle con precio seleccionado para extraer info
-          const detalle = await tx.cotizacionDetalle.findFirst({
-            where: {
-              cotizacionId: cotizacionId,
-              sku: estadoProducto.sku,
-            },
-            include: {
-              precios: {
-                where: { id: { not: undefined } },
-              },
-            },
-          });
+          // Obtener el detalle con precio seleccionado para extraer info.
+          // Por cotizacionDetalleId (llave real); fallback a SKU.
+          const detalle = estadoProducto.cotizacionDetalleId
+            ? await tx.cotizacionDetalle.findFirst({
+                where: { id: estadoProducto.cotizacionDetalleId, cotizacionId },
+                include: { precios: { where: { id: { not: undefined } } } },
+              })
+            : await tx.cotizacionDetalle.findFirst({
+                where: { cotizacionId, sku: estadoProducto.sku },
+                include: { precios: { where: { id: { not: undefined } } } },
+              });
 
           const precioSeleccionado = detalle?.preciosId
             ? await tx.precios.findUnique({

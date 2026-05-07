@@ -77,6 +77,14 @@ type Producto = {
     rechazado?: boolean;
     fechaRechazo?: string;
     motivoRechazo?: string;
+    ordenCompraId?: string | null;
+    comprado?: boolean;
+    pagado?: boolean;
+    enFOB?: boolean;
+    conBL?: boolean;
+    enCIF?: boolean;
+    recibido?: boolean;
+    aprobadoCompra?: boolean;
   };
   timelineSugerido?: TimelineSKU;
   precios?: Precio[];
@@ -2406,11 +2414,45 @@ export default function FollowUps() {
                                               const precioActual = preciosPorProducto[producto.id]?.[0];
                                               const estaGuardando = savingPrecio === producto.id;
                                               const yaAprobado = producto.estadoProducto?.aprobadoPorSupervisor || false;
+                                              const ep = producto.estadoProducto;
+                                              const ocId = ep?.ordenCompraId ?? null;
+                                              const ocAsignada = ocId
+                                                ? cotizacionSeleccionada.ordenesCompra?.find(o => o.id === ocId)
+                                                : null;
+                                              const enEstadoAvanzado = !!(
+                                                ep?.comprado || ep?.pagado || ep?.enFOB || ep?.conBL ||
+                                                ep?.enCIF || ep?.recibido || ep?.aprobadoCompra
+                                              );
+                                              // Bloquear edición de precio cuando el producto ya pertenece a una OC
+                                              // o avanzó más allá de "cotizado". Editarlo desde aquí podría
+                                              // sobrescribir datos de una compra ya en curso.
+                                              const bloqueadoPorOC = !!ocAsignada || enEstadoAvanzado;
+                                              const inputDeshabilitado = estaGuardando || yaAprobado || bloqueadoPorOC;
                                               return (
                                                 <tr key={producto.id} className={`hover:bg-gray-50 dark:hover:bg-gray-700/30 ${estaGuardando ? 'opacity-60' : ''}`}>
                                                   <td className="py-3 pr-3">
                                                     <div className="font-medium text-gray-900 dark:text-white">{producto.descripcionProducto}</div>
                                                     <div className="text-xs text-gray-400 dark:text-gray-500">{producto.sku}</div>
+                                                    {(ocAsignada || enEstadoAvanzado) && (
+                                                      <div className="mt-1 flex flex-wrap items-center gap-1">
+                                                        {ocAsignada && (
+                                                          <span
+                                                            className="inline-flex items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-2 py-0.5 text-[10px] font-medium text-purple-700 dark:border-purple-800 dark:bg-purple-900/20 dark:text-purple-300"
+                                                            title={`Producto asignado a la orden de compra "${ocAsignada.nombre}"${ocAsignada.numeroOC ? ` — ${ocAsignada.numeroOC}` : ''}. La edición de precio está bloqueada.`}
+                                                          >
+                                                            🛒 En OC: {ocAsignada.nombre}{ocAsignada.numeroOC ? ` (${ocAsignada.numeroOC})` : ''}
+                                                          </span>
+                                                        )}
+                                                        {enEstadoAvanzado && (
+                                                          <span
+                                                            className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300"
+                                                            title="El producto ya avanzó (comprado/pagado/FOB/BL/CIF/recibido). Edición bloqueada para evitar inconsistencias con la compra en curso."
+                                                          >
+                                                            🔒 Compra en curso
+                                                          </span>
+                                                        )}
+                                                      </div>
+                                                    )}
                                                     {producto.notas && (
                                                       <div className="relative inline-block mt-0.5">
                                                         <button onClick={() => setNotasAbiertas(notasAbiertas === producto.id ? null : producto.id)}
@@ -2437,7 +2479,7 @@ export default function FollowUps() {
                                                         step="0.01"
                                                         min="0"
                                                         placeholder="0.00"
-                                                        disabled={estaGuardando || yaAprobado}
+                                                        disabled={inputDeshabilitado}
                                                         value={precioEditando[producto.id] !== undefined ? precioEditando[producto.id] : (precioActual?.precio?.toString() ?? '')}
                                                         onChange={(e) => setPrecioEditando(prev => ({ ...prev, [producto.id]: e.target.value }))}
                                                         onBlur={() => {
@@ -2470,7 +2512,7 @@ export default function FollowUps() {
                                                             }
                                                           }
                                                         }}
-                                                        disabled={yaAprobado}
+                                                        disabled={inputDeshabilitado}
                                                         className="rounded border border-gray-300 bg-white px-2 py-1 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
                                                       >
                                                         <option value="">Seleccionar</option>
@@ -2519,7 +2561,7 @@ export default function FollowUps() {
                                                               step="0.01"
                                                               min="0"
                                                               placeholder="Precio c/desc."
-                                                              disabled={yaAprobado}
+                                                              disabled={inputDeshabilitado}
                                                               value={precioDescuentoEditando[producto.id] ?? (precioActual?.precioDescuento != null ? String(precioActual.precioDescuento) : '')}
                                                               onChange={(e) => setPrecioDescuentoEditando(prev => ({ ...prev, [producto.id]: e.target.value }))}
                                                               onBlur={() => {
@@ -2543,9 +2585,10 @@ export default function FollowUps() {
                                                     <input
                                                       type="checkbox"
                                                       checked={yaAprobado}
-                                                      disabled={estaGuardando}
+                                                      disabled={estaGuardando || bloqueadoPorOC}
                                                       onChange={(e) => producto.estadoProducto && confirmarPrecioFinal(producto, producto.estadoProducto.id, e.target.checked)}
                                                       className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 cursor-pointer disabled:cursor-not-allowed"
+                                                      title={bloqueadoPorOC ? 'Producto en compra: edición bloqueada' : ''}
                                                     />
                                                   </td>
                                                   {!isComercial && cotizacionSeleccionada.tipoCompra !== 'NACIONAL' && (
