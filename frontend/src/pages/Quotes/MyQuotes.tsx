@@ -482,8 +482,8 @@ export default function MyQuotes() {
             // Auto-seleccionar cotización indicada en el query param ?cotizacion=ID
             const targetId = searchParams.get('cotizacion');
             if (targetId) {
-                const target = items.find((c: Cotizacion) => c.id === targetId);
-                if (target) seleccionarCotizacion(target);
+                const target = items.find((c: Cotizacion) => c.id === targetId) ?? ({ id: targetId } as Cotizacion);
+                seleccionarCotizacion(target);
             }
         } catch (error) {
             console.error("Error al cargar cotizaciones:", error);

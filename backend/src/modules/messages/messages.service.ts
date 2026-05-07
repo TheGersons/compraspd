@@ -641,6 +641,7 @@ export class MessagesService {
         },
         estadosProductos: {
           select: {
+            id: true,
             responsableSeguimiento: {
               select: { id: true, nombre: true, email: true, activo: true },
             },
@@ -764,6 +765,7 @@ export class MessagesService {
           ...notif,
           chatId,
           openTab: 'chat',
+          estadoProductoId: cotizacion?.estadosProductos?.[0]?.id ?? undefined,
         });
       }),
     );

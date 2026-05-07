@@ -18,27 +18,36 @@ function resolveNotifUrl(
   n: BackendNotification,
   userRole: string | undefined,
 ): string | null {
-  const isSupervisorOrAbove = ["SUPERVISOR", "ADMIN", "JEFE_COMPRAS", "COMERCIAL"].includes(userRole ?? "");
+  const isSupervisorOrAbove = ["SUPERVISOR", "ADMIN", "JEFE_COMPRAS", "COMERCIAL", "IMPORT_EXPORT"].includes(userRole ?? "");
   const shoppingFollowUps = "/shopping/follow-ups";
   const quotesFollowUps = "/quotes/follow-ups";
   const myQuotes = "/quotes/my-quotes";
 
-  // Nueva cotización para revisar → siempre en quotes (fase de cotización)
+  // Nueva cotización para revisar → supervisores a quotes/follow-ups, USUARIO a my-quotes
   if (n.tipo === "COMPRA_CREADA") {
-    if (n.cotizacionId) return `${quotesFollowUps}?cotizacion=${n.cotizacionId}`;
-    return quotesFollowUps;
+    if (isSupervisorOrAbove) {
+      if (n.cotizacionId) return `${quotesFollowUps}?cotizacion=${n.cotizacionId}`;
+      return quotesFollowUps;
+    }
+    if (n.cotizacionId) return `${myQuotes}?cotizacion=${n.cotizacionId}`;
+    return myQuotes;
   }
 
-  // Asignación rechazada → siempre en quotes
+  // Asignación rechazada → supervisores a quotes/follow-ups, USUARIO a my-quotes
   if (n.tipo === "ASIGNACION_RECHAZADA") {
-    if (n.cotizacionId) return `${quotesFollowUps}?cotizacion=${n.cotizacionId}`;
-    return quotesFollowUps;
+    if (isSupervisorOrAbove) {
+      if (n.cotizacionId) return `${quotesFollowUps}?cotizacion=${n.cotizacionId}`;
+      return quotesFollowUps;
+    }
+    if (n.cotizacionId) return `${myQuotes}?cotizacion=${n.cotizacionId}`;
+    return myQuotes;
   }
 
-  // Mensaje nuevo → supervisores van a shopping primero (con fallback a quotes si no existe),
+  // Mensaje nuevo → supervisores van a shopping via ?producto= (mecanismo probado),
   // solicitantes van a mis cotizaciones
   if (n.tipo === "COMENTARIO_NUEVO") {
     if (isSupervisorOrAbove) {
+      if (n.estadoProductoId) return `${shoppingFollowUps}?producto=${n.estadoProductoId}&tab=chat`;
       if (n.cotizacionId) return `${shoppingFollowUps}?cotizacion=${n.cotizacionId}&tab=chat`;
       return shoppingFollowUps;
     }

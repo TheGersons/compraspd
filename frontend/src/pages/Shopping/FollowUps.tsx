@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import PageMeta from "../../components/common/PageMeta";
 import { getToken } from "../../lib/api";
@@ -547,7 +547,6 @@ export default function ShoppingFollowUps() {
   const [apelarCotId, setApelarCotId] = useState("");
   const [apelarCotNombre, setApelarCotNombre] = useState("");
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
 
   // Estados principales
   const [productos, setProductos] = useState<EstadoProducto[]>([]);
@@ -645,7 +644,7 @@ export default function ShoppingFollowUps() {
   useEffect(() => {
     const productoId = searchParams.get("producto");
     if (!productoId) return;
-    if (loading) return; // esperar a que cargue la lista para poder expandir el grupo correcto
+    if (loading) return;
     if (handledProductoParamRef.current === productoId) return;
     handledProductoParamRef.current = productoId;
     (async () => {
@@ -655,39 +654,13 @@ export default function ShoppingFollowUps() {
       const cotId = detalle.cotizacionId || detalle.cotizacion?.id || 'sin-cotizacion';
       const groupKey = ocId ? `oc:${ocId}` : `cot:${cotId}`;
       setGrupoExpandido(groupKey);
-      setTimeout(() => {
-        acordeonRefs.current[groupKey]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 200);
-    })();
-  }, [searchParams, loading]);
-
-  // Deep-link por cotizacionId: busca el primer producto de esa cotización en shopping,
-  // expande su grupo y abre chat si tab=chat. Si no existe → redirige a quotes.
-  const handledCotizacionParamRef = useRef<string | null>(null);
-  useEffect(() => {
-    const cotizacionId = searchParams.get("cotizacion");
-    if (!cotizacionId) return;
-    if (loading) return;
-    if (handledCotizacionParamRef.current === cotizacionId) return;
-    handledCotizacionParamRef.current = cotizacionId;
-    const tabParam = searchParams.get("tab") || "productos";
-    (async () => {
-      const data = await api.getEstadosProductos({ cotizacionId, pageSize: 1 });
-      const firstProduct = data?.items?.[0];
-      if (!firstProduct) {
-        // No existe en shopping → ir a quotes
-        const quotesUrl = `/quotes/follow-ups?cotizacion=${cotizacionId}${tabParam !== 'productos' ? `&tab=${tabParam}` : ''}`;
-        navigate(quotesUrl);
-        return;
+      const tabParam = searchParams.get("tab");
+      if (detalle.cotizacion?.chatId) {
+        setChatIdActivo(detalle.cotizacion.chatId);
       }
-      const ocId = firstProduct.ordenCompraId || null;
-      const cotId = firstProduct.cotizacionId || firstProduct.cotizacion?.id || cotizacionId;
-      const groupKey = ocId ? `oc:${ocId}` : `cot:${cotId}`;
-      const chatId = firstProduct.cotizacion?.chatId || null;
-      setGrupoExpandido(groupKey);
-      setChatIdActivo(chatId);
-      if (tabParam === 'chat') setVistaActivaGrupo('chat');
-      await seleccionarProducto(firstProduct.id);
+      if (tabParam === 'chat') {
+        setVistaActivaGrupo('chat');
+      }
       setTimeout(() => {
         acordeonRefs.current[groupKey]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 200);
