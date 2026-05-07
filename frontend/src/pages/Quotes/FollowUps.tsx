@@ -2438,7 +2438,7 @@ export default function FollowUps() {
                                                               <span className="truncate max-w-[110px]">{subiendoComprobante === producto.id ? 'Subiendo...' : 'Subir comprobante'}</span>
                                                               <input
                                                                 type="file"
-                                                                accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx"
+                                                                accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.txt,.dwg,.dxf"
                                                                 className="hidden"
                                                                 disabled={!!subiendoComprobante}
                                                                 onChange={(e) => {
@@ -2561,8 +2561,8 @@ export default function FollowUps() {
                   key={page}
                   onClick={() => setCurrentPage(page)}
                   className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${currentPage === page
-                      ? "bg-blue-600 text-white dark:bg-blue-500"
-                      : "border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                    ? "bg-blue-600 text-white dark:bg-blue-500"
+                    : "border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                     }`}
                 >
                   {page}

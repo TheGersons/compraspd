@@ -382,7 +382,7 @@ export default function Documents() {
     return (
         <>
             <PageMeta title="Documentos de Compra" description="Gestión de documentos por estado" />
-            <input ref={fileInputRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp" onChange={handleFileUpload} className="hidden" />
+            <input ref={fileInputRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.txt,.dwg,.dxf" onChange={handleFileUpload} className="hidden" />
 
             <div className="space-y-6">
                 {/* Header */}
@@ -794,7 +794,7 @@ export default function Documents() {
             )}
 
             {/* Input oculto para upload masivo */}
-            <input ref={fileMasivoRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp" onChange={handleUploadMasivo} className="hidden" />
+            <input ref={fileMasivoRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.txt,.dwg,.dxf" onChange={handleUploadMasivo} className="hidden" />
 
             {/* Modal Upload Masivo */}
             {showUploadMasivoModal && uploadMasivoConfig && (

@@ -112,7 +112,19 @@ export class StorageService {
       | 'otros' = 'comprobantes_descuento',
   ): Promise<{ url: string; path: string; fileName: string }> {
     // Validar tipo de archivo
-    const allowedExtensions = ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp'];
+    const allowedExtensions = [
+      'pdf',
+      'png',
+      'jpg',
+      'jpeg',
+      'gif',
+      'webp',
+      'doc',
+      'docx',
+      'txt',
+      'dwg',
+      'dxf',
+    ];
     const ext = originalName.split('.').pop()?.toLowerCase();
 
     if (!ext || !allowedExtensions.includes(ext)) {
@@ -327,21 +339,66 @@ export class StorageService {
   }> {
     const allowedExtensions = [
       // Imágenes
-      'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'tiff', 'tif', 'svg', 'heic', 'heif',
+      'png',
+      'jpg',
+      'jpeg',
+      'gif',
+      'webp',
+      'bmp',
+      'tiff',
+      'tif',
+      'svg',
+      'heic',
+      'heif',
       // Videos
-      'mp4', 'mov', 'avi', 'mkv', 'wmv', 'flv', 'webm', 'm4v', '3gp',
+      'mp4',
+      'mov',
+      'avi',
+      'mkv',
+      'wmv',
+      'flv',
+      'webm',
+      'm4v',
+      '3gp',
       // Documentos Office
-      'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp',
+      'pdf',
+      'doc',
+      'docx',
+      'xls',
+      'xlsx',
+      'ppt',
+      'pptx',
+      'odt',
+      'ods',
+      'odp',
       // Texto y datos
-      'csv', 'txt', 'json', 'xml',
+      'csv',
+      'txt',
+      'json',
+      'xml',
       // Correos
       'eml',
       // Comprimidos
-      'zip', 'rar', '7z', 'tar', 'gz',
+      'zip',
+      'rar',
+      '7z',
+      'tar',
+      'gz',
       // AutoCAD / Ingeniería
-      'dwg', 'dxf', 'dwf', 'rvt', 'ifc', 'step', 'stp', 'iges', 'igs', 'stl',
+      'dwg',
+      'dxf',
+      'dwf',
+      'rvt',
+      'ifc',
+      'step',
+      'stp',
+      'iges',
+      'igs',
+      'stl',
       // Otros técnicos
-      'mpp', 'vsd', 'vsdx',
+      'mpp',
+      'vsd',
+      'vsdx',
     ];
     const ext = originalName.split('.').pop()?.toLowerCase() || '';
 
@@ -364,7 +421,8 @@ export class StorageService {
     const timestamp = Date.now();
     // Separar extensión del nombre base para no truncarla
     const dotIndex = originalName.lastIndexOf('.');
-    const rawBase = dotIndex > 0 ? originalName.slice(0, dotIndex) : originalName;
+    const rawBase =
+      dotIndex > 0 ? originalName.slice(0, dotIndex) : originalName;
     const fileExt = dotIndex > 0 ? originalName.slice(dotIndex) : ''; // ej: ".xlsx"
     const safeBase = rawBase.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 50);
     const fileName = `${timestamp}_${safeBase}${fileExt}`;
@@ -394,7 +452,18 @@ export class StorageService {
     const publicUrl = await this.getShareLink(fullPath);
 
     // Si es imagen, generar preview URL
-    const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'tiff', 'tif', 'heic', 'heif'];
+    const imageExtensions = [
+      'png',
+      'jpg',
+      'jpeg',
+      'gif',
+      'webp',
+      'bmp',
+      'tiff',
+      'tif',
+      'heic',
+      'heif',
+    ];
     let previewUrl: string | null = null;
 
     if (imageExtensions.includes(ext)) {

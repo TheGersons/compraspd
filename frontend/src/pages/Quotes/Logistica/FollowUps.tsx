@@ -838,14 +838,14 @@ export default function FollowUps() {
         prev.map(c =>
           c.id === cotizacionId
             ? {
-                ...c,
-                estado: detalle.estado,
-                aprobadaParcialmente: detalle.aprobadaParcialmente,
-                todosProductosAprobados: detalle.todosProductosAprobados,
-                productosAprobados: detalle.productosAprobados,
-                productosPendientes: detalle.productosPendientes,
-                porcentajeAprobado: detalle.porcentajeAprobado,
-              }
+              ...c,
+              estado: detalle.estado,
+              aprobadaParcialmente: detalle.aprobadaParcialmente,
+              todosProductosAprobados: detalle.todosProductosAprobados,
+              productosAprobados: detalle.productosAprobados,
+              productosPendientes: detalle.productosPendientes,
+              porcentajeAprobado: detalle.porcentajeAprobado,
+            }
             : c,
         ),
       );
@@ -2100,15 +2100,15 @@ export default function FollowUps() {
                                   );
                                 })()}
                                 {canAsignarResponsable && (
-                                <button
-                                  onClick={eliminarCotizacionActual}
-                                  className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
-                                >
-                                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                  </svg>
-                                  Eliminar
-                                </button>
+                                  <button
+                                    onClick={eliminarCotizacionActual}
+                                    className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
+                                  >
+                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                    Eliminar
+                                  </button>
                                 )}
                                 {canAsignarResponsable && (
                                   <div className="relative">
@@ -2387,7 +2387,7 @@ export default function FollowUps() {
                                                               <span className="truncate max-w-[110px]">{subiendoComprobante === producto.id ? 'Subiendo...' : 'Subir comprobante'}</span>
                                                               <input
                                                                 type="file"
-                                                                accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx"
+                                                                accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.txt,.dwg,.dxf"
                                                                 className="hidden"
                                                                 disabled={!!subiendoComprobante}
                                                                 onChange={(e) => {
@@ -2509,11 +2509,10 @@ export default function FollowUps() {
                 <button
                   key={page}
                   onClick={() => setCurrentPage(page)}
-                  className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                    currentPage === page
+                  className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${currentPage === page
                       ? "bg-blue-600 text-white dark:bg-blue-500"
                       : "border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-                  }`}
+                    }`}
                 >
                   {page}
                 </button>
