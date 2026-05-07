@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import PageMeta from "../../../components/common/PageMeta";
-import { getToken } from "../../../lib/api";
+import { getToken, uploadWithProgress } from "../../../lib/api";
 import { useNotifications } from "../../Notifications/context/NotificationContext";
 import { useAuth } from "../../../context/AuthContext";
 import toast from "react-hot-toast";
@@ -117,20 +117,14 @@ const api = {
         if (!response.ok) throw new Error("Error al cargar requeridos");
         return response.json();
     },
-    async uploadDocumento(file: File, data: { estadoProductoId: string; documentoRequeridoId?: string; estado: string; nombreDocumento: string }) {
-        const token = this.getToken();
+    async uploadDocumento(file: File, data: { estadoProductoId: string; documentoRequeridoId?: string; estado: string; nombreDocumento: string }, onProgress?: (pct: number) => void) {
         const formData = new FormData();
         formData.append("file", file);
         formData.append("estadoProductoId", data.estadoProductoId);
         if (data.documentoRequeridoId) formData.append("documentoRequeridoId", data.documentoRequeridoId);
         formData.append("estado", data.estado);
         formData.append("nombreDocumento", data.nombreDocumento);
-        const response = await fetch(`${API_BASE_URL}/api/v1/documentos/upload`, {
-            method: "POST", credentials: "include",
-            headers: { Authorization: `Bearer ${token}` }, body: formData,
-        });
-        if (!response.ok) { const err = await response.json(); throw new Error(err.message || "Error al subir documento"); }
-        return response.json();
+        await uploadWithProgress(`${API_BASE_URL}/api/v1/documentos/upload`, formData, onProgress ?? (() => {}));
     },
     async deleteDocumento(id: string) {
         const token = this.getToken();
@@ -218,6 +212,10 @@ export default function Documents() {
     const [vistaAgrupada, setVistaAgrupada] = useState(true);
     const [grupoExpandido, setGrupoExpandido] = useState<string | null>(null);
 
+    // Upload progress
+    const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+    const [uploadFileName, setUploadFileName] = useState("");
+
     // Upload masivo (mismo documento para múltiples productos)
     const [showUploadMasivoModal, setShowUploadMasivoModal] = useState(false);
     const [uploadMasivoConfig, setUploadMasivoConfig] = useState<{ estado: string; requeridoId?: string; requeridoNombre: string } | null>(null);
@@ -263,10 +261,14 @@ export default function Documents() {
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]; if (!file || !productoSeleccionado || !uploadingFor) return;
-        const toastId = toast.loading("Subiendo documento...");
-        try { await api.uploadDocumento(file, { estadoProductoId: productoSeleccionado.id, documentoRequeridoId: uploadingFor.requeridoId, estado: uploadingFor.estado, nombreDocumento: uploadingFor.requeridoNombre }); toast.success("Documento subido correctamente", { id: toastId }); await recargarDocumentos(); }
-        catch (error: any) { toast.error(error.message || "Error al subir documento", { id: toastId }); }
-        finally { setUploadingFor(null); if (fileInputRef.current) fileInputRef.current.value = ""; }
+        setUploadFileName(file.name);
+        setUploadProgress(0);
+        try {
+            await api.uploadDocumento(file, { estadoProductoId: productoSeleccionado.id, documentoRequeridoId: uploadingFor.requeridoId, estado: uploadingFor.estado, nombreDocumento: uploadingFor.requeridoNombre }, (pct) => setUploadProgress(pct));
+            toast.success("Documento subido correctamente");
+            await recargarDocumentos();
+        } catch (error: any) { toast.error(error.message || "Error al subir documento"); }
+        finally { setUploadingFor(null); setUploadProgress(null); if (fileInputRef.current) fileInputRef.current.value = ""; }
     };
     const triggerUpload = (estado: string, requeridoId?: string, requeridoNombre?: string) => {
         setUploadingFor({ estado, requeridoId, requeridoNombre: requeridoNombre || "Documento extra" });
@@ -330,23 +332,25 @@ export default function Documents() {
         const file = e.target.files?.[0];
         if (!file || !uploadMasivoConfig || productosParaUpload.length === 0) return;
         setUploadingMasivo(true);
-        const toastId = toast.loading(`Subiendo a ${productosParaUpload.length} producto(s)...`);
+        setUploadFileName(file.name);
+        setUploadProgress(0);
 
-        // Leer archivo una sola vez como ArrayBuffer
         const buffer = await file.arrayBuffer();
+        const total = productosParaUpload.length;
         let exitosos = 0, fallidos = 0;
 
-        // Subir secuencialmente para evitar race conditions
-        for (const prodId of productosParaUpload) {
+        for (let i = 0; i < total; i++) {
+            const prodId = productosParaUpload[i];
             try {
-                // Crear un File nuevo desde el buffer para cada request
                 const fileCopy = new File([buffer], file.name, { type: file.type });
-                await api.uploadDocumento(fileCopy, { estadoProductoId: prodId, documentoRequeridoId: uploadMasivoConfig.requeridoId, estado: uploadMasivoConfig.estado, nombreDocumento: uploadMasivoConfig.requeridoNombre });
+                const baseOffset = (i / total) * 100;
+                await api.uploadDocumento(fileCopy, { estadoProductoId: prodId, documentoRequeridoId: uploadMasivoConfig.requeridoId, estado: uploadMasivoConfig.estado, nombreDocumento: uploadMasivoConfig.requeridoNombre },
+                    (pct) => setUploadProgress(Math.round(baseOffset + (pct / total))));
                 exitosos++;
-                toast.loading(`Subido ${exitosos}/${productosParaUpload.length}...`, { id: toastId });
             } catch { fallidos++; }
         }
-        toast.success(`${exitosos} subidos${fallidos > 0 ? `, ${fallidos} fallidos` : ''}`, { id: toastId });
+        setUploadProgress(null);
+        toast.success(`${exitosos} subidos${fallidos > 0 ? `, ${fallidos} fallidos` : ''}`);
         setShowUploadMasivoModal(false);
         setUploadingMasivo(false);
         if (fileMasivoRef.current) fileMasivoRef.current.value = "";
@@ -834,6 +838,25 @@ export default function Documents() {
                                 {uploadingMasivo ? "Subiendo..." : `Seleccionar archivo (${productosParaUpload.length} productos)`}
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Overlay bloqueante de progreso de subida */}
+            {uploadProgress !== null && (
+                <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50">
+                    <div className="w-80 rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900">
+                        <div className="mb-1 flex items-center gap-2">
+                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent flex-shrink-0" />
+                            <p className="truncate text-sm font-semibold text-gray-800 dark:text-white">{uploadFileName}</p>
+                        </div>
+                        <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
+                            {uploadProgress < 100 ? 'Subiendo a la nube...' : 'Procesando...'}
+                        </p>
+                        <div className="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-700">
+                            <div className="h-full rounded-full bg-blue-500 transition-all duration-150" style={{ width: `${uploadProgress}%` }} />
+                        </div>
+                        <p className="mt-2 text-right text-sm font-bold text-blue-600 dark:text-blue-400">{uploadProgress}%</p>
                     </div>
                 </div>
             )}
