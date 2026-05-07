@@ -143,7 +143,7 @@ export class CompraService {
     pageSize?: number;
   }, user?: UserJwt) {
     const page = filters?.page || 1;
-    const pageSize = Math.min(filters?.pageSize || 20, 100);
+    const pageSize = Math.min(filters?.pageSize || 20, 10000);
     const skip = (page - 1) * pageSize;
 
     const where: any = {};
