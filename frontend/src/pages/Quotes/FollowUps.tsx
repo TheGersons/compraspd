@@ -730,6 +730,21 @@ export default function FollowUps() {
     api.getSupervisores().then(setSupervisores).catch(() => { });
   }, []);
 
+  // Deep-link: respond to ?cotizacion= param changes when already on this page
+  useEffect(() => {
+    const targetId = searchParams.get('cotizacion');
+    if (!targetId || loading || cotizaciones.length === 0) return;
+    if (cotizacionSeleccionada?.id === targetId) return;
+    const target = cotizaciones.find((c: any) => c.id === targetId);
+    if (!target) return;
+    const rawTab = searchParams.get('tab');
+    const initialTab: 'detalle' | 'chat' | 'historial' =
+      rawTab === 'chat' ? 'chat' : rawTab === 'historial' ? 'historial' : 'detalle';
+    seleccionarCotizacion(target, initialTab);
+    setTimeout(() => {
+      accordionRefs.current[targetId]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 300);
+  }, [searchParams]);
 
   // Scroll al acordeón expandido
   useEffect(() => {

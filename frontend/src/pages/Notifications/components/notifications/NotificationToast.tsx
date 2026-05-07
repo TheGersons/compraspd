@@ -1,5 +1,6 @@
 // components/notifications/NotificationToast.tsx
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ToastNotification } from '../../types/notification.types';
 import { useNotifications } from '../../context/NotificationContext';
 
@@ -10,6 +11,7 @@ interface NotificationToastProps {
 export default function NotificationToast({ notification }: NotificationToastProps) {
   const { dismissNotification, markAsRead } = useNotifications();
   const [isExiting, setIsExiting] = useState(false);
+  const navigate = useNavigate();
 
   const colors = {
     info: {
@@ -178,8 +180,8 @@ export default function NotificationToast({ notification }: NotificationToastPro
               <button
                 className={`mt-2 text-xs font-medium ${theme.icon} hover:underline`}
                 onClick={() => {
-                  // Aquí iría la navegación
-                  console.log('Navigate to:', notification.actionUrl);
+                  navigate(notification.actionUrl!);
+                  dismissNotification(notification.id);
                 }}
               >
                 Ver detalles →
