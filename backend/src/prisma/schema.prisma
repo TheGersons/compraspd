@@ -906,13 +906,14 @@ model Adjuntos {
 // ============================================
 
 model Notificacion {
-  id          String   @id @default(uuid()) @db.Uuid
-  userId      String   @map("user_id") @db.Uuid
-  tipo        String
-  titulo      String
-  descripcion String
-  creada      DateTime @default(now())
-  completada  Boolean  @default(false)
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  tipo          String
+  titulo        String
+  descripcion   String
+  creada        DateTime @default(now())
+  completada    Boolean  @default(false)
+  cotizacionId  String?  @map("cotizacion_id") @db.Uuid
 
   usuario Usuario @relation(fields: [userId], references: [id], onDelete: Cascade)
 

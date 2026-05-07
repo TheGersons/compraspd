@@ -749,19 +749,21 @@ export class MessagesService {
           tipo: 'COMENTARIO_NUEVO',
           titulo,
           descripcion,
+          cotizacionId: cotizacion?.id ?? undefined,
+          openTab: 'chat',
         };
 
-        // 1. Crear notificación en BD
+        // 1. Crear notificación en BD (con cotizacionId para deep-link persistente)
         const notif = await this.notificacionService.create({
           userId: usuario.id,
           ...notifData,
         } as any);
 
-        // 2. Emitir por SSE — incluir chatId y cotizacionId para navegación en el frontend
+        // 2. Emitir por SSE — incluir chatId y openTab para navegación inmediata
         this.notificacionService.emitToUser(usuario.id, {
           ...notif,
           chatId,
-          cotizacionId: cotizacion?.id ?? null,
+          openTab: 'chat',
         });
       }),
     );

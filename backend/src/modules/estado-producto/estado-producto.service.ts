@@ -1256,7 +1256,8 @@ export class EstadoProductoService {
         tipo: TipoNotificacion.ASIGNACION_RECHAZADA,
         titulo,
         descripcion,
-      });
+        cotizacionId,
+      } as any);
       this.notificacionService.emitToUser(receptor.id, notif);
     }
 

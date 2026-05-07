@@ -210,23 +210,21 @@ export class QuotationsService {
       tipo: 'COMPRA_CREADA',
       titulo: 'Nueva cotización pendiente',
       descripcion: `"${quotationName}" solicitada por ${requesterName}`,
+      cotizacionId,
     };
 
     // Notificaciones BD + SSE para todos los supervisores/jefe de compras
     // Email solo a usuarios con rol JEFE_COMPRAS
     await Promise.allSettled(
       supervisores.map(async (s) => {
-        // 1. Crear notificación en BD
+        // 1. Crear notificación en BD (con cotizacionId para deep-link persistente)
         const notif = await this.notificacionService.create({
           userId: s.id,
           ...notifData,
         } as any);
 
         // 2. Emitir por SSE
-        this.notificacionService.emitToUser(s.id, {
-          ...notif,
-          cotizacionId,
-        });
+        this.notificacionService.emitToUser(s.id, notif);
       }),
     );
 

@@ -36,7 +36,8 @@ export class NotificacionService {
         userId: dto.userId,
         tipo: dto.tipo,
         titulo: dto.titulo,
-        descripcion: dto.descripcion
+        descripcion: dto.descripcion,
+        ...(dto.cotizacionId ? { cotizacionId: dto.cotizacionId } : {}),
       },
       include: {
         usuario: {
@@ -46,12 +47,19 @@ export class NotificacionService {
     });
   }
 
-  async createBulk(userIds: string[], tipo: string, titulo: string, descripcion: string) {
+  async createBulk(
+    userIds: string[],
+    tipo: string,
+    titulo: string,
+    descripcion: string,
+    extras?: { cotizacionId?: string; openTab?: string },
+  ) {
     const data = userIds.map(userId => ({
       userId,
       tipo,
       titulo,
-      descripcion
+      descripcion,
+      ...(extras?.cotizacionId ? { cotizacionId: extras.cotizacionId } : {}),
     }));
 
     return this.prisma.notificacion.createMany({ data });

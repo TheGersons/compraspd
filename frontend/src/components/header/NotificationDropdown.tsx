@@ -18,25 +18,29 @@ function resolveNotifUrl(
   n: BackendNotification,
   userRole: string | undefined,
 ): string | null {
-  const isSupervisorOrAbove =
-    userRole === "SUPERVISOR" || userRole === "ADMIN" || userRole === "JEFE_COMPRAS" || userRole === "COMERCIAL";
+  const isSupervisorOrAbove = ["SUPERVISOR", "ADMIN", "JEFE_COMPRAS", "COMERCIAL"].includes(userRole ?? "");
+  const followUps = "/quotes/follow-ups";
+  const myQuotes = "/quotes/my-quotes";
 
-  if (n.tipo === "COMPRA_CREADA") {
-    if (n.cotizacionId)
-      return `/quotes/follow-ups?cotizacion=${n.cotizacionId}`;
-    return "/quotes/follow-ups";
+  if (n.tipo === "COMPRA_CREADA" || n.tipo === "ASIGNACION_RECHAZADA") {
+    if (n.cotizacionId) return `${followUps}?cotizacion=${n.cotizacionId}`;
+    return followUps;
   }
 
   if (n.tipo === "COMENTARIO_NUEVO") {
-    const base = isSupervisorOrAbove ? "/quotes/follow-ups" : "/quotes/my-quotes";
-    if (n.cotizacionId) return `${base}?cotizacion=${n.cotizacionId}`;
+    const base = isSupervisorOrAbove ? followUps : myQuotes;
+    if (n.cotizacionId) return `${base}?cotizacion=${n.cotizacionId}&tab=chat`;
     return base;
   }
 
   if (n.tipo === "ESTADO_ACTUALIZADO" || n.tipo === "COMPRA_COMPLETADA") {
-    if (n.cotizacionId)
-      return `/quotes/my-quotes?cotizacion=${n.cotizacionId}`;
-    return "/quotes/my-quotes";
+    const base = isSupervisorOrAbove ? followUps : myQuotes;
+    if (n.cotizacionId) return `${base}?cotizacion=${n.cotizacionId}`;
+    return base;
+  }
+
+  if (n.tipo === "IMPORT_EXPORT") {
+    return "/import-export";
   }
 
   return null;

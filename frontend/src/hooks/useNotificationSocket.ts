@@ -13,6 +13,7 @@ export type BackendNotification = {
   completada: boolean;
   chatId?: string;
   cotizacionId?: string;
+  openTab?: 'chat' | 'detalle' | 'historial';
 };
 
 type Options = {

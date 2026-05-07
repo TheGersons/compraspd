@@ -27,6 +27,16 @@ export class CreateNotificacionDto {
   @ApiProperty()
   @IsString()
   descripcion: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  cotizacionId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  openTab?: string;
 }
 
 export class ListNotificacionesQueryDto {

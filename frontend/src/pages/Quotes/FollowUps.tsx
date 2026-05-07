@@ -772,11 +772,15 @@ export default function FollowUps() {
       setCotizaciones(items);
 
       // Auto-seleccionar cotización indicada en el query param ?cotizacion=ID
+      // y abrir la pestaña indicada por ?tab= (detalle | chat | historial)
       const targetId = searchParams.get('cotizacion');
       if (targetId) {
         const target = items.find((c: any) => c.id === targetId);
         if (target) {
-          seleccionarCotizacion(target);
+          const rawTab = searchParams.get('tab');
+          const initialTab: "detalle" | "chat" | "historial" =
+            rawTab === 'chat' ? 'chat' : rawTab === 'historial' ? 'historial' : 'detalle';
+          seleccionarCotizacion(target, initialTab);
           setTimeout(() => {
             accordionRefs.current[targetId]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
           }, 300);
