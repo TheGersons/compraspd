@@ -1,5 +1,5 @@
 // DashboardGerencia.tsx - CONECTADO AL API
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { NavegacionContext, Area, Proyecto, EtapaDetalle, ProductoDetallado } from './types/gerencia.types';
 import { getToken } from '../../lib/api';
 import Breadcrumbs from './components/gerencia/Breadcrumbs';
@@ -44,11 +44,17 @@ export default function DashboardGerencia() {
   const [proyectos, setProyectos] = useState<Proyecto[]>([]);
   const [productosDetallados, setProductosDetallados] = useState<ProductoDetallado[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Cargar datos del API
+  const isFirstLoad = useRef(true);
   const cargarDatos = useCallback(async () => {
     try {
-      setLoading(true);
+      if (isFirstLoad.current) {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
+      }
       const token = getToken();
       const params = new URLSearchParams();
       if (desde) params.set('desde', desde.toISOString().slice(0, 10));
@@ -66,6 +72,8 @@ export default function DashboardGerencia() {
       console.error('Error cargando dashboard gerencia:', error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
+      isFirstLoad.current = false;
     }
   }, [desde, hasta]);
 
@@ -236,7 +244,7 @@ export default function DashboardGerencia() {
               onChange={setDesde}
               maxDate={hasta ?? undefined}
               placeholder="Fecha inicio"
-              className="h-7 px-2 py-0 text-[11px] rounded border border-gray-200 border-2-0"
+              className="h-7 px-2 py-0 text-[11px] rounded border border-gray-200"
             />
           </div>
         </div>
@@ -248,9 +256,13 @@ export default function DashboardGerencia() {
               onChange={setHasta}
               minDate={desde ?? undefined}
               placeholder="Fecha fin"
+              className="h-7 px-2 py-0 text-[11px] rounded border border-gray-200"
             />
           </div>
         </div>
+        {refreshing && (
+          <div className="h-3 w-3 animate-spin rounded-full border-2 border-blue-400 border-t-transparent" />
+        )}
         <button
           onClick={() => { setDesde(defaultDesde()); setHasta(defaultHasta()); setFiltroTipoCompra('INTERNACIONAL'); }}
           className="rounded border border-gray-200 px-2 py-1 text-[11px] text-gray-400 hover:bg-gray-50 hover:text-gray-600 dark:border-gray-600 dark:text-gray-500 dark:hover:bg-gray-700"

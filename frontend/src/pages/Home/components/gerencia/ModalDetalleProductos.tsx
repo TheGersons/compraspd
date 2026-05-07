@@ -329,24 +329,23 @@ export default function ModalDetalleProductos({
       resultado = resultado.filter(p => getBucket(p) === 'cotizacion');
     } else if (filtroEstado === 'completado') {
       resultado = resultado.filter(p => getBucket(p) === 'completados');
+    } else if (filtroEstado === 'TODOS') {
+      // TODOS: mostrar todos los buckets sin filtro de estado
     } else {
-      // activos únicamente
+      // atrasado / en_proceso / pendiente → solo activos filtrados por ese estado
       resultado = resultado.filter(p => getBucket(p) === 'activos');
 
-      // Dentro de activos, filtrar por estado concreto si aplica
-      if (filtroEstado !== 'TODOS') {
-        if (esVistaTotal) {
-          resultado = resultado.filter(p =>
-            etapasRelevantes.some(e => p.estados[e] === filtroEstado),
-          );
-        } else {
-          resultado = resultado.filter(p => p.estados[etapa] === filtroEstado);
-        }
+      if (esVistaTotal) {
+        resultado = resultado.filter(p =>
+          etapasRelevantes.some(e => p.estados[e] === filtroEstado),
+        );
+      } else {
+        resultado = resultado.filter(p => p.estados[etapa] === filtroEstado);
       }
     }
 
-    // Vista por etapa: ocultar pendientes en esa etapa (solo en activos)
-    if (!esVistaTotal && filtroEstado !== 'cotizacion' && filtroEstado !== 'completado') {
+    // Vista por etapa: ocultar pendientes en esa etapa (excepto cuando se ven todos o completados)
+    if (!esVistaTotal && filtroEstado !== 'cotizacion' && filtroEstado !== 'completado' && filtroEstado !== 'TODOS') {
       resultado = resultado.filter(p => p.estados[etapa] !== 'pendiente');
     }
 
