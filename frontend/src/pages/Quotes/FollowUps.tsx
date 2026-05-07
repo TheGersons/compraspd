@@ -844,7 +844,7 @@ export default function FollowUps() {
     }
   };
 
-  const seleccionarCotizacion = async (cotizacion: Cotizacion) => {
+  const seleccionarCotizacion = async (cotizacion: Cotizacion, initialTab: "detalle" | "chat" | "historial" = "detalle") => {
     // Toggle: collapse if already selected
     if (cotizacionSeleccionada?.id === cotizacion.id) {
       setCotizacionSeleccionada(null);
@@ -878,7 +878,7 @@ export default function FollowUps() {
       }
 
       setCotizacionSeleccionada(detalle);
-      setVistaActiva("detalle");
+      setVistaActiva(initialTab);
       // Load prices for all products immediately
       if (detalle.detalles?.length) {
         const preciosPromises = detalle.detalles.map((d: Producto) => api.getPreciosByDetalle(d.id));
@@ -2441,7 +2441,7 @@ export default function FollowUps() {
                                                               <span className="truncate max-w-[110px]">{subiendoComprobante === producto.id ? 'Subiendo...' : 'Subir comprobante'}</span>
                                                               <input
                                                                 type="file"
-                                                                accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.txt,.dwg,.dxf"
+                                                                accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.txt,.dwg,.dxf,.xls,.xlsx"
                                                                 className="hidden"
                                                                 disabled={!!subiendoComprobante}
                                                                 onChange={(e) => {

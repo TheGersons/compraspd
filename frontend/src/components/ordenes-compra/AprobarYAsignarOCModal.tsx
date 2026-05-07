@@ -304,19 +304,17 @@ export function AprobarYAsignarOCModal({
               return (
                 <div
                   key={p.estadoProductoId}
-                  className={`rounded-lg border transition-colors ${
-                    form.selected
+                  className={`rounded-lg border transition-colors ${form.selected
                       ? "border-blue-300 dark:border-blue-700"
                       : "border-gray-200 dark:border-gray-700"
-                  }`}
+                    }`}
                 >
                   {/* Product header row */}
                   <div
-                    className={`flex cursor-pointer items-center gap-2 rounded-t-lg px-3 py-2 ${
-                      form.selected
+                    className={`flex cursor-pointer items-center gap-2 rounded-t-lg px-3 py-2 ${form.selected
                         ? "bg-blue-50 dark:bg-blue-900/20"
                         : "bg-gray-50 dark:bg-gray-900/20"
-                    }`}
+                      }`}
                     onClick={() =>
                       updateForm(p.estadoProductoId, {
                         selected: !form.selected,
@@ -446,7 +444,7 @@ export function AprobarYAsignarOCModal({
                                 }}
                                 type="file"
                                 className="hidden"
-                                accept=".pdf,.jpg,.jpeg,.png,.webp"
+                                accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx"
                                 onChange={(e) => {
                                   const file = e.target.files?.[0];
                                   if (file)
