@@ -11,6 +11,43 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 const PIN_MAX = 8;
 const ROLES_EDICION = ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS"];
 
+// Vocabulario fijo del status (alineado con el Excel del cliente).
+const STATUS_OPTIONS = [
+  "Fabricación",
+  "Orden de compra",
+  "Pendiente PO",
+  "Descartado",
+  "En coordinación",
+  "En tránsito",
+  "Revisión de planos",
+  "Pruebas de equipo",
+  "Aduana",
+  "Almacén",
+  "Entregado",
+  "Finalizado",
+  "Información técnica",
+  "Consultas",
+  "Cotizando",
+] as const;
+
+const STATUS_STYLES: Record<string, string> = {
+  "Fabricación":         "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+  "Orden de compra":     "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+  "Pendiente PO":        "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400",
+  "Descartado":          "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300",
+  "En coordinación":     "bg-pink-100 text-pink-700 dark:bg-pink-900/20 dark:text-pink-300",
+  "En tránsito":         "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-300",
+  "Revisión de planos":  "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
+  "Pruebas de equipo":   "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300",
+  "Aduana":              "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
+  "Almacén":             "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300",
+  "Entregado":           "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+  "Finalizado":          "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300",
+  "Información técnica": "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300",
+  "Consultas":           "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300",
+  "Cotizando":           "bg-lime-100 text-lime-700 dark:bg-lime-900/30 dark:text-lime-300",
+};
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type ControlComprasRow = {
@@ -32,17 +69,19 @@ type ControlComprasRow = {
   llegadaReal: string | null;
   observaciones: string | null;
   status: string;
+  statusEsManual: boolean;
   encargado: { id: string; nombre: string } | null;
 };
 
 type Solicitante = { id: string; nombre: string };
+type Proyecto = { id: string; nombre: string };
 
 type ColDef = { key: string; label: string; width: number };
 
 const COL_DEFS: ColDef[] = [
   { key: "proyecto",            label: "Proyecto",                       width: 140 },
   { key: "descripcion",         label: "Descripción del Equipo",         width: 240 },
-  { key: "po",                  label: "PO",                             width: 95  },
+  { key: "po",                  label: "PO",                             width: 105 },
   { key: "fechaEmisionOC",      label: "Fecha Emisión OC",               width: 120 },
   { key: "fechaPagoAnticipo",   label: "Fecha Pago Anticipo",            width: 130 },
   { key: "fechaFinFabricacion", label: "Fecha Fin. Fabricación",         width: 145 },
@@ -52,21 +91,24 @@ const COL_DEFS: ColDef[] = [
   { key: "fobReal",             label: "T. Entrega FOB",                 width: 120 },
   { key: "cifReal",             label: "Transporte CIF",                 width: 120 },
   { key: "llegadaReal",         label: "Llegada a Sitio",                width: 120 },
-  { key: "observaciones",       label: "Observaciones",                  width: 220 },
-  { key: "status",              label: "Status",                         width: 130 },
+  { key: "observaciones",       label: "Observaciones",                  width: 240 },
+  { key: "status",              label: "Status",                         width: 180 },
   { key: "encargado",           label: "Encargado Responsable",          width: 160 },
 ];
 
 const DEFAULT_PINNED = ["proyecto", "descripcion", "po"];
 
-const STATUS_STYLES: Record<string, string> = {
-  "Recibido":         "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
-  "En Coordinación":  "bg-pink-100 text-pink-700 dark:bg-pink-900/20 dark:text-pink-300",
-  "Fabricación":      "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
-  "Orden de Compra":  "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
-  "Cotización":       "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
-  "Pendiente":        "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400",
-};
+const DATE_KEYS: ReadonlyArray<keyof ControlComprasRow> = [
+  "fechaEmisionOC",
+  "fechaPagoAnticipo",
+  "fechaFinFabricacion",
+  "fobBase",
+  "cifBase",
+  "llegadaBase",
+  "fobReal",
+  "cifReal",
+  "llegadaReal",
+];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -123,23 +165,14 @@ function PinIcon({ pinned }: { pinned: boolean }) {
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const cls = STATUS_STYLES[status] ?? STATUS_STYLES["Pendiente"];
-  return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${cls}`}>
-      {status}
-    </span>
-  );
-}
-
 function DateCell({
   value,
-  esManual,
+  italic,
   editable,
   onSave,
 }: {
   value: string | null;
-  esManual: boolean;
+  italic?: boolean;
   editable: boolean;
   onSave: (v: string | null) => void;
 }) {
@@ -159,8 +192,8 @@ function DateCell({
     return (
       <span
         tabIndex={0}
-        title={esManual ? "Valor manual — clic para editar" : "Default (1er seguimiento) — clic para editar"}
-        className={`block cursor-pointer rounded px-1 py-0.5 text-xs hover:bg-blue-50 dark:hover:bg-blue-900/20 focus:outline-none focus:ring-1 focus:ring-blue-400 ${esManual ? "" : "italic text-gray-500 dark:text-gray-400"}`}
+        title="Clic para editar"
+        className={`block cursor-pointer rounded px-1 py-0.5 text-xs hover:bg-blue-50 dark:hover:bg-blue-900/20 focus:outline-none focus:ring-1 focus:ring-blue-400 ${italic ? "italic text-gray-500 dark:text-gray-400" : ""}`}
         onClick={() => setEditing(true)}
         onFocus={() => setEditing(true)}
       >
@@ -186,6 +219,98 @@ function DateCell({
   );
 }
 
+function TextCell({
+  value,
+  editable,
+  placeholder = "—",
+  onSave,
+}: {
+  value: string | null;
+  editable: boolean;
+  placeholder?: string;
+  onSave: (v: string | null) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value ?? "");
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (editing) ref.current?.focus(); }, [editing]);
+
+  if (!editable) {
+    return value ? (
+      <span className="block max-w-[300px] truncate text-xs" title={value}>{value}</span>
+    ) : (
+      <span className="text-gray-300 dark:text-gray-600">{placeholder}</span>
+    );
+  }
+
+  if (!editing) {
+    return (
+      <span
+        tabIndex={0}
+        onClick={() => { setDraft(value ?? ""); setEditing(true); }}
+        onFocus={() => { setDraft(value ?? ""); setEditing(true); }}
+        className="block cursor-pointer rounded px-1 py-0.5 text-xs hover:bg-blue-50 dark:hover:bg-blue-900/20 focus:outline-none focus:ring-1 focus:ring-blue-400"
+        title="Clic para editar"
+      >
+        {value ? (
+          <span className="block max-w-[300px] truncate" title={value}>{value}</span>
+        ) : (
+          <span className="text-gray-300 dark:text-gray-600">{placeholder}</span>
+        )}
+      </span>
+    );
+  }
+
+  return (
+    <input
+      ref={ref}
+      className="w-full min-w-[200px] rounded border border-blue-400 px-1.5 py-0.5 text-xs outline-none dark:bg-gray-700 dark:text-white"
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => { setEditing(false); onSave(draft.trim() === "" ? null : draft.trim()); }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") { setEditing(false); onSave(draft.trim() === "" ? null : draft.trim()); }
+        if (e.key === "Escape") { setEditing(false); setDraft(value ?? ""); }
+      }}
+    />
+  );
+}
+
+function StatusCell({
+  value,
+  esManual,
+  editable,
+  onSave,
+}: {
+  value: string;
+  esManual: boolean;
+  editable: boolean;
+  onSave: (v: string | null) => void;
+}) {
+  const cls = STATUS_STYLES[value] ?? STATUS_STYLES["Pendiente PO"];
+
+  if (!editable) {
+    return (
+      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${cls}`}>
+        {value}
+      </span>
+    );
+  }
+
+  return (
+    <div className="min-w-[160px]" title={esManual ? "Status manual" : "Auto (derivado del flujo)"}>
+      <SearchableSelect
+        value={esManual ? value : ""}
+        onChange={(v) => onSave(v === "" ? null : v)}
+        options={STATUS_OPTIONS.map((s) => ({ id: s, nombre: s }))}
+        allLabel={`Auto (${value})`}
+        allValue=""
+        placeholder="Selecciona status"
+      />
+    </div>
+  );
+}
+
 // ─── Componente principal ────────────────────────────────────────────────────
 
 export default function ReporteControlCompras() {
@@ -195,10 +320,12 @@ export default function ReporteControlCompras() {
 
   const [rows, setRows] = useState<ControlComprasRow[]>([]);
   const [solicitantes, setSolicitantes] = useState<Solicitante[]>([]);
+  const [proyectos, setProyectos] = useState<Proyecto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
 
+  const [proyectoId, setProyectoId] = useState<string>("TODOS");
   const [solicitanteId, setSolicitanteId] = useState<string>("TODOS");
   const [search, setSearch] = useState("");
 
@@ -212,7 +339,6 @@ export default function ReporteControlCompras() {
     });
   }, []);
 
-  // Orden: ancladas primero (preservando orden de COL_DEFS), luego el resto
   const pinnedInOrder = COL_DEFS.filter((c) => pinnedCols.includes(c.key));
   const unpinned = COL_DEFS.filter((c) => !pinnedCols.includes(c.key));
   const allColsOrdered = [...pinnedInOrder, ...unpinned];
@@ -228,8 +354,13 @@ export default function ReporteControlCompras() {
 
   // Cargar filtros
   useEffect(() => {
-    apiFetch<{ solicitantes: Solicitante[] }>("/api/v1/reportes/control-compras/filtros")
-      .then((d) => setSolicitantes(d.solicitantes))
+    apiFetch<{ solicitantes: Solicitante[]; proyectos: Proyecto[] }>(
+      "/api/v1/reportes/control-compras/filtros",
+    )
+      .then((d) => {
+        setSolicitantes(d.solicitantes);
+        setProyectos(d.proyectos);
+      })
       .catch(() => {});
   }, []);
 
@@ -239,6 +370,7 @@ export default function ReporteControlCompras() {
     try {
       const params = new URLSearchParams();
       if (solicitanteId && solicitanteId !== "TODOS") params.set("solicitanteId", solicitanteId);
+      if (proyectoId && proyectoId !== "TODOS") params.set("proyectoId", proyectoId);
       const data = await apiFetch<ControlComprasRow[]>(
         `/api/v1/reportes/control-compras?${params}`,
       );
@@ -252,27 +384,39 @@ export default function ReporteControlCompras() {
     } finally {
       setLoading(false);
     }
-  }, [solicitanteId]);
+  }, [solicitanteId, proyectoId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const guardarFinFabricacion = async (id: string, fechaIso: string | null) => {
+  // Guardado genérico — actualiza la fila local y hace PATCH al backend
+  const guardarCampo = async (id: string, campo: string, valor: any) => {
     if (!puedeEditar) return;
     setSaving(id);
+
     setRows((prev) =>
-      prev.map((r) =>
-        r.id === id
-          ? { ...r, fechaFinFabricacion: fechaIso, fechaFinFabricacionEsManual: fechaIso != null }
-          : r,
-      ),
+      prev.map((r) => {
+        if (r.id !== id) return r;
+        const next: any = { ...r, [campo]: valor };
+        if (campo === "fechaFinFabricacion") next.fechaFinFabricacionEsManual = valor != null;
+        if (campo === "status") {
+          next.statusEsManual = valor != null;
+          // Si limpia el manual, mostramos un placeholder hasta el próximo refresh
+          if (valor == null) next.status = r.status;
+          else next.status = valor;
+        }
+        return next;
+      }),
     );
+
     try {
-      await apiFetch(`/api/v1/reportes/control-compras/${id}/fin-fabricacion`, {
+      await apiFetch(`/api/v1/reportes/control-compras/${id}`, {
         method: "PATCH",
-        body: JSON.stringify({ fecha: fechaIso }),
+        body: JSON.stringify({ [campo]: valor }),
       });
+      // Refrescar para que valores derivados (status auto) y campos calculados queden coherentes
+      if (campo === "status" && valor == null) fetchData();
     } catch (e: any) {
-      setError(e?.message || "Error al guardar fecha");
+      setError(e?.message || "Error al guardar");
       fetchData();
     } finally {
       setSaving(null);
@@ -323,6 +467,19 @@ export default function ReporteControlCompras() {
 
   // ─── Renderer por columna ───────────────────────────────────────────────
   const renderCell = (key: string, r: ControlComprasRow) => {
+    if (DATE_KEYS.includes(key as keyof ControlComprasRow)) {
+      const isFinFabricacion = key === "fechaFinFabricacion";
+      const value = (r as any)[key] as string | null;
+      return (
+        <DateCell
+          value={value}
+          italic={isFinFabricacion && !r.fechaFinFabricacionEsManual}
+          editable={puedeEditar}
+          onSave={(v) => guardarCampo(r.id, key, v)}
+        />
+      );
+    }
+
     switch (key) {
       case "proyecto":
         return r.proyecto?.nombre ?? <span className="text-gray-300 dark:text-gray-600">—</span>;
@@ -334,34 +491,27 @@ export default function ReporteControlCompras() {
         );
       case "po":
         return r.po ?? <span className="text-gray-300 dark:text-gray-600">—</span>;
-      case "fechaEmisionOC":     return fmtDateDMY(r.fechaEmisionOC);
-      case "fechaPagoAnticipo":  return fmtDateDMY(r.fechaPagoAnticipo);
-      case "fechaFinFabricacion":
+      case "observaciones":
         return (
-          <DateCell
-            value={r.fechaFinFabricacion}
-            esManual={r.fechaFinFabricacionEsManual}
+          <TextCell
+            value={r.observaciones}
             editable={puedeEditar}
-            onSave={(v) => guardarFinFabricacion(r.id, v)}
+            onSave={(v) => guardarCampo(r.id, "observaciones", v)}
           />
         );
-      case "fobBase":     return fmtDateDMY(r.fobBase);
-      case "cifBase":     return fmtDateDMY(r.cifBase);
-      case "llegadaBase": return fmtDateDMY(r.llegadaBase);
-      case "fobReal":     return fmtDateDMY(r.fobReal);
-      case "cifReal":     return fmtDateDMY(r.cifReal);
-      case "llegadaReal": return fmtDateDMY(r.llegadaReal);
-      case "observaciones":
-        return r.observaciones ? (
-          <span className="block max-w-[300px] truncate" title={r.observaciones}>
-            {r.observaciones}
-          </span>
-        ) : (
-          <span className="text-gray-300 dark:text-gray-600">—</span>
+      case "status":
+        return (
+          <StatusCell
+            value={r.status}
+            esManual={r.statusEsManual}
+            editable={puedeEditar}
+            onSave={(v) => guardarCampo(r.id, "status", v)}
+          />
         );
-      case "status":      return <StatusBadge status={r.status} />;
-      case "encargado":   return r.encargado?.nombre ?? <span className="text-gray-300 dark:text-gray-600">—</span>;
-      default: return null;
+      case "encargado":
+        return r.encargado?.nombre ?? <span className="text-gray-300 dark:text-gray-600">—</span>;
+      default:
+        return null;
     }
   };
 
@@ -375,7 +525,7 @@ export default function ReporteControlCompras() {
           <div>
             <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Control de Compras</h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Reporte por solicitante con encargado responsable y fechas base/reales.
+              Reporte por proyecto / solicitante con encargado responsable y fechas base/reales.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -391,7 +541,20 @@ export default function ReporteControlCompras() {
 
         {/* Filtros */}
         <div className="mb-3 flex flex-wrap items-end gap-3 rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
-          <div className="min-w-[260px] flex-1">
+          <div className="min-w-[240px] flex-1">
+            <label className="mb-1 block text-[11px] font-medium text-gray-500 dark:text-gray-400">
+              Proyecto
+            </label>
+            <SearchableSelect
+              value={proyectoId}
+              onChange={setProyectoId}
+              options={proyectos}
+              allLabel="Todos los proyectos"
+              allValue="TODOS"
+              placeholder="Selecciona proyecto"
+            />
+          </div>
+          <div className="min-w-[240px] flex-1">
             <label className="mb-1 block text-[11px] font-medium text-gray-500 dark:text-gray-400">
               Solicitante
             </label>

@@ -98,20 +98,25 @@ export class ReportesController {
   @Get('control-compras')
   @ApiOperation({ summary: 'Reporte estilo Excel "Control de Compras"' })
   @ApiQuery({ name: 'solicitanteId', required: false, description: 'UUID del solicitante o "TODOS"' })
+  @ApiQuery({ name: 'proyectoId',    required: false, description: 'UUID del proyecto o "TODOS"' })
   listarControlCompras(
     @CurrentUser() user: UserJwt,
     @Query('solicitanteId') solicitanteId?: string,
+    @Query('proyectoId')    proyectoId?: string,
   ) {
-    return this.service.listarControlCompras(user, { solicitanteId });
+    return this.service.listarControlCompras(user, { solicitanteId, proyectoId });
   }
 
-  @Patch('control-compras/:id/fin-fabricacion')
-  @ApiOperation({ summary: 'Editar fecha de finalización de fabricación (solo ADMIN/SUPERVISOR/JEFE_COMPRAS)' })
-  actualizarFinFabricacion(
+  @Patch('control-compras/:id')
+  @ApiOperation({
+    summary:
+      'Editar campos del reporte (fechas, observaciones, status). Solo ADMIN/SUPERVISOR/JEFE_COMPRAS.',
+  })
+  actualizarControlCompras(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: { fecha: string | null },
+    @Body() dto: Record<string, any>,
     @CurrentUser() user: UserJwt,
   ) {
-    return this.service.actualizarFinFabricacion(id, dto?.fecha ?? null, user);
+    return this.service.actualizarControlCompras(id, dto, user);
   }
 }

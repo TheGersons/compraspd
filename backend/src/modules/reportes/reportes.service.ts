@@ -22,23 +22,38 @@ function derivarEstatus(ep: any): string {
   return ESTADOS_PRODUCTO_ORDEN.find((k) => ep[k]) ?? 'pendiente';
 }
 
+// Vocabulario fijo del select de status (alineado con el Excel del cliente).
+const STATUS_REPORTE_VALUES = [
+  'Fabricación',
+  'Orden de compra',
+  'Pendiente PO',
+  'Descartado',
+  'En coordinación',
+  'En tránsito',
+  'Revisión de planos',
+  'Pruebas de equipo',
+  'Aduana',
+  'Almacén',
+  'Entregado',
+  'Finalizado',
+  'Información técnica',
+  'Consultas',
+  'Cotizando',
+] as const;
+
 // Etiquetas agrupadas para el reporte "Control de Compras" (estilo Excel cliente).
+// Mapeo desde los flags booleanos al vocabulario fijo del select.
 function derivarStatusReporte(ep: any): string {
-  if (ep.recibido) return 'Recibido';
-  if (
-    ep.enCIF ||
-    ep.conBL ||
-    ep.segundoSeguimiento ||
-    ep.cotizacionFleteInternacional ||
-    ep.enFOB ||
-    ep.primerSeguimiento
-  ) {
-    return 'En Coordinación';
-  }
-  if (ep.aprobacionPlanos || ep.pagado || ep.comprado) return 'Fabricación';
-  if (ep.aprobacionCompra) return 'Orden de Compra';
-  if (ep.cotizado || ep.conDescuento) return 'Cotización';
-  return 'Pendiente';
+  if (ep.recibido) return 'Entregado';
+  if (ep.enCIF) return 'Aduana';
+  if (ep.conBL || ep.segundoSeguimiento) return 'En tránsito';
+  if (ep.cotizacionFleteInternacional || ep.enFOB || ep.primerSeguimiento)
+    return 'En coordinación';
+  if (ep.aprobacionPlanos) return 'Revisión de planos';
+  if (ep.pagado || ep.comprado) return 'Fabricación';
+  if (ep.aprobacionCompra) return 'Orden de compra';
+  if (ep.cotizado || ep.conDescuento) return 'Cotizando';
+  return 'Pendiente PO';
 }
 
 const CAMPO_LABELS: Record<string, string> = {
@@ -406,21 +421,28 @@ export class ReportesService {
 
   async getFiltrosControlCompras(user: UserJwt) {
     await this.verificarAcceso(user);
-    const solicitantes = await this.prisma.usuario.findMany({
-      where: {
-        cotizaciones: {
-          some: { estado: { notIn: ESTADOS_FINALES } },
+    const [solicitantes, proyectos] = await Promise.all([
+      this.prisma.usuario.findMany({
+        where: {
+          cotizaciones: {
+            some: { estado: { notIn: ESTADOS_FINALES } },
+          },
         },
-      },
-      select: { id: true, nombre: true },
-      orderBy: { nombre: 'asc' },
-    });
-    return { solicitantes };
+        select: { id: true, nombre: true },
+        orderBy: { nombre: 'asc' },
+      }),
+      this.prisma.proyecto.findMany({
+        where: { estado: true },
+        select: { id: true, nombre: true },
+        orderBy: { nombre: 'asc' },
+      }),
+    ]);
+    return { solicitantes, proyectos };
   }
 
   async listarControlCompras(
     user: UserJwt,
-    filters: { solicitanteId?: string },
+    filters: { solicitanteId?: string; proyectoId?: string },
   ) {
     await this.verificarAcceso(user);
 
@@ -433,12 +455,18 @@ export class ReportesService {
       cotizacionWhere.solicitanteId = filters.solicitanteId;
     }
 
+    const where: any = {
+      rechazado: false,
+      cotizacionId: { not: null },
+      cotizacion: cotizacionWhere,
+    };
+
+    if (filters.proyectoId && filters.proyectoId !== 'TODOS') {
+      where.proyectoId = filters.proyectoId;
+    }
+
     const productos = await this.prisma.estadoProducto.findMany({
-      where: {
-        rechazado: false,
-        cotizacionId: { not: null },
-        cotizacion: cotizacionWhere,
-      },
+      where,
       include: {
         proyecto: { select: { id: true, nombre: true } },
         ordenCompra: { select: { id: true, nombre: true, numeroOC: true } },
@@ -450,6 +478,7 @@ export class ReportesService {
             nombreCotizacion: true,
             estado: true,
             fechaSolicitud: true,
+            ordenCompra: true,
             solicitante: { select: { id: true, nombre: true } },
             supervisorResponsable: { select: { id: true, nombre: true } },
           },
@@ -465,14 +494,33 @@ export class ReportesService {
     return productos.map((ep) => this.mapControlComprasRow(ep));
   }
 
-  async actualizarFinFabricacion(
+  // Mapeo del campo expuesto por el reporte → columna real en EstadoProducto.
+  // Las "base" se escriben en fechaLimite*; las "real" en fechaReal*. Status y
+  // observaciones tienen su propio campo.
+  private static readonly CAMPOS_EDITABLES_CONTROL_COMPRAS: Record<
+    string,
+    { col: string; tipo: 'date' | 'text' }
+  > = {
+    fechaEmisionOC:      { col: 'fechaRealAprobacionCompra', tipo: 'date' },
+    fechaPagoAnticipo:   { col: 'fechaRealPagado',           tipo: 'date' },
+    fechaFinFabricacion: { col: 'fechaFinFabricacion',       tipo: 'date' },
+    fobBase:             { col: 'fechaLimiteEnFOB',          tipo: 'date' },
+    cifBase:             { col: 'fechaLimiteEnCIF',          tipo: 'date' },
+    llegadaBase:         { col: 'fechaLimiteRecibido',       tipo: 'date' },
+    fobReal:             { col: 'fechaRealEnFOB',            tipo: 'date' },
+    cifReal:             { col: 'fechaRealEnCIF',            tipo: 'date' },
+    llegadaReal:         { col: 'fechaRealRecibido',         tipo: 'date' },
+    observaciones:       { col: 'observaciones',             tipo: 'text' },
+    status:              { col: 'statusManual',              tipo: 'text' },
+  };
+
+  async actualizarControlCompras(
     id: string,
-    fecha: string | null,
+    dto: Record<string, any>,
     user: UserJwt,
   ) {
     await this.verificarAcceso(user);
 
-    // Gate de edición: solo ADMIN, SUPERVISOR, JEFE_COMPRAS pueden editar
     const usuario = await this.prisma.usuario.findUnique({
       where: { id: user.sub },
       include: { rol: true },
@@ -480,7 +528,7 @@ export class ReportesService {
     const rol = usuario?.rol.nombre.toUpperCase() ?? '';
     if (!ROLES_EDICION_CONTROL_COMPRAS.includes(rol)) {
       throw new ForbiddenException(
-        'Solo ADMIN, SUPERVISOR o JEFE_COMPRAS pueden editar esta fecha',
+        'Solo ADMIN, SUPERVISOR o JEFE_COMPRAS pueden editar este reporte',
       );
     }
 
@@ -492,13 +540,39 @@ export class ReportesService {
       throw new NotFoundException('Producto no encontrado');
     }
 
-    return this.prisma.estadoProducto.update({
+    const data: Record<string, any> = {};
+    const mapa = ReportesService.CAMPOS_EDITABLES_CONTROL_COMPRAS;
+
+    for (const key of Object.keys(dto)) {
+      const cfg = mapa[key];
+      if (!cfg) continue;
+      const raw = dto[key];
+
+      if (cfg.tipo === 'date') {
+        data[cfg.col] = raw == null || raw === '' ? null : new Date(raw);
+      } else if (cfg.col === 'statusManual') {
+        if (raw == null || raw === '') {
+          data[cfg.col] = null;
+        } else if (!STATUS_REPORTE_VALUES.includes(raw)) {
+          throw new ForbiddenException(`Status inválido: ${raw}`);
+        } else {
+          data[cfg.col] = raw;
+        }
+      } else {
+        data[cfg.col] = raw == null || raw === '' ? null : String(raw);
+      }
+    }
+
+    if (Object.keys(data).length === 0) {
+      return { id, actualizado: 0 };
+    }
+
+    await this.prisma.estadoProducto.update({
       where: { id },
-      data: {
-        fechaFinFabricacion: fecha ? new Date(fecha) : null,
-      },
-      select: { id: true, fechaFinFabricacion: true },
+      data,
     });
+
+    return { id, actualizado: Object.keys(data).length };
   }
 
   private mapControlComprasRow(ep: any) {
@@ -517,7 +591,9 @@ export class ReportesService {
         ? { id: ep.cotizacion.solicitante.id, nombre: ep.cotizacion.solicitante.nombre }
         : null,
       descripcion,
-      po: ep.ordenCompra?.numeroOC ?? null,
+      // PO = OC. Preferir el numeroOC vinculado al producto; si no hay OC dividida,
+      // fallback al ordenCompra global de la cotización.
+      po: ep.ordenCompra?.numeroOC ?? ep.cotizacion?.ordenCompra ?? null,
       fechaEmisionOC: ep.fechaRealAprobacionCompra ?? ep.fechaAprobacionCompra ?? null,
       fechaPagoAnticipo: ep.fechaRealPagado ?? ep.fechaPagado ?? null,
       // Editable: si no hay valor manual, default a la fecha límite del 1er seguimiento
@@ -530,7 +606,8 @@ export class ReportesService {
       cifReal: ep.fechaRealEnCIF ?? ep.fechaEnCIF ?? null,
       llegadaReal: ep.fechaRealRecibido ?? ep.fechaRecibido ?? null,
       observaciones: ep.observaciones ?? null,
-      status: derivarStatusReporte(ep),
+      status: ep.statusManual ?? derivarStatusReporte(ep),
+      statusEsManual: ep.statusManual != null,
       encargado: encargado ? { id: encargado.id, nombre: encargado.nombre } : null,
     };
   }
