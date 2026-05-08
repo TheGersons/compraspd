@@ -5,6 +5,7 @@ import { getToken } from "../../lib/api";
 import { matchesSearch } from "../../utils/utils";
 import { useAuth } from "../../context/AuthContext";
 import * as XLSX from "xlsx";
+import { ChevronDown, Search } from "lucide-react";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
@@ -287,6 +288,26 @@ function StatusCell({
   editable: boolean;
   onSave: (v: string | null) => void;
 }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setQuery("");
+      }
+    };
+    if (open) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  useEffect(() => {
+    if (open) setTimeout(() => inputRef.current?.focus(), 0);
+  }, [open]);
+
   const cls = STATUS_STYLES[value] ?? STATUS_STYLES["Pendiente PO"];
 
   if (!editable) {
@@ -297,16 +318,79 @@ function StatusCell({
     );
   }
 
+  const filteredOpts = STATUS_OPTIONS.filter((s) => matchesSearch(query, s));
+  const showAuto = matchesSearch(query, "Auto") || matchesSearch(query, "derivado");
+
+  const handleSelect = (v: string | null) => {
+    onSave(v);
+    setOpen(false);
+    setQuery("");
+  };
+
   return (
-    <div className="min-w-[160px]" title={esManual ? "Status manual" : "Auto (derivado del flujo)"}>
-      <SearchableSelect
-        value={esManual ? value : ""}
-        onChange={(v) => onSave(v === "" ? null : v)}
-        options={STATUS_OPTIONS.map((s) => ({ id: s, nombre: s }))}
-        allLabel={`Auto (${value})`}
-        allValue=""
-        placeholder="Selecciona status"
-      />
+    <div ref={containerRef} className="relative inline-block">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        title={esManual ? "Status manual — clic para cambiar" : `Auto (${value}) — clic para fijar manual`}
+        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium transition-opacity hover:ring-2 hover:ring-blue-300 ${cls} ${esManual ? "" : "opacity-70"}`}
+      >
+        <span>{value}</span>
+        <ChevronDown size={11} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="absolute z-50 mt-1 w-56 rounded-lg border border-gray-300 bg-white shadow-lg dark:border-gray-600 dark:bg-gray-800">
+          <div className="relative border-b border-gray-200 p-2 dark:border-gray-700">
+            <Search size={12} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar..."
+              className="w-full rounded-md border border-gray-300 bg-white py-1 pl-7 pr-2 text-xs focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            />
+          </div>
+          <ul className="max-h-64 overflow-y-auto py-1">
+            {showAuto && (
+              <li>
+                <button
+                  type="button"
+                  onClick={() => handleSelect(null)}
+                  className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-[11px] italic transition-colors hover:bg-blue-50 dark:hover:bg-gray-700 ${!esManual ? "bg-blue-50 font-medium text-blue-700 dark:bg-gray-700 dark:text-blue-300" : "text-gray-600 dark:text-gray-400"}`}
+                >
+                  <span>Auto (derivado)</span>
+                  {!esManual && <span>✓</span>}
+                </button>
+              </li>
+            )}
+            {filteredOpts.map((s) => {
+              const optCls = STATUS_STYLES[s];
+              const selected = esManual && s === value;
+              return (
+                <li key={s}>
+                  <button
+                    type="button"
+                    onClick={() => handleSelect(s)}
+                    className={`flex w-full items-center justify-between px-3 py-1.5 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 ${selected ? "bg-blue-50/40 dark:bg-gray-700" : ""}`}
+                  >
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${optCls}`}>
+                      {s}
+                    </span>
+                    {selected && <span className="text-blue-500">✓</span>}
+                  </button>
+                </li>
+              );
+            })}
+            {filteredOpts.length === 0 && !showAuto && (
+              <li className="px-3 py-2 text-center text-[11px] text-gray-500 dark:text-gray-400">
+                Sin resultados
+              </li>
+            )}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
