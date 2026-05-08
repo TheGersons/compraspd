@@ -763,6 +763,33 @@ export class EstadoProductoService {
       );
     }
 
+    // Defensa contra mezcla de grupos: todos los IDs deben pertenecer
+    // al mismo (cotizacionId, ordenCompraId). Si la cotización fue dividida
+    // en OCs, cada OC es un grupo independiente — no se debe arrastrar
+    // productos de otra OC ni de la base.
+    if (ids.length > 1) {
+      const productos = await this.prisma.estadoProducto.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, cotizacionId: true, ordenCompraId: true },
+      });
+      if (productos.length !== ids.length) {
+        throw new BadRequestException(
+          'Algunos productos no existen o no son accesibles',
+        );
+      }
+      const ref = productos[0];
+      const mezclados = productos.some(
+        (p) =>
+          p.cotizacionId !== ref.cotizacionId ||
+          (p.ordenCompraId ?? null) !== (ref.ordenCompraId ?? null),
+      );
+      if (mezclados) {
+        throw new BadRequestException(
+          'No se puede avanzar en grupo productos de cotizaciones u órdenes de compra distintas. Avanza cada grupo por separado.',
+        );
+      }
+    }
+
     const resultados: {
       id: string;
       sku: string;

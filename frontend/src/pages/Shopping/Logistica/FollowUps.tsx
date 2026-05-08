@@ -1568,14 +1568,20 @@ export default function ShoppingFollowUps() {
                                                       Avanzar Estado
                                                     </button>
                                                     {productoSeleccionado.cotizacionId && (() => {
-                                                      const grupoProductos = productos.filter(p => p.cotizacionId === productoSeleccionado.cotizacionId);
+                                                      // El "grupo" debe ser misma cotización Y misma OC.
+                                                      // Productos de OCs separadas son grupos distintos.
+                                                      const ocSelec = productoSeleccionado.ordenCompraId ?? null;
+                                                      const grupoProductos = productos.filter(p =>
+                                                        p.cotizacionId === productoSeleccionado.cotizacionId &&
+                                                        (p.ordenCompraId ?? null) === ocSelec
+                                                      );
                                                       const eligiblesAvance = grupoProductos.filter(p => p.progreso < 100 && p.siguienteEstado && !p.rechazado);
                                                       return eligiblesAvance.length > 1 ? (
                                                         <button
                                                           onClick={() => abrirAvanceMasivo(productoSeleccionado.cotizacionId!, grupoProductos)}
                                                           disabled={loadingAccion || ocFaltante}
                                                           className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50 whitespace-nowrap"
-                                                          title={ocFaltante ? 'Debes asignar el # de Orden de Compra primero' : 'Avanzar todos los productos de esta compra al siguiente estado'}
+                                                          title={ocFaltante ? 'Debes asignar el # de Orden de Compra primero' : `Avanzar todos los productos de ${ocSelec ? 'esta OC' : 'la cotización base'} al siguiente estado`}
                                                         >
                                                           Avanzar todos ({eligiblesAvance.length})
                                                         </button>

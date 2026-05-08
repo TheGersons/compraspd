@@ -41,6 +41,8 @@ type Producto = {
     progreso?: number; nivelCriticidad: string;
     cotizacionId?: string;
     cotizacion?: { id?: string; nombreCotizacion: string; tipoCompra: "NACIONAL" | "INTERNACIONAL" };
+    ordenCompraId?: string | null;
+    ordenCompra?: { id: string; nombre: string; numeroOC?: string | null; estado?: string } | null;
 };
 
 // ============================================================================
@@ -341,14 +343,41 @@ export default function Documents() {
         return p.sku.toLowerCase().includes(q) || p.descripcion.toLowerCase().includes(q) || p.proveedor?.toLowerCase().includes(q);
     });
 
-    // Agrupar por cotización
+    // Agrupar por cotización + OC. Productos en una OC separada forman su
+    // propio grupo, distinto de la "base" de la cotización. Esto evita que
+    // operaciones de "subir a grupo" / "avanzar en grupo" arrastren productos
+    // de OCs que ya se separaron.
     const productosAgrupados = productosFiltrados.reduce((acc, p) => {
-        const key = p.cotizacionId || p.cotizacion?.id || 'sin-cotizacion';
-        if (!acc[key]) acc[key] = { cotizacionId: key, nombre: p.cotizacion?.nombreCotizacion || 'Sin cotización', tipoCompra: p.cotizacion?.tipoCompra || p.tipoCompra, productos: [] };
+        const cotId = p.cotizacionId || p.cotizacion?.id || 'sin-cotizacion';
+        const ocId = p.ordenCompraId || null;
+        const key = ocId ? `oc:${ocId}` : `cot:${cotId}`;
+        if (!acc[key]) {
+            const nombreCot = p.cotizacion?.nombreCotizacion || 'Sin cotización';
+            const ocLabel = p.ordenCompra
+                ? ` — ${p.ordenCompra.nombre}${p.ordenCompra.numeroOC ? ` (${p.ordenCompra.numeroOC})` : ''}`
+                : '';
+            acc[key] = {
+                groupKey: key,
+                cotizacionId: cotId,
+                ordenCompraId: ocId,
+                nombre: nombreCot + ocLabel,
+                nombreCot,
+                tipoCompra: p.cotizacion?.tipoCompra || p.tipoCompra,
+                productos: [],
+            };
+        }
         acc[key].productos.push(p);
         return acc;
-    }, {} as Record<string, { cotizacionId: string; nombre: string; tipoCompra: string; productos: Producto[] }>);
-    const gruposOrdenados = Object.values(productosAgrupados).sort((a, b) => a.nombre.localeCompare(b.nombre));
+    }, {} as Record<string, { groupKey: string; cotizacionId: string; ordenCompraId: string | null; nombre: string; nombreCot: string; tipoCompra: string; productos: Producto[] }>);
+    // Orden: cotizaciones agrupadas, dentro de cada cotización primero la
+    // base (sin OC), luego las OCs separadas.
+    const gruposOrdenados = Object.values(productosAgrupados).sort((a, b) => {
+        const cmp = a.nombreCot.localeCompare(b.nombreCot);
+        if (cmp !== 0) return cmp;
+        if (!a.ordenCompraId && b.ordenCompraId) return -1;
+        if (a.ordenCompraId && !b.ordenCompraId) return 1;
+        return a.nombre.localeCompare(b.nombre);
+    });
 
     // Upload masivo: subir mismo archivo a múltiples productos
     const handleUploadMasivo = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -382,13 +411,13 @@ export default function Documents() {
         if (productoSeleccionado) await recargarDocumentos();
     };
 
-    const abrirUploadMasivo = (cotizacionId: string, estado: string, requeridoId?: string, requeridoNombre?: string) => {
-        const grupo = productosAgrupados[cotizacionId];
+    const abrirUploadMasivo = (groupKey: string, estado: string, requeridoId?: string, requeridoNombre?: string) => {
+        const grupo = productosAgrupados[groupKey];
         if (!grupo) {
-            toast.error("No se encontró el grupo de cotización");
+            toast.error("No se encontró el grupo");
             return;
         }
-        setCotizacionParaUpload(cotizacionId);
+        setCotizacionParaUpload(groupKey);
         setUploadMasivoConfig({ estado, requeridoId, requeridoNombre: requeridoNombre || "Documento" });
         setProductosParaUpload(grupo.productos.map(p => p.id));
         setShowUploadMasivoModal(true);
@@ -459,16 +488,19 @@ export default function Documents() {
                                     <div className="divide-y divide-gray-200 dark:divide-gray-700">
                                         {vistaAgrupada ? (
                                             gruposOrdenados.map((grupo) => (
-                                                <div key={grupo.cotizacionId || 'sin'}>
+                                                <div key={grupo.groupKey}>
                                                     <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-50 dark:bg-gray-800/50 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
-                                                        onClick={() => setGrupoExpandido(grupoExpandido === grupo.cotizacionId ? null : grupo.cotizacionId)}>
-                                                        <span className="text-xs">{grupoExpandido === grupo.cotizacionId ? '▼' : '▶'}</span>
+                                                        onClick={() => setGrupoExpandido(grupoExpandido === grupo.groupKey ? null : grupo.groupKey)}>
+                                                        <span className="text-xs">{grupoExpandido === grupo.groupKey ? '▼' : '▶'}</span>
                                                         <div className="flex-1 min-w-0">
                                                             <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{grupo.nombre}</p>
-                                                            <p className="text-[10px] text-gray-500">{grupo.productos.length} producto(s) • {grupo.tipoCompra}</p>
+                                                            <p className="text-[10px] text-gray-500">
+                                                                {grupo.productos.length} producto(s) • {grupo.tipoCompra}
+                                                                {grupo.ordenCompraId && <span className="ml-1 inline-flex items-center rounded-full bg-purple-100 px-1.5 text-[9px] font-bold text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">OC separada</span>}
+                                                            </p>
                                                         </div>
                                                     </div>
-                                                    {grupoExpandido === grupo.cotizacionId && grupo.productos.map((producto) => (
+                                                    {grupoExpandido === grupo.groupKey && grupo.productos.map((producto) => (
                                                         <button key={producto.id} onClick={() => seleccionarProducto(producto)}
                                                             className={`w-full p-3 pl-8 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 border-l-2 ${productoSeleccionado?.id === producto.id ? "bg-blue-50 dark:bg-blue-900/20 border-l-blue-600" : "border-l-transparent"}`}>
                                                             <div className="flex items-center justify-between gap-2">
@@ -640,10 +672,24 @@ export default function Documents() {
                                                                     {esEditable && !req.noAplica && (
                                                                         <div className="flex items-center gap-4">
                                                                             <button onClick={() => triggerUpload(estado, req.id, req.nombre)} className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 transition-colors"><Upload size={12} /> Subir</button>
-                                                                            {(productoSeleccionado?.cotizacionId || productoSeleccionado?.cotizacion?.id) && (
-                                                                                <button onClick={() => abrirUploadMasivo(productoSeleccionado!.cotizacionId || productoSeleccionado!.cotizacion!.id!, estado, req.id, req.nombre)}
-                                                                                    className="inline-flex items-center gap-1.5 text-xs text-purple-600 hover:text-purple-700 dark:text-purple-400 transition-colors"><Upload size={12} /> Subir a grupo</button>
-                                                                            )}
+                                                                            {(productoSeleccionado?.cotizacionId || productoSeleccionado?.cotizacion?.id) && (() => {
+                                                                                // El "grupo" es OC si el producto está en una OC separada,
+                                                                                // de lo contrario la cotización base. No mezclar.
+                                                                                const cotId = productoSeleccionado!.cotizacionId || productoSeleccionado!.cotizacion!.id!;
+                                                                                const ocId = productoSeleccionado!.ordenCompraId || null;
+                                                                                const groupKey = ocId ? `oc:${ocId}` : `cot:${cotId}`;
+                                                                                const grupo = productosAgrupados[groupKey];
+                                                                                const labelGrupo = ocId
+                                                                                    ? `OC: ${productoSeleccionado!.ordenCompra?.nombre ?? 'separada'}`
+                                                                                    : 'cotización base';
+                                                                                return (
+                                                                                    <button onClick={() => abrirUploadMasivo(groupKey, estado, req.id, req.nombre)}
+                                                                                        className="inline-flex items-center gap-1.5 text-xs text-purple-600 hover:text-purple-700 dark:text-purple-400 transition-colors"
+                                                                                        title={`Subir a los ${grupo?.productos.length ?? 0} producto(s) de ${labelGrupo}`}>
+                                                                                        <Upload size={12} /> Subir a grupo ({grupo?.productos.length ?? 0})
+                                                                                    </button>
+                                                                                );
+                                                                            })()}
                                                                             {req.adjuntos.length === 0 && <button onClick={() => handleToggleNoAplicaDoc(estado, req.id, true)} className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-colors"><Ban size={12} /> No aplica</button>}
                                                                         </div>
                                                                     )}
@@ -831,6 +877,16 @@ export default function Documents() {
                         <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                             Documento: <strong>{uploadMasivoConfig.requeridoNombre}</strong> · Estado: <strong>{ESTADOS_LABELS[uploadMasivoConfig.estado] || uploadMasivoConfig.estado}</strong>
                         </p>
+                        {(() => {
+                            const grupo = cotizacionParaUpload ? productosAgrupados[cotizacionParaUpload] : null;
+                            if (!grupo) return null;
+                            return (
+                                <p className="text-xs text-gray-500 mb-2">
+                                    Grupo: <strong className="text-gray-700 dark:text-gray-200">{grupo.nombre}</strong>
+                                    {grupo.ordenCompraId && <span className="ml-2 inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">OC separada</span>}
+                                </p>
+                            );
+                        })()}
                         <p className="text-xs text-gray-500 mb-4">Selecciona los productos a los que se aplicará el mismo documento:</p>
 
                         <div className="space-y-2 mb-4 max-h-48 overflow-y-auto">
