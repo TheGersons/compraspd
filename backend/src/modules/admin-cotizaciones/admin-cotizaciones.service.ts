@@ -11,6 +11,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { UpdateCotizacionAdminDto } from './dto/update-cotizacion-admin.dto';
 import { UpdateEstadoProductoAdminDto } from './dto/update-estado-producto-admin.dto';
 import { DeleteCotizacionAdminDto } from './dto/delete-cotizacion-admin.dto';
+import { DeleteEstadoProductoAdminDto } from './dto/delete-estado-producto-admin.dto';
 
 type UserJwt = { sub: string; email?: string; role?: string };
 
@@ -392,7 +393,13 @@ export class AdminCotizacionesService {
 
     const existing = await this.prisma.estadoProducto.findUnique({
       where: { id },
-      select: { id: true, cotizacionDetalleId: true, compraDetalleId: true },
+      select: {
+        id: true,
+        cotizacionId: true,
+        cotizacionDetalleId: true,
+        compraDetalleId: true,
+        ordenCompraId: true,
+      },
     });
     if (!existing) throw new NotFoundException('Producto no encontrado');
 
@@ -410,6 +417,40 @@ export class AdminCotizacionesService {
     if (dto.observaciones !== undefined) data.observaciones = dto.observaciones;
 
     return this.prisma.$transaction(async (tx) => {
+      // Manejo de numeroOC: find-or-create OrdenCompra dentro de la cotización
+      // y vincular. Si numeroOC es null/'', desvincular.
+      if (dto.numeroOC !== undefined) {
+        if (!existing.cotizacionId) {
+          throw new BadRequestException(
+            'No se puede asignar OC: el producto no está vinculado a una cotización',
+          );
+        }
+        if (dto.numeroOC == null || dto.numeroOC === '') {
+          data.ordenCompraId = null;
+        } else {
+          const numero = dto.numeroOC.trim().toUpperCase();
+          let oc = await tx.ordenCompra.findFirst({
+            where: {
+              cotizacionId: existing.cotizacionId,
+              OR: [{ numeroOC: numero }, { nombre: numero }],
+            },
+            select: { id: true },
+          });
+          if (!oc) {
+            oc = await tx.ordenCompra.create({
+              data: {
+                cotizacionId: existing.cotizacionId,
+                nombre: numero,
+                numeroOC: numero,
+                estado: 'ACTIVA',
+              },
+              select: { id: true },
+            });
+          }
+          data.ordenCompraId = oc.id;
+        }
+      }
+
       const updated = await tx.estadoProducto.update({ where: { id }, data });
 
       // Propagar SKU/descripción/cantidad a CotizacionDetalle si existe relación
@@ -448,6 +489,76 @@ export class AdminCotizacionesService {
 
       return updated;
     });
+  }
+
+  // ============================================================================
+  // DELETE ESTADO PRODUCTO (puntual, requiere password)
+  // ============================================================================
+
+  async deleteEstadoProducto(
+    user: UserJwt,
+    id: string,
+    dto: DeleteEstadoProductoAdminDto,
+  ) {
+    this.ensureAdmin(user);
+    await this.verifyPassword(user.sub, dto.password);
+
+    const ep = await this.prisma.estadoProducto.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        sku: true,
+        descripcion: true,
+        cotizacionId: true,
+        cotizacionDetalleId: true,
+        compraDetalleId: true,
+      },
+    });
+    if (!ep) throw new NotFoundException('Producto no encontrado');
+
+    await this.prisma.$transaction(async (tx) => {
+      // Si comparte CotizacionDetalle con otros EP, NO borramos el detalle —
+      // solo este EP. Si es el único, también borramos el detalle (cascade
+      // arrastrará Precios y cualquier otro EP huérfano si lo hubiera).
+      let borrarDetalle = false;
+      if (ep.cotizacionDetalleId) {
+        const hermanos = await tx.estadoProducto.count({
+          where: {
+            cotizacionDetalleId: ep.cotizacionDetalleId,
+            NOT: { id },
+          },
+        });
+        borrarDetalle = hermanos === 0;
+      }
+
+      // Borrar el EstadoProducto (cascade: documentos, justificaciones,
+      // historial de fechas, evidencias).
+      await tx.estadoProducto.delete({ where: { id } });
+
+      // Si era el único EP del CotizacionDetalle, borrar el detalle
+      if (borrarDetalle && ep.cotizacionDetalleId) {
+        await tx.cotizacionDetalle.delete({
+          where: { id: ep.cotizacionDetalleId },
+        });
+      }
+
+      // CompraDetalle: si existe y no quedó referenciado por otros EP
+      if (ep.compraDetalleId) {
+        const refsCD = await tx.estadoProducto.count({
+          where: { compraDetalleId: ep.compraDetalleId },
+        });
+        if (refsCD === 0) {
+          await tx.compraDetalle.delete({ where: { id: ep.compraDetalleId } });
+        }
+      }
+    });
+
+    this.logger.warn(
+      `Admin ${user.sub} eliminó EstadoProducto ${id} ("${ep.sku} — ${ep.descripcion?.slice(0, 60)}")` +
+        (dto.motivo ? `. Motivo: ${dto.motivo}` : ''),
+    );
+
+    return { ok: true, id };
   }
 
   // ============================================================================

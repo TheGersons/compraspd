@@ -4,6 +4,8 @@ import {
   IsUUID,
   IsNumber,
   Min,
+  Matches,
+  ValidateIf,
 } from 'class-validator';
 
 /**
@@ -53,4 +55,11 @@ export class UpdateEstadoProductoAdminDto {
   @IsOptional()
   @IsString()
   observaciones?: string;
+
+  // Número de OC en formato "P00000". Vacío/null = desvincular OC.
+  // Si la OC no existe para esta cotización, se crea automáticamente.
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null && v !== '')
+  @Matches(/^P\d{5}$/, { message: 'Formato de OC inválido. Debe ser P00000' })
+  numeroOC?: string | null;
 }

@@ -178,6 +178,19 @@ const api = {
     }
     return r.json();
   },
+  async deleteProducto(id: string, password: string, motivo?: string) {
+    const token = await getToken();
+    const r = await fetch(`${API_BASE_URL}/api/v1/admin/cotizaciones/estado-producto/${id}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ password, motivo }),
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      throw new Error(e.message || "Error al eliminar el producto");
+    }
+    return r.json();
+  },
   async deleteCotizacion(id: string, password: string, motivo?: string) {
     const token = await getToken();
     const r = await fetch(`${API_BASE_URL}/api/v1/admin/cotizaciones/${id}`, {
@@ -506,6 +519,11 @@ export default function AdminCotizaciones() {
                 toast.success("Producto actualizado");
                 await refrescarDetalle();
               }}
+              onDeleteProducto={async (id, password, motivo) => {
+                await api.deleteProducto(id, password, motivo);
+                toast.success("Producto eliminado");
+                await Promise.all([refrescarDetalle(), cargarLista()]);
+              }}
               onRefrescar={refrescarDetalle}
             />
           ) : null}
@@ -540,12 +558,14 @@ function DetalleEditor({
   catalogos,
   onUpdate,
   onUpdateProducto,
+  onDeleteProducto,
   onRefrescar,
 }: {
   detalle: DetalleCotizacion;
   catalogos: Catalogos | null;
   onUpdate: (data: Record<string, any>) => Promise<void>;
   onUpdateProducto: (id: string, data: Record<string, any>) => Promise<void>;
+  onDeleteProducto: (id: string, password: string, motivo?: string) => Promise<void>;
   onRefrescar: () => Promise<void>;
 }) {
   const [tab, setTab] = useState<"general" | "productos" | "compras" | "chat" | "historial">("general");
@@ -821,7 +841,13 @@ function DetalleEditor({
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                 {detalle.estadosProductos.map((p) => (
-                  <ProductoRow key={p.id} producto={p} catalogos={catalogos} onUpdateProducto={onUpdateProducto} />
+                  <ProductoRow
+                    key={p.id}
+                    producto={p}
+                    catalogos={catalogos}
+                    onUpdateProducto={onUpdateProducto}
+                    onDeleteProducto={onDeleteProducto}
+                  />
                 ))}
               </tbody>
             </table>
@@ -912,13 +938,19 @@ function ProductoRow({
   producto,
   catalogos,
   onUpdateProducto,
+  onDeleteProducto,
 }: {
   producto: EstadoProductoDetalle;
   catalogos: Catalogos | null;
   onUpdateProducto: (id: string, data: Record<string, any>) => Promise<void>;
+  onDeleteProducto: (id: string, password: string, motivo?: string) => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  const ocActual = producto.ordenCompra?.numeroOC ?? producto.ordenCompra?.nombre ?? "";
+
   const [data, setData] = useState({
     sku: producto.sku,
     descripcion: producto.descripcion,
@@ -929,6 +961,7 @@ function ProductoRow({
     monedaId: producto.monedaId ?? "",
     paisOrigenId: producto.paisOrigenId ?? "",
     responsableSeguimientoId: producto.responsableSeguimiento?.id ?? "",
+    numeroOC: ocActual,
   });
 
   const monedas = useMemo(() => (catalogos?.monedas ?? []).map((m) => ({ id: m.id, nombre: `${m.codigo} — ${m.nombre}` })), [catalogos]);
@@ -936,6 +969,12 @@ function ProductoRow({
   const usuarios = useMemo(() => (catalogos?.usuarios ?? []).map((u) => ({ id: u.id, nombre: u.nombre })), [catalogos]);
 
   const guardar = async () => {
+    // Validación de OC: vacío o ^P\d{5}$
+    const ocTrim = data.numeroOC.trim().toUpperCase();
+    if (ocTrim !== "" && !/^P\d{5}$/.test(ocTrim)) {
+      toast.error("Formato de OC inválido. Debe ser P00000 (ej: P19181)");
+      return;
+    }
     setSaving(true);
     try {
       const payload: Record<string, any> = {
@@ -949,6 +988,10 @@ function ProductoRow({
         paisOrigenId: data.paisOrigenId || null,
         responsableSeguimientoId: data.responsableSeguimientoId || null,
       };
+      // Solo incluir numeroOC si cambió respecto al actual (evita reasignaciones innecesarias)
+      if (ocTrim !== ocActual.toUpperCase()) {
+        payload.numeroOC = ocTrim === "" ? null : ocTrim;
+      }
       await onUpdateProducto(producto.id, payload);
       setEditing(false);
     } catch (e: any) {
@@ -960,20 +1003,47 @@ function ProductoRow({
 
   if (!editing) {
     return (
-      <tr className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-        <td className="px-3 py-2 font-mono text-xs">{producto.sku}</td>
-        <td className="px-3 py-2 text-gray-700 dark:text-gray-300">{producto.descripcion}</td>
-        <td className="px-3 py-2 text-right">{producto.cantidad ?? "—"}</td>
-        <td className="px-3 py-2 text-gray-700 dark:text-gray-300">{producto.proveedor ?? "—"}</td>
-        <td className="px-3 py-2 text-right">{fmtDecimal(producto.precioUnitario)}</td>
-        <td className="px-3 py-2 text-right">{fmtDecimal(producto.precioTotal)}</td>
-        <td className="px-3 py-2 text-xs text-gray-500">{producto.ordenCompra?.numeroOC ?? producto.ordenCompra?.nombre ?? "—"}</td>
-        <td className="px-3 py-2 text-right">
-          <button onClick={() => setEditing(true)} className="rounded border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-900/20 dark:text-blue-300">
-            Editar
-          </button>
-        </td>
-      </tr>
+      <>
+        <tr className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+          <td className="px-3 py-2 font-mono text-xs">{producto.sku}</td>
+          <td className="px-3 py-2 text-gray-700 dark:text-gray-300">{producto.descripcion}</td>
+          <td className="px-3 py-2 text-right">{producto.cantidad ?? "—"}</td>
+          <td className="px-3 py-2 text-gray-700 dark:text-gray-300">{producto.proveedor ?? "—"}</td>
+          <td className="px-3 py-2 text-right">{fmtDecimal(producto.precioUnitario)}</td>
+          <td className="px-3 py-2 text-right">{fmtDecimal(producto.precioTotal)}</td>
+          <td className="px-3 py-2 font-mono text-xs text-gray-700 dark:text-gray-300">
+            {ocActual || <span className="text-gray-400">—</span>}
+          </td>
+          <td className="px-3 py-2 text-right">
+            <div className="flex justify-end gap-1">
+              <button
+                onClick={() => setEditing(true)}
+                className="rounded border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
+                title="Editar producto"
+              >
+                Editar
+              </button>
+              <button
+                onClick={() => setConfirmingDelete(true)}
+                className="rounded border border-rose-200 bg-rose-50 p-1 text-rose-700 hover:bg-rose-100 dark:border-rose-700 dark:bg-rose-900/20 dark:text-rose-300"
+                title="Eliminar producto"
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
+          </td>
+        </tr>
+        {confirmingDelete && (
+          <ConfirmacionEliminarProducto
+            producto={producto}
+            onClose={() => setConfirmingDelete(false)}
+            onConfirm={async (password, motivo) => {
+              await onDeleteProducto(producto.id, password, motivo);
+              setConfirmingDelete(false);
+            }}
+          />
+        )}
+      </>
     );
   }
 
@@ -986,7 +1056,15 @@ function ProductoRow({
       <td className="px-2 py-2 text-right"><input type="number" step="any" className="w-24 rounded border px-2 py-1 text-xs text-right" value={data.precioUnitario} onChange={(e) => setData({ ...data, precioUnitario: e.target.value })} /></td>
       <td className="px-2 py-2 text-right"><input type="number" step="any" className="w-24 rounded border px-2 py-1 text-xs text-right" value={data.precioTotal} onChange={(e) => setData({ ...data, precioTotal: e.target.value })} /></td>
       <td className="px-2 py-2">
-        <div className="space-y-1">
+        <input
+          className="w-24 rounded border px-2 py-1 text-xs font-mono uppercase"
+          placeholder="P00000"
+          maxLength={6}
+          value={data.numeroOC}
+          onChange={(e) => setData({ ...data, numeroOC: e.target.value.toUpperCase() })}
+          title="Formato: P seguido de 5 dígitos. Vacío = desvincular OC"
+        />
+        <div className="mt-1 space-y-1">
           <SearchableSelect value={data.monedaId} onChange={(v) => setData({ ...data, monedaId: v })} options={monedas} allLabel="Sin moneda" allValue="" placeholder="Moneda" className="w-full" />
           <SearchableSelect value={data.paisOrigenId} onChange={(v) => setData({ ...data, paisOrigenId: v })} options={paises} allLabel="Sin país" allValue="" placeholder="País" className="w-full" />
           <SearchableSelect value={data.responsableSeguimientoId} onChange={(v) => setData({ ...data, responsableSeguimientoId: v })} options={usuarios} allLabel="Sin responsable" allValue="" placeholder="Responsable" className="w-full" />
@@ -1003,6 +1081,97 @@ function ProductoRow({
         </div>
       </td>
     </tr>
+  );
+}
+
+// ============================================================================
+// Modal de confirmación para eliminar un producto puntual
+// ============================================================================
+
+function ConfirmacionEliminarProducto({
+  producto,
+  onClose,
+  onConfirm,
+}: {
+  producto: EstadoProductoDetalle;
+  onClose: () => void;
+  onConfirm: (password: string, motivo?: string) => Promise<void>;
+}) {
+  const [password, setPassword] = useState("");
+  const [motivo, setMotivo] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const eliminar = async () => {
+    if (!password) return;
+    setSubmitting(true);
+    try {
+      await onConfirm(password, motivo || undefined);
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal isOpen={true} onClose={onClose} className="max-w-md mx-4">
+      <div className="p-5">
+        <div className="mb-3 flex items-center gap-2">
+          <AlertTriangle className="text-rose-500" size={20} />
+          <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+            Eliminar producto
+          </h3>
+        </div>
+
+        <div className="mb-3 rounded-md border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-300">
+          Vas a eliminar el producto <strong className="font-mono">{producto.sku}</strong>{" "}
+          ({producto.descripcion?.slice(0, 60)}). Esta acción borra el detalle de
+          la cotización y, si existe, su detalle de compra. Es irreversible.
+        </div>
+
+        <div className="space-y-2">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
+              Contraseña
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoFocus
+              className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
+              Motivo (opcional)
+            </label>
+            <input
+              type="text"
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              placeholder="Ej: producto duplicado, cargado por error…"
+              className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+            />
+          </div>
+        </div>
+
+        <div className="mt-4 flex justify-end gap-2">
+          <Button onClick={onClose} variant="outline" size="sm">
+            Cancelar
+          </Button>
+          <Button
+            onClick={eliminar}
+            variant="primary"
+            size="sm"
+            disabled={!password || submitting}
+            className="!bg-rose-600 hover:!bg-rose-700"
+          >
+            {submitting ? "Eliminando…" : "Eliminar producto"}
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 

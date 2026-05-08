@@ -15,6 +15,7 @@ import { AdminCotizacionesService } from './admin-cotizaciones.service';
 import { UpdateCotizacionAdminDto } from './dto/update-cotizacion-admin.dto';
 import { UpdateEstadoProductoAdminDto } from './dto/update-estado-producto-admin.dto';
 import { DeleteCotizacionAdminDto } from './dto/delete-cotizacion-admin.dto';
+import { DeleteEstadoProductoAdminDto } from './dto/delete-estado-producto-admin.dto';
 
 type UserJwt = { sub: string; email?: string; role?: string };
 
@@ -78,6 +79,15 @@ export class AdminCotizacionesController {
     @Body() dto: UpdateEstadoProductoAdminDto,
   ) {
     return this.service.updateEstadoProducto(user, id, dto);
+  }
+
+  @Delete('estado-producto/:id')
+  deleteEstadoProducto(
+    @CurrentUser() user: UserJwt,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: DeleteEstadoProductoAdminDto,
+  ) {
+    return this.service.deleteEstadoProducto(user, id, dto);
   }
 
   @Delete(':id')
