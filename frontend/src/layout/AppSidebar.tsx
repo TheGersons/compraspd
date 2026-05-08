@@ -122,8 +122,9 @@ const navItems: NavItem[] = [
     name: "Reportes",
     roles: STAFF_EXT,
     subItems: [
-      { name: "Seguimiento de Compras", path: "/reportes",          pro: false },
-      { name: "Por Producto",           path: "/reportes/productos", pro: false },
+      { name: "Seguimiento de Compras", path: "/reportes",                  pro: false },
+      { name: "Por Producto",           path: "/reportes/productos",        pro: false },
+      { name: "Control de Compras",     path: "/reportes/control-compras",  pro: false },
     ],
   },
 ];

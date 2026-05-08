@@ -9,6 +9,7 @@ type UserJwt = { sub: string; role?: string };
 
 const ESTADOS_FINALES = ['RECHAZADA', 'CANCELADA'];
 const ROLES_PERMITIDOS = ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS', 'GERENCIA'];
+const ROLES_EDICION_CONTROL_COMPRAS = ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'];
 
 const ESTADOS_PRODUCTO_ORDEN = [
   'recibido', 'enCIF', 'segundoSeguimiento', 'conBL',
@@ -19,6 +20,25 @@ const ESTADOS_PRODUCTO_ORDEN = [
 
 function derivarEstatus(ep: any): string {
   return ESTADOS_PRODUCTO_ORDEN.find((k) => ep[k]) ?? 'pendiente';
+}
+
+// Etiquetas agrupadas para el reporte "Control de Compras" (estilo Excel cliente).
+function derivarStatusReporte(ep: any): string {
+  if (ep.recibido) return 'Recibido';
+  if (
+    ep.enCIF ||
+    ep.conBL ||
+    ep.segundoSeguimiento ||
+    ep.cotizacionFleteInternacional ||
+    ep.enFOB ||
+    ep.primerSeguimiento
+  ) {
+    return 'En Coordinación';
+  }
+  if (ep.aprobacionPlanos || ep.pagado || ep.comprado) return 'Fabricación';
+  if (ep.aprobacionCompra) return 'Orden de Compra';
+  if (ep.cotizado || ep.conDescuento) return 'Cotización';
+  return 'Pendiente';
 }
 
 const CAMPO_LABELS: Record<string, string> = {
@@ -379,6 +399,139 @@ export class ReportesService {
       saldoPendiente,
       statusPago,
       actualizado: r.actualizado,
+    };
+  }
+
+  // ── Reporte Control de Compras ────────────────────────────────────────────
+
+  async getFiltrosControlCompras(user: UserJwt) {
+    await this.verificarAcceso(user);
+    const solicitantes = await this.prisma.usuario.findMany({
+      where: {
+        cotizaciones: {
+          some: { estado: { notIn: ESTADOS_FINALES } },
+        },
+      },
+      select: { id: true, nombre: true },
+      orderBy: { nombre: 'asc' },
+    });
+    return { solicitantes };
+  }
+
+  async listarControlCompras(
+    user: UserJwt,
+    filters: { solicitanteId?: string },
+  ) {
+    await this.verificarAcceso(user);
+
+    const cotizacionWhere: any = {
+      estado: { notIn: ESTADOS_FINALES },
+      NOT: { tipo: { nombre: { contains: 'logistica', mode: 'insensitive' } } },
+    };
+
+    if (filters.solicitanteId && filters.solicitanteId !== 'TODOS') {
+      cotizacionWhere.solicitanteId = filters.solicitanteId;
+    }
+
+    const productos = await this.prisma.estadoProducto.findMany({
+      where: {
+        rechazado: false,
+        cotizacionId: { not: null },
+        cotizacion: cotizacionWhere,
+      },
+      include: {
+        proyecto: { select: { id: true, nombre: true } },
+        ordenCompra: { select: { id: true, nombre: true, numeroOC: true } },
+        responsableSeguimiento: { select: { id: true, nombre: true } },
+        cotizacionDetalle: { select: { descripcionProducto: true, cantidad: true } },
+        cotizacion: {
+          select: {
+            id: true,
+            nombreCotizacion: true,
+            estado: true,
+            fechaSolicitud: true,
+            solicitante: { select: { id: true, nombre: true } },
+            supervisorResponsable: { select: { id: true, nombre: true } },
+          },
+        },
+      },
+      orderBy: [
+        { proyecto: { nombre: 'asc' } },
+        { cotizacion: { fechaSolicitud: 'desc' } },
+        { creado: 'desc' },
+      ],
+    });
+
+    return productos.map((ep) => this.mapControlComprasRow(ep));
+  }
+
+  async actualizarFinFabricacion(
+    id: string,
+    fecha: string | null,
+    user: UserJwt,
+  ) {
+    await this.verificarAcceso(user);
+
+    // Gate de edición: solo ADMIN, SUPERVISOR, JEFE_COMPRAS pueden editar
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id: user.sub },
+      include: { rol: true },
+    });
+    const rol = usuario?.rol.nombre.toUpperCase() ?? '';
+    if (!ROLES_EDICION_CONTROL_COMPRAS.includes(rol)) {
+      throw new ForbiddenException(
+        'Solo ADMIN, SUPERVISOR o JEFE_COMPRAS pueden editar esta fecha',
+      );
+    }
+
+    const existe = await this.prisma.estadoProducto.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    if (!existe) {
+      throw new NotFoundException('Producto no encontrado');
+    }
+
+    return this.prisma.estadoProducto.update({
+      where: { id },
+      data: {
+        fechaFinFabricacion: fecha ? new Date(fecha) : null,
+      },
+      select: { id: true, fechaFinFabricacion: true },
+    });
+  }
+
+  private mapControlComprasRow(ep: any) {
+    const descripcion =
+      ep.descripcion ?? ep.cotizacionDetalle?.descripcionProducto ?? '';
+    const encargado =
+      ep.responsableSeguimiento ??
+      ep.cotizacion?.supervisorResponsable ??
+      null;
+
+    return {
+      id: ep.id,
+      proyecto: ep.proyecto ? { id: ep.proyecto.id, nombre: ep.proyecto.nombre } : null,
+      cotizacionNombre: ep.cotizacion?.nombreCotizacion ?? null,
+      solicitante: ep.cotizacion?.solicitante
+        ? { id: ep.cotizacion.solicitante.id, nombre: ep.cotizacion.solicitante.nombre }
+        : null,
+      descripcion,
+      po: ep.ordenCompra?.numeroOC ?? null,
+      fechaEmisionOC: ep.fechaRealAprobacionCompra ?? ep.fechaAprobacionCompra ?? null,
+      fechaPagoAnticipo: ep.fechaRealPagado ?? ep.fechaPagado ?? null,
+      // Editable: si no hay valor manual, default a la fecha límite del 1er seguimiento
+      fechaFinFabricacion: ep.fechaFinFabricacion ?? ep.fechaLimitePrimerSeguimiento ?? null,
+      fechaFinFabricacionEsManual: ep.fechaFinFabricacion != null,
+      fobBase: ep.fechaLimiteEnFOB ?? null,
+      cifBase: ep.fechaLimiteEnCIF ?? null,
+      llegadaBase: ep.fechaLimiteRecibido ?? null,
+      fobReal: ep.fechaRealEnFOB ?? ep.fechaEnFOB ?? null,
+      cifReal: ep.fechaRealEnCIF ?? ep.fechaEnCIF ?? null,
+      llegadaReal: ep.fechaRealRecibido ?? ep.fechaRecibido ?? null,
+      observaciones: ep.observaciones ?? null,
+      status: derivarStatusReporte(ep),
+      encargado: encargado ? { id: encargado.id, nombre: encargado.nombre } : null,
     };
   }
 

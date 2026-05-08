@@ -86,4 +86,32 @@ export class ReportesController {
   ) {
     return this.service.actualizar(id, dto, user);
   }
+
+  // ── Reporte Control de Compras ─────────────────────────────────────────────
+
+  @Get('control-compras/filtros')
+  @ApiOperation({ summary: 'Opciones de filtro para el reporte Control de Compras' })
+  getFiltrosControlCompras(@CurrentUser() user: UserJwt) {
+    return this.service.getFiltrosControlCompras(user);
+  }
+
+  @Get('control-compras')
+  @ApiOperation({ summary: 'Reporte estilo Excel "Control de Compras"' })
+  @ApiQuery({ name: 'solicitanteId', required: false, description: 'UUID del solicitante o "TODOS"' })
+  listarControlCompras(
+    @CurrentUser() user: UserJwt,
+    @Query('solicitanteId') solicitanteId?: string,
+  ) {
+    return this.service.listarControlCompras(user, { solicitanteId });
+  }
+
+  @Patch('control-compras/:id/fin-fabricacion')
+  @ApiOperation({ summary: 'Editar fecha de finalización de fabricación (solo ADMIN/SUPERVISOR/JEFE_COMPRAS)' })
+  actualizarFinFabricacion(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: { fecha: string | null },
+    @CurrentUser() user: UserJwt,
+  ) {
+    return this.service.actualizarFinFabricacion(id, dto?.fecha ?? null, user);
+  }
 }

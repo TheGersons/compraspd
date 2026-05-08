@@ -695,6 +695,9 @@ model EstadoProducto {
   responsableSeguimientoId String?            @map("responsable_seguimiento_id") @db.Uuid
   responsableSeguimiento   Usuario?           @relation("ResponsableSeguimiento", fields: [responsableSeguimientoId], references: [id], onDelete: SetNull)
 
+  // Reporte Control de Compras: fecha editable por usuario
+  fechaFinFabricacion      DateTime?          @map("fecha_fin_fabricacion")
+
   // Documentos adjuntos
   documentosAdjuntos      DocumentoAdjunto[]
   justificacionesNoAplica JustificacionNoAplica[]
