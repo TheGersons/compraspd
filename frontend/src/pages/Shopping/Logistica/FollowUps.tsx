@@ -880,7 +880,12 @@ export default function ShoppingFollowUps() {
 
   const gruposOrdenados = Object.values(productosAgrupados).sort((a, b) => a.nombre.localeCompare(b.nombre));
 
-  // Abrir modal de avance masivo para un grupo de cotización
+  // IDs del grupo abierto en el modal masivo. Fijos al abrir, así el
+  // listado del modal corresponde al grupo (cotización base u OC) y
+  // no a cualquier grupo de la cotización.
+  const [elegiblesAvanceIds, setElegiblesAvanceIds] = useState<string[]>([]);
+
+  // Abrir modal de avance masivo para un grupo
   const abrirAvanceMasivo = async (cotizacionId: string, productosDelGrupo: EstadoProducto[]) => {
     const elegibles = productosDelGrupo.filter(p => p.progreso < 100 && p.siguienteEstado);
     if (elegibles.length === 0) {
@@ -888,6 +893,7 @@ export default function ShoppingFollowUps() {
       return;
     }
     setCotizacionParaAvance(cotizacionId);
+    setElegiblesAvanceIds(elegibles.map(p => p.id));
     setProductosParaAvance(elegibles.map(p => p.id));
     setObservacionMasiva("");
     setVerificacionMasiva({});
@@ -908,10 +914,13 @@ export default function ShoppingFollowUps() {
     setLoadingVerificacionMasiva(false);
   };
 
-  // Obtener productos elegibles agrupados por estado actual
+  // Obtener productos elegibles agrupados por estado actual.
+  // Listo solo los del grupo abierto (elegiblesAvanceIds), no todos los
+  // de la cotización — esto evita que el modal mezcle productos de OCs
+  // distintas o de la base.
   const getElegiblesPorEstado = () => {
-    const grupo = Object.values(productosAgrupados).find(g => g.cotizacionId === cotizacionParaAvance);
-    const elegibles = grupo?.productos.filter(p => p.progreso < 100 && p.siguienteEstado) || [];
+    const idSet = new Set(elegiblesAvanceIds);
+    const elegibles = productos.filter(p => idSet.has(p.id) && p.progreso < 100 && p.siguienteEstado);
     const porEstado: Record<string, EstadoProducto[]> = {};
     for (const p of elegibles) {
       const key = p.estadoActual || 'desconocido';

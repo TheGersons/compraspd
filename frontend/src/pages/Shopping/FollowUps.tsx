@@ -944,7 +944,15 @@ export default function ShoppingFollowUps() {
 
   const gruposOrdenados = Object.values(productosAgrupados).sort((a, b) => a.nombre.localeCompare(b.nombre));
 
-  // Abrir modal de avance masivo para un grupo de cotización
+  // IDs de los productos elegibles del grupo actual del modal masivo.
+  // Se setean al abrir y NO cambian con la (de)selección del usuario,
+  // así getElegiblesPorEstado siempre lista los productos del grupo
+  // correcto (no re-deriva del groupKey y arrastra otra OC).
+  const [elegiblesAvanceIds, setElegiblesAvanceIds] = useState<string[]>([]);
+
+  // Abrir modal de avance masivo para un grupo (cotización base o OC).
+  // El primer parámetro queda como cotizacionId por compatibilidad, pero
+  // el grupo real lo definen los IDs en `productosDelGrupo`.
   const abrirAvanceMasivo = async (cotizacionId: string, productosDelGrupo: EstadoProducto[]) => {
     const elegibles = productosDelGrupo.filter(p => p.progreso < 100 && p.siguienteEstado);
     if (elegibles.length === 0) {
@@ -952,6 +960,7 @@ export default function ShoppingFollowUps() {
       return;
     }
     setCotizacionParaAvance(cotizacionId);
+    setElegiblesAvanceIds(elegibles.map(p => p.id));
     setProductosParaAvance(elegibles.map(p => p.id));
     setObservacionMasiva("");
     setVerificacionMasiva({});
@@ -972,10 +981,13 @@ export default function ShoppingFollowUps() {
     setLoadingVerificacionMasiva(false);
   };
 
-  // Obtener productos elegibles agrupados por estado actual
+  // Obtener productos elegibles agrupados por estado actual.
+  // Se basa en elegiblesAvanceIds (los IDs exactos del grupo abierto)
+  // — no en productosAgrupados.find(cotizacionId), que devolvía el
+  // primer grupo de la cotización y mezclaba productos de otra OC.
   const getElegiblesPorEstado = () => {
-    const grupo = Object.values(productosAgrupados).find(g => g.cotizacionId === cotizacionParaAvance);
-    const elegibles = grupo?.productos.filter(p => p.progreso < 100 && p.siguienteEstado) || [];
+    const idSet = new Set(elegiblesAvanceIds);
+    const elegibles = productos.filter(p => idSet.has(p.id) && p.progreso < 100 && p.siguienteEstado);
     const porEstado: Record<string, EstadoProducto[]> = {};
     for (const p of elegibles) {
       const key = p.estadoActual || 'desconocido';
