@@ -49,6 +49,7 @@ import RejectedQuotes from "./pages/Quotes/Rejectedquotes";
 import Reports from "./pages/Quotes/Reports";
 import ReportesProductos from "./pages/Quotes/ReportesProductos";
 import ReporteControlCompras from "./pages/Quotes/ReporteControlCompras";
+import MiReporteControlCompras from "./pages/Quotes/MiReporteControlCompras";
 import Licitaciones from "./pages/Licitaciones/Licitaciones";
 import Archivadas from "./pages/Licitaciones/Archivadas";
 import OfertasArchivadas from "./pages/Ofertas/OfertasArchivadas";
@@ -186,6 +187,7 @@ export default function App() {
                 <Route path="new" element={<QuotesNew />} />
                 {/* My Quotes - TODOS pueden acceder */}
                 <Route path="my-quotes" element={<MyQuotes />} />
+                <Route path="my-quotes/reporte" element={<MiReporteControlCompras />} />
                 {/* Follow-ups - Solo STAFF */}
                 <Route
                   path="follow-ups"

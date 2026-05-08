@@ -107,6 +107,26 @@ export class ReportesController {
     return this.service.listarControlCompras(user, { solicitanteId, proyectoId });
   }
 
+  @Get('control-compras/mio/filtros')
+  @ApiOperation({ summary: 'Filtros del reporte propio (solo proyectos del solicitante autenticado)' })
+  getFiltrosControlComprasPropias(@CurrentUser() user: UserJwt) {
+    return this.service.getFiltrosControlComprasPropias(user);
+  }
+
+  @Get('control-compras/mio')
+  @ApiOperation({
+    summary: 'Reporte Control de Compras del solicitante autenticado',
+    description:
+      'Devuelve únicamente los productos solicitados por el usuario logueado. Sin gate de rol.',
+  })
+  @ApiQuery({ name: 'proyectoId', required: false })
+  listarControlComprasPropias(
+    @CurrentUser() user: UserJwt,
+    @Query('proyectoId') proyectoId?: string,
+  ) {
+    return this.service.listarControlComprasPropias(user, { proyectoId });
+  }
+
   @Patch('control-compras/:id')
   @ApiOperation({
     summary:

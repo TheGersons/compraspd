@@ -494,6 +494,79 @@ export class ReportesService {
     return productos.map((ep) => this.mapControlComprasRow(ep));
   }
 
+  // ── Reporte Control de Compras (vista PROPIA — sin gate de rol) ───────────
+  // El solicitante autenticado ve únicamente sus propios productos.
+
+  async getFiltrosControlComprasPropias(user: UserJwt) {
+    // Sin verificarAcceso: cualquier autenticado puede pedir los SUYOS.
+    const proyectos = await this.prisma.proyecto.findMany({
+      where: {
+        estado: true,
+        estadosProductos: {
+          some: {
+            rechazado: false,
+            cotizacion: {
+              solicitanteId: user.sub,
+              estado: { notIn: ESTADOS_FINALES },
+            },
+          },
+        },
+      },
+      select: { id: true, nombre: true },
+      orderBy: { nombre: 'asc' },
+    });
+    return { proyectos };
+  }
+
+  async listarControlComprasPropias(
+    user: UserJwt,
+    filters: { proyectoId?: string },
+  ) {
+    const cotizacionWhere: any = {
+      solicitanteId: user.sub,
+      estado: { notIn: ESTADOS_FINALES },
+      NOT: { tipo: { nombre: { contains: 'logistica', mode: 'insensitive' } } },
+    };
+
+    const where: any = {
+      rechazado: false,
+      cotizacionId: { not: null },
+      cotizacion: cotizacionWhere,
+    };
+
+    if (filters.proyectoId && filters.proyectoId !== 'TODOS') {
+      where.proyectoId = filters.proyectoId;
+    }
+
+    const productos = await this.prisma.estadoProducto.findMany({
+      where,
+      include: {
+        proyecto: { select: { id: true, nombre: true } },
+        ordenCompra: { select: { id: true, nombre: true, numeroOC: true } },
+        responsableSeguimiento: { select: { id: true, nombre: true } },
+        cotizacionDetalle: { select: { descripcionProducto: true, cantidad: true } },
+        cotizacion: {
+          select: {
+            id: true,
+            nombreCotizacion: true,
+            estado: true,
+            fechaSolicitud: true,
+            ordenCompra: true,
+            solicitante: { select: { id: true, nombre: true } },
+            supervisorResponsable: { select: { id: true, nombre: true } },
+          },
+        },
+      },
+      orderBy: [
+        { proyecto: { nombre: 'asc' } },
+        { cotizacion: { fechaSolicitud: 'desc' } },
+        { creado: 'desc' },
+      ],
+    });
+
+    return productos.map((ep) => this.mapControlComprasRow(ep));
+  }
+
   // Mapeo del campo expuesto por el reporte → columna real en EstadoProducto.
   // Las "base" se escriben en fechaLimite*; las "real" en fechaReal*. Status y
   // observaciones tienen su propio campo.
