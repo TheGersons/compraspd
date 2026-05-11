@@ -21,6 +21,7 @@ type Reporte = {
   area: string | null;
   tipo: string | null;
   solicitante: string | null;
+  proyecto: string | null;
   descripcionProducto: string;
   statusOC: string | null;
   numeroPO: string;
@@ -402,6 +403,7 @@ export default function Reports() {
         r.descripcionProducto,
         r.solicitante,
         r.area,
+        r.proyecto,
       );
     });
 
@@ -419,6 +421,7 @@ export default function Reports() {
     { key: "estadoCotizacion",     label: "Estado Cot.",          fmt: (v: any) => ESTADO_COT[v]?.label ?? v ?? "" },
     { key: "area",                 label: "Área",                 fmt: (v: any) => v ?? "" },
     { key: "tipo",                 label: "Tipo",                 fmt: (v: any) => v ?? "" },
+    { key: "proyecto",             label: "Proyecto",             fmt: (v: any) => v ?? "" },
     { key: "solicitante",          label: "Solicitante",          fmt: (v: any) => v ?? "" },
     { key: "numeroPO",             label: "#PO",                  fmt: (v: any) => v ?? "" },
     { key: "proveedor",            label: "Proveedor",            fmt: (v: any) => v ?? "" },
@@ -445,13 +448,124 @@ export default function Reports() {
   ] as const;
 
   const exportExcel = () => {
-    const rows = filtered.map((r) =>
-      Object.fromEntries(EXPORT_COLUMNS.map((c) => [c.label, c.fmt((r as any)[c.key])]))
+    // Columnas que deben quedar como Date / Number en el Excel (no string)
+    const DATE_KEYS = new Set([
+      "fechaSolicitud", "fechaContratoFirmado",
+      "fechaPago1", "fechaPago2", "fechaPago3", "fechaPago4",
+    ]);
+    const CURRENCY_KEYS = new Set([
+      "totalPrice", "pago1", "pago2", "pago3", "pago4",
+      "totalPagado", "saldoPendiente",
+    ]);
+
+    const headers = EXPORT_COLUMNS.map((c) => c.label);
+
+    // Filas como AOA con valores en su tipo nativo (no string formateado)
+    // para que Excel los reconozca y permita orden / autosum / etc.
+    const dataRows = filtered.map((r) =>
+      EXPORT_COLUMNS.map((c) => {
+        const raw = (r as any)[c.key];
+        if (raw == null || raw === "") return null;
+        if (DATE_KEYS.has(c.key)) {
+          const d = new Date(raw);
+          return isNaN(d.getTime()) ? null : d;
+        }
+        if (CURRENCY_KEYS.has(c.key)) {
+          const n = Number(raw);
+          return isNaN(n) ? null : n;
+        }
+        // Para el resto, usa el formato definido en la columna
+        return c.fmt(raw);
+      })
     );
-    const ws = XLSX.utils.json_to_sheet(rows);
+
+    // Filas de cabecera del documento (título + meta)
+    const tituloRow = [`Control de Flujo — Cotizaciones y Compras en Proceso`];
+    const metaRow = [
+      `Periodo: ${desde || "—"} → ${hasta || "—"}  ·  ` +
+      `Registros: ${filtered.length}  ·  ` +
+      `Generado: ${new Date().toLocaleDateString("es-HN", { day: "2-digit", month: "long", year: "numeric" })}`,
+    ];
+
+    // Espaciador entre meta y headers
+    const aoa: any[][] = [
+      tituloRow,
+      metaRow,
+      [],
+      headers,
+      ...dataRows,
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+    // Merge para título y meta (que ocupen todas las columnas)
+    const lastCol = headers.length - 1;
+    ws["!merges"] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: lastCol } },
+    ];
+
+    // Anchos de columna basados en el contenido (con min/max razonables)
+    const MIN_WIDTH = 10;
+    const MAX_WIDTH = 38;
+    const cols = EXPORT_COLUMNS.map((c, idx) => {
+      let maxLen = c.label.length;
+      for (const row of dataRows) {
+        const v = row[idx];
+        let len: number;
+        if (v instanceof Date) len = 10;        // "dd/mm/yyyy"
+        else if (v == null) len = 0;
+        else len = String(v).length;
+        if (len > maxLen) maxLen = len;
+      }
+      return { wch: Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, maxLen + 2)) };
+    });
+    ws["!cols"] = cols;
+
+    // Altura de filas: título grande, header un poco más alto
+    ws["!rows"] = [
+      { hpt: 22 }, // título
+      { hpt: 16 }, // meta
+      { hpt: 8 },  // espaciador
+      { hpt: 20 }, // headers
+    ];
+
+    // Freeze: bloquea las primeras 4 filas (título, meta, blanco, headers)
+    ws["!freeze"] = { xSplit: "0", ySplit: "4", topLeftCell: "A5", activePane: "bottomLeft", state: "frozen" } as any;
+    // Algunos lectores prefieren la forma "views"
+    (ws as any)["!views"] = [{ state: "frozen", xSplit: 0, ySplit: 4, topLeftCell: "A5" }];
+
+    // Aplicar formato de número / fecha a cada celda relevante (z = format code)
+    const HEADER_ROW_IDX = 3; // 0-based: titulo=0, meta=1, blanco=2, headers=3, data=4+
+    EXPORT_COLUMNS.forEach((c, idx) => {
+      const isDate = DATE_KEYS.has(c.key);
+      const isCurr = CURRENCY_KEYS.has(c.key);
+      if (!isDate && !isCurr) return;
+      for (let r = HEADER_ROW_IDX + 1; r < aoa.length; r++) {
+        const addr = XLSX.utils.encode_cell({ r, c: idx });
+        const cell = (ws as any)[addr];
+        if (!cell || cell.v == null) continue;
+        if (isDate) {
+          cell.t = "d";
+          cell.z = "dd/mm/yyyy";
+        } else if (isCurr) {
+          cell.t = "n";
+          cell.z = "#,##0.00";
+        }
+      }
+    });
+
+    // Auto-filter en la fila de headers para filtrar/ordenar en Excel
+    ws["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: HEADER_ROW_IDX, c: 0 }, e: { r: HEADER_ROW_IDX, c: lastCol } }) };
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Reportes");
-    XLSX.writeFile(wb, `Reportes_${defaultHasta()}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, "Control de Flujo");
+
+    // Nombre de archivo con rango si aplica
+    const filename = desde && hasta
+      ? `ControlFlujo_${desde}_a_${hasta}.xlsx`
+      : `ControlFlujo_${defaultHasta()}.xlsx`;
+    XLSX.writeFile(wb, filename);
   };
 
   const exportPDF = () => {
@@ -631,6 +745,7 @@ export default function Reports() {
                   <th className={th}>Órdenes de Compra</th>
                   <th className={th}>Estado Cot.</th>
                   <th className={th}>Área / Tipo</th>
+                  <th className={th}>Proyecto</th>
                   <th className={th}>Solicitante</th>
                   <th className={th}>#PO</th>
                   <th className={th}>Proveedor</th>
@@ -726,6 +841,13 @@ export default function Reports() {
                           {r.tipo && <span className="text-xs text-gray-400 dark:text-gray-500">{r.tipo}</span>}
                           {!r.area && !r.tipo && <span className="text-xs text-gray-300 dark:text-gray-600">—</span>}
                         </div>
+                      </td>
+
+                      {/* Proyecto — auto */}
+                      <td className={td}>
+                        <span className="block max-w-[160px] truncate text-xs text-gray-600 dark:text-gray-300" title={r.proyecto ?? ""}>
+                          {r.proyecto || <span className="text-gray-300 dark:text-gray-600">—</span>}
+                        </span>
                       </td>
 
                       {/* Solicitante — auto */}
