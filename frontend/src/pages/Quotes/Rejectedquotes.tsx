@@ -272,9 +272,13 @@ export default function RejectedQuotes() {
                                                             </td>
                                                             <td className="px-4 py-3 text-center">
                                                                 <button
+                                                                    onClick={() => handleRevertir(p.id)}
+                                                                    disabled={actionLoading === p.id}
                                                                     className="inline-flex items-center gap-1 rounded-lg border border-orange-300 px-2.5 py-1 text-xs font-medium text-orange-600 hover:bg-orange-50 disabled:opacity-50 dark:border-orange-600 dark:text-orange-400 dark:hover:bg-orange-900/20"
+                                                                    title="Devolver al seguimiento normal"
                                                                 >
-                                                                    Disponibles en proxima actualizacion
+                                                                    <Undo2 size={12} />
+                                                                    {actionLoading === p.id ? "Revirtiendo…" : "Devolver a seguimiento"}
                                                                 </button>
                                                             </td>
                                                         </tr>

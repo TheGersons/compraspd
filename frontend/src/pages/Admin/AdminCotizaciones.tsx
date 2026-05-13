@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import toast from "react-hot-toast";
-import { Search, Trash2, Edit3, X, AlertTriangle, RefreshCw } from "lucide-react";
+import { Search, Trash2, Edit3, X, AlertTriangle, RefreshCw, Undo2, ThumbsDown } from "lucide-react";
 import { Modal } from "../../components/ui/modal";
 import { SearchableSelect } from "../../components/ui/searchable-select";
 import Button from "../../components/ui/button/Button";
@@ -106,6 +106,9 @@ interface EstadoProductoDetalle {
   responsableSeguimiento: { id: string; nombre: string } | null;
   estadoGeneral: string;
   criticidad: number;
+  rechazado: boolean;
+  motivoRechazo: string | null;
+  fechaRechazo: string | null;
   ordenCompra: { id: string; nombre: string; numeroOC: string | null } | null;
 }
 
@@ -201,6 +204,18 @@ const api = {
     if (!r.ok) {
       const e = await r.json().catch(() => ({}));
       throw new Error(e.message || "Error al eliminar la cotización");
+    }
+    return r.json();
+  },
+  async revertirRechazo(id: string) {
+    const token = await getToken();
+    const r = await fetch(`${API_BASE_URL}/api/v1/estado-productos/${id}/revertir-rechazo`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      throw new Error(e.message || "Error al revertir el rechazo");
     }
     return r.json();
   },
@@ -524,6 +539,11 @@ export default function AdminCotizaciones() {
                 toast.success("Producto eliminado");
                 await Promise.all([refrescarDetalle(), cargarLista()]);
               }}
+              onRevertirRechazo={async (id) => {
+                await api.revertirRechazo(id);
+                toast.success("Producto devuelto al seguimiento");
+                await refrescarDetalle();
+              }}
               onRefrescar={refrescarDetalle}
             />
           ) : null}
@@ -559,6 +579,7 @@ function DetalleEditor({
   onUpdate,
   onUpdateProducto,
   onDeleteProducto,
+  onRevertirRechazo,
   onRefrescar,
 }: {
   detalle: DetalleCotizacion;
@@ -566,6 +587,7 @@ function DetalleEditor({
   onUpdate: (data: Record<string, any>) => Promise<void>;
   onUpdateProducto: (id: string, data: Record<string, any>) => Promise<void>;
   onDeleteProducto: (id: string, password: string, motivo?: string) => Promise<void>;
+  onRevertirRechazo: (id: string) => Promise<void>;
   onRefrescar: () => Promise<void>;
 }) {
   const [tab, setTab] = useState<"general" | "productos" | "compras" | "chat" | "historial">("general");
@@ -836,6 +858,7 @@ function DetalleEditor({
                   <th className="px-3 py-2 text-right font-semibold text-gray-700 dark:text-gray-200">Precio Unit.</th>
                   <th className="px-3 py-2 text-right font-semibold text-gray-700 dark:text-gray-200">Precio Total</th>
                   <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-200">OC</th>
+                  <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-200">Estado</th>
                   <th className="px-3 py-2 text-right font-semibold text-gray-700 dark:text-gray-200">Acciones</th>
                 </tr>
               </thead>
@@ -847,6 +870,7 @@ function DetalleEditor({
                     catalogos={catalogos}
                     onUpdateProducto={onUpdateProducto}
                     onDeleteProducto={onDeleteProducto}
+                    onRevertirRechazo={onRevertirRechazo}
                   />
                 ))}
               </tbody>
@@ -939,15 +963,30 @@ function ProductoRow({
   catalogos,
   onUpdateProducto,
   onDeleteProducto,
+  onRevertirRechazo,
 }: {
   producto: EstadoProductoDetalle;
   catalogos: Catalogos | null;
   onUpdateProducto: (id: string, data: Record<string, any>) => Promise<void>;
   onDeleteProducto: (id: string, password: string, motivo?: string) => Promise<void>;
+  onRevertirRechazo: (id: string) => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [revirtiendo, setRevirtiendo] = useState(false);
+
+  const handleRevertir = async () => {
+    if (!confirm("¿Devolver este producto al seguimiento normal? Se borrarán el motivo y la fecha de rechazo.")) return;
+    setRevirtiendo(true);
+    try {
+      await onRevertirRechazo(producto.id);
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setRevirtiendo(false);
+    }
+  };
 
   const ocActual = producto.ordenCompra?.numeroOC ?? producto.ordenCompra?.nombre ?? "";
 
@@ -1014,8 +1053,39 @@ function ProductoRow({
           <td className="px-3 py-2 font-mono text-xs text-gray-700 dark:text-gray-300">
             {ocActual || <span className="text-gray-400">—</span>}
           </td>
+          <td className="px-3 py-2">
+            {producto.rechazado ? (
+              <div className="flex flex-col gap-0.5">
+                <span className="inline-flex w-fit items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                  <ThumbsDown size={10} /> Rechazado
+                </span>
+                {producto.motivoRechazo && (
+                  <span className="flex items-start gap-1 text-xs text-red-600 dark:text-red-400" title={producto.motivoRechazo}>
+                    <AlertTriangle size={10} className="mt-0.5 shrink-0" />
+                    <span className="line-clamp-2 max-w-[180px]">{producto.motivoRechazo}</span>
+                  </span>
+                )}
+                {producto.fechaRechazo && (
+                  <span className="text-[10px] text-gray-500">{fmt(producto.fechaRechazo)}</span>
+                )}
+              </div>
+            ) : (
+              <span className="text-xs text-gray-400">—</span>
+            )}
+          </td>
           <td className="px-3 py-2 text-right">
             <div className="flex justify-end gap-1">
+              {producto.rechazado && (
+                <button
+                  onClick={handleRevertir}
+                  disabled={revirtiendo}
+                  className="inline-flex items-center gap-1 rounded border border-orange-300 bg-orange-50 px-2 py-1 text-xs font-medium text-orange-700 hover:bg-orange-100 disabled:opacity-50 dark:border-orange-600 dark:bg-orange-900/20 dark:text-orange-300"
+                  title="Devolver al seguimiento normal"
+                >
+                  <Undo2 size={12} />
+                  {revirtiendo ? "…" : "Devolver"}
+                </button>
+              )}
               <button
                 onClick={() => setEditing(true)}
                 className="rounded border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
@@ -1070,6 +1140,7 @@ function ProductoRow({
           <SearchableSelect value={data.responsableSeguimientoId} onChange={(v) => setData({ ...data, responsableSeguimientoId: v })} options={usuarios} allLabel="Sin responsable" allValue="" placeholder="Responsable" className="w-full" />
         </div>
       </td>
+      <td className="px-2 py-2 text-xs text-gray-400">—</td>
       <td className="px-2 py-2 text-right">
         <div className="flex justify-end gap-1">
           <button disabled={saving} onClick={guardar} className="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50">
