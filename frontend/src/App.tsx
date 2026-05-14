@@ -325,31 +325,10 @@ export default function App() {
                 }
               />
 
-              {/* REPORTES - Solo STAFF */}
-              <Route
-                path="/reportes"
-                element={
-                  <ProtectedRoute roles={STAFF_ROLES}>
-                    <Reports />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/reportes/productos"
-                element={
-                  <ProtectedRoute roles={STAFF_ROLES}>
-                    <ReportesProductos />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/reportes/control-compras"
-                element={
-                  <ProtectedRoute roles={STAFF_ROLES}>
-                    <ReporteControlCompras />
-                  </ProtectedRoute>
-                }
-              />
+              {/* REPORTES - Abierto a todos los autenticados; la edición se restringe dentro de cada página */}
+              <Route path="/reportes" element={<Reports />} />
+              <Route path="/reportes/productos" element={<ReportesProductos />} />
+              <Route path="/reportes/control-compras" element={<ReporteControlCompras />} />
 
               {/* PROVEEDORES - Solo STAFF */}
               <Route

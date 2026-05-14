@@ -2,11 +2,13 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import PageMeta from "../../components/common/PageMeta";
 import { getToken } from "../../lib/api";
 import { matchesSearch } from "../../utils/utils";
+import { useAuth } from "../../context/AuthContext";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const ROLES_EDICION = ["ADMIN", "SUPERVISOR", "JEFE_COMPRAS"];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -140,9 +142,17 @@ function TextCell({ value, onSave, disabled }: { value: string | null; onSave: (
   );
 }
 
-function LongTextCell({ value, onSave }: { value: string | null; onSave: (v: string | null) => void }) {
+function LongTextCell({ value, onSave, disabled }: { value: string | null; onSave: (v: string | null) => void; disabled?: boolean }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(value ?? "");
+
+  if (disabled) {
+    return (
+      <span className="block max-w-[160px] truncate text-xs text-gray-400" title={value ?? ""}>
+        {value || "—"}
+      </span>
+    );
+  }
 
   return (
     <>
@@ -180,12 +190,20 @@ function LongTextCell({ value, onSave }: { value: string | null; onSave: (v: str
   );
 }
 
-function MoneyCell({ value, onSave }: { value: number | null; onSave: (v: number | null) => void }) {
+function MoneyCell({ value, onSave, disabled }: { value: number | null; onSave: (v: number | null) => void; disabled?: boolean }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value != null ? String(value) : "");
   const ref = useRef<HTMLInputElement>(null);
 
   useEffect(() => { if (editing) ref.current?.select(); }, [editing]);
+
+  if (disabled) {
+    return (
+      <span className="block text-xs text-gray-400">
+        {value != null ? fmtMoney(value) : "—"}
+      </span>
+    );
+  }
 
   if (!editing) {
     return (
@@ -217,11 +235,19 @@ function MoneyCell({ value, onSave }: { value: number | null; onSave: (v: number
   );
 }
 
-function DateCell({ value, onSave }: { value: string | null; onSave: (v: string | null) => void }) {
+function DateCell({ value, onSave, disabled }: { value: string | null; onSave: (v: string | null) => void; disabled?: boolean }) {
   const [editing, setEditing] = useState(false);
   const ref = useRef<HTMLInputElement>(null);
 
   useEffect(() => { if (editing) ref.current?.showPicker?.(); }, [editing]);
+
+  if (disabled) {
+    return (
+      <span className="block text-xs text-gray-400">
+        {value ? fmtDate(value) : "—"}
+      </span>
+    );
+  }
 
   if (!editing) {
     return (
@@ -331,6 +357,9 @@ const ESTADO_COT: Record<string, { label: string; cls: string }> = {
 };
 
 export default function Reports() {
+  const { user } = useAuth();
+  const puedeEditar = ROLES_EDICION.includes((user as any)?.rol?.nombre?.toUpperCase?.() ?? "");
+
   const [reportes, setReportes] = useState<Reporte[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -365,6 +394,7 @@ export default function Reports() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleSave = useCallback(async (reporteId: string, campo: string, valor: any) => {
+    if (!puedeEditar) return;
     setSaving(reporteId);
     try {
       await apiFetch(`/api/v1/reportes/${reporteId}`, {
@@ -377,7 +407,7 @@ export default function Reports() {
     } finally {
       setSaving(null);
     }
-  }, []);
+  }, [puedeEditar]);
 
   // Recalcular campos derivados en cliente para feedback inmediato
   const withCalc = (r: Reporte): Reporte => {
@@ -727,10 +757,17 @@ export default function Reports() {
             <span>
               {filtered.length === 0 ? "0 registros" : `${(safePage - 1) * PAGE_SIZE + 1}–${Math.min(safePage * PAGE_SIZE, filtered.length)} de ${filtered.length} registro${filtered.length !== 1 ? "s" : ""}`}
             </span>
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block h-2 w-2 rounded-full bg-blue-400" />
-              Celdas azules = editables
-            </span>
+            {puedeEditar ? (
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-2 w-2 rounded-full bg-blue-400" />
+                Celdas azules = editables
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+                <span className="inline-block h-2 w-2 rounded-full bg-amber-400" />
+                Vista de solo lectura
+              </span>
+            )}
             {saving && <span className="text-blue-500">Guardando…</span>}
           </div>
 
@@ -857,17 +894,17 @@ export default function Reports() {
 
                       {/* #PO — editable */}
                       <td className={td}>
-                        <TextCell value={r.numeroPO} onSave={(v) => handleSave(r.id, "numeroPO", v ?? "-")} />
+                        <TextCell value={r.numeroPO} onSave={(v) => handleSave(r.id, "numeroPO", v ?? "-")} disabled={!puedeEditar} />
                       </td>
 
                       {/* Proveedor — editable */}
                       <td className={td}>
-                        <TextCell value={r.proveedor} onSave={(v) => handleSave(r.id, "proveedor", v)} />
+                        <TextCell value={r.proveedor} onSave={(v) => handleSave(r.id, "proveedor", v)} disabled={!puedeEditar} />
                       </td>
 
                       {/* Origen — editable */}
                       <td className={td}>
-                        <TextCell value={r.origen} onSave={(v) => handleSave(r.id, "origen", v)} />
+                        <TextCell value={r.origen} onSave={(v) => handleSave(r.id, "origen", v)} disabled={!puedeEditar} />
                       </td>
 
                       {/* Descripción — auto */}
@@ -879,7 +916,7 @@ export default function Reports() {
 
                       {/* EPD/EPS — editable */}
                       <td className={td}>
-                        <TextCell value={r.epdEps} onSave={(v) => handleSave(r.id, "epdEps", v)} />
+                        <TextCell value={r.epdEps} onSave={(v) => handleSave(r.id, "epdEps", v)} disabled={!puedeEditar} />
                       </td>
 
                       {/* Status OC — auto */}
@@ -895,54 +932,54 @@ export default function Reports() {
 
                       {/* Total Price — editable */}
                       <td className={td}>
-                        <MoneyCell value={r.totalPrice} onSave={(v) => handleSave(r.id, "totalPrice", v)} />
+                        <MoneyCell value={r.totalPrice} onSave={(v) => handleSave(r.id, "totalPrice", v)} disabled={!puedeEditar} />
                       </td>
 
                       {/* Fecha contrato — editable */}
                       <td className={td}>
-                        <DateCell value={r.fechaContratoFirmado} onSave={(v) => handleSave(r.id, "fechaContratoFirmado", v)} />
+                        <DateCell value={r.fechaContratoFirmado} onSave={(v) => handleSave(r.id, "fechaContratoFirmado", v)} disabled={!puedeEditar} />
                       </td>
 
                       {/* Términos pago — editable */}
                       <td className={td}>
-                        <TextCell value={r.terminosPago} onSave={(v) => handleSave(r.id, "terminosPago", v)} />
+                        <TextCell value={r.terminosPago} onSave={(v) => handleSave(r.id, "terminosPago", v)} disabled={!puedeEditar} />
                       </td>
 
                       {/* Observaciones — long text */}
                       <td className={td}>
-                        <LongTextCell value={r.observaciones} onSave={(v) => handleSave(r.id, "observaciones", v)} />
+                        <LongTextCell value={r.observaciones} onSave={(v) => handleSave(r.id, "observaciones", v)} disabled={!puedeEditar} />
                       </td>
 
                       {/* 1er Pago */}
                       <td className={td}>
-                        <MoneyCell value={r.pago1} onSave={(v) => handleSave(r.id, "pago1", v)} />
+                        <MoneyCell value={r.pago1} onSave={(v) => handleSave(r.id, "pago1", v)} disabled={!puedeEditar} />
                       </td>
                       <td className={td}>
-                        <DateCell value={r.fechaPago1} onSave={(v) => handleSave(r.id, "fechaPago1", v)} />
+                        <DateCell value={r.fechaPago1} onSave={(v) => handleSave(r.id, "fechaPago1", v)} disabled={!puedeEditar} />
                       </td>
 
                       {/* 2do Pago */}
                       <td className={td}>
-                        <MoneyCell value={r.pago2} onSave={(v) => handleSave(r.id, "pago2", v)} />
+                        <MoneyCell value={r.pago2} onSave={(v) => handleSave(r.id, "pago2", v)} disabled={!puedeEditar} />
                       </td>
                       <td className={td}>
-                        <DateCell value={r.fechaPago2} onSave={(v) => handleSave(r.id, "fechaPago2", v)} />
+                        <DateCell value={r.fechaPago2} onSave={(v) => handleSave(r.id, "fechaPago2", v)} disabled={!puedeEditar} />
                       </td>
 
                       {/* 3er Pago */}
                       <td className={td}>
-                        <MoneyCell value={r.pago3} onSave={(v) => handleSave(r.id, "pago3", v)} />
+                        <MoneyCell value={r.pago3} onSave={(v) => handleSave(r.id, "pago3", v)} disabled={!puedeEditar} />
                       </td>
                       <td className={td}>
-                        <DateCell value={r.fechaPago3} onSave={(v) => handleSave(r.id, "fechaPago3", v)} />
+                        <DateCell value={r.fechaPago3} onSave={(v) => handleSave(r.id, "fechaPago3", v)} disabled={!puedeEditar} />
                       </td>
 
                       {/* 4to Pago */}
                       <td className={td}>
-                        <MoneyCell value={r.pago4} onSave={(v) => handleSave(r.id, "pago4", v)} />
+                        <MoneyCell value={r.pago4} onSave={(v) => handleSave(r.id, "pago4", v)} disabled={!puedeEditar} />
                       </td>
                       <td className={td}>
-                        <DateCell value={r.fechaPago4} onSave={(v) => handleSave(r.id, "fechaPago4", v)} />
+                        <DateCell value={r.fechaPago4} onSave={(v) => handleSave(r.id, "fechaPago4", v)} disabled={!puedeEditar} />
                       </td>
 
                       {/* Total pagado — auto */}
@@ -974,7 +1011,7 @@ export default function Reports() {
 
                       {/* Comentarios — long text */}
                       <td className={td}>
-                        <LongTextCell value={r.comentarios} onSave={(v) => handleSave(r.id, "comentarios", v)} />
+                        <LongTextCell value={r.comentarios} onSave={(v) => handleSave(r.id, "comentarios", v)} disabled={!puedeEditar} />
                       </td>
                     </tr>
                   );

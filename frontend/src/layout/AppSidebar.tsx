@@ -54,7 +54,6 @@ const navItems: NavItem[] = [
     icon: <PieChartIcon />,
     name: "Inicio",
     path: "/dashboard",
-    roles: STAFF_EXT,
   },
   {
     icon: <DocsIcon />,
@@ -120,7 +119,6 @@ const navItems: NavItem[] = [
   {
     icon: <BoxCubeIcon />,
     name: "Reportes",
-    roles: STAFF_EXT,
     subItems: [
       { name: "Seguimiento de Compras", path: "/reportes",                  pro: false },
       { name: "Por Producto",           path: "/reportes/productos",        pro: false },

@@ -8,8 +8,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 type UserJwt = { sub: string; role?: string };
 
 const ESTADOS_FINALES = ['RECHAZADA', 'CANCELADA'];
-const ROLES_PERMITIDOS = ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS', 'GERENCIA'];
-const ROLES_EDICION_CONTROL_COMPRAS = ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'];
+const ROLES_EDICION = ['ADMIN', 'SUPERVISOR', 'JEFE_COMPRAS'];
 
 const ESTADOS_PRODUCTO_ORDEN = [
   'recibido', 'enCIF', 'segundoSeguimiento', 'conBL',
@@ -80,14 +79,20 @@ const CAMPO_LABELS: Record<string, string> = {
 export class ReportesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private async verificarAcceso(user: UserJwt) {
+  /**
+   * Valida que el usuario pueda EDITAR (PATCH) los reportes.
+   * La lectura (GET) está abierta a cualquier autenticado.
+   */
+  private async verificarEdicion(user: UserJwt) {
     const usuario = await this.prisma.usuario.findUnique({
       where: { id: user.sub },
       include: { rol: true },
     });
     const rol = usuario?.rol.nombre.toUpperCase() ?? '';
-    if (!ROLES_PERMITIDOS.includes(rol)) {
-      throw new ForbiddenException('Acceso restringido a supervisores y gerencia');
+    if (!ROLES_EDICION.includes(rol)) {
+      throw new ForbiddenException(
+        'Solo ADMIN, SUPERVISOR o JEFE_COMPRAS pueden editar este reporte',
+      );
     }
     return usuario!;
   }
@@ -101,7 +106,7 @@ export class ReportesService {
     user: UserJwt,
     filters?: { desde?: string; hasta?: string },
   ) {
-    await this.verificarAcceso(user);
+    void user;
 
     const where: any = {
       estado: { notIn: ESTADOS_FINALES },
@@ -165,7 +170,7 @@ export class ReportesService {
    * Historial de cambios de un reporte
    */
   async getLogs(reporteId: string, user: UserJwt) {
-    await this.verificarAcceso(user);
+    void user;
 
     const logs = await this.prisma.reporteCompraLog.findMany({
       where: { reporteId },
@@ -188,7 +193,7 @@ export class ReportesService {
    * Actualiza campos editables y registra el log
    */
   async actualizar(reporteId: string, dto: Record<string, any>, user: UserJwt) {
-    await this.verificarAcceso(user);
+    await this.verificarEdicion(user);
 
     const reporte = await this.prisma.reporteCompra.findUnique({
       where: { id: reporteId },
@@ -238,7 +243,7 @@ export class ReportesService {
   // ── Reporte por producto ──────────────────────────────────────────────────
 
   async getFiltrosProductos(user: UserJwt) {
-    await this.verificarAcceso(user);
+    void user;
     const [proyectos, responsables] = await Promise.all([
       this.prisma.proyecto.findMany({
         where: { estado: true },
@@ -268,7 +273,7 @@ export class ReportesService {
       descripcion?: string;
     },
   ) {
-    await this.verificarAcceso(user);
+    void user;
 
     const cotizacionWhere: any = {
       estado: { notIn: ESTADOS_FINALES },
@@ -420,7 +425,7 @@ export class ReportesService {
   // ── Reporte Control de Compras ────────────────────────────────────────────
 
   async getFiltrosControlCompras(user: UserJwt) {
-    await this.verificarAcceso(user);
+    void user;
     const [solicitantes, proyectos] = await Promise.all([
       this.prisma.usuario.findMany({
         where: {
@@ -444,7 +449,7 @@ export class ReportesService {
     user: UserJwt,
     filters: { solicitanteId?: string; proyectoId?: string },
   ) {
-    await this.verificarAcceso(user);
+    void user;
 
     const cotizacionWhere: any = {
       estado: { notIn: ESTADOS_FINALES },
@@ -592,18 +597,7 @@ export class ReportesService {
     dto: Record<string, any>,
     user: UserJwt,
   ) {
-    await this.verificarAcceso(user);
-
-    const usuario = await this.prisma.usuario.findUnique({
-      where: { id: user.sub },
-      include: { rol: true },
-    });
-    const rol = usuario?.rol.nombre.toUpperCase() ?? '';
-    if (!ROLES_EDICION_CONTROL_COMPRAS.includes(rol)) {
-      throw new ForbiddenException(
-        'Solo ADMIN, SUPERVISOR o JEFE_COMPRAS pueden editar este reporte',
-      );
-    }
+    await this.verificarEdicion(user);
 
     const existe = await this.prisma.estadoProducto.findUnique({
       where: { id },
